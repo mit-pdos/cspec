@@ -3,3 +3,5 @@
 DecidableEquality.v
 Automation.v
 Mem.v
+Bytes.v
+Prog.v
