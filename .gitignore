@@ -1,0 +1,7 @@
+/Makefile.coq
+# emacs
+*.aux
+# Coq compiled files
+*.vo
+*.v.d
+*.glob
