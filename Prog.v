@@ -12,12 +12,11 @@ Inductive diskId := d0 | d1 | d2.
 
 (** A [prog T] is a program that executes to a T-typed result. Programs may
 manipulate disks with the primitive Read, Write, and Sync opcodes. *)
-Inductive prog : Type -> Type :=
-| Read (i:diskId) (a:addr) : prog block
-| Write (i:diskId) (a:addr) (b:block) : prog unit
-| Sync (i:diskId) : prog unit
-| Ret T (v:T) : prog T
-| Bind T T' (p: prog T) (p': T -> prog T') : prog T'.
+Inductive prog3 : Type -> Type :=
+| Read (i:diskId) (a:addr) : prog3 block
+| Write (i:diskId) (a:addr) (b:block) : prog3 unit
+| Ret T (v:T) : prog3 T
+| Bind T T' (p: prog3 T) (p': T -> prog3 T') : prog3 T'.
 
 Definition disk := mem addr block.
 
@@ -57,7 +56,7 @@ Arguments NonDet {T}.
 
 (** [step] gives each primitive operation a semantics by specifying how the
 state is transformed and giving a return value of the appropriate type. *)
-Definition step T (p:prog T) (sigma:Sigma) : StepResult T :=
+Definition step T (p:prog3 T) (sigma:Sigma) : StepResult T :=
   match p with
   | Read i a =>
     match (disk_id i sigma) a with
@@ -70,7 +69,6 @@ Definition step T (p:prog T) (sigma:Sigma) : StepResult T :=
                StepTo tt sigma'
     | None => Fails
     end
-  | Sync _ => StepTo tt sigma
   | Ret v => StepTo v sigma
   | Bind _ _ => NonDet
   end.
@@ -93,24 +91,24 @@ Arguments Failed {T}.
 behavior of each individual instruction given by [step] with [Bind], which
 sequentially composes programs, and crashes, which can expose any intermediate
 state of a program. *)
-Inductive exec : forall T, prog T -> Sigma -> Result T -> Prop :=
-| ExecStepTo : forall T (p:prog T) sigma v sigma',
+Inductive exec : forall T, prog3 T -> Sigma -> Result T -> Prop :=
+| ExecStepTo : forall T (p:prog3 T) sigma v sigma',
     step p sigma = StepTo v sigma' ->
     exec p sigma (Finished v sigma')
-| ExecStepFail : forall T (p:prog T) sigma,
+| ExecStepFail : forall T (p:prog3 T) sigma,
     step p sigma = Fails ->
     exec p sigma Failed
-| ExecCrashBefore : forall T (p: prog T) sigma,
+| ExecCrashBefore : forall T (p: prog3 T) sigma,
     exec p sigma (Crashed sigma)
-| ExecCrashAfter : forall T (p: prog T) sigma v sigma',
+| ExecCrashAfter : forall T (p: prog3 T) sigma v sigma',
     step p sigma = StepTo v sigma' ->
     exec p sigma (Crashed sigma')
-| ExecBindFinished : forall T T' (p: prog T) (p': T -> prog T')
+| ExecBindFinished : forall T T' (p: prog3 T) (p': T -> prog3 T')
                      sigma v sigma' r,
     exec p sigma (Finished v sigma') ->
     exec (p' v) sigma' r ->
     exec (Bind p p') sigma r
-| ExecBindCrashed : forall T T' (p: prog T) (p': T -> prog T')
+| ExecBindCrashed : forall T T' (p: prog3 T) (p': T -> prog3 T')
                    sigma sigma',
     (* Note: this introduces some executions redundant with ExecCrashBefore,
     since the bind can directly crash using ExecCrashBefore or its first
@@ -118,10 +116,16 @@ Inductive exec : forall T, prog T -> Sigma -> Result T -> Prop :=
     constructor. *)
     exec p sigma (Crashed sigma') ->
     exec (Bind p p') sigma (Crashed sigma')
-| ExecBindFailed : forall T T' (p: prog T) (p': T -> prog T')
+| ExecBindFailed : forall T T' (p: prog3 T) (p': T -> prog3 T')
                    sigma,
     exec p sigma Failed ->
     exec (Bind p p') sigma Failed.
+
+Notation "x <- p1 ; p2" := (Bind p1 (fun x => p2))
+                            (at level 60, right associativity).
+Notation "'do' x .. y <- p1 ; p2" := (Bind p1 (fun x => .. (fun y => p2) ..))
+                                      (at level 60, right associativity,
+                                       x binder, y binder, only parsing).
 
 (* Local Variables: *)
 (* company-coq-local-symbols: (("Sigma" . ?Σ) ("sigma" . ?σ) ("sigma'" . (?σ (Br . Bl) ?'))) *)

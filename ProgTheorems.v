@@ -6,7 +6,7 @@ Require Import ProofIrrelevance.
 
 Hint Constructors exec.
 
-Theorem can_crash_at_begin : forall T (p: prog T) sigma,
+Theorem can_crash_at_begin : forall T (p: prog3 T) sigma,
     exec p sigma (Crashed sigma).
 Proof.
   eauto.
@@ -25,7 +25,7 @@ Ltac inv_exec :=
     repeat inj_pair2
   end.
 
-Theorem can_crash_at_end : forall T (p: prog T) sigma v sigma',
+Theorem can_crash_at_end : forall T (p: prog3 T) sigma v sigma',
     exec p sigma (Finished v sigma') ->
     exec p sigma (Crashed sigma').
 Proof.
