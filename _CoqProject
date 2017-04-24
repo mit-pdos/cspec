@@ -5,3 +5,4 @@ Automation.v
 Mem.v
 Bytes.v
 Prog.v
+ProgTheorems.v
