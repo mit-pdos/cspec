@@ -1,7 +1,7 @@
 Require Import Coq.Program.Equality.
+Require Import EquivDec.
 
 Require Import Automation.
-Require Import DecidableEquality.
 Require Import Prog.
 Require SequentialDisk.
 
@@ -13,10 +13,10 @@ disks for replication. *)
 (** vote picks any one of [a1], [a2] and [a3] if it is equal to at least one
 other; this implementation is non-trivial, but a more obvious correctness proof
 is given below. *)
-Definition vote A {AEQ:EqDec A} (a1 a2 a3:A) : A :=
-  if is_eq a2 a3 then a2 else a1.
+Definition vote A {AEQ:EqDec A eq} (a1 a2 a3:A) : A :=
+  if a2 == a3 then a2 else a1.
 
-Theorem vote_spec : forall A (AEQ:EqDec A) a1 a2 a3,
+Theorem vote_spec : forall A (AEQ:EqDec A eq) a1 a2 a3,
     let a := vote a1 a2 a3 in
     (a1 = a2 -> a = a1) /\
     (a2 = a3 -> a = a2) /\
@@ -25,10 +25,10 @@ Theorem vote_spec : forall A (AEQ:EqDec A) a1 a2 a3,
     (a1 <> a2 /\ a2 <> a3 /\ a1 <> a3 -> a = a1).
 Proof.
   unfold vote; intros.
-  destruct (is_eq a2 a3); intuition.
+  destruct (a2 == a3); intuition.
 Qed.
 
-Lemma vote_eq : forall A {AEQ:EqDec A} a a',
+Lemma vote_eq : forall A {AEQ:EqDec A eq} a a',
     vote a a a' = a.
 Proof.
   unfold vote; intros.

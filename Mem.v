@@ -1,17 +1,17 @@
-Require Export DecidableEquality.
+Require Export EquivDec.
 Require Export FunctionalExtensionality.
 Require Import Automation.
 
 Set Implicit Arguments.
 
-Definition mem A {AEQ:EqDec A} V := A -> option V.
+Definition mem A {AEQ:EqDec A eq} V := A -> option V.
 
 Arguments mem A {AEQ} V.
 
 Section Memories.
 
   Variable A:Type.
-  Context {AEQ:EqDec A}.
+  Context {AEQ:EqDec A eq}.
   Variable V:Type.
 
   Implicit Type (m:mem A V).
