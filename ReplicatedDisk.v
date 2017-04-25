@@ -2,6 +2,7 @@ Require Import Coq.Program.Equality.
 Require Import EquivDec.
 
 Require Import Automation.
+Require Import Mem.
 Require Import Prog.
 Require Import ProgTheorems.
 Require SequentialDisk.
@@ -35,6 +36,10 @@ Proof.
   unfold vote; intros.
   destruct matches.
 Qed.
+
+(* we require the majority to be among a1/a2 or a2/a3 *)
+Definition has_majority A {AEQ:EqDec A eq} (a1 a2 a3:A) :=
+  a1 = a2 \/ a2 = a3.
 
 Definition RRead_impl (a:addr) : prog3 block :=
   v0 <- Read d0 a;
@@ -78,7 +83,8 @@ Definition pstate_rel (spstate:SPState) (pstate:PState) : Prop :=
                   disk0 pstate a = Some v0 /\
                   disk1 pstate a = Some v1 /\
                   disk2 pstate a = Some v2 /\
-                  v = vote v0 v1 v2
+                  v = vote v0 v1 v2 /\
+                  has_majority v0 v1 v2
        | None => disk0 pstate a = None /\
                 disk1 pstate a = None /\
                 disk2 pstate a = None
@@ -123,9 +129,9 @@ Lemma Write_ok : forall i a b pstate r,
     Prog.exec (Write i a b) pstate r ->
     match r with
     | Finished v pstate' => (exists v0, disk_id i pstate a = Some v0) /\
-                           pstate' = upd_disk i pstate (fun d => Mem.upd d a b)
+                           pstate' = upd_disk i pstate (fun d => upd d a b)
     | Crashed pstate' => pstate' = pstate \/
-                        pstate' = upd_disk i pstate (fun d => Mem.upd d a b)
+                        pstate' = upd_disk i pstate (fun d => upd d a b)
     | Failed => disk_id i pstate a = None
     end.
 Proof.
@@ -178,6 +184,58 @@ Proof.
   subst; descend; intuition eauto.
 Qed.
 
+Lemma RWrite_impl_ok : forall a b pstate r,
+    Prog.exec (RWrite_impl a b) pstate r ->
+    match r with
+    | Finished u pstate' => (exists v0 v1 v2, disk0 pstate a = Some v0 /\
+                           disk1 pstate a = Some v1 /\
+                           disk2 pstate a = Some v2 /\
+                           u = tt) /\
+                           let 'Disks d_0 d_1 d_2 := pstate in
+                           pstate' = Disks (upd d_0 a b) (upd d_1 a b) (upd d_2 a b)
+    | Crashed pstate' =>
+      let 'Disks d_0 d_1 d_2 := pstate in
+      pstate' = pstate \/
+      pstate' = Disks (upd d_0 a b) d_1 d_2 \/
+      pstate' = Disks (upd d_0 a b) (upd d_1 a b) d_2 \/
+      pstate' = Disks (upd d_0 a b) (upd d_1 a b) (upd d_2 a b)
+    | Failed => (disk0 pstate a = None \/
+                disk1 pstate a = None \/
+                disk2 pstate a = None)
+    end.
+Proof.
+  unfold RWrite_impl; intros.
+
+  eapply exec_bind in H;
+    intuition; repeat deex;
+      match goal with
+      | [ H: Prog.exec (Write _ _ _) _ _ |- _ ] =>
+        apply Write_ok in H; safe_intuition;
+          repeat deex;
+          cbn [disk_id] in *; subst
+      end; auto.
+
+  eapply exec_bind in H0;
+  intuition; repeat deex;
+    repeat match goal with
+           | [ H: Prog.exec (Write _ _ _) _ _ |- _ ] =>
+             apply Write_ok in H; safe_intuition;
+               repeat deex;
+               cbn [disk_id] in *; subst
+           end; auto.
+
+  destruct pstate; simpl in *.
+  destruct r; intuition eauto; repeat deex; subst.
+  repeat match goal with
+         | [ u: unit |- _ ] => destruct u
+         end.
+  descend; intuition eauto.
+
+  destruct pstate; intuition; simpl in *; subst.
+  destruct pstate; intuition; simpl in *; subst.
+  destruct pstate; intuition; simpl in *; subst.
+Qed.
+
 Lemma opts_eq : forall T a (v v':T),
     a = Some v ->
     a = Some v' ->
@@ -186,6 +244,12 @@ Proof.
   intros; subst.
   inversion H0; auto.
 Qed.
+
+Ltac opts_eq :=
+      repeat match goal with
+             | [ H: ?a = Some _, H': ?a = Some _ |- _ ] =>
+               pose proof (opts_eq H H'); clear H'; subst
+             end.
 
 Lemma opt_discriminate : forall T a (v:T),
     a = Some v ->
@@ -204,6 +268,53 @@ Ltac inv_rel :=
     inversion H; subst; clear H
   end.
 
+Lemma pstate_rel_upd_all : forall spstate d_0 d_1 d_2 a b,
+    pstate_rel spstate (Disks d_0 d_1 d_2) ->
+    pstate_rel (SDisk (upd (sdisk spstate) a b))
+               (Disks (upd d_0 a b)
+                      (upd d_1 a b)
+                      (upd d_2 a b)).
+Proof.
+  unfold pstate_rel; intros.
+  specialize (H a0).
+  simpl.
+  destruct (a == a0); unfold equiv in *; subst;
+    autorewrite with upd.
+  descend; intuition eauto.
+  rewrite vote_eq; auto.
+  unfold has_majority; auto.
+
+  destruct matches in *|-.
+Qed.
+
+Lemma pstate_rel_upd_one : forall spstate d_0 d_1 d_2 a b,
+    pstate_rel spstate (Disks d_0 d_1 d_2) ->
+    pstate_rel spstate
+               (Disks (upd d_0 a b)
+                      d_1
+                      d_2).
+Proof.
+  unfold pstate_rel; intros.
+  specialize (H a0).
+  simpl.
+  destruct (a == a0); unfold equiv in *; subst;
+    autorewrite with upd.
+
+  destruct matches in *|-; repeat deex; simpl in *.
+  descend; intuition eauto.
+  match goal with
+  | [ H: has_majority _ _ _ |- _ ] =>
+    destruct H; subst
+  end.
+  (* oops, there's a bug: if [v_0 = v_1] and v_2 is different due to a crash,
+  then writing to v_0 breaks the majority invariant
+
+   this is fine but means that if v_2 is different, then writing to just v_0
+   changes the sequential disk *)
+Qed.
+
+Hint Resolve pstate_rel_upd_all.
+
 Theorem translate_exec : forall T (p: prog T),
     forall pstate r,
       Prog.exec (translate p) pstate r ->
@@ -216,25 +327,34 @@ Proof.
     pose proof (H0 a).
     destruct (sdisk spstate a) eqn:?;
              repeat deex.
-    destruct r; safe_intuition; repeat deex; subst; eauto.
-    repeat match goal with
-           | [ H: ?a = Some _, H': ?a = Some _ |- _ ] =>
-             pose proof (opts_eq H H');
-               clear H';
-               subst
-           end.
-    exists (Finished (vote v0 v1 v2) spstate);
-      intuition eauto.
-    eapply ExecStepTo; simpl; simpl_match; eauto.
-    intuition;
-      solve [ exfalso; eauto using opt_discriminate ].
+    + destruct r; safe_intuition; repeat deex; subst; eauto.
+      opts_eq.
+      exists (Finished (vote v0 v1 v2) spstate);
+        intuition eauto.
+      eapply ExecStepTo; simpl; simpl_match; eauto.
+      intuition;
+        solve [ exfalso; eauto using opt_discriminate ].
 
-    destruct r; safe_intuition; repeat deex; subst; eauto.
-    solve [ exfalso; eauto using opt_discriminate ].
-    clear H.
-    exists Failed; intuition eauto.
-    eapply ExecStepFail; simpl; simpl_match; auto.
-  - admit.
+    + destruct r; safe_intuition; repeat deex; subst; eauto.
+      solve [ exfalso; eauto using opt_discriminate ].
+      clear H.
+      exists Failed; intuition eauto.
+      eapply ExecStepFail; simpl; simpl_match; auto.
+  - apply RWrite_impl_ok in H.
+    pose proof (H0 a).
+    destruct (sdisk spstate a) eqn:?;
+             repeat deex.
+    + destruct r; safe_intuition; repeat deex; subst; eauto.
+      opts_eq.
+      destruct pstate; simpl in *; subst.
+      exists (Finished tt (SDisk (upd (sdisk spstate) a b)));
+        intuition eauto.
+      eapply ExecStepTo; simpl; simpl_match; eauto.
+
+      destruct pstate; simpl in *; intuition; subst.
+      eauto.
+      exists (Crashed spstate); intuition eauto.
+
   - apply exec_ret in H.
     destruct r; safe_intuition; subst; eauto.
     exists (Finished v0 spstate); intuition eauto.
