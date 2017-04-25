@@ -57,16 +57,16 @@ Inductive exec : forall T, seq_prog T -> SSigma -> Result SSigma T -> Prop :=
     exec p sigma Failed ->
     exec (Bind p p') sigma Failed.
 
-Inductive exec_recover : forall T R, seq_prog T -> seq_prog R -> SSigma -> RResult SSigma T R -> Prop :=
-| RExec : forall T R (p:seq_prog T) (rec:seq_prog R) sigma v sigma',
+Inductive exec_recover T R : seq_prog T -> seq_prog R -> SSigma -> RResult SSigma T R -> Prop :=
+| RExec : forall (p:seq_prog T) (rec:seq_prog R) sigma v sigma',
     exec p sigma (Finished v sigma') ->
     exec_recover p rec sigma (RFinished v sigma')
-| RExecFailed : forall T R (p:seq_prog T) (rec:seq_prog R) sigma,
+| RExecFailed : forall (p:seq_prog T) (rec:seq_prog R) sigma,
     exec p sigma Failed ->
     exec_recover p rec sigma RFailed
-| RExecCrash : forall T R (p:seq_prog T) (rec:seq_prog R) sigma sigma' r,
+| RExecCrash : forall (p:seq_prog T) (rec:seq_prog R) sigma sigma' r,
     exec p sigma (Crashed sigma') ->
-    exec_recover rec rec sigma' r ->
+    exec_recover (T:=R) rec rec sigma' r ->
     exec_recover p rec sigma (to_recovered r).
 
 (* Local Variables: *)

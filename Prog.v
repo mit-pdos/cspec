@@ -139,16 +139,16 @@ Definition to_recovered {Sigma T R} (r:RResult Sigma R R) : RResult Sigma T R :=
   | RFailed => RFailed
   end.
 
-Inductive exec_recover : forall T R, prog3 T -> prog3 R -> Sigma -> RResult Sigma T R -> Prop :=
-| RExec : forall T R (p:prog3 T) (rec:prog3 R) sigma v sigma',
+Inductive exec_recover T R : prog3 T -> prog3 R -> Sigma -> RResult Sigma T R -> Prop :=
+| RExec : forall (p:prog3 T) (rec:prog3 R) sigma v sigma',
     exec p sigma (Finished v sigma') ->
     exec_recover p rec sigma (RFinished v sigma')
-| RExecFailed : forall T R (p:prog3 T) (rec:prog3 R) sigma,
+| RExecFailed : forall (p:prog3 T) (rec:prog3 R) sigma,
     exec p sigma Failed ->
     exec_recover p rec sigma RFailed
-| RExecCrash : forall T R (p:prog3 T) (rec:prog3 R) sigma sigma' r,
+| RExecCrash : forall (p:prog3 T) (rec:prog3 R) sigma sigma' r,
     exec p sigma (Crashed sigma') ->
-    exec_recover rec rec sigma' r ->
+    exec_recover (T:=R) rec rec sigma' r ->
     exec_recover p rec sigma (to_recovered r).
 
 Notation "x <- p1 ; p2" := (Bind p1 (fun x => p2))

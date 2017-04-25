@@ -1,3 +1,5 @@
+Require Import Coq.Program.Equality.
+
 Require Import Automation.
 Require Import DecidableEquality.
 Require Import Prog.
@@ -209,3 +211,46 @@ Proof.
     end.
     exists Failed; intuition eauto.
 Qed.
+
+Inductive rresult_rel Sigma1 Sigma2 (rel: Sigma1 -> Sigma2 -> Prop) T R :
+  RResult Sigma1 T R -> RResult Sigma2 T R -> Prop :=
+| RFinished_rel : forall sigma1 sigma2 v,
+    rel sigma1 sigma2 ->
+    rresult_rel rel (RFinished v sigma1) (RFinished v sigma2)
+(* TODO: as above, add rresult_rel Finished Fail *)
+| Recovered_rel : forall sigma1 sigma2 r,
+    rel sigma1 sigma2 ->
+    rresult_rel rel (Recovered r sigma1) (Recovered r sigma2)
+| RFailed_rel : rresult_rel rel RFailed RFailed.
+
+Hint Constructors rresult_rel.
+Hint Constructors Prog.exec_recover.
+
+Theorem translate_exec_recover : forall T R (p: seq_prog T) (rec: seq_prog R),
+    forall ssigma sr,
+      exec_recover p rec ssigma sr -> forall sigma,
+        sigma_rel ssigma sigma ->
+        (* NOTE: the equivalent recovery procedure is more generally run before
+        [translate rec]. However, we need some way to handoff the recovered
+        memory state to [fun v => translate (rec v)] while also making [rec] a
+        complete program in [seq_prog]. *)
+        exists r, Prog.exec_recover (translate p) (translate rec) sigma r /\
+             rresult_rel sigma_rel sr r.
+Proof.
+  destruct 1; simpl; intros.
+  - eapply translate_exec in H; eauto.
+    repeat deex; eauto.
+    match goal with
+    | [ H: result_rel sigma_rel  _ _ |- _ ] =>
+      inversion H; subst; clear H
+    end.
+    exists (RFinished v sigma2); intuition eauto.
+  - eapply translate_exec in H; eauto.
+    repeat deex; eauto.
+    match goal with
+    | [ H: result_rel sigma_rel  _ _ |- _ ] =>
+      inversion H; subst; clear H
+    end.
+    exists (RFailed); intuition eauto.
+  - dependent induction H0.
+Abort.
