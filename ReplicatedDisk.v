@@ -97,8 +97,8 @@ Inductive result_rel Sigma1 Sigma2 (rel: Sigma1 -> Sigma2 -> Prop) T :
     result_rel rel (Crashed sigma1) (Crashed sigma2)
 | Failed_rel : result_rel rel Failed Failed.
 
-Hint Constructors Prog.exec.
 Hint Constructors result_rel.
+Hint Constructors Prog.exec.
 
 Ltac prog_bind :=
   eapply Prog.ExecBindFinished.
@@ -107,110 +107,23 @@ Ltac prog_step :=
                  eapply Prog.ExecStepFail ];
   simpl; simpl_match; eauto.
 
+Ltac simp_stepto :=
+  match goal with
+  | [ H: rstep _ _ = StepTo _ _ |- _ ] =>
+    progress cbn [rstep] in H;
+    destruct_nongoal_matches;
+    inversion H; subst; clear H
+  end.
+
 Theorem translate_exec : forall T (p: seq_prog T),
-    forall ssigma sr,
-      exec p ssigma sr -> forall sigma,
-        sigma_rel ssigma sigma ->
-        exists r, Prog.exec (translate p) sigma r /\
-             result_rel sigma_rel sr r.
+    forall sigma r,
+      Prog.exec (translate p) sigma r ->
+      forall ssigma, sigma_rel ssigma sigma ->
+                exists sr, exec p ssigma sr /\
+                      result_rel sigma_rel sr r.
 Proof.
-  induction 1; intros.
-  - destruct p; simpl in *;
-      destruct matches in *;
-      match goal with
-      | [ H: _ = StepTo _ _ |- _ ] =>
-        inversion H; subst; clear H
-      end.
-    + exists (Finished v sigma0); intuition.
-      specialize (H0 a); simpl_match;
-        repeat deex.
-      unfold RRead_impl.
-      repeat (prog_bind; [ prog_step | ]); eauto.
-    + pose proof (H0 a); simpl_match;
-        repeat deex.
-      destruct sigma0; simpl in *; subst.
-      refine (ex_intro _ (Finished _ _) _); split.
-      repeat (prog_bind; [ prog_step | ]).
-      prog_step.
-
-      constructor.
-      unfold sigma_rel; intros; simpl.
-      destruct (is_eq a a0); subst;
-        autorewrite with upd.
-      descend; intuition eauto.
-      rewrite vote_eq; auto.
-      specialize (H0 a0).
-      destruct (sdisk sigma a0);
-        simpl in *; repeat deex.
-      descend; intuition eauto.
-      intuition.
-    + exists (Finished v sigma0); intuition.
-  - destruct p; simpl in *;
-      destruct matches in *;
-      match goal with
-      | [ H: _ = Fails |- _ ] =>
-        inversion H; subst; clear H
-      end.
-    exists Failed; intuition.
-    specialize (H0 a); simpl_match; intuition.
-    unfold RRead_impl.
-    eapply Prog.ExecBindFailed; prog_step.
-
-    exists Failed; intuition.
-    specialize (H0 a); simpl_match; intuition.
-    unfold RRead_impl.
-    eapply Prog.ExecBindFailed; prog_step.
-
-  - destruct p; simpl in *;
-      destruct matches in *;
-      match goal with
-      | [ H: _ = StepTo _ _ |- _ ] =>
-        inversion H; subst; clear H
-      end.
-    + exists (Crashed sigma0); intuition.
-    + pose proof (H0 a); simpl_match;
-        repeat deex.
-      destruct sigma0; simpl in *; subst.
-      refine (ex_intro _ (Crashed _) _); split.
-      repeat (prog_bind; [ prog_step | ]).
-      eapply Prog.ExecCrashAfter; simpl; simpl_match; eauto.
-
-      constructor.
-      unfold sigma_rel; intros; simpl.
-      destruct (is_eq a a0); subst;
-        autorewrite with upd.
-      descend; intuition eauto.
-      rewrite vote_eq; auto.
-      specialize (H0 a0).
-      destruct (sdisk sigma a0);
-        simpl in *; repeat deex.
-      descend; intuition eauto.
-      intuition.
-    + descend; intuition eauto.
-  - specialize (IHexec1 _ ltac:(eauto)); repeat deex.
-    match goal with
-    | [ H: result_rel sigma_rel  _ _ |- _ ] =>
-      inversion H; subst; clear H
-    end.
-    specialize (IHexec2 _ ltac:(eauto)); repeat deex.
-    simpl.
-    exists r0; intuition eauto.
-  - exists (Crashed sigma0); intuition eauto.
-  - specialize (IHexec _ ltac:(eauto)); repeat deex.
-    simpl.
-    match goal with
-    | [ H: result_rel sigma_rel  _ _ |- _ ] =>
-      inversion H; subst; clear H
-    end.
-    exists (Crashed sigma2); intuition eauto.
-  - specialize (IHexec _ ltac:(eauto)); repeat deex.
-    simpl.
-    match goal with
-    | [ H: result_rel sigma_rel  _ _ |- _ ] =>
-      inversion H; subst; clear H
-    end.
-    exists Failed; intuition eauto.
-Qed.
+  induction p; simpl; intros.
+Admitted.
 
 Inductive rresult_rel Sigma1 Sigma2 (rel: Sigma1 -> Sigma2 -> Prop) T R :
   RResult Sigma1 T R -> RResult Sigma2 T R -> Prop :=
@@ -224,33 +137,99 @@ Inductive rresult_rel Sigma1 Sigma2 (rel: Sigma1 -> Sigma2 -> Prop) T R :
 | RFailed_rel : rresult_rel rel RFailed RFailed.
 
 Hint Constructors rresult_rel.
-Hint Constructors Prog.exec_recover.
+Hint Constructors exec_recover.
+
+Ltac inv_rel :=
+  match goal with
+  | [ H: result_rel _ _ _ |- _ ] =>
+    inversion H; subst; clear H
+  end.
+
+Lemma RExecCrash_eq : forall T R (p: seq_prog T) (rec: seq_prog R)
+                        sigma sigma' r r',
+    exec p sigma (Crashed sigma') ->
+    exec_recover rec rec sigma' r ->
+    r' = to_recovered r ->
+    exec_recover p rec sigma r'.
+Proof.
+  intros; subst.
+  eauto.
+Qed.
+
+Hint Resolve RExecCrash_eq.
+
+Ltac apply_translate :=
+match goal with
+      | [ H: Prog.exec (translate _) ?s _,
+             H': sigma_rel _ ?s |- _ ] =>
+        eapply translate_exec in H; eauto;
+          repeat deex; repeat inv_rel
+      end.
+
+Lemma to_recovered_idempotent : forall T R Sigma (r: RResult Sigma R R),
+    to_recovered (T:=T) (to_recovered (T:=R) r) = to_recovered r.
+Proof.
+  destruct r; simpl; eauto.
+Qed.
+
+Theorem translate_exec_self_recover : forall R (rec: seq_prog R),
+    forall sigma r,
+      Prog.exec_recover (translate rec) (translate rec) sigma r ->
+      forall ssigma, sigma_rel ssigma sigma ->
+                exists sr, exec_recover rec rec ssigma sr /\
+                      rresult_rel sigma_rel sr r.
+Proof.
+  intros.
+  generalize dependent ssigma.
+  dependent induction H; simpl; intros;
+    apply_translate.
+  - exists (RFinished v sigma1); intuition eauto.
+  - exists (RFailed); intuition eauto.
+  - specialize (IHexec_recover rec r0).
+    repeat match type of IHexec_recover with
+           | ?P -> _ =>
+             lazymatch type of P with
+             | Prop => specialize (IHexec_recover ltac:(auto))
+             | _ => idtac
+             end
+           end.
+    admit. (* this seems to require some idempotence of the seq_prog recovery
+    procedure - surprising, but maybe it's required? *)
+Admitted.
+
+Lemma rresult_rel_recovered : forall Sigma1 Sigma2 rel T R
+                                (r: RResult Sigma1 R R)
+                                (r': RResult Sigma2 R R),
+    rresult_rel rel r r' ->
+    rresult_rel (T:=T) rel (to_recovered r) (to_recovered r').
+Proof.
+  intros.
+  inversion H; subst; simpl; eauto.
+Qed.
+
+Hint Resolve rresult_rel_recovered.
 
 Theorem translate_exec_recover : forall T R (p: seq_prog T) (rec: seq_prog R),
-    forall ssigma sr,
-      exec_recover p rec ssigma sr -> forall sigma,
-        sigma_rel ssigma sigma ->
-        (* NOTE: the equivalent recovery procedure is more generally run before
-        [translate rec]. However, we need some way to handoff the recovered
-        memory state to [fun v => translate (rec v)] while also making [rec] a
-        complete program in [seq_prog]. *)
-        exists r, Prog.exec_recover (translate p) (translate rec) sigma r /\
-             rresult_rel sigma_rel sr r.
+    forall sigma r,
+      (* NOTE: the equivalent recovery procedure is more generally run before
+      [translate rec]. However, we need some way to handoff the recovered memory
+      state to [fun v => translate (rec v)] while also making [rec] a complete
+      program in [seq_prog]. *)
+      Prog.exec_recover (translate p) (translate rec) sigma r ->
+      forall ssigma, sigma_rel ssigma sigma ->
+                exists sr, exec_recover p rec ssigma sr /\
+                      rresult_rel sigma_rel sr r.
 Proof.
-  destruct 1; simpl; intros.
-  - eapply translate_exec in H; eauto.
-    repeat deex; eauto.
-    match goal with
-    | [ H: result_rel sigma_rel  _ _ |- _ ] =>
-      inversion H; subst; clear H
-    end.
-    exists (RFinished v sigma2); intuition eauto.
-  - eapply translate_exec in H; eauto.
-    repeat deex; eauto.
-    match goal with
-    | [ H: result_rel sigma_rel  _ _ |- _ ] =>
-      inversion H; subst; clear H
-    end.
-    exists (RFailed); intuition eauto.
-  - dependent induction H0.
-Abort.
+  intros.
+  remember (translate p).
+  remember (translate rec).
+  destruct H; simpl; intros; subst.
+  - apply_translate.
+    descend; intuition eauto.
+  - apply_translate.
+    descend; intuition eauto.
+  - apply_translate.
+    eapply translate_exec_self_recover in H1; eauto;
+      repeat deex.
+    exists (to_recovered sr); intuition eauto.
+Qed.
