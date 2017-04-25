@@ -36,6 +36,36 @@ Proof.
     eauto.
 Qed.
 
+Theorem exec_decidable T (p: prog3 T) sigma :
+  { r | let '(v, sigma') := r in
+        exec p sigma (Finished v sigma')} + {exec p sigma Failed}.
+Proof.
+  generalize dependent sigma.
+  induction p; simpl; intros.
+  - destruct (disk_id i sigma a) eqn:?.
+    + left.
+      refine (exist _ (_, _) _).
+      eapply ExecStepTo; simpl; simpl_match; eauto.
+    + right.
+      eapply ExecStepFail; simpl; simpl_match; eauto.
+  - destruct (disk_id i sigma a) eqn:?.
+    + left.
+      refine (exist _ (_, _) _).
+      eapply ExecStepTo; simpl; simpl_match; eauto.
+    + right.
+      eapply ExecStepFail; simpl; simpl_match; eauto.
+  - left.
+    refine (exist _ (_, _) _).
+    eapply ExecStepTo; simpl; eauto.
+  - destruct (IHp sigma); eauto.
+    destruct s as [ [v sigma'] ?].
+    specialize (X v).
+    destruct (X sigma'); eauto.
+    destruct s as [ [v' sigma''] ?].
+    left; exists (v', sigma'').
+    eauto.
+Defined.
+
 (** These are the monad laws
 
 TODO: explain what the monad is and what these monad laws mean (specifically,
