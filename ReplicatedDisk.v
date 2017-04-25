@@ -37,9 +37,12 @@ Proof.
   destruct matches.
 Qed.
 
-(* we require the majority to be among a1/a2 or a2/a3 *)
-Definition has_majority A {AEQ:EqDec A eq} (a1 a2 a3:A) :=
-  a1 = a2 \/ a2 = a3.
+Lemma vote_eq' : forall A {AEQ:EqDec A eq} a a',
+    vote a a' a' = a'.
+Proof.
+  unfold vote; intros.
+  destruct matches.
+Qed.
 
 Definition RRead_impl (a:addr) : prog3 block :=
   v0 <- Read d0 a;
@@ -83,8 +86,7 @@ Definition pstate_rel (spstate:SPState) (pstate:PState) : Prop :=
                   disk0 pstate a = Some v0 /\
                   disk1 pstate a = Some v1 /\
                   disk2 pstate a = Some v2 /\
-                  v = vote v0 v1 v2 /\
-                  has_majority v0 v1 v2
+                  v = vote v0 v1 v2
        | None => disk0 pstate a = None /\
                 disk1 pstate a = None /\
                 disk2 pstate a = None
@@ -131,7 +133,8 @@ Lemma Write_ok : forall i a b pstate r,
     | Finished v pstate' => (exists v0, disk_id i pstate a = Some v0) /\
                            pstate' = upd_disk i pstate (fun d => upd d a b)
     | Crashed pstate' => pstate' = pstate \/
-                        pstate' = upd_disk i pstate (fun d => upd d a b)
+                        (pstate' = upd_disk i pstate (fun d => upd d a b) /\
+                         exists v0, disk_id i pstate a = Some v0)
     | Failed => disk_id i pstate a = None
     end.
 Proof.
@@ -196,9 +199,12 @@ Lemma RWrite_impl_ok : forall a b pstate r,
     | Crashed pstate' =>
       let 'Disks d_0 d_1 d_2 := pstate in
       pstate' = pstate \/
-      pstate' = Disks (upd d_0 a b) d_1 d_2 \/
-      pstate' = Disks (upd d_0 a b) (upd d_1 a b) d_2 \/
-      pstate' = Disks (upd d_0 a b) (upd d_1 a b) (upd d_2 a b)
+      (pstate' = Disks (upd d_0 a b) d_1 d_2 /\
+       exists v0, d_0 a = Some v0) \/
+      (pstate' = Disks (upd d_0 a b) (upd d_1 a b) d_2 /\
+       exists v0 v1, d_0 a = Some v0 /\ d_1 a = Some v1) \/
+      (pstate' = Disks (upd d_0 a b) (upd d_1 a b) (upd d_2 a b) /\
+       exists v0 v1 v2, d_0 a = Some v0 /\ d_1 a = Some v1 /\ d_2 a = Some v2)
     | Failed => (disk0 pstate a = None \/
                 disk1 pstate a = None \/
                 disk2 pstate a = None)
@@ -231,9 +237,10 @@ Proof.
          end.
   descend; intuition eauto.
 
-  destruct pstate; intuition; simpl in *; subst.
-  destruct pstate; intuition; simpl in *; subst.
-  destruct pstate; intuition; simpl in *; subst.
+  eauto 10.
+  destruct pstate; intuition; simpl in *; repeat deex; eauto 10.
+  destruct pstate; intuition; simpl in *; repeat deex; eauto 10.
+  destruct pstate; intuition; simpl in *; repeat deex; eauto 10.
 Qed.
 
 Lemma opts_eq : forall T a (v v':T),
@@ -282,38 +289,83 @@ Proof.
     autorewrite with upd.
   descend; intuition eauto.
   rewrite vote_eq; auto.
-  unfold has_majority; auto.
 
   destruct matches in *|-.
 Qed.
 
-Lemma pstate_rel_upd_one : forall spstate d_0 d_1 d_2 a b,
+Lemma pstate_rel_upd_one_others_eq : forall spstate d_0 d_1 d_2 v1 a b,
+    d_1 a = Some v1 ->
+    d_2 a = Some v1 ->
     pstate_rel spstate (Disks d_0 d_1 d_2) ->
     pstate_rel spstate
-               (Disks (upd d_0 a b)
-                      d_1
-                      d_2).
+               (Disks (upd d_0 a b) d_1 d_2).
 Proof.
   unfold pstate_rel; intros.
-  specialize (H a0).
+  specialize (H1 a0).
   simpl.
   destruct (a == a0); unfold equiv in *; subst;
     autorewrite with upd.
 
   destruct matches in *|-; repeat deex; simpl in *.
   descend; intuition eauto.
-  match goal with
-  | [ H: has_majority _ _ _ |- _ ] =>
-    destruct H; subst
-  end.
-  (* oops, there's a bug: if [v_0 = v_1] and v_2 is different due to a crash,
-  then writing to v_0 breaks the majority invariant
+  opts_eq.
+  rewrite ?vote_eq'; auto.
+  intuition;
+    exfalso; eauto using opt_discriminate.
 
-   this is fine but means that if v_2 is different, then writing to just v_0
-   changes the sequential disk *)
+  destruct matches in *|-.
+Qed.
+
+Lemma pstate_rel_upd_one_others_neq : forall spstate d_0 d_1 d_2 v1 v2 a b,
+    d_1 a = Some v1 ->
+    d_2 a = Some v2 ->
+    v1 <> v2 ->
+    pstate_rel spstate (Disks d_0 d_1 d_2) ->
+    pstate_rel (SDisk (upd (sdisk spstate) a b))
+               (Disks (upd d_0 a b) d_1 d_2).
+Proof.
+  unfold pstate_rel; intros.
+  specialize (H2 a0).
+  simpl.
+  destruct (a == a0); unfold equiv in *; subst;
+    autorewrite with upd.
+
+  destruct matches in *|-; repeat deex; simpl in *.
+  descend; intuition eauto.
+  opts_eq.
+  unfold vote.
+  destruct matches.
+  intuition;
+    exfalso; eauto using opt_discriminate.
+
+  destruct matches in *|-.
+Qed.
+
+Lemma pstate_rel_upd_two : forall spstate d_0 d_1 d_2 v0 a b,
+    d_2 a = Some v0 ->
+    pstate_rel spstate (Disks d_0 d_1 d_2) ->
+    pstate_rel (SDisk (upd (sdisk spstate) a b))
+               (Disks (upd d_0 a b) (upd d_1 a b) d_2).
+Proof.
+  unfold pstate_rel; intros.
+  specialize (H0 a0).
+  simpl.
+  destruct (a == a0); unfold equiv in *; subst;
+    autorewrite with upd.
+
+  destruct matches in *|-; repeat deex; simpl in *.
+  descend; intuition eauto.
+  rewrite vote_eq; auto.
+  intuition;
+    exfalso; eauto using opt_discriminate.
+
+  destruct matches in *|-.
 Qed.
 
 Hint Resolve pstate_rel_upd_all.
+Hint Resolve pstate_rel_upd_one_others_eq.
+Hint Resolve pstate_rel_upd_one_others_neq.
+Hint Resolve pstate_rel_upd_two.
 
 Theorem translate_exec : forall T (p: prog T),
     forall pstate r,
@@ -353,8 +405,28 @@ Proof.
 
       destruct pstate; simpl in *; intuition; subst.
       eauto.
+      destruct (v1 == v2); unfold equiv, complement in *; subst.
       exists (Crashed spstate); intuition eauto.
-
+      exists (Crashed (SDisk (upd (sdisk spstate) a b))); intuition eauto.
+      eapply ExecCrashAfter; simpl; simpl_match; eauto.
+      exists (Crashed (SDisk (upd (sdisk spstate) a b))); intuition eauto.
+      eapply ExecCrashAfter; simpl; simpl_match; eauto.
+      exists (Crashed (SDisk (upd (sdisk spstate) a b))); intuition eauto.
+      eapply ExecCrashAfter; simpl; simpl_match; eauto.
+      intuition;
+        solve [ exfalso; eauto using opt_discriminate ].
+    + destruct pstate; simpl in *.
+      destruct r; intuition; repeat deex; subst; eauto;
+        try match goal with
+          | [ H: ?a = Some _, H': ?a = None |- _ ] =>
+            solve [ exfalso; eauto using opt_discriminate ]
+        end.
+      exists Failed; intuition eauto.
+      eapply ExecStepFail; simpl; simpl_match; eauto.
+      exists Failed; intuition eauto.
+      eapply ExecStepFail; simpl; simpl_match; eauto.
+      exists Failed; intuition eauto.
+      eapply ExecStepFail; simpl; simpl_match; eauto.
   - apply exec_ret in H.
     destruct r; safe_intuition; subst; eauto.
     exists (Finished v0 spstate); intuition eauto.
@@ -371,7 +443,7 @@ Proof.
     + specialize (IHp _ _ ltac:(eauto) _ ltac:(eauto)).
       repeat deex; inv_rel.
       eauto.
-Admitted.
+Qed.
 
 Inductive rresult_rel PState1 PState2 (rel: PState1 -> PState2 -> Prop) T R :
   RResult PState1 T R -> RResult PState2 T R -> Prop :=
