@@ -47,16 +47,16 @@ Definition upd_disk (i:diskId) (sigma:Sigma) (up:disk -> disk) : Sigma :=
 outcome and return value, or report that the program fails. A third option
 [NonDet] allows a StepResult to not specify any behavior for a program,
 potentially under only certain conditions. *)
-Inductive StepResult T :=
+Inductive StepResult Sigma T :=
 | StepTo (v:T) (sigma:Sigma)
 | Fails
 | NonDet.
-Arguments Fails {T}.
-Arguments NonDet {T}.
+Arguments Fails {Sigma T}.
+Arguments NonDet {Sigma T}.
 
 (** [step] gives each primitive operation a semantics by specifying how the
 state is transformed and giving a return value of the appropriate type. *)
-Definition step T (p:prog3 T) (sigma:Sigma) : StepResult T :=
+Definition step T (p:prog3 T) (sigma:Sigma) : StepResult Sigma T :=
   match p with
   | Read i a =>
     match (disk_id i sigma) a with
@@ -74,32 +74,29 @@ Definition step T (p:prog3 T) (sigma:Sigma) : StepResult T :=
   end.
 
 (** A [Result] is the outcome from running a program. *)
-Inductive Result T :=
+Inductive Result Sigma T :=
   (** the program finished, returning v and leaving the state at [sigma] *)
 | Finished (v:T) (sigma:Sigma)
 (** the program could crash at some intermediate point in state [sigma] (the return
 value is in memory and is thus lost) *)
 | Crashed (sigma:Sigma)
 (** the program failed by attempting some illegal operation, eg, an
-out-of-bounds writeV *)
+out-of-bounds write *)
 | Failed.
-
-Arguments Crashed {T} sigma.
-Arguments Failed {T}.
+Arguments Crashed {Sigma T} sigma.
+Arguments Failed {Sigma T}.
 
 (** Finally [exec] gives the semantics of a whole program. This combines
 behavior of each individual instruction given by [step] with [Bind], which
 sequentially composes programs, and crashes, which can expose any intermediate
 state of a program. *)
-Inductive exec : forall T, prog3 T -> Sigma -> Result T -> Prop :=
+Inductive exec : forall T, prog3 T -> Sigma -> Result Sigma T -> Prop :=
 | ExecStepTo : forall T (p:prog3 T) sigma v sigma',
     step p sigma = StepTo v sigma' ->
     exec p sigma (Finished v sigma')
 | ExecStepFail : forall T (p:prog3 T) sigma,
     step p sigma = Fails ->
     exec p sigma Failed
-| ExecCrashBefore : forall T (p: prog3 T) sigma,
-    exec p sigma (Crashed sigma)
 | ExecCrashAfter : forall T (p: prog3 T) sigma v sigma',
     step p sigma = StepTo v sigma' ->
     exec p sigma (Crashed sigma')
@@ -108,6 +105,8 @@ Inductive exec : forall T, prog3 T -> Sigma -> Result T -> Prop :=
     exec p sigma (Finished v sigma') ->
     exec (p' v) sigma' r ->
     exec (Bind p p') sigma r
+| ExecCrashBefore : forall T (p: prog3 T) sigma,
+    exec p sigma (Crashed sigma)
 | ExecBindCrashed : forall T T' (p: prog3 T) (p': T -> prog3 T')
                    sigma sigma',
     (* Note: this introduces some executions redundant with ExecCrashBefore,
@@ -122,25 +121,25 @@ Inductive exec : forall T, prog3 T -> Sigma -> Result T -> Prop :=
     exec (Bind p p') sigma Failed.
 
 (** analogous to [Result] for recovery *)
-Inductive RResult T R :=
+Inductive RResult Sigma T R :=
 | RFinished (v:T) (sigma:Sigma)
 | Recovered (v:R) (sigma:Sigma)
 | RFailed.
 
-Arguments RFinished {T R} v sigma.
-Arguments Recovered {T R} v sigma.
-Arguments RFailed {T R}.
+Arguments RFinished {Sigma T R} v sigma.
+Arguments Recovered {Sigma T R} v sigma.
+Arguments RFailed {Sigma T R}.
 
 (** mark a recovery result as always being recovered, since it was executed
 after a crash *)
-Definition to_recovered {T R} (r:RResult R R) : RResult T R :=
+Definition to_recovered {Sigma T R} (r:RResult Sigma R R) : RResult Sigma T R :=
   match r with
   | RFinished v sigma => Recovered v sigma
   | Recovered v sigma => Recovered v sigma
   | RFailed => RFailed
   end.
 
-Inductive exec_recover : forall T R, prog3 T -> prog3 R -> Sigma -> RResult T R -> Prop :=
+Inductive exec_recover : forall T R, prog3 T -> prog3 R -> Sigma -> RResult Sigma T R -> Prop :=
 | RExec : forall T R (p:prog3 T) (rec:prog3 R) sigma v sigma',
     exec p sigma (Finished v sigma') ->
     exec_recover p rec sigma (RFinished v sigma')

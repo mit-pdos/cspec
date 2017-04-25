@@ -6,3 +6,4 @@ Mem.v
 Bytes.v
 Prog.v
 ProgTheorems.v
+SequentialDisk.v
