@@ -156,3 +156,9 @@ Local Ltac specialize_unique_quantifier :=
 Ltac safe_specialize :=
   repeat specialize_unique_quantifier;
   intuition auto.
+
+Ltac safe_intuition :=
+  repeat match goal with
+         | [ H: _ /\ _ |- _ ] =>
+           destruct H
+         end.
