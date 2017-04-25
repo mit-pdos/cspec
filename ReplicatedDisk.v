@@ -48,7 +48,7 @@ Definition RWrite_impl (a:addr) (b:block) : prog3 unit :=
 
 Import SequentialDisk.
 
-Fixpoint translate T (p: seq_prog T) : prog3 T :=
+Fixpoint translate T (p: prog T) : prog3 T :=
  match p with
  | SRead a => RRead_impl a
  | SWrite a b => RWrite_impl a b
@@ -61,40 +61,40 @@ Fixpoint translate T (p: seq_prog T) : prog3 T :=
 single-disk programs implemented using replication on top of a 3-disk
 configuration.
 
-The idea of this proof is that correctness of a seq_prog in terms of the
+The idea of this proof is that correctness of a prog in terms of the
 supposed single-disk semantics should carry over to correctness of the
 translated program (which implements a sequential program using replication).
 The proof will show that from a pair of related states, any behavior of the
-seq_prog can be re-produced as related behavior in the translated prog3.
+prog can be re-produced as related behavior in the translated prog3.
  *)
 
 (* The simulation is defined in terms of relating the states of the two
 programs. Our relation captures replicated configurations line up with a
 sequential disk. *)
-Definition sigma_rel (ssigma:SSigma) (sigma:Sigma) : Prop :=
-  forall a, match sdisk ssigma a with
+Definition pstate_rel (spstate:SPState) (pstate:PState) : Prop :=
+  forall a, match sdisk spstate a with
        | Some v => exists v0 v1 v2,
-                  disk0 sigma a = Some v0 /\
-                  disk1 sigma a = Some v1 /\
-                  disk2 sigma a = Some v2 /\
+                  disk0 pstate a = Some v0 /\
+                  disk1 pstate a = Some v1 /\
+                  disk2 pstate a = Some v2 /\
                   v = vote v0 v1 v2
-       | None => disk0 sigma a = None /\
-                disk1 sigma a = None /\
-                disk2 sigma a = None
+       | None => disk0 pstate a = None /\
+                disk1 pstate a = None /\
+                disk2 pstate a = None
        end.
 
-Inductive result_rel Sigma1 Sigma2 (rel: Sigma1 -> Sigma2 -> Prop) T :
-  Result Sigma1 T -> Result Sigma2 T -> Prop :=
-| Finished_rel : forall sigma1 sigma2 v,
-    rel sigma1 sigma2 ->
-    result_rel rel (Finished v sigma1) (Finished v sigma2)
+Inductive result_rel PState1 PState2 (rel: PState1 -> PState2 -> Prop) T :
+  Result PState1 T -> Result PState2 T -> Prop :=
+| Finished_rel : forall pstate1 pstate2 v,
+    rel pstate1 pstate2 ->
+    result_rel rel (Finished v pstate1) (Finished v pstate2)
 (* there is one more valid simulation: if the first relation succeeds, then it's
-   ok for the second to fail, in the order Sigma1 and Sigma2 are given here. *)
-| Crashed_rel : forall sigma1 sigma2,
-    rel sigma1 sigma2 ->
+   ok for the second to fail, in the order PState1 and PState2 are given here. *)
+| Crashed_rel : forall pstate1 pstate2,
+    rel pstate1 pstate2 ->
     (* this is too strong: should be able to state any relation for crash states
     and then fix things up in recovery *)
-    result_rel rel (Crashed sigma1) (Crashed sigma2)
+    result_rel rel (Crashed pstate1) (Crashed pstate2)
 | Failed_rel : result_rel rel Failed Failed.
 
 Hint Constructors result_rel.
@@ -115,25 +115,25 @@ Ltac simp_stepto :=
     inversion H; subst; clear H
   end.
 
-Theorem translate_exec : forall T (p: seq_prog T),
-    forall sigma r,
-      Prog.exec (translate p) sigma r ->
-      forall ssigma, sigma_rel ssigma sigma ->
-                exists sr, exec p ssigma sr /\
-                      result_rel sigma_rel sr r.
+Theorem translate_exec : forall T (p: prog T),
+    forall pstate r,
+      Prog.exec (translate p) pstate r ->
+      forall spstate, pstate_rel spstate pstate ->
+                exists sr, exec p spstate sr /\
+                      result_rel pstate_rel sr r.
 Proof.
   induction p; simpl; intros.
 Admitted.
 
-Inductive rresult_rel Sigma1 Sigma2 (rel: Sigma1 -> Sigma2 -> Prop) T R :
-  RResult Sigma1 T R -> RResult Sigma2 T R -> Prop :=
-| RFinished_rel : forall sigma1 sigma2 v,
-    rel sigma1 sigma2 ->
-    rresult_rel rel (RFinished v sigma1) (RFinished v sigma2)
+Inductive rresult_rel PState1 PState2 (rel: PState1 -> PState2 -> Prop) T R :
+  RResult PState1 T R -> RResult PState2 T R -> Prop :=
+| RFinished_rel : forall pstate1 pstate2 v,
+    rel pstate1 pstate2 ->
+    rresult_rel rel (RFinished v pstate1) (RFinished v pstate2)
 (* TODO: as above, add rresult_rel Finished Fail *)
-| Recovered_rel : forall sigma1 sigma2 r,
-    rel sigma1 sigma2 ->
-    rresult_rel rel (Recovered r sigma1) (Recovered r sigma2)
+| Recovered_rel : forall pstate1 pstate2 r,
+    rel pstate1 pstate2 ->
+    rresult_rel rel (Recovered r pstate1) (Recovered r pstate2)
 | RFailed_rel : rresult_rel rel RFailed RFailed.
 
 Hint Constructors rresult_rel.
@@ -145,12 +145,12 @@ Ltac inv_rel :=
     inversion H; subst; clear H
   end.
 
-Lemma RExecCrash_eq : forall T R (p: seq_prog T) (rec: seq_prog R)
-                        sigma sigma' r r',
-    exec p sigma (Crashed sigma') ->
-    exec_recover rec rec sigma' r ->
+Lemma RExecCrash_eq : forall T R (p: prog T) (rec: prog R)
+                        pstate pstate' r r',
+    exec p pstate (Crashed pstate') ->
+    exec_recover rec rec pstate' r ->
     r' = to_recovered r ->
-    exec_recover p rec sigma r'.
+    exec_recover p rec pstate r'.
 Proof.
   intros; subst.
   eauto.
@@ -161,29 +161,29 @@ Hint Resolve RExecCrash_eq.
 Ltac apply_translate :=
 match goal with
       | [ H: Prog.exec (translate _) ?s _,
-             H': sigma_rel _ ?s |- _ ] =>
+             H': pstate_rel _ ?s |- _ ] =>
         eapply translate_exec in H; eauto;
           repeat deex; repeat inv_rel
       end.
 
-Lemma to_recovered_idempotent : forall T R Sigma (r: RResult Sigma R R),
+Lemma to_recovered_idempotent : forall T R PState (r: RResult PState R R),
     to_recovered (T:=T) (to_recovered (T:=R) r) = to_recovered r.
 Proof.
   destruct r; simpl; eauto.
 Qed.
 
-Theorem translate_exec_self_recover : forall R (rec: seq_prog R),
-    forall sigma r,
-      Prog.exec_recover (translate rec) (translate rec) sigma r ->
-      forall ssigma, sigma_rel ssigma sigma ->
-                exists sr, exec_recover rec rec ssigma sr /\
-                      rresult_rel sigma_rel sr r.
+Theorem translate_exec_self_recover : forall R (rec: prog R),
+    forall pstate r,
+      Prog.exec_recover (translate rec) (translate rec) pstate r ->
+      forall spstate, pstate_rel spstate pstate ->
+                exists sr, exec_recover rec rec spstate sr /\
+                      rresult_rel pstate_rel sr r.
 Proof.
   intros.
-  generalize dependent ssigma.
+  generalize dependent spstate.
   dependent induction H; simpl; intros;
     apply_translate.
-  - exists (RFinished v sigma1); intuition eauto.
+  - exists (RFinished v pstate1); intuition eauto.
   - exists (RFailed); intuition eauto.
   - specialize (IHexec_recover rec r0).
     repeat match type of IHexec_recover with
@@ -193,13 +193,13 @@ Proof.
              | _ => idtac
              end
            end.
-    admit. (* this seems to require some idempotence of the seq_prog recovery
+    admit. (* this seems to require some idempotence of the prog recovery
     procedure - surprising, but maybe it's required? *)
 Admitted.
 
-Lemma rresult_rel_recovered : forall Sigma1 Sigma2 rel T R
-                                (r: RResult Sigma1 R R)
-                                (r': RResult Sigma2 R R),
+Lemma rresult_rel_recovered : forall PState1 PState2 rel T R
+                                (r: RResult PState1 R R)
+                                (r': RResult PState2 R R),
     rresult_rel rel r r' ->
     rresult_rel (T:=T) rel (to_recovered r) (to_recovered r').
 Proof.
@@ -209,16 +209,16 @@ Qed.
 
 Hint Resolve rresult_rel_recovered.
 
-Theorem translate_exec_recover : forall T R (p: seq_prog T) (rec: seq_prog R),
-    forall sigma r,
+Theorem translate_exec_recover : forall T R (p: prog T) (rec: prog R),
+    forall pstate r,
       (* NOTE: the equivalent recovery procedure is more generally run before
       [translate rec]. However, we need some way to handoff the recovered memory
       state to [fun v => translate (rec v)] while also making [rec] a complete
-      program in [seq_prog]. *)
-      Prog.exec_recover (translate p) (translate rec) sigma r ->
-      forall ssigma, sigma_rel ssigma sigma ->
-                exists sr, exec_recover p rec ssigma sr /\
-                      rresult_rel sigma_rel sr r.
+      program in [prog]. *)
+      Prog.exec_recover (translate p) (translate rec) pstate r ->
+      forall spstate, pstate_rel spstate pstate ->
+                exists sr, exec_recover p rec spstate sr /\
+                      rresult_rel pstate_rel sr r.
 Proof.
   intros.
   remember (translate p).

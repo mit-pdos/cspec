@@ -1,74 +1,77 @@
 Require Import Prog.
 Require Import Mem.
 
-(* Defines seq_prog, sequential programs over sequential disks. *)
+(* Defines prog, programs over a single disks. *)
+
+(* TODO: need better names for these types - spstate and SPState for single disk
+states are quite awkward. *)
 
 Set Implicit Arguments.
 
-Inductive seq_prog : Type -> Type :=
-| SRead (a:addr) : seq_prog block
-| SWrite (a:addr) (b:block) : seq_prog unit
-| Ret T (v:T) : seq_prog T
-| Bind T T' (p: seq_prog T) (p': T -> seq_prog T') : seq_prog T'.
+Inductive prog : Type -> Type :=
+| SRead (a:addr) : prog block
+| SWrite (a:addr) (b:block) : prog unit
+| Ret T (v:T) : prog T
+| Bind T T' (p: prog T) (p': T -> prog T') : prog T'.
 
-Record SSigma :=
+Record SPState :=
   SDisk { sdisk: disk }.
 
-Definition rstep T (p:seq_prog T) (sigma:SSigma) : StepResult SSigma T :=
+Definition rstep T (p:prog T) (pstate:SPState) : StepResult SPState T :=
   match p with
   | SRead a =>
-    match (sdisk sigma) a with
-    | Some v => StepTo v sigma
+    match (sdisk pstate) a with
+    | Some v => StepTo v pstate
     | None => Fails
     end
   | SWrite a b =>
-    match (sdisk sigma) a with
-    | Some _ => let sigma' := SDisk (upd (sdisk sigma) a b) in
-               StepTo tt sigma'
+    match (sdisk pstate) a with
+    | Some _ => let pstate' := SDisk (upd (sdisk pstate) a b) in
+               StepTo tt pstate'
     | None => Fails
     end
-  | Ret v => StepTo v sigma
+  | Ret v => StepTo v pstate
   | Bind _ _ => NonDet
   end.
 
-Inductive exec : forall T, seq_prog T -> SSigma -> Result SSigma T -> Prop :=
-| ExecStepTo : forall T (p:seq_prog T) sigma v sigma',
-    rstep p sigma = StepTo v sigma' ->
-    exec p sigma (Finished v sigma')
-| ExecStepFail : forall T (p:seq_prog T) sigma,
-    rstep p sigma = Fails ->
-    exec p sigma Failed
-| ExecCrashAfter : forall T (p: seq_prog T) sigma v sigma',
-    rstep p sigma = StepTo v sigma' ->
-    exec p sigma (Crashed sigma')
-| ExecBindFinished : forall T T' (p: seq_prog T) (p': T -> seq_prog T')
-                       sigma v sigma' r,
-    exec p sigma (Finished v sigma') ->
-    exec (p' v) sigma' r ->
-    exec (Bind p p') sigma r
-| ExecCrashBefore : forall T (p: seq_prog T) sigma,
-    exec p sigma (Crashed sigma)
-| ExecBindCrashed : forall T T' (p: seq_prog T) (p': T -> seq_prog T')
-                      sigma sigma',
-    exec p sigma (Crashed sigma') ->
-    exec (Bind p p') sigma (Crashed sigma')
-| ExecBindFailed : forall T T' (p: seq_prog T) (p': T -> seq_prog T')
-                     sigma,
-    exec p sigma Failed ->
-    exec (Bind p p') sigma Failed.
+Inductive exec : forall T, prog T -> SPState -> Result SPState T -> Prop :=
+| ExecStepTo : forall T (p:prog T) pstate v pstate',
+    rstep p pstate = StepTo v pstate' ->
+    exec p pstate (Finished v pstate')
+| ExecStepFail : forall T (p:prog T) pstate,
+    rstep p pstate = Fails ->
+    exec p pstate Failed
+| ExecCrashAfter : forall T (p: prog T) pstate v pstate',
+    rstep p pstate = StepTo v pstate' ->
+    exec p pstate (Crashed pstate')
+| ExecBindFinished : forall T T' (p: prog T) (p': T -> prog T')
+                       pstate v pstate' r,
+    exec p pstate (Finished v pstate') ->
+    exec (p' v) pstate' r ->
+    exec (Bind p p') pstate r
+| ExecCrashBefore : forall T (p: prog T) pstate,
+    exec p pstate (Crashed pstate)
+| ExecBindCrashed : forall T T' (p: prog T) (p': T -> prog T')
+                      pstate pstate',
+    exec p pstate (Crashed pstate') ->
+    exec (Bind p p') pstate (Crashed pstate')
+| ExecBindFailed : forall T T' (p: prog T) (p': T -> prog T')
+                     pstate,
+    exec p pstate Failed ->
+    exec (Bind p p') pstate Failed.
 
-Inductive exec_recover T R : seq_prog T -> seq_prog R -> SSigma -> RResult SSigma T R -> Prop :=
-| RExec : forall (p:seq_prog T) (rec:seq_prog R) sigma v sigma',
-    exec p sigma (Finished v sigma') ->
-    exec_recover p rec sigma (RFinished v sigma')
-| RExecFailed : forall (p:seq_prog T) (rec:seq_prog R) sigma,
-    exec p sigma Failed ->
-    exec_recover p rec sigma RFailed
-| RExecCrash : forall (p:seq_prog T) (rec:seq_prog R) sigma sigma' r,
-    exec p sigma (Crashed sigma') ->
-    exec_recover (T:=R) rec rec sigma' r ->
-    exec_recover p rec sigma (to_recovered r).
+Inductive exec_recover T R : prog T -> prog R -> SPState -> RResult SPState T R -> Prop :=
+| RExec : forall (p:prog T) (rec:prog R) pstate v pstate',
+    exec p pstate (Finished v pstate') ->
+    exec_recover p rec pstate (RFinished v pstate')
+| RExecFailed : forall (p:prog T) (rec:prog R) pstate,
+    exec p pstate Failed ->
+    exec_recover p rec pstate RFailed
+| RExecCrash : forall (p:prog T) (rec:prog R) pstate pstate' r,
+    exec p pstate (Crashed pstate') ->
+    exec_recover (T:=R) rec rec pstate' r ->
+    exec_recover p rec pstate (to_recovered r).
 
 (* Local Variables: *)
-(* company-coq-local-symbols: (("Sigma" . ?Σ) ("sigma" . ?σ) ("sigma'" . (?σ (Br . Bl) ?'))) *)
+(* company-coq-local-symbols: (("PState" . ?Σ) ("pstate" . ?σ) ("pstate'" . (?σ (Br . Bl) ?'))) *)
 (* End: *)
