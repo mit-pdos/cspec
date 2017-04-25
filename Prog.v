@@ -97,6 +97,8 @@ Inductive exec : forall T, prog3 T -> Sigma -> Result Sigma T -> Prop :=
 | ExecStepFail : forall T (p:prog3 T) sigma,
     step p sigma = Fails ->
     exec p sigma Failed
+| ExecCrashBefore : forall T (p: prog3 T) sigma,
+    exec p sigma (Crashed sigma)
 | ExecCrashAfter : forall T (p: prog3 T) sigma v sigma',
     step p sigma = StepTo v sigma' ->
     exec p sigma (Crashed sigma')
@@ -105,8 +107,6 @@ Inductive exec : forall T, prog3 T -> Sigma -> Result Sigma T -> Prop :=
     exec p sigma (Finished v sigma') ->
     exec (p' v) sigma' r ->
     exec (Bind p p') sigma r
-| ExecCrashBefore : forall T (p: prog3 T) sigma,
-    exec p sigma (Crashed sigma)
 | ExecBindCrashed : forall T T' (p: prog3 T) (p': T -> prog3 T')
                    sigma sigma',
     (* Note: this introduces some executions redundant with ExecCrashBefore,

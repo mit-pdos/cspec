@@ -48,7 +48,22 @@ Section Memories.
   Qed.
 
   Definition upd m a v : mem A V :=
-    fun a' => if AEQ a a' then Some v else m a.
+    fun a' => if AEQ a a' then Some v else m a'.
+
+  Theorem upd_eq : forall m a v,
+      upd m a v a = Some v.
+  Proof.
+    unfold upd; intros.
+    destruct matches.
+  Qed.
+
+  Theorem upd_neq : forall m a v a',
+      a <> a' ->
+      upd m a v a' = m a'.
+  Proof.
+    unfold upd; intros.
+    destruct matches.
+  Qed.
 
   Theorem mem_disjoint_from_union_1 : forall m1 m2 m3,
       mem_disjoint (mem_union m1 m2) m3 ->
@@ -124,3 +139,6 @@ Section Memories.
 End Memories.
 
 Arguments emptyMem {A AEQ V}.
+
+Hint Rewrite upd_eq : upd.
+Hint Rewrite upd_neq using (solve [ auto ]) : upd.
