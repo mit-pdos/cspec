@@ -121,6 +121,37 @@ Inductive exec : forall T, prog3 T -> Sigma -> Result T -> Prop :=
     exec p sigma Failed ->
     exec (Bind p p') sigma Failed.
 
+(** analogous to [Result] for recovery *)
+Inductive RResult T R :=
+| RFinished (v:T) (sigma:Sigma)
+| Recovered (v:R) (sigma:Sigma)
+| RFailed.
+
+Arguments RFinished {T R} v sigma.
+Arguments Recovered {T R} v sigma.
+Arguments RFailed {T R}.
+
+(** mark a recovery result as always being recovered, since it was executed
+after a crash *)
+Definition to_recovered {T R} (r:RResult R R) : RResult T R :=
+  match r with
+  | RFinished v sigma => Recovered v sigma
+  | Recovered v sigma => Recovered v sigma
+  | RFailed => RFailed
+  end.
+
+Inductive exec_recover : forall T R, prog3 T -> prog3 R -> Sigma -> RResult T R -> Prop :=
+| RExec : forall T R (p:prog3 T) (rec:prog3 R) sigma v sigma',
+    exec p sigma (Finished v sigma') ->
+    exec_recover p rec sigma (RFinished v sigma')
+| RExecFailed : forall T R (p:prog3 T) (rec:prog3 R) sigma,
+    exec p sigma Failed ->
+    exec_recover p rec sigma RFailed
+| RExecCrash : forall T R (p:prog3 T) (rec:prog3 R) sigma sigma' r,
+    exec p sigma (Crashed sigma') ->
+    exec_recover rec rec sigma' r ->
+    exec_recover p rec sigma (to_recovered r).
+
 Notation "x <- p1 ; p2" := (Bind p1 (fun x => p2))
                             (at level 60, right associativity).
 Notation "'do' x .. y <- p1 ; p2" := (Bind p1 (fun x => .. (fun y => p2) ..))
