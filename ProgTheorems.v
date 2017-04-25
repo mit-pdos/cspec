@@ -1,6 +1,5 @@
 Require Import Automation.
 Require Import Prog.
-Require Import ProofIrrelevance.
 
 Set Implicit Arguments.
 
@@ -13,19 +12,6 @@ Theorem can_crash_at_begin : forall T (p: prog3 T) sigma,
 Proof.
   eauto.
 Qed.
-
-Ltac inj_pair2 :=
-  match goal with
-  | [ H: existT ?P ?A _ = existT ?P ?A _ |- _ ] =>
-    apply inj_pair2 in H; subst
-  end.
-
-Ltac inv_exec :=
-  match goal with
-  | [ H: exec _ _ _ |- _ ] =>
-    inversion H; subst; clear H;
-    repeat inj_pair2
-  end.
 
 Theorem can_crash_at_end : forall T (p: prog3 T) sigma v sigma',
     exec p sigma (Finished v sigma') ->
@@ -119,6 +105,19 @@ Proof.
   - destruct r; inv_exec; try cleanup_exec; eauto.
     eapply can_crash_at_end; eauto.
   - destruct r; eauto.
+Qed.
+
+Lemma exec_bind : forall T T' (p: prog3 T) (p': T -> prog3 T') pstate r,
+    exec (Bind p p') pstate r ->
+    (exists v pstate', exec p pstate (Finished v pstate') /\
+                  exec (p' v) pstate' r) \/
+    (exists pstate', exec p pstate (Crashed pstate') /\
+                r = Crashed pstate') \/
+    (exec p pstate Failed /\
+    r = Failed).
+Proof.
+  intros.
+  inv_exec; try simp_stepto; eauto.
 Qed.
 
 (* Local Variables: *)

@@ -3,6 +3,7 @@ Require Import EquivDec.
 
 Require Import Automation.
 Require Import Prog.
+Require Import ProgTheorems.
 Require SequentialDisk.
 
 Set Implicit Arguments.
@@ -100,18 +101,106 @@ Inductive result_rel PState1 PState2 (rel: PState1 -> PState2 -> Prop) T :
 Hint Constructors result_rel.
 Hint Constructors Prog.exec.
 
-Ltac prog_bind :=
-  eapply Prog.ExecBindFinished.
-Ltac prog_step :=
-  first [ eapply Prog.ExecStepTo ||
-                 eapply Prog.ExecStepFail ];
-  simpl; simpl_match; eauto.
+(* TODO: cleanup these almost Hoare specs:
 
-Ltac simp_stepto :=
+ move them into a BasicSpecs file, and probably make them proper Hoare
+ quadruples *)
+
+Lemma Read_ok : forall i a pstate r,
+    Prog.exec (Read i a) pstate r ->
+    match r with
+    | Finished v pstate' => disk_id i pstate a = Some v /\
+                           pstate' = pstate
+    | Crashed pstate' => pstate' = pstate
+    | Failed => disk_id i pstate a = None
+    end.
+Proof.
+  intros.
+  inv_exec; try simp_stepto; intuition eauto.
+Qed.
+
+Lemma Write_ok : forall i a b pstate r,
+    Prog.exec (Write i a b) pstate r ->
+    match r with
+    | Finished v pstate' => (exists v0, disk_id i pstate a = Some v0) /\
+                           pstate' = upd_disk i pstate (fun d => Mem.upd d a b)
+    | Crashed pstate' => pstate' = pstate \/
+                        pstate' = upd_disk i pstate (fun d => Mem.upd d a b)
+    | Failed => disk_id i pstate a = None
+    end.
+Proof.
+  intros.
+  inv_exec; try simp_stepto; intuition eauto.
+Qed.
+
+Lemma RRead_impl_ok : forall a pstate r,
+    Prog.exec (RRead_impl a) pstate r ->
+    match r with
+    | Finished v pstate' => (exists v0 v1 v2, disk0 pstate a = Some v0 /\
+                           disk1 pstate a = Some v1 /\
+                           disk2 pstate a = Some v2 /\
+                           v = vote v0 v1 v2) /\
+                           pstate' = pstate
+    | Crashed pstate' => pstate' = pstate
+    | Failed => (disk0 pstate a = None \/
+                disk1 pstate a = None \/
+                disk2 pstate a = None)
+    end.
+Proof.
+  unfold RRead_impl; intros.
+
+  eapply exec_bind in H.
+  intuition; repeat deex;
+    match goal with
+    | [ H: Prog.exec (Read _ _) _ _ |- _ ] =>
+      apply Read_ok in H; safe_intuition;
+        cbn [disk_id] in *; subst
+    end; auto.
+
+  eapply exec_bind in H0;
+    intuition; repeat deex;
+      match goal with
+      | [ H: Prog.exec (Read _ _) _ _ |- _ ] =>
+        apply Read_ok in H; safe_intuition;
+          cbn [disk_id] in *; subst
+      end; auto.
+
+  eapply exec_bind in H1;
+    intuition; repeat deex;
+      match goal with
+      | [ H: Prog.exec (Read _ _) _ _ |- _ ] =>
+        apply Read_ok in H; safe_intuition;
+          cbn [disk_id] in *; subst
+      end; auto.
+
+  apply exec_ret in H2.
+  destruct r; intuition.
+  subst; descend; intuition eauto.
+Qed.
+
+Lemma opts_eq : forall T a (v v':T),
+    a = Some v ->
+    a = Some v' ->
+    v = v'.
+Proof.
+  intros; subst.
+  inversion H0; auto.
+Qed.
+
+Lemma opt_discriminate : forall T a (v:T),
+    a = Some v ->
+    a = None ->
+    False.
+Proof.
+  intros; subst.
+  discriminate.
+Qed.
+
+Hint Constructors exec.
+
+Ltac inv_rel :=
   match goal with
-  | [ H: rstep _ _ = StepTo _ _ |- _ ] =>
-    progress cbn [rstep] in H;
-    destruct_nongoal_matches;
+  | [ H: result_rel _ _ _ |- _ ] =>
     inversion H; subst; clear H
   end.
 
@@ -119,10 +208,49 @@ Theorem translate_exec : forall T (p: prog T),
     forall pstate r,
       Prog.exec (translate p) pstate r ->
       forall spstate, pstate_rel spstate pstate ->
-                exists sr, exec p spstate sr /\
-                      result_rel pstate_rel sr r.
+                 exists sr, exec p spstate sr /\
+                       result_rel pstate_rel sr r.
 Proof.
   induction p; simpl; intros.
+  - apply RRead_impl_ok in H.
+    pose proof (H0 a).
+    destruct (sdisk spstate a) eqn:?;
+             repeat deex.
+    destruct r; safe_intuition; repeat deex; subst; eauto.
+    repeat match goal with
+           | [ H: ?a = Some _, H': ?a = Some _ |- _ ] =>
+             pose proof (opts_eq H H');
+               clear H';
+               subst
+           end.
+    exists (Finished (vote v0 v1 v2) spstate);
+      intuition eauto.
+    eapply ExecStepTo; simpl; simpl_match; eauto.
+    intuition;
+      solve [ exfalso; eauto using opt_discriminate ].
+
+    destruct r; safe_intuition; repeat deex; subst; eauto.
+    solve [ exfalso; eauto using opt_discriminate ].
+    clear H.
+    exists Failed; intuition eauto.
+    eapply ExecStepFail; simpl; simpl_match; auto.
+  - admit.
+  - apply exec_ret in H.
+    destruct r; safe_intuition; subst; eauto.
+    exists (Finished v0 spstate); intuition eauto.
+    exists Failed; intuition eauto.
+  - eapply exec_bind in H0; intuition; repeat deex; subst.
+    + specialize (IHp _ _ ltac:(eauto) _ ltac:(eauto)).
+      repeat deex; inv_rel.
+      specialize (H _ _ _ ltac:(eauto) _ ltac:(eauto)).
+      repeat deex.
+      eauto.
+    + specialize (IHp _ _ ltac:(eauto) _ ltac:(eauto)).
+      repeat deex; inv_rel.
+      eauto.
+    + specialize (IHp _ _ ltac:(eauto) _ ltac:(eauto)).
+      repeat deex; inv_rel.
+      eauto.
 Admitted.
 
 Inductive rresult_rel PState1 PState2 (rel: PState1 -> PState2 -> Prop) T R :
@@ -138,12 +266,6 @@ Inductive rresult_rel PState1 PState2 (rel: PState1 -> PState2 -> Prop) T R :
 
 Hint Constructors rresult_rel.
 Hint Constructors exec_recover.
-
-Ltac inv_rel :=
-  match goal with
-  | [ H: result_rel _ _ _ |- _ ] =>
-    inversion H; subst; clear H
-  end.
 
 Lemma RExecCrash_eq : forall T R (p: prog T) (rec: prog R)
                         pstate pstate' r r',

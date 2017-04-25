@@ -1,3 +1,6 @@
+Require Import ProofIrrelevance.
+
+Require Import Automation.
 Require Import Mem.
 Require Import Bytes.
 
@@ -156,6 +159,33 @@ Notation "x <- p1 ; p2" := (Bind p1 (fun x => p2))
 Notation "'do' x .. y <- p1 ; p2" := (Bind p1 (fun x => .. (fun y => p2) ..))
                                       (at level 60, right associativity,
                                        x binder, y binder, only parsing).
+
+(* A bit of automation to prove properties of executions. *)
+
+Ltac inj_pair2 :=
+  match goal with
+  | [ H: existT ?P ?A _ = existT ?P ?A _ |- _ ] =>
+    apply inj_pair2 in H; subst
+  end.
+
+Ltac inv_exec :=
+  match goal with
+  | [ H: exec _ _ _ |- _ ] =>
+    inversion H; subst; clear H;
+    repeat inj_pair2
+  end.
+
+Ltac simp_stepto :=
+  match goal with
+  | [ H: step _ _ = StepTo _ _ |- _ ] =>
+    progress cbn [step] in H;
+    destruct_nongoal_matches;
+    inversion H; subst; clear H
+  | [ H: step _ _ = Fails |- _ ] =>
+    progress cbn [step] in H;
+    destruct_nongoal_matches;
+    inversion H; subst; clear H
+  end.
 
 (* Local Variables: *)
 (* company-coq-local-symbols: (("PState" . ?Σ) ("pstate" . ?σ) ("pstate'" . (?σ (Br . Bl) ?'))) *)
