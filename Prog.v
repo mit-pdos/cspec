@@ -18,7 +18,7 @@ manipulate disks with the primitive Read, Write, and Sync opcodes. *)
 Inductive prog3 : Type -> Type :=
 | Read (i:diskId) (a:addr) : prog3 block
 | Write (i:diskId) (a:addr) (b:block) : prog3 unit
-| Ret T (v:T) : prog3 T
+| Ret {T} (v:T) : prog3 T
 | Bind T T' (p: prog3 T) (p': T -> prog3 T') : prog3 T'.
 
 Definition disk := mem addr block.
