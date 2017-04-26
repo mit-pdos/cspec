@@ -79,25 +79,17 @@ Module D.
              eapply TD.Write_ok in H; simpl in H; safe_intuition
            end.
     destruct matches; safe_intuition; subst;
+      hide_fn TD.abstraction;
       match goal with
       | [ H: invariant _ |- _ ] =>
         pose proof (H a); repeat (simpl_match || deex)
       end.
-
-    all: repeat match goal with
-    | |- context[TD.abstraction ?w] => generalize dependent (TD.abstraction w); clear w; intro w; intros
-    | H: context[TD.abstraction ?w] |- _ => generalize dependent (TD.abstraction w); clear w; intro w; intros
-    end.
-
-    - subst.
-      rewrite TDSpec.get_disk1_upd_d0 in *.
-      simpl_match.
-      subst.
+    - rewrite TDSpec.get_disk1_upd_d0 in *.
+      simpl_match; subst.
       destruct t; simpl.
       intuition eauto.
-    - subst; repeat simpl_match.
+    - repeat (subst || simpl_match).
       intuition eauto.
-      subst; auto.
   Qed.
 
 End D.
