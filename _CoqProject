@@ -1,10 +1,9 @@
 -R . Pocs
-
 Automation.v
-Mem.v
 Bytes.v
-Prog.v
-ProgTheorems.v
-Hoare.v
-SequentialDisk.v
-ReplicatedDisk.v
+Mem.v
+Shallow/Hoare.v
+Shallow/Prog.v
+Shallow/ProgTheorems.v
+Shallow/ReplicatedDisk.v
+Shallow/SequentialDisk.v
