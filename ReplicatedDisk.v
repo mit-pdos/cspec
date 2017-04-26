@@ -225,6 +225,9 @@ Definition pstate_rel (spstate:SPState) (pstate:PState) : Prop :=
 Hint Constructors Prog.exec.
 Hint Constructors exec.
 
+(* TODO; these proofs are really slow, and I think destructing equalities using
+the EqDec typeclass is the culprit. *)
+
 Lemma pstate_rel_upd_all : forall spstate d_0 d_1 d_2 a b,
     pstate_rel spstate (Disks d_0 d_1 d_2) ->
     pstate_rel (SDisk (upd (sdisk spstate) a b))
