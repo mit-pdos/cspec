@@ -59,13 +59,13 @@ Definition RWrite_impl (a:addr) (b:block) : prog3 unit :=
 Import SequentialDisk.
 
 Fixpoint translate T (p: prog T) : prog3 T :=
- match p with
- | SRead a => RRead_impl a
- | SWrite a b => RWrite_impl a b
- | Ret v => Prog.Ret v
- | Bind p p' => Prog.Bind (translate p)
-                         (fun r => translate (p' r))
- end.
+  match p with
+  | SRead a => RRead_impl a
+  | SWrite a b => RWrite_impl a b
+  | Ret v => Prog.Ret v
+  | Bind p p' => Prog.Bind (translate p)
+                          (fun r => translate (p' r))
+  end.
 
 (** We will now show a simulation between the single-disk semantics and
 single-disk programs implemented using replication on top of a 3-disk
@@ -120,8 +120,8 @@ Ltac step p_ok :=
   | [ H: Prog.exec (Prog.Ret _) _ _ |- _ ] =>
     eapply exec_ret in H;
     try lazymatch type of H with
-    | match ?r with | _ => _ end =>
-      destruct r; hyp_intuition
+        | match ?r with | _ => _ end =>
+          destruct r; hyp_intuition
         end;
     cleanup
   | [ H: Prog.exec (Prog.Bind ?p _) _ _ |- _ ] =>
@@ -193,10 +193,10 @@ Proof.
 Qed.
 
 Ltac opts_eq :=
-      repeat match goal with
-             | [ H: ?a = Some _, H': ?a = Some _ |- _ ] =>
-               pose proof (opts_eq H H'); clear H'; subst
-             end.
+  repeat match goal with
+         | [ H: ?a = Some _, H': ?a = Some _ |- _ ] =>
+           pose proof (opts_eq H H'); clear H'; subst
+         end.
 
 Lemma opt_discriminate : forall T a (v:T),
     a = Some v ->
@@ -455,12 +455,12 @@ Qed.
 Hint Resolve RExecCrash_eq.
 
 Ltac apply_translate :=
-match goal with
-      | [ H: Prog.exec (translate _) ?s _,
-             H': pstate_rel _ ?s |- _ ] =>
-        eapply translate_exec in H; eauto;
-          repeat deex; repeat inv_rel
-      end.
+  match goal with
+  | [ H: Prog.exec (translate _) ?s _,
+         H': pstate_rel _ ?s |- _ ] =>
+    eapply translate_exec in H; eauto;
+    repeat deex; repeat inv_rel
+  end.
 
 Lemma to_recovered_idempotent : forall T R PState (r: RResult PState R R),
     to_recovered (T:=T) (to_recovered (T:=R) r) = to_recovered r.
