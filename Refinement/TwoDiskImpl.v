@@ -12,17 +12,21 @@ Module TD.
   Axiom Write : diskId -> addr -> block -> IO unit.
 
   Axiom abstraction : world -> TDSpec.State.
+  (* any world state, and thus any TD state that the abstraction function might
+  produce, is ok, so we use a trivial invariant below *)
 
   Axiom Read_ok : forall i a,
       implements
         (TDSpec.Read i a)
         (io_semantics (Read i a))
-        abstraction.
+        abstraction
+        (fun _ => True).
 
   Axiom Write_ok : forall i a b,
       implements
         (TDSpec.Write i a b)
         (io_semantics (Write i a b))
-        abstraction.
+        abstraction
+        (fun _ => True).
 
 End TD.

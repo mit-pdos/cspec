@@ -25,9 +25,10 @@ Section Implements.
   Variable Spec:Semantics T.
   Variable Impl:Semantics T.
   Variable abstraction: State Impl -> State Spec.
+  Variable invariant : State Impl -> Prop.
 
   (* A proof of [implements] shows that [Impl] implements [Spec] via an
-  abstraction function [abstraction].
+  abstraction function [abstraction], preserving [invariant].
 
    The order of the arguments is chosen to go from more interesting to less
    interesting:
@@ -36,9 +37,13 @@ Section Implements.
      functions and primitives
    - the abstraction relation is both a proof tool and defines how physical
      states line up
+   - the invariant is mostly a proof tool, although it can't be too restrictive
+     since the system must be started from a state satisfying this predicate
    *)
   Definition implements :=
     forall t v t', Step Impl t v t' ->
-              Step Spec (abstraction t) v (abstraction t').
+              invariant t ->
+              Step Spec (abstraction t) v (abstraction t') /\
+              invariant t'.
 
 End Implements.

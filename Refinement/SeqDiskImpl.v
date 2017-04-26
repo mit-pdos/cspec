@@ -17,11 +17,30 @@ Module D.
   Definition abstraction : TDSpec.State -> DSpec.State :=
     fun ds => DSpec.Disk (TDSpec.disk0 ds).
 
+  Definition invariant (ds:TDSpec.State) :=
+    forall a, match TDSpec.disk0 ds a with
+         | Some v0 => exists v1, TDSpec.disk1 ds a = Some v1
+         | None => TDSpec.disk1 ds a = None
+         end.
+
+  (* we need this lemma due to some terrible behavior in congruence:
+   https://coq.inria.fr/bugs/show_bug.cgi?id=5394 *)
+  Lemma invariant_respects_eq : forall ds ds',
+      ds = ds' ->
+      invariant ds ->
+      invariant ds'.
+  Proof.
+    intros; subst; auto.
+  Qed.
+
+  Hint Resolve invariant_respects_eq.
+
   Theorem Read_ok : forall a,
       implements
         (DSpec.Read a)
         (io_semantics (Read a))
-        (fun w => abstraction (TD.abstraction w)).
+        (fun w => abstraction (TD.abstraction w))
+        (fun w => invariant (TD.abstraction w)).
   Proof.
     intros.
     unfold implements; simpl; intros.
@@ -29,14 +48,27 @@ Module D.
     step.
     step.
     eapply TD.Read_ok in H; simpl in H; safe_intuition.
-    destruct matches; intuition subst; try congruence.
+    destruct matches; intuition (subst; eauto); try congruence.
   Qed.
+
+  Lemma invariant_stable_upd : forall d_0 d_1 a b,
+      invariant (TDSpec.Disks d_0 d_1) ->
+      invariant (TDSpec.Disks (upd d_0 a b) (upd d_1 a b)).
+  Proof.
+    unfold invariant; simpl; intros.
+    destruct (a == a0); unfold equiv, complement in *; subst;
+      autorewrite with upd; eauto.
+    apply H.
+  Qed.
+
+  Hint Resolve invariant_stable_upd.
 
   Theorem Write_ok : forall a b,
       implements
         (DSpec.Write a b)
         (io_semantics (Write a b))
-        (fun w => abstraction (TD.abstraction w)).
+        (fun w => abstraction (TD.abstraction w))
+        (fun w => invariant (TD.abstraction w)).
   Proof.
     intros.
     unfold implements; simpl; intros.
@@ -46,9 +78,20 @@ Module D.
            | [ H: io_step (TD.Write _ _ _) _ _ _ |- _ ] =>
              eapply TD.Write_ok in H; simpl in H; safe_intuition
            end.
-    destruct matches; intuition subst.
-    (* actually need to know invariant that domains are equal; implements
-     relation should incorporate an invariant over the impl states *)
-  Abort.
+    destruct matches; safe_intuition; subst;
+      match goal with
+      | [ H: invariant _ |- _ ] =>
+        pose proof (H a); repeat (simpl_match || deex)
+      end.
+    - replace (TD.abstraction w') in *.
+      rewrite TDSpec.get_disk1_upd_d0 in *.
+      simpl_match.
+      replace (TD.abstraction w'0).
+      destruct (TD.abstraction t); simpl.
+      intuition eauto.
+    - replace (TD.abstraction w') in *; repeat simpl_match.
+      intuition eauto.
+      replace (TD.abstraction w'0); auto.
+  Qed.
 
 End D.

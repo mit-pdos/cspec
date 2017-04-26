@@ -161,6 +161,11 @@ Ltac safe_intuition :=
   repeat match goal with
          | [ H: _ /\ _ |- _ ] =>
            destruct H
+         | [ H: ?P -> _ |- _ ] =>
+           lazymatch type of P with
+           | Prop => specialize (H ltac:(auto))
+           | _ => fail
+           end
          end.
 
 Ltac hyp_intuition :=

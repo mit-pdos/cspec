@@ -23,6 +23,12 @@ Module TDSpec.
     | d1 => Disks d_0 (f d_1)
     end.
 
+  Lemma get_disk1_upd_d0 : forall state f,
+      disk1 (upd_disk d0 f state) = disk1 state.
+  Proof.
+    destruct state; eauto.
+  Qed.
+
   Definition Read i a : Semantics block :=
     StepRel (fun state r state' =>
                match get_disk i state a with
@@ -34,7 +40,7 @@ Module TDSpec.
     StepRel (fun state r state' =>
                match get_disk i state a with
                | Some v0 => state' = upd_disk i (fun d => upd d a b) state
-               | None => True (* new disk is arbitrary *)
+               | None => state' = state (* silently fails *)
                end).
 
 End TDSpec.
