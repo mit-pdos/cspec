@@ -9,7 +9,11 @@ Require Export Refinement.IO.
    One can think of a [Semantics T] as a fragment of step, and one that produces
    a T-typed result. *)
 Record Semantics T :=
+  (* we name the constructor for [Semantics] StepRel since it takes State
+  implicitly and thus converts a relation to a Semantics. *)
   StepRel { State : Type;
+            (* when [Step state r state'] holds, then this operation can step from [state]
+            to [state'] and return [r]. *)
             Step : State -> T -> State -> Prop; }.
 
 Definition io_semantics T (p:IO T) : Semantics T :=
@@ -21,9 +25,6 @@ Section Implements.
   Variable Spec:Semantics T.
   Variable Impl:Semantics T.
   Variable abstraction: State Impl -> State Spec.
-
-  Implicit Type t : State Impl.
-  Implicit Type s : State Spec.
 
   (* A proof of [implements] shows that [Impl] implements [Spec] via an
   abstraction function [abstraction].

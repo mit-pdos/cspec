@@ -21,7 +21,3 @@ Module DSpec.
                end).
 
 End DSpec.
-
-(* Local Variables: *)
-(* company-coq-local-symbols: (("State" . ?Σ) ("state" . ?σ) ("state'" . (?σ (Br . Bl) ?'))) *)
-(* End: *)

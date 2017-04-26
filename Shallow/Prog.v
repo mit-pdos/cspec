@@ -186,7 +186,3 @@ Ltac simp_stepto :=
     destruct_nongoal_matches;
     inversion H; subst; clear H
   end.
-
-(* Local Variables: *)
-(* company-coq-local-symbols: (("PState" . ?Σ) ("pstate" . ?σ) ("pstate'" . (?σ (Br . Bl) ?'))) *)
-(* End: *)

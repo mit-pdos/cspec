@@ -119,7 +119,3 @@ Proof.
   intros.
   inv_exec; try simp_stepto; eauto.
 Qed.
-
-(* Local Variables: *)
-(* company-coq-local-symbols: (("Pstate" . ?Σ) ("pstate" . ?σ) ("pstate'" . (?σ (Br . Bl) ?'))) *)
-(* End: *)

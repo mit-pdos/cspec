@@ -71,7 +71,3 @@ Inductive exec_recover T R : prog T -> prog R -> SPState -> RResult SPState T R 
     exec p pstate (Crashed pstate') ->
     exec_recover (T:=R) rec rec pstate' r ->
     exec_recover p rec pstate (to_recovered r).
-
-(* Local Variables: *)
-(* company-coq-local-symbols: (("PState" . ?Σ) ("pstate" . ?σ) ("pstate'" . (?σ (Br . Bl) ?'))) *)
-(* End: *)
