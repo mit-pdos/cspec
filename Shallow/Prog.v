@@ -1,4 +1,5 @@
 Require Import ProofIrrelevance.
+Require Import EquivDec.
 
 Require Import Automation.
 Require Import Mem.
@@ -10,6 +11,8 @@ Set Implicit Arguments.
 
 Definition addr := nat.
 Definition block := bytes 4096.
+(* Speeds up typeclass resolution by a lot, due to the large constant 4096 *)
+Instance block_dec : EqDec block eq := bytes_dec 4096.
 
 Inductive diskId := d0 | d1 | d2.
 
