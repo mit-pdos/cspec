@@ -1,14 +1,11 @@
-Require Import Disk.
+Require Export Disk.
 Require Import Mem.
 Require Import Implements.
 
 Inductive diskId := d0 | d1.
 
-(* TD is an API for operations that manipulate two disks. *)
-Module TD.
-
-  Axiom Read : diskId -> addr -> IO block.
-  Axiom Write : diskId -> addr -> block -> IO unit.
+(* TDSpec is an API for operations that manipulate two disks. *)
+Module TDSpec.
 
   Record State :=
     Disks { disk0: disk;
@@ -27,29 +24,21 @@ Module TD.
     | d1 => Disks d_0 (f d_1)
     end.
 
-  Axiom abstraction : world -> State.
+  Definition Read i a : Semantics block :=
+    StepRel (fun state v state' =>
+                match get_disk i state a with
+                | Some v0 => v = v0
+                | None => True
+                end /\ state' = state).
 
-  Axiom Read_spec : forall i a,
-      implements
-        (StepRel (fun state v state' =>
-                    match get_disk i state a with
-                    | Some v0 => v = v0
-                    | None => True
-                    end /\ state' = state))
-        (io_semantics (Read i a))
-        abstraction.
+  Definition Write i a b : Semantics unit :=
+    StepRel (fun state v state' =>
+               match get_disk i state a with
+               | Some v0 => state' = upd_disk i (fun d => upd d a b) state
+               | None => True (* new disk is arbitrary *)
+               end).
 
-  Axiom Write_spec : forall i a b,
-      implements
-        (StepRel (fun state v state' =>
-                    match get_disk i state a with
-                    | Some v0 => state' = upd_disk i (fun d => upd d a b) state
-                    | None => True (* new disk is arbitrary *)
-                    end))
-        (io_semantics (Write i a b))
-        abstraction.
-
-End TD.
+End TDSpec.
 
 (* Local Variables: *)
 (* company-coq-local-symbols: (("State" . ?Σ) ("state" . ?σ) ("state'" . (?σ (Br . Bl) ?'))) *)

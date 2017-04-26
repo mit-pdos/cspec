@@ -6,6 +6,7 @@ Refinement/Disk.v
 Refinement/IO.v
 Refinement/Implements.v
 Refinement/TwoDiskAPI.v
+Refinement/TwoDiskImpl.v
 Shallow/Hoare.v
 Shallow/Prog.v
 Shallow/ProgTheorems.v
