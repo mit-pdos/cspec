@@ -51,26 +51,37 @@ Module Monad.
 
   Hint Resolve ret_does_step bind_does_step.
 
+  Local Ltac t :=
+    repeat match goal with
+           | |- io_equiv _ _ => split
+           | [ H: io_step (Bind _ _) _ _ _ |- _ ] =>
+             eapply bind_step in H; repeat deex
+           | [ H: io_step (Ret _) _ _ _ |- _ ] =>
+             eapply ret_step in H; intuition subst
+           | _ => progress intros
+           end; eauto 10.
+
   Theorem monad_left_id : forall T (v:T) T' (p: T -> IO T'),
       io_equiv (io_step (Bind (Ret v) p))
                (io_step (p v)).
   Proof.
-    intros.
-    split; intros.
-    - apply bind_step in H; repeat deex.
-      apply ret_step in H; intuition; subst; eauto.
-    - eauto.
+    t.
   Qed.
 
   Theorem monad_right_id : forall T (p: IO T),
       io_equiv (io_step (Bind p Ret))
                (io_step p).
   Proof.
-    intros.
-    split; intros.
-    - apply bind_step in H; repeat deex.
-      apply ret_step in H0; intuition; subst; eauto.
-    - eauto.
+    t.
+  Qed.
+
+  Theorem monad_assoc : forall T (p: IO T)
+                          T' (p': T -> IO T')
+                          T'' (p'': T' -> IO T''),
+      io_equiv (io_step (Bind (Bind p p') p''))
+               (io_step (Bind p (fun v => Bind (p' v) p''))).
+  Proof.
+    t.
   Qed.
 
 End Monad.
