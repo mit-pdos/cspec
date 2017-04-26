@@ -436,8 +436,7 @@ Inductive rresult_rel PState1 PState2 (rel: PState1 -> PState2 -> Prop) T R :
 | Recovered_rel : forall pstate1 pstate2 r,
     rel pstate1 pstate2 ->
     rresult_rel rel (Recovered r pstate1) (Recovered r pstate2)
-(* TODO: as above, change to [forall r, rresult_rel r Fail] *)
-| RFailed_rel : rresult_rel rel RFailed RFailed.
+| RFailed_rel : forall r, rresult_rel rel RFailed r.
 
 Hint Constructors rresult_rel.
 Hint Constructors exec_recover.
@@ -473,15 +472,15 @@ Theorem translate_exec_self_recover : forall R (rec: prog R),
     forall pstate r,
       Prog.exec_recover (translate rec) (translate rec) pstate r ->
       forall spstate, pstate_rel spstate pstate ->
-                exists sr, exec_recover rec rec spstate sr /\
-                      rresult_rel pstate_rel sr r.
+                 exists sr, exec_recover rec rec spstate sr /\
+                       rresult_rel pstate_rel sr r.
 Proof.
   intros.
   generalize dependent spstate.
   dependent induction H; simpl; intros;
-    apply_translate.
+    apply_translate;
+    try solve [ exists RFailed; intuition eauto ].
   - exists (RFinished v pstate1); intuition eauto.
-  - exists (RFailed); intuition eauto.
   - specialize (IHexec_recover rec r0).
     repeat match type of IHexec_recover with
            | ?P -> _ =>
@@ -514,19 +513,17 @@ Theorem translate_exec_recover : forall T R (p: prog T) (rec: prog R),
       program in [prog]. *)
       Prog.exec_recover (translate p) (translate rec) pstate r ->
       forall spstate, pstate_rel spstate pstate ->
-                exists sr, exec_recover p rec spstate sr /\
-                      rresult_rel pstate_rel sr r.
+                 exists sr, exec_recover p rec spstate sr /\
+                       rresult_rel pstate_rel sr r.
 Proof.
   intros.
   remember (translate p).
   remember (translate rec).
-  destruct H; simpl; intros; subst.
-  - apply_translate.
-    descend; intuition eauto.
-  - apply_translate.
-    descend; intuition eauto.
-  - apply_translate.
-    eapply translate_exec_self_recover in H1; eauto;
+  destruct H; simpl; intros; subst;
+    apply_translate;
+    try solve [ exists RFailed; intuition eauto ].
+  - descend; intuition eauto.
+  - eapply translate_exec_self_recover in H1; eauto;
       repeat deex.
     exists (to_recovered sr); intuition eauto.
 Qed.
