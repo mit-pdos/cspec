@@ -53,7 +53,8 @@ Definition RRead_impl (a:addr) : prog3 block :=
 Definition RWrite_impl (a:addr) (b:block) : prog3 unit :=
   _ <- Write d0 a b;
     _ <- Write d1 a b;
-    Write d2 a b.
+    _ <- Write d2 a b;
+    Ret tt.
 
 Import SequentialDisk.
 
@@ -114,133 +115,104 @@ Hint Constructors Prog.exec.
  move them into a BasicSpecs file, and probably make them proper Hoare
  quadruples *)
 
-Lemma Read_ok : forall i a pstate r,
+Lemma Read_ok : forall i v0 a pstate r,
+    disk_id i pstate a = Some v0 ->
     Prog.exec (Read i a) pstate r ->
     match r with
-    | Finished v pstate' => disk_id i pstate a = Some v /\
+    | Finished v pstate' => v = v0 /\
                            pstate' = pstate
     | Crashed pstate' => pstate' = pstate
-    | Failed => disk_id i pstate a = None
+    | Failed => False
     end.
 Proof.
   intros.
   inv_exec; try simp_stepto; intuition eauto.
 Qed.
 
-Lemma Write_ok : forall i a b pstate r,
+Lemma Write_ok : forall i a v0 b pstate r,
+    disk_id i pstate a = Some v0 ->
     Prog.exec (Write i a b) pstate r ->
     match r with
-    | Finished v pstate' => (exists v0, disk_id i pstate a = Some v0) /\
-                           pstate' = upd_disk i pstate (fun d => upd d a b)
+    | Finished v pstate' => pstate' = upd_disk i pstate (fun d => upd d a b)
     | Crashed pstate' => pstate' = pstate \/
-                        (pstate' = upd_disk i pstate (fun d => upd d a b) /\
-                         exists v0, disk_id i pstate a = Some v0)
-    | Failed => disk_id i pstate a = None
+                        pstate' = upd_disk i pstate (fun d => upd d a b)
+    | Failed => False
     end.
 Proof.
   intros.
   inv_exec; try simp_stepto; intuition eauto.
 Qed.
 
-Lemma RRead_impl_ok : forall a pstate r,
+(* especially to deal with fallout from applying specs *)
+Ltac cleanup :=
+  safe_intuition; subst; eauto; try contradiction.
+
+Ltac step p_ok :=
+  match goal with
+  | [ H: Prog.exec (Prog.Ret _) _ _ |- _ ] =>
+    eapply exec_ret in H;
+    try lazymatch type of H with
+    | match ?r with | _ => _ end =>
+      destruct r; hyp_intuition
+        end;
+    cleanup
+  | [ H: Prog.exec (Prog.Bind ?p _) _ _ |- _ ] =>
+    eapply exec_bind in H; hyp_intuition; repeat deex;
+    try lazymatch goal with
+        | [ H: Prog.exec p _ _ |- _ ] =>
+          eapply p_ok in H; eauto; cleanup
+        end
+  end.
+
+Lemma RRead_impl_ok : forall a v0 v1 v2 pstate r,
+    disk0 pstate a = Some v0 ->
+    disk1 pstate a = Some v1 ->
+    disk2 pstate a = Some v2 ->
     Prog.exec (RRead_impl a) pstate r ->
     match r with
-    | Finished v pstate' => (exists v0 v1 v2, disk0 pstate a = Some v0 /\
-                           disk1 pstate a = Some v1 /\
-                           disk2 pstate a = Some v2 /\
-                           v = vote v0 v1 v2) /\
+    | Finished v pstate' => v = vote v0 v1 v2 /\
                            pstate' = pstate
     | Crashed pstate' => pstate' = pstate
-    | Failed => (disk0 pstate a = None \/
-                disk1 pstate a = None \/
-                disk2 pstate a = None)
+    | Failed => False
     end.
 Proof.
   unfold RRead_impl; intros.
 
-  eapply exec_bind in H.
-  intuition; repeat deex;
-    match goal with
-    | [ H: Prog.exec (Read _ _) _ _ |- _ ] =>
-      apply Read_ok in H; safe_intuition;
-        cbn [disk_id] in *; subst
-    end; auto.
-
-  eapply exec_bind in H0;
-    intuition; repeat deex;
-      match goal with
-      | [ H: Prog.exec (Read _ _) _ _ |- _ ] =>
-        apply Read_ok in H; safe_intuition;
-          cbn [disk_id] in *; subst
-      end; auto.
-
-  eapply exec_bind in H1;
-    intuition; repeat deex;
-      match goal with
-      | [ H: Prog.exec (Read _ _) _ _ |- _ ] =>
-        apply Read_ok in H; safe_intuition;
-          cbn [disk_id] in *; subst
-      end; auto.
-
-  apply exec_ret in H2.
-  destruct r; intuition.
-  subst; descend; intuition eauto.
+  step Read_ok.
+  step Read_ok.
+  step Read_ok.
+  step tt.
 Qed.
 
-Lemma RWrite_impl_ok : forall a b pstate r,
+Lemma RWrite_impl_ok : forall a b v0 v1 v2 pstate r,
+    disk0 pstate a = Some v0 ->
+    disk1 pstate a = Some v1 ->
+    disk2 pstate a = Some v2 ->
     Prog.exec (RWrite_impl a b) pstate r ->
     match r with
-    | Finished u pstate' => (exists v0 v1 v2, disk0 pstate a = Some v0 /\
-                           disk1 pstate a = Some v1 /\
-                           disk2 pstate a = Some v2 /\
-                           u = tt) /\
+    | Finished u pstate' => u = tt /\
                            let 'Disks d_0 d_1 d_2 := pstate in
                            pstate' = Disks (upd d_0 a b) (upd d_1 a b) (upd d_2 a b)
     | Crashed pstate' =>
       let 'Disks d_0 d_1 d_2 := pstate in
       pstate' = pstate \/
-      (pstate' = Disks (upd d_0 a b) d_1 d_2 /\
-       exists v0, d_0 a = Some v0) \/
-      (pstate' = Disks (upd d_0 a b) (upd d_1 a b) d_2 /\
-       exists v0 v1, d_0 a = Some v0 /\ d_1 a = Some v1) \/
-      (pstate' = Disks (upd d_0 a b) (upd d_1 a b) (upd d_2 a b) /\
-       exists v0 v1 v2, d_0 a = Some v0 /\ d_1 a = Some v1 /\ d_2 a = Some v2)
-    | Failed => (disk0 pstate a = None \/
-                disk1 pstate a = None \/
-                disk2 pstate a = None)
+      pstate' = Disks (upd d_0 a b) d_1 d_2 \/
+      pstate' = Disks (upd d_0 a b) (upd d_1 a b) d_2 \/
+      pstate' = Disks (upd d_0 a b) (upd d_1 a b) (upd d_2 a b)
+    | Failed => False
     end.
 Proof.
   unfold RWrite_impl; intros.
 
-  eapply exec_bind in H;
-    intuition; repeat deex;
-      match goal with
-      | [ H: Prog.exec (Write _ _ _) _ _ |- _ ] =>
-        apply Write_ok in H; safe_intuition;
-          repeat deex;
-          cbn [disk_id] in *; subst
-      end; auto.
-
-  eapply exec_bind in H0;
-  intuition; repeat deex;
-    repeat match goal with
-           | [ H: Prog.exec (Write _ _ _) _ _ |- _ ] =>
-             apply Write_ok in H; safe_intuition;
-               repeat deex;
-               cbn [disk_id] in *; subst
-           end; auto.
-
   destruct pstate; simpl in *.
-  destruct r; intuition eauto; repeat deex; subst.
-  repeat match goal with
-         | [ u: unit |- _ ] => destruct u
-         end.
-  descend; intuition eauto.
 
-  eauto 10.
-  destruct pstate; intuition; simpl in *; repeat deex; eauto 10.
-  destruct pstate; intuition; simpl in *; repeat deex; eauto 10.
-  destruct pstate; intuition; simpl in *; repeat deex; eauto 10.
+  step Write_ok.
+  step Write_ok.
+  step Write_ok.
+  step tt.
+
+  intuition eauto.
+  intuition eauto.
 Qed.
 
 Lemma opts_eq : forall T a (v v':T),

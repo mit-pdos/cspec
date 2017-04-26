@@ -162,3 +162,11 @@ Ltac safe_intuition :=
          | [ H: _ /\ _ |- _ ] =>
            destruct H
          end.
+
+Ltac hyp_intuition :=
+  repeat match goal with
+         | [ H: _ /\ _ |- _ ] =>
+           destruct H
+         | [ H: _ \/ _ |- _ ] =>
+           destruct H
+         end.
