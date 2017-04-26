@@ -69,7 +69,7 @@ Ltac destruct_matches_in e :=
   lazymatch e with
   | context[match ?d with | _ => _ end] =>
     destruct_matches_in d
-  | _ => case_eq e; intros
+  | _ => destruct e eqn:?; intros
   end.
 
 Ltac destruct_all_matches :=

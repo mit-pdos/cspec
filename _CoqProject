@@ -5,6 +5,8 @@ Mem.v
 Refinement/Disk.v
 Refinement/IO.v
 Refinement/Implements.v
+Refinement/SeqDiskAPI.v
+Refinement/SeqDiskImpl.v
 Refinement/TwoDiskAPI.v
 Refinement/TwoDiskImpl.v
 Shallow/Hoare.v

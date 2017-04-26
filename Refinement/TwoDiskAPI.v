@@ -1,5 +1,4 @@
 Require Export Disk.
-Require Import Mem.
 Require Import Implements.
 
 Inductive diskId := d0 | d1.
@@ -25,14 +24,14 @@ Module TDSpec.
     end.
 
   Definition Read i a : Semantics block :=
-    StepRel (fun state v state' =>
-                match get_disk i state a with
-                | Some v0 => v = v0
-                | None => True
-                end /\ state' = state).
+    StepRel (fun state r state' =>
+               match get_disk i state a with
+               | Some v0 => r = v0
+               | None => True
+               end /\ state' = state).
 
   Definition Write i a b : Semantics unit :=
-    StepRel (fun state v state' =>
+    StepRel (fun state r state' =>
                match get_disk i state a with
                | Some v0 => state' = upd_disk i (fun d => upd d a b) state
                | None => True (* new disk is arbitrary *)

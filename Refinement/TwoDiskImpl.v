@@ -13,13 +13,13 @@ Module TD.
 
   Axiom abstraction : world -> TDSpec.State.
 
-  Axiom Read_spec : forall i a,
+  Axiom Read_ok : forall i a,
       implements
         (TDSpec.Read i a)
         (io_semantics (Read i a))
         abstraction.
 
-  Axiom Write_spec : forall i a b,
+  Axiom Write_ok : forall i a b,
       implements
         (TDSpec.Write i a b)
         (io_semantics (Write i a b))

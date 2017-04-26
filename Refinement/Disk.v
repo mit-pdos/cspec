@@ -1,5 +1,5 @@
 Require Import Bytes.
-Require Import Mem.
+Require Export Mem.
 
 Definition addr := nat.
 Definition block := bytes 4096.

@@ -1,6 +1,6 @@
 (* model of an IO monad *)
 
-Require Automation.
+Require Import Automation.
 
 Global Set Implicit Arguments.
 
@@ -45,20 +45,23 @@ Qed.
 Definition io_equiv T (step1 step2: world -> T -> world -> Prop) :=
   forall w v w', step1 w v w' <-> step2 w v w'.
 
-Module Monad.
+Ltac step :=
+  match goal with
+  | [ H: io_step (Bind _ _) _ _ _ |- _ ] =>
+    eapply bind_step in H; repeat deex
+  | [ H: io_step (Ret _) _ _ _ |- _ ] =>
+    eapply ret_step in H; safe_intuition; subst
+  end.
 
-  Import Automation.
+Module Monad.
 
   Hint Resolve ret_does_step bind_does_step.
 
   Local Ltac t :=
     repeat match goal with
            | |- io_equiv _ _ => split
-           | [ H: io_step (Bind _ _) _ _ _ |- _ ] =>
-             eapply bind_step in H; repeat deex
-           | [ H: io_step (Ret _) _ _ _ |- _ ] =>
-             eapply ret_step in H; intuition subst
            | _ => progress intros
+           | _ => step
            end; eauto 10.
 
   Theorem monad_left_id : forall T (v:T) T' (p: T -> IO T'),
@@ -85,3 +88,6 @@ Module Monad.
   Qed.
 
 End Monad.
+
+Notation "x <- p1 ; p2" := (Bind p1 (fun x => p2))
+                           (at level 60, right associativity).
