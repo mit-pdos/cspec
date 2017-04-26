@@ -64,37 +64,58 @@ Definition prog_ok T A (spec: Specification A T) (p: prog3 T) :=
               (forall pstate', crash (spec a pstate) pstate' ->
                           crashinv pstate')) (Bind p rx).
 
-Theorem prog_ok_spec_equiv : forall T A (spec: Specification A T) (p: prog3 T),
+Theorem prog_ok_to_spec : forall T A (spec: Specification A T) (p: prog3 T),
     (forall a pstate r pstate', pre (spec a pstate) ->
                            post (spec a pstate) r pstate' ->
                            crash (spec a pstate) pstate') ->
-    prog_ok spec p <-> prog_spec spec p.
+    prog_ok spec p -> prog_spec spec p.
 Proof.
-  unfold prog_ok, prog_double, prog_spec; split; intros.
-  - specialize (H0 _ Ret).
-    specialize (H0 pstate).
-    eapply H0.
-    exists a; intuition eauto; subst.
+  unfold prog_ok, prog_double, prog_spec; intros.
+  specialize (H0 _ Ret).
+  specialize (H0 pstate).
+  eapply H0.
+  exists a; intuition eauto; subst.
+  match goal with
+  | [ H: exec (Ret _) _ _ |- _ ] =>
+    apply exec_ret in H
+  end.
+  destruct r1; intuition (subst; eauto).
+  apply monad_right_id; auto.
+Qed.
+
+Theorem prog_spec_to_ok : forall T A (spec: Specification A T) (p: prog3 T),
+    (forall a pstate r pstate', pre (spec a pstate) ->
+                           post (spec a pstate) r pstate' ->
+                           crash (spec a pstate) pstate') ->
+    prog_spec spec p -> prog_ok spec p.
+Proof.
+  unfold prog_ok, prog_double, prog_spec; intros.
+  deex.
+  match goal with
+  | [ H: exec (Bind _ _) _ _ |- _ ] =>
+    apply exec_bind in H
+  end.
+  intuition; repeat deex.
+  + eapply H3; intuition eauto.
+    eapply H0 in H2; eauto.
+  + eapply H0 in H2; eauto.
+  + subst.
     match goal with
-    | [ H: exec (Ret _) _ _ |- _ ] =>
-      apply exec_ret in H
+    | [ Hexec: exec _ _ Failed |- _ ] =>
+      eapply H0 in Hexec; eauto
     end.
-    destruct r1; intuition (subst; eauto).
-    apply monad_right_id; auto.
-  - deex.
-    match goal with
-    | [ H: exec (Bind _ _) _ _ |- _ ] =>
-      apply exec_bind in H
-    end.
-    intuition; repeat deex.
-    + eapply H3; intuition eauto.
-      eapply H0 in H2; eauto.
-    + eapply H0 in H2; eauto.
-    + subst.
-      match goal with
-      | [ Hexec: exec _ _ Failed |- _ ] =>
-        eapply H0 in Hexec; eauto
-      end.
+Qed.
+
+Remark crash_invariants_must_handle_pre :
+  forall T A (spec: Specification A T) (p: prog3 T),
+    prog_spec spec p ->
+    forall a pstate, pre (spec a pstate) ->
+                crash (spec a pstate) pstate.
+Proof.
+  unfold prog_spec; intros.
+  specialize (H _ _ ltac:(eauto)).
+  eapply (H (Crashed pstate)).
+  apply can_crash_at_begin.
 Qed.
 
 Theorem double_weaken : forall T (pre pre': DoublePre T) (p: prog3 T),
