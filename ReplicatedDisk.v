@@ -322,15 +322,13 @@ Inductive result_rel PState1 PState2 (rel: PState1 -> PState2 -> Prop) T :
 | Finished_rel : forall pstate1 pstate2 v,
     rel pstate1 pstate2 ->
     result_rel rel (Finished v pstate1) (Finished v pstate2)
-(* there is one more valid simulation: if the first relation succeeds, then it's
-   ok for the second to fail, in the order PState1 and PState2 are given
-   here. *)
 | Crashed_rel : forall pstate1 pstate2,
     rel pstate1 pstate2 ->
     (* this is too strong: should be able to state any relation for crash states
     and then fix things up in recovery *)
     result_rel rel (Crashed pstate1) (Crashed pstate2)
-| Failed_rel : result_rel rel Failed Failed.
+(* a failure in the first  *)
+| Failed_rel : forall r, result_rel rel Failed r.
 
 Ltac inv_rel :=
   match goal with
@@ -340,6 +338,39 @@ Ltac inv_rel :=
 
 Hint Constructors result_rel.
 
+Lemma pstate_rel_some : forall spstate pstate a b,
+    sdisk spstate a = Some b ->
+    pstate_rel spstate pstate ->
+    exists v0 v1 v2, disk0 pstate a = Some v0 /\
+                disk1 pstate a = Some v1 /\
+                disk2 pstate a = Some v2 /\
+                b = vote v0 v1 v2.
+Proof.
+  intros.
+  specialize (H0 a); simpl_match; eauto.
+Qed.
+
+Lemma pstate_rel_none : forall spstate pstate a,
+    sdisk spstate a = None ->
+    pstate_rel spstate pstate ->
+    disk0 pstate a = None /\
+    disk1 pstate a = None /\
+    disk2 pstate a = None.
+Proof.
+  intros.
+  specialize (H0 a); simpl_match; eauto.
+Qed.
+
+Ltac prim_step :=
+  match goal with
+  | |- exec _ _ (Finished _ _) =>
+    eapply ExecStepTo; simpl; repeat simpl_match; eauto
+  | |- exec _ _ Failed =>
+    eapply ExecStepFail; simpl; repeat simpl_match; eauto
+  | |- exec _ _ (Crashed _) =>
+    eapply ExecCrashAfter; simpl; repeat simpl_match; eauto
+  end.
+
 Theorem translate_exec : forall T (p: prog T),
     forall pstate r,
       Prog.exec (translate p) pstate r ->
@@ -348,71 +379,50 @@ Theorem translate_exec : forall T (p: prog T),
                        result_rel pstate_rel sr r.
 Proof.
   induction p; simpl; intros.
-  - apply RRead_impl_ok in H.
-    pose proof (H0 a).
-    destruct (sdisk spstate a) eqn:?;
-             repeat deex.
-    + destruct r; safe_intuition; repeat deex; subst; eauto.
-      opts_eq.
+  - destruct (sdisk spstate a) eqn:?.
+    + pose proof (pstate_rel_some _ Heqo ltac:(eauto));
+        repeat deex.
+      eapply RRead_impl_ok in H; eauto.
+      destruct r; cleanup.
       exists (Finished (vote v0 v1 v2) spstate);
         intuition eauto.
-      eapply ExecStepTo; simpl; simpl_match; eauto.
-      intuition;
-        solve [ exfalso; eauto using opt_discriminate ].
-
-    + destruct r; safe_intuition; repeat deex; subst; eauto.
-      solve [ exfalso; eauto using opt_discriminate ].
-      clear H.
-      exists Failed; intuition eauto.
-      eapply ExecStepFail; simpl; simpl_match; auto.
-  - apply RWrite_impl_ok in H.
-    pose proof (H0 a).
-    destruct (sdisk spstate a) eqn:?;
-             repeat deex.
-    + destruct r; safe_intuition; repeat deex; subst; eauto.
-      opts_eq.
+      prim_step.
+    + exists Failed; intuition eauto.
+      prim_step.
+  - destruct (sdisk spstate a) eqn:?.
+    + pose proof (pstate_rel_some _ Heqo ltac:(eauto));
+        repeat deex.
+      eapply RWrite_impl_ok in H; eauto.
+      destruct r; cleanup.
       destruct pstate; simpl in *; subst.
       exists (Finished tt (SDisk (upd (sdisk spstate) a b)));
         intuition eauto.
-      eapply ExecStepTo; simpl; simpl_match; eauto.
-
-      destruct pstate; simpl in *; intuition; subst.
-      eauto.
+      prim_step.
+      destruct pstate; simpl in *; intuition subst.
+      exists (Crashed spstate); intuition.
       destruct (v1 == v2); unfold equiv, complement in *; subst.
       exists (Crashed spstate); intuition eauto.
       exists (Crashed (SDisk (upd (sdisk spstate) a b))); intuition eauto.
-      eapply ExecCrashAfter; simpl; simpl_match; eauto.
+      prim_step.
       exists (Crashed (SDisk (upd (sdisk spstate) a b))); intuition eauto.
-      eapply ExecCrashAfter; simpl; simpl_match; eauto.
+      prim_step.
       exists (Crashed (SDisk (upd (sdisk spstate) a b))); intuition eauto.
-      eapply ExecCrashAfter; simpl; simpl_match; eauto.
-      intuition;
-        solve [ exfalso; eauto using opt_discriminate ].
-    + destruct pstate; simpl in *.
-      destruct r; intuition; repeat deex; subst; eauto;
-        try match goal with
-          | [ H: ?a = Some _, H': ?a = None |- _ ] =>
-            solve [ exfalso; eauto using opt_discriminate ]
-        end.
-      exists Failed; intuition eauto.
-      eapply ExecStepFail; simpl; simpl_match; eauto.
-      exists Failed; intuition eauto.
-      eapply ExecStepFail; simpl; simpl_match; eauto.
-      exists Failed; intuition eauto.
-      eapply ExecStepFail; simpl; simpl_match; eauto.
-  - apply exec_ret in H.
-    destruct r; safe_intuition; subst; eauto.
-    exists (Finished v0 spstate); intuition eauto.
-    exists Failed; intuition eauto.
+      prim_step.
+    + exists Failed; intuition eauto.
+      prim_step.
+  - step tt.
+    exists (Finished v0 spstate); intuition.
   - eapply exec_bind in H0; intuition; repeat deex; subst.
     + specialize (IHp _ _ ltac:(eauto) _ ltac:(eauto)).
       repeat deex; inv_rel.
       specialize (H _ _ _ ltac:(eauto) _ ltac:(eauto)).
       repeat deex.
       eauto.
+      exists Failed; intuition eauto.
     + specialize (IHp _ _ ltac:(eauto) _ ltac:(eauto)).
       repeat deex; inv_rel.
       eauto.
+      exists Failed; intuition eauto.
     + specialize (IHp _ _ ltac:(eauto) _ ltac:(eauto)).
       repeat deex; inv_rel.
       eauto.
@@ -423,10 +433,10 @@ Inductive rresult_rel PState1 PState2 (rel: PState1 -> PState2 -> Prop) T R :
 | RFinished_rel : forall pstate1 pstate2 v,
     rel pstate1 pstate2 ->
     rresult_rel rel (RFinished v pstate1) (RFinished v pstate2)
-(* TODO: as above, add rresult_rel Finished Fail *)
 | Recovered_rel : forall pstate1 pstate2 r,
     rel pstate1 pstate2 ->
     rresult_rel rel (Recovered r pstate1) (Recovered r pstate2)
+(* TODO: as above, change to [forall r, rresult_rel r Fail] *)
 | RFailed_rel : rresult_rel rel RFailed RFailed.
 
 Hint Constructors rresult_rel.
