@@ -83,15 +83,21 @@ Module D.
       | [ H: invariant _ |- _ ] =>
         pose proof (H a); repeat (simpl_match || deex)
       end.
-    - replace (TD.abstraction w') in *.
+
+    all: repeat match goal with
+    | |- context[TD.abstraction ?w] => generalize dependent (TD.abstraction w); clear w; intro w; intros
+    | H: context[TD.abstraction ?w] |- _ => generalize dependent (TD.abstraction w); clear w; intro w; intros
+    end.
+
+    - subst.
       rewrite TDSpec.get_disk1_upd_d0 in *.
       simpl_match.
-      replace (TD.abstraction w'0).
-      destruct (TD.abstraction t); simpl.
+      subst.
+      destruct t; simpl.
       intuition eauto.
-    - replace (TD.abstraction w') in *; repeat simpl_match.
+    - subst; repeat simpl_match.
       intuition eauto.
-      replace (TD.abstraction w'0); auto.
+      subst; auto.
   Qed.
 
 End D.
