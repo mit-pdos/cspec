@@ -2,6 +2,8 @@
 Automation.v
 Bytes.v
 Mem.v
+Refinement/IO.v
+Refinement/Implements.v
 Shallow/Hoare.v
 Shallow/Prog.v
 Shallow/ProgTheorems.v
