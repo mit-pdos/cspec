@@ -2,8 +2,10 @@
 Automation.v
 Bytes.v
 Mem.v
+Refinement/Disk.v
 Refinement/IO.v
 Refinement/Implements.v
+Refinement/TwoDiskAPI.v
 Shallow/Hoare.v
 Shallow/Prog.v
 Shallow/ProgTheorems.v
