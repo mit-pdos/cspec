@@ -78,38 +78,6 @@ The proof will show that from a pair of related states, any behavior of the
 prog can be re-produced as related behavior in the translated prog3.
  *)
 
-(* The simulation is defined in terms of relating the states of the two
-programs. Our relation captures replicated configurations line up with a
-sequential disk. *)
-Definition pstate_rel (spstate:SPState) (pstate:PState) : Prop :=
-  forall a, match sdisk spstate a with
-       | Some v => exists v0 v1 v2,
-                  disk0 pstate a = Some v0 /\
-                  disk1 pstate a = Some v1 /\
-                  disk2 pstate a = Some v2 /\
-                  v = vote v0 v1 v2
-       | None => disk0 pstate a = None /\
-                disk1 pstate a = None /\
-                disk2 pstate a = None
-       end.
-
-Inductive result_rel PState1 PState2 (rel: PState1 -> PState2 -> Prop) T :
-  Result PState1 T -> Result PState2 T -> Prop :=
-| Finished_rel : forall pstate1 pstate2 v,
-    rel pstate1 pstate2 ->
-    result_rel rel (Finished v pstate1) (Finished v pstate2)
-(* there is one more valid simulation: if the first relation succeeds, then it's
-   ok for the second to fail, in the order PState1 and PState2 are given here. *)
-| Crashed_rel : forall pstate1 pstate2,
-    rel pstate1 pstate2 ->
-    (* this is too strong: should be able to state any relation for crash states
-    and then fix things up in recovery *)
-    result_rel rel (Crashed pstate1) (Crashed pstate2)
-| Failed_rel : result_rel rel Failed Failed.
-
-Hint Constructors result_rel.
-Hint Constructors Prog.exec.
-
 (* TODO: cleanup these almost Hoare specs:
 
  move them into a BasicSpecs file, and probably make them proper Hoare
@@ -239,13 +207,23 @@ Proof.
   discriminate.
 Qed.
 
-Hint Constructors exec.
+(* The simulation is defined in terms of relating the states of the two
+programs. Our relation captures replicated configurations line up with a
+sequential disk. *)
+Definition pstate_rel (spstate:SPState) (pstate:PState) : Prop :=
+  forall a, match sdisk spstate a with
+       | Some v => exists v0 v1 v2,
+                  disk0 pstate a = Some v0 /\
+                  disk1 pstate a = Some v1 /\
+                  disk2 pstate a = Some v2 /\
+                  v = vote v0 v1 v2
+       | None => disk0 pstate a = None /\
+                disk1 pstate a = None /\
+                disk2 pstate a = None
+       end.
 
-Ltac inv_rel :=
-  match goal with
-  | [ H: result_rel _ _ _ |- _ ] =>
-    inversion H; subst; clear H
-  end.
+Hint Constructors Prog.exec.
+Hint Constructors exec.
 
 Lemma pstate_rel_upd_all : forall spstate d_0 d_1 d_2 a b,
     pstate_rel spstate (Disks d_0 d_1 d_2) ->
@@ -338,6 +316,29 @@ Hint Resolve pstate_rel_upd_all.
 Hint Resolve pstate_rel_upd_one_others_eq.
 Hint Resolve pstate_rel_upd_one_others_neq.
 Hint Resolve pstate_rel_upd_two.
+
+Inductive result_rel PState1 PState2 (rel: PState1 -> PState2 -> Prop) T :
+  Result PState1 T -> Result PState2 T -> Prop :=
+| Finished_rel : forall pstate1 pstate2 v,
+    rel pstate1 pstate2 ->
+    result_rel rel (Finished v pstate1) (Finished v pstate2)
+(* there is one more valid simulation: if the first relation succeeds, then it's
+   ok for the second to fail, in the order PState1 and PState2 are given
+   here. *)
+| Crashed_rel : forall pstate1 pstate2,
+    rel pstate1 pstate2 ->
+    (* this is too strong: should be able to state any relation for crash states
+    and then fix things up in recovery *)
+    result_rel rel (Crashed pstate1) (Crashed pstate2)
+| Failed_rel : result_rel rel Failed Failed.
+
+Ltac inv_rel :=
+  match goal with
+  | [ H: result_rel _ _ _ |- _ ] =>
+    inversion H; subst; clear H
+  end.
+
+Hint Constructors result_rel.
 
 Theorem translate_exec : forall T (p: prog T),
     forall pstate r,
