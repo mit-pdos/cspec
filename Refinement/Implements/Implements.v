@@ -1,6 +1,6 @@
 (** Proving implementations correct via an abstraction relation between two
 semantics. *)
-Require Export Refinement.IO.
+Require Export Refinement.Implements.IO.
 
 (** A [Semantics] is a general way to describe a transition; a given operation
    will have a particular semantics, whereas a layer will have several semantics

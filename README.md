@@ -20,7 +20,7 @@ subdirectories.
   These will nicely extract to Haskell's `Data.ByteString.Strict`.
 * `Mem.v`: as in FSCQ, a `mem A V` is a `A -> option V`, where addresses are
   required to have deciable equality in order to update memories.
-* `Shallow`
+* `Shallow/`
 
   FSCQ-like programming languages at each layer. We avoid abstraction and thus
   repeat the definitions of `prog`, `exec`, and `exec_recover` at every layer.
@@ -38,25 +38,27 @@ subdirectories.
     faithfully simulates the original. Follows much of the same approach as the
     optimistic translator in CFSCQ.
 
-* `Refinement`
-  - `IOstep.v`: assumes some operations in an `IO` monad, ncluding `Ret` and
-    `Bind` operations, as well as its semantics. These programs have an opaque
-    semantics: they manipulate state of type `world` according to some (unknown)
-    relation `io_step`. We can add axioms for operations in `IO` and assume
-    the appropriate `io_step` for these operations; `TwoDiskImpl` does so.
+* `Refinement/`
+  * `Implements/` defines an IO monad and the notion of an implementation
+    refining the opaque behavior of this monad. This is our definition of what a spec is and when a program meets its specification.
+    - `IOstep.v`: assumes some operations in an `IO` monad, ncluding `Ret` and
+      `Bind` operations, as well as its semantics. These programs have an opaque
+      semantics: they manipulate state of type `world` according to some (unknown)
+      relation `io_step`. We can add axioms for operations in `IO` and assume
+      the appropriate `io_step` for these operations; `TwoDiskImpl` does so.
 
-    For extraction `IO` is particularly clean: it just extracts to the Haskell
-    `IO` monad! The assumed `Ret` and `Bind` because `return` and `(>>=)`, while
-    the semantics and `world` state type are not needed for extraction. Then any
-    axiomatized operations are provided as ordinary Haskell programs.
-  - `IOcrash.v`: extends `IOstep` to also define `io_crash`, which is like step
-    but has rules for crashing before a program starts, in the middle of a bind,
-    and during either side of a bind.
-  - `IO.v`: re-exports `IOstep` and `IOcrash` to give a complete semantics to
-    the `IO` monad.
-  - `Implements.v`: defines an `implements` relation between two relations based
-    on refinement, linked via an abstraction function. A proof of an
-    `implements` relation is a correctness specification.
+      For extraction `IO` is particularly clean: it just extracts to the Haskell
+      `IO` monad! The assumed `Ret` and `Bind` because `return` and `(>>=)`, while
+      the semantics and `world` state type are not needed for extraction. Then any
+      axiomatized operations are provided as ordinary Haskell programs.
+    - `IOcrash.v`: extends `IOstep` to also define `io_crash`, which is like step
+      but has rules for crashing before a program starts, in the middle of a bind,
+      and during either side of a bind.
+    - `IO.v`: re-exports `IOstep` and `IOcrash` to give a complete semantics to
+      the `IO` monad.
+    - `Implements.v`: defines an `implements` relation between two relations based
+      on refinement, linked via an abstraction function. A proof of an
+      `implements` relation is a correctness specification.
   - `Disk.v`: self-explanatory; just defines `disk` as an appropriate memory,
     using `nat` addresses and 4KB values.
   - `TwoDiskAPI.v`: provides definitions for what operations on two disks should

@@ -1,8 +1,7 @@
-Require Import Refinement.IO.
+Require Import Automation.
+Require Import Implements.
 Require Import TwoDiskAPI TwoDiskImpl.
 Require Import SeqDiskAPI.
-Require Import Implements.
-Require Import Automation.
 
 (* D is an implementation of the single, sequential disk in DSpec. *)
 Module D.
