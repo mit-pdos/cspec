@@ -38,7 +38,7 @@ Module D.
   Theorem Read_ok : forall a,
       implements
         (DSpec.Read a)
-        (io_semantics (Read a))
+        (Read a)
         (fun w => abstraction (TD.abstraction w))
         (fun w => invariant (TD.abstraction w)).
   Proof.
@@ -66,7 +66,7 @@ Module D.
   Theorem Write_ok : forall a b,
       implements
         (DSpec.Write a b)
-        (io_semantics (Write a b))
+        (Write a b)
         (fun w => abstraction (TD.abstraction w))
         (fun w => invariant (TD.abstraction w)).
   Proof.

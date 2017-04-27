@@ -18,14 +18,14 @@ Module TD.
   Axiom Read_ok : forall i a,
       implements
         (TDSpec.Read i a)
-        (io_semantics (Read i a))
+        (Read i a)
         abstraction
         (fun _ => True).
 
   Axiom Write_ok : forall i a b,
       implements
         (TDSpec.Write i a b)
-        (io_semantics (Write i a b))
+        (Write i a b)
         abstraction
         (fun _ => True).
 

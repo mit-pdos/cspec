@@ -16,16 +16,12 @@ Record Semantics T :=
             to [state'] and return [r]. *)
             Step : State -> T -> State -> Prop; }.
 
-Definition io_semantics T (p:IO T) : Semantics T :=
-  {| State := world;
-     Step := io_step p; |}.
-
 Section Implements.
   Variable T:Type.
   Variable Spec:Semantics T.
-  Variable Impl:Semantics T.
-  Variable abstraction: State Impl -> State Spec.
-  Variable invariant : State Impl -> Prop.
+  Variable Impl:IO T.
+  Variable abstraction: world -> State Spec.
+  Variable invariant : world -> Prop.
 
   (* A proof of [implements] shows that [Impl] implements [Spec] via an
   abstraction function [abstraction], preserving [invariant].
@@ -41,7 +37,7 @@ Section Implements.
      since the system must be started from a state satisfying this predicate
    *)
   Definition implements :=
-    forall t v t', Step Impl t v t' ->
+    forall t v t', io_step Impl t v t' ->
               invariant t ->
               Step Spec (abstraction t) v (abstraction t') /\
               invariant t'.
