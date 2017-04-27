@@ -83,6 +83,13 @@ Arguments Crashed {State T} state.
 
 Global Generalizable Variables T opT State step.
 
+(* modify a semantics by adding a background step before every operation *)
+Definition background_step `(bg_step: State -> State -> Prop) `(step: Semantics opT State) :
+  Semantics opT State :=
+  fun T (op:opT T) state v state'' =>
+    exists state', bg_step state state' /\
+          step _ op state' v state''.
+
 Ltac inv_exec :=
   match goal with
   | [ H: exec _ _ _ _ |- _ ] =>
