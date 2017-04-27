@@ -3,5 +3,5 @@
 
 ((coq-mode
   (company-coq-dir-local-symbols
-   ("State" . ?Σ) ("pstate" . ?σ) ("pstate'" . (?σ (Br . Bl) ?'))
+   ("State" . ?Σ) ("state" . ?σ) ("state'" . (?σ (Br . Bl) ?'))
    )))
