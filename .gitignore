@@ -1,4 +1,5 @@
 /Makefile.coq
+/_CoqProject
 # emacs
 *.aux
 # Coq compiled files

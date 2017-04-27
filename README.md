@@ -3,9 +3,6 @@ Labs for 6.826 (POCS)
 
 ## Hacking
 
-`update-coqproject.sh` populates `_CoqProject` with files known to git. After
-`git add NewFile.v`, re-run the script and commit the new `_CoqProject`.
-
 `make` generates `Makefile.coq` and then compiles the default rule, which
 compiles all the `.vo` files. `make -jN` will work correctly (`make` natively
 handles parallelism across sub-makes correctly). To compile a specific file
