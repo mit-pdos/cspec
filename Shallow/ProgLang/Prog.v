@@ -76,6 +76,7 @@ End Prog.
 Notation "x <- p1 ; p2" := (Bind p1 (fun x => p2))
                              (at level 60, right associativity).
 
+Arguments Prim {opT T} op.
 Arguments Ret {opT T} v.
 Arguments Bind {opT T T'} p p'.
 Arguments Crashed {State T} state.
