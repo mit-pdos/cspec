@@ -29,8 +29,8 @@ Ltac simpl_match :=
 Goal forall (vd m: nat -> option nat) a,
     vd a = m a ->
     vd a = match (m a) with
-         | Some v => Some v
-         | None => None
+           | Some v => Some v
+           | None => None
            end.
 Proof.
   intros.
@@ -122,13 +122,6 @@ Ltac deex :=
     destruct H as [newvar ?]; destruct_ands; subst
   end.
 
-Ltac edeex H :=
-  match type of H with
-  | context[_ -> exists (varname:_), _] =>
-    let newvar := fresh varname in
-    edestruct H as [newvar]; [ solve [ eauto ] | .. | idtac ]
-  end.
-
 (** * Helpers *)
 
 Ltac descend :=
@@ -142,20 +135,7 @@ Ltac sigT_eq :=
     apply Eqdep.EqdepTheory.inj_pair2 in H; subst
   end.
 
-(** * Specializing general lemmas *)
-
-Local Ltac specialize_unique_quantifier :=
-  match goal with
-  | [ T: Type |- _ ] =>
-    lazymatch goal with
-    | [ v: T, v': T |- _ ] => fail
-    | [ v: T, H: forall (_:T), _ |- _ ] => specialize (H v)
-    end
-  end.
-
-Ltac safe_specialize :=
-  repeat specialize_unique_quantifier;
-  intuition auto.
+(** * Variants of intuition that do not split the goal. *)
 
 Ltac safe_intuition :=
   repeat match goal with
