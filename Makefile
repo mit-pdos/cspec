@@ -1,6 +1,6 @@
 .PHONY: coq clean
 
-CODE := $(wildcard *.v)
+CODE := $(wildcard **.v)
 
 coq: Makefile.coq
 	$(MAKE) -f Makefile.coq
