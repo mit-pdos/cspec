@@ -14,5 +14,5 @@ clean: Makefile.coq
 	$(MAKE) -f Makefile.coq clean
 	rm -f Makefile.coq _CoqProject
 
-_CoqProject: $(CODE)
-	bash update-coqproject.sh
+_CoqProject: $(CODE) _CoqProject.in
+	{ cat _CoqProject.in; git ls-files "*.v"; } > $@
