@@ -4,6 +4,8 @@ Bytes.v
 Mem.v
 Refinement/Disk.v
 Refinement/IO.v
+Refinement/IOcrash.v
+Refinement/IOstep.v
 Refinement/Implements.v
 Refinement/SeqDiskAPI.v
 Refinement/SeqDiskImpl.v
