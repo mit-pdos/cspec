@@ -1,5 +1,5 @@
 Require Import Prog.
-Require Import Mem.
+Require Import Disk.
 
 (* Defines prog, programs over a single disks. *)
 

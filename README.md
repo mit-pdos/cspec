@@ -20,6 +20,8 @@ subdirectories.
   These will nicely extract to Haskell's `Data.ByteString.Strict`.
 * `Mem.v`: as in FSCQ, a `mem A V` is a `A -> option V`, where addresses are
   required to have deciable equality in order to update memories.
+* `Disk.v`: self-explanatory; just defines `disk` as an appropriate memory,
+  using `nat` addresses and 4KB values.
 * `Shallow/`
 
   FSCQ-like programming languages at each layer. We avoid abstraction and thus
@@ -59,8 +61,6 @@ subdirectories.
     - `Implements.v`: defines an `implements` relation between two relations based
       on refinement, linked via an abstraction function. A proof of an
       `implements` relation is a correctness specification.
-  - `Disk.v`: self-explanatory; just defines `disk` as an appropriate memory,
-    using `nat` addresses and 4KB values.
   - `TwoDiskAPI.v`: provides definitions for what operations on two disks should
     do; not quite an API since the signatures for `Read` and `Write` are not
     really given, but are instead implicit in the signatures for `Read` and

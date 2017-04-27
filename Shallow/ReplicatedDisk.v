@@ -2,7 +2,7 @@ Require Import Coq.Program.Equality.
 Require Import EquivDec.
 
 Require Import Automation.
-Require Import Mem.
+Require Import Disk.
 Require Import Prog.
 Require Import ProgTheorems.
 Require SequentialDisk.
