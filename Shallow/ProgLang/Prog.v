@@ -93,14 +93,21 @@ Definition background_step `(bg_step: State -> State -> Prop) `(step: Semantics 
 Local Ltac inv_exec' H :=
   inversion H; subst; clear H; repeat sigT_eq.
 
+Ltac inv_ret :=
+  match goal with
+  | [ H: exec _ (Ret _) _ _ |- _ ] =>
+    inv_exec' H
+  end.
+
 Ltac inv_exec :=
   match goal with
   | [ H: exec _ _ _ _ |- _ ] =>
     inv_exec' H;
-    repeat match goal with
-           | [ H: exec _ (Ret _) _ _ |- _ ] =>
-             inv_exec' H
-           | [ H: exec _ (Prim _) _ _ |- _ ] =>
-             inv_exec' H
-           end
+    repeat inv_ret
+  end.
+
+Ltac inv_prim :=
+  match goal with
+  | [ H: exec _ (Prim _) _ _ |- _ ] =>
+    inv_exec' H
   end.

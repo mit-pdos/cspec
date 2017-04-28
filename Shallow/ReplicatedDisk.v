@@ -16,7 +16,7 @@ Module RD.
     mv0 <- Prim (TD.Read d0 a);
       match mv0 with
       | Working v => Ret v
-      | Failed => mv2 <- Prim (TD.Read d0 a);
+      | Failed => mv2 <- Prim (TD.Read d1 a);
                    match mv2 with
                    | Working v => Ret v
                    | Failed => Ret block0
@@ -200,6 +200,10 @@ Module RD.
     intuition eauto.
   Qed.
 
+  Hint Resolve tt.
+
+  Hint Constructors D.step.
+
   Theorem RD_ok : interpretation
                     op_impl
                     TD.step D.step
@@ -209,53 +213,29 @@ Module RD.
     eapply interpret_exec; intros; eauto.
     - destruct op; simpl in *; unfold Read, Write in *.
       + inv_exec.
-        destruct v0; safe_intuition.
-        inv_exec.
-        match goal with
-        | [ H: TD.step _ _ _ _ |- _ ] =>
-          inversion H; safe_intuition; eauto
-        end.
-        match goal with
-        | [ H: TD.op_step _ _ _ _ |- _ ] =>
-          inversion H; safe_intuition; eauto;
-            repeat sigT_eq
-        end.
+        eapply TDRead0_ok in H6; cbn [pre post crash] in *;
+          safe_intuition; eauto.
+        destruct v0; safe_intuition;
+          try inv_ret.
+        repeat match goal with
+               | [ H: _ = _ |- _ ] =>
+                 rewrite H in *
+               end.
         intuition eauto.
-        rewrite <- (@abstraction_preserved_bg_step state state'); eauto.
-        destruct matches in *.
-        match goal with
-        | [ H: Working _ = Working _ |- _ ] =>
-          inversion H; subst
-        end.
-        econstructor; eauto.
-        erewrite abstraction_d0_eq; eauto; simpl; eauto.
-        econstructor; eauto.
-        erewrite abstraction_d0_eq; eauto; simpl; eauto.
 
-        (* need to read second disk *)
         inv_exec.
-        admit.
+        eapply TDRead1_ok in H9; cbn [pre post crash] in *;
+          safe_intuition; eauto.
+        destruct v0; safe_intuition;
+          try inv_ret;
+          try contradiction.
+        repeat match goal with
+               | [ H: _ = _ |- _ ] =>
+                 rewrite H in *
+               end.
+        intuition eauto.
       + inv_exec.
-        match goal with
-        | [ H: TD.step _ _ _ _ |- _ ] =>
-          inversion H; safe_intuition; eauto
-        end.
-        match goal with
-        | [ H: TD.op_step _ _ _ _ |- _ ] =>
-          inversion H; safe_intuition; eauto;
-            repeat sigT_eq
-        end.
-        subst state'1 r.
-        inv_exec.
-        destruct (TD.get_disk d0 x).
-        destruct (d a).
-
-        unfold TD.step, background_step in *;
-          repeat deex.
-        (* TODO: really need specs to make these cases manageable; they don't
-        require much work but manipulating hypotheses is quite painful *)
-        admit.
-        admit.
+        (* TODO: prove and use Write specs *)
         admit.
     - (* also need crash proofs *)
   Abort.
