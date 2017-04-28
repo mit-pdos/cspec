@@ -49,6 +49,13 @@ Section Interpreter.
 
   Hint Constructors exec.
 
+  Definition interpretation :=
+    forall T (p: prog2 T) state r,
+      invariant state ->
+      exec1 (interpret p) state r ->
+      exec2 p (abstraction state) (res_abstraction r) /\
+      res_invariant r.
+
   Theorem interpret_exec :
     (* every operation is implemented according to the step semantics of the
     spec language *)
@@ -69,12 +76,9 @@ Section Interpreter.
           (abstraction state' = abstraction state \/
            exists v, step2 op (abstraction state) v (abstraction state')) /\
           invariant state'),
-    forall T (p: prog2 T) state r,
-      invariant state ->
-      exec1 (interpret p) state r ->
-      exec2 p (abstraction state) (res_abstraction r) /\
-      res_invariant r.
+      interpretation.
   Proof.
+    unfold interpretation.
     induction p; simpl; intros.
     - destruct r; simpl.
       + eapply Hop_ok in H0; eauto.

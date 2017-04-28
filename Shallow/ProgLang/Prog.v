@@ -90,9 +90,17 @@ Definition background_step `(bg_step: State -> State -> Prop) `(step: Semantics 
     exists state', bg_step state state' /\
           step _ op state' v state''.
 
+Local Ltac inv_exec' H :=
+  inversion H; subst; clear H; repeat sigT_eq.
+
 Ltac inv_exec :=
   match goal with
   | [ H: exec _ _ _ _ |- _ ] =>
-    inversion H; subst; clear H;
-    repeat sigT_eq
+    inv_exec' H;
+    repeat match goal with
+           | [ H: exec _ (Ret _) _ _ |- _ ] =>
+             inv_exec' H
+           | [ H: exec _ (Prim _) _ _ |- _ ] =>
+             inv_exec' H
+           end
   end.

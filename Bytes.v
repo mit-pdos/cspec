@@ -8,3 +8,5 @@ Axiom bytes : nat -> Type.
 Axiom bytes_dec : forall n, EqDec (bytes n) eq.
 
 Existing Instance bytes_dec.
+
+Axiom bytes0 : forall n, bytes n.
