@@ -87,9 +87,6 @@ Qed.
 
 Theorem prog_spec_to_ok : forall `(step: Semantics opT State)
                             A `(spec: Specification A T State) (p: prog opT T),
-    (forall a state r state', pre (spec a state) ->
-                 post (spec a state) r state' ->
-                 crash (spec a state) state') ->
     prog_spec step spec p -> prog_ok step spec p.
 Proof.
   unfold prog_ok, prog_double, prog_spec; intros.
@@ -99,9 +96,9 @@ Proof.
     apply exec_bind in H
   end.
   intuition; repeat deex.
-  + eapply H3; intuition eauto.
-    eapply H0 in H2; eauto.
-  + eapply H0 in H2; eauto.
+  + eapply H2; intuition eauto.
+    eapply H in H1; eauto.
+  + eapply H in H1; eauto.
 Qed.
 
 Remark crash_invariants_must_handle_pre :
