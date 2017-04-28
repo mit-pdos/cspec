@@ -1,6 +1,6 @@
 .PHONY: coq clean
 
-CODE := $(wildcard **.v)
+CODE := $(shell git ls-files "*.v")
 
 all: _CoqProject coq
 
