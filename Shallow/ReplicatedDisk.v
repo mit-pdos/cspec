@@ -50,10 +50,7 @@ Module RD.
   Definition invariant (state:TD.State) :=
     match state with
     | TD.Disks (Some d_0) (Some d_1) _ =>
-      forall a, match d_0 a with
-           | Some v0 => d_1 a = Some v0
-           | None => d_1 a = None
-           end
+      d_0 = d_1
     | _ => True
     end.
 
@@ -73,12 +70,7 @@ Module RD.
       TD.bg_step state state' ->
       abstraction state' = abstraction state.
   Proof.
-    inversion 2; subst; simpl in *; eauto.
-    repeat deex.
-    f_equal.
-    extensionality a.
-    specialize (H a).
-    destruct matches in *; eauto.
+    inversion 2; subst; simpl in *; subst; eauto.
   Qed.
 
   Lemma abstraction_d0_eq : forall state d a v,
