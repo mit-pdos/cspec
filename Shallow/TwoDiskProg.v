@@ -1,5 +1,6 @@
 Require Import Prog.
 Require Import Disk.
+Require Import Automation.
 
 Inductive diskId := d0 | d1.
 
@@ -73,5 +74,18 @@ Module TD.
 
   Definition exec := Prog.exec step.
   Definition exec_recover := Prog.exec_recover step.
+
+  Ltac inv_step :=
+    match goal with
+    | [ H: step _ _ _ _ |- _ ] =>
+      inversion H; subst; clear H;
+      safe_intuition;
+      match goal with
+      | [ H: op_step _ _ _ _ |- _ ] =>
+        inversion H; subst; clear H;
+        repeat sigT_eq;
+        safe_intuition
+      end
+    end.
 
 End TD.
