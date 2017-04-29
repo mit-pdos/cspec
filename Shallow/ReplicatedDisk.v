@@ -40,9 +40,9 @@ Module RD.
   Proof.
     destruct state.
     destruct disk0.
-    exact (D.SDisk d).
+    exact (D.Disk d).
     destruct disk1.
-    exact (D.SDisk d).
+    exact (D.Disk d).
     exfalso.
     abstract (deex; intuition; congruence).
   Defined.
@@ -203,7 +203,7 @@ Module RD.
   Lemma abstraction_set_d0 : forall state d a b,
       TD.get_disk d0 state = Some d ->
       abstraction (TD.set_disk d0 state (upd d a b)) =
-      D.SDisk (upd (D.sdisk (abstraction state)) a b).
+      D.Disk (upd (D.sdisk (abstraction state)) a b).
   Proof.
     intros.
     destruct state; simpl in *.
@@ -243,9 +243,9 @@ Module RD.
 
   Lemma abstraction_is_some_disk : forall state,
       {exists d, TD.get_disk d0 state = Some d /\
-            abstraction state = D.SDisk d} +
+            abstraction state = D.Disk d} +
       {exists d, TD.get_disk d1 state = Some d /\
-            abstraction state = D.SDisk d /\
+            abstraction state = D.Disk d /\
             TD.get_disk d0 state = None}.
   Proof.
     intros.
@@ -295,7 +295,7 @@ Module RD.
                     D.sdisk (abstraction state) a = Some b0;
              post :=
                fun r state' =>
-                 (abstraction state' = D.SDisk (upd (D.sdisk (abstraction state)) a b) /\
+                 (abstraction state' = D.Disk (upd (D.sdisk (abstraction state)) a b) /\
                   invariant_except state' a b) \/
                  (abstraction state' = abstraction state /\
                   first_disk_failed state');
@@ -303,7 +303,7 @@ Module RD.
                fun state' =>
                  (abstraction state' = abstraction state /\
                   invariant state') \/
-                 (abstraction state' = D.SDisk (upd (D.sdisk (abstraction state)) a b) /\
+                 (abstraction state' = D.Disk (upd (D.sdisk (abstraction state)) a b) /\
                   (* this should be a recoverable property *)
                   invariant_except state' a b)
            |})
@@ -426,12 +426,12 @@ Module RD.
       TD.bg_step state state' ->
       (* d0 survived *)
       (exists d, TD.get_disk d0 state' = Some d /\
-            abstraction state' = D.SDisk d /\
+            abstraction state' = D.Disk d /\
             d a = Some b /\
             invariant_except state' a b) \/
       (* only d1 survived *)
       (exists b0 d, TD.get_disk d1 state' = Some d /\
-               abstraction state' = D.SDisk d /\
+               abstraction state' = D.Disk d /\
                d a = Some b0 /\
                TD.get_disk d0 state' = None).
   Proof.
@@ -510,7 +510,7 @@ Module RD.
                  crash, to add a new crash state after a disk possibly fails but
                  before the write runs *)
                  (* (exists d, TD.disk1 state = Some d /\
-                       abstraction state' = D.SDisk d) *);
+                       abstraction state' = D.Disk d) *);
            |})
         (Prim (TD.Write d1 a b))
         TD.step.
@@ -565,13 +565,13 @@ Module RD.
                     D.sdisk (abstraction state) a = Some b0;
              post :=
                fun r state' =>
-                 abstraction state' = D.SDisk (upd (D.sdisk (abstraction state)) a b) /\
+                 abstraction state' = D.Disk (upd (D.sdisk (abstraction state)) a b) /\
                  invariant state';
              crash :=
                fun state' =>
                  (abstraction state' = abstraction state /\
                   invariant state') \/
-                 (abstraction state' = D.SDisk (upd (D.sdisk (abstraction state)) a b) /\
+                 (abstraction state' = D.Disk (upd (D.sdisk (abstraction state)) a b) /\
                  invariant state');
            |})
         (Prim (TD.Write d1 a b))
@@ -602,7 +602,7 @@ Module RD.
   Lemma step_write_inbounds : forall state a b0 b,
       D.sdisk state a = Some b0 ->
       D.step (D.Write a b) state tt
-             (D.SDisk (upd (D.sdisk state) a b)).
+             (D.Disk (upd (D.sdisk state) a b)).
   Proof.
     intros.
     pose proof (D.step_write a b state); simpl in *.

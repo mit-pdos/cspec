@@ -12,7 +12,7 @@ Module D.
   Definition prog := Prog.prog Op.
 
   Record State :=
-    SDisk { sdisk: disk }.
+    Disk { sdisk: disk }.
 
   Inductive step : Semantics Op State :=
   | step_read : forall a b state,
@@ -23,7 +23,7 @@ Module D.
                    | Some _ => upd (sdisk state) a b
                    | None => sdisk state
                    end in
-      step (Write a b) state tt (SDisk disk').
+      step (Write a b) state tt (Disk disk').
 
   Definition exec := Prog.exec step.
   Definition exec_recover := Prog.exec_recover step.
