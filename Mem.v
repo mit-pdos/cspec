@@ -33,7 +33,16 @@ Section Memories.
     destruct matches.
   Qed.
 
+  Theorem upd_upd : forall m a v v',
+      upd (upd m a v) a v' = upd m a v'.
+  Proof.
+    unfold upd; intros.
+    extensionality a'.
+    destruct matches.
+  Qed.
+
 End Memories.
 
 Hint Rewrite upd_eq : upd.
+Hint Rewrite upd_upd : upd.
 Hint Rewrite upd_neq using (solve [ auto ]) : upd.

@@ -135,6 +135,13 @@ Ltac sigT_eq :=
     apply Eqdep.EqdepTheory.inj_pair2 in H; subst
   end.
 
+(* substitute variables that are let bindings (these can be created with [set
+(x:=value)] and appear in the context as v := def) *)
+Ltac subst_var :=
+  repeat match goal with
+  | [ v := _ |- _ ] => subst v
+  end.
+
 (** * Variants of intuition that do not split the goal. *)
 
 Ltac safe_intuition :=

@@ -1,7 +1,7 @@
 Require Import Prog.
 Require Import Disk.
 
-(* Defines programs over a single disks. *)
+(* Defines programs over a single disk. *)
 
 Module D.
 
