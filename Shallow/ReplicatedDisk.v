@@ -100,21 +100,23 @@ Module RD.
   Hint Resolve abstraction_preserved_bg_step.
 
   Theorem TDRead0_ok : forall a,
-      prog_spec TD.step
-                (fun (_:unit) (state:TD.State) =>
-                   {|
-                     pre := invariant state;
-                     post := fun r state' =>
-                               abstraction state' = abstraction state /\
-                               invariant state' /\
-                               match r with
-                               | Working v => forall v0, D.sdisk (abstraction state) a = Some v0 ->
-                                                   v = v0
-                               | Failed => first_disk_failed state'
-                               end;
-                     crash := fun state' => abstraction state' = abstraction state;
-                   |})
-                (Prim (TD.Read d0 a)).
+      prog_spec
+        (fun (_:unit) (state:TD.State) =>
+           {|
+             pre := invariant state;
+             post :=
+               fun r state' =>
+                 abstraction state' = abstraction state /\
+                 invariant state' /\
+                 match r with
+                 | Working v => forall v0, D.sdisk (abstraction state) a = Some v0 ->
+                                     v = v0
+                 | Failed => first_disk_failed state'
+                 end;
+             crash := fun state' => abstraction state' = abstraction state;
+           |})
+        (Prim (TD.Read d0 a))
+        TD.step.
   Proof.
     intros.
     unfold prog_spec; simpl; intros.
@@ -155,22 +157,24 @@ Module RD.
   Qed.
 
   Theorem TDRead1_ok : forall a,
-      prog_spec TD.step
-                (fun (_:unit) (state:TD.State) =>
-                   {|
-                     pre := invariant state /\
-                            first_disk_failed state;
-                     post := fun r state' =>
-                               abstraction state' = abstraction state /\
-                               invariant state' /\
-                               match r with
-                               | Working v => forall v0, D.sdisk (abstraction state) a = Some v0 ->
-                                                   v = v0
-                               | Failed => False
-                               end;
-                     crash := fun state' => abstraction state' = abstraction state;
-                   |})
-                (Prim (TD.Read d1 a)).
+      prog_spec
+        (fun (_:unit) (state:TD.State) =>
+           {|
+             pre := invariant state /\
+                    first_disk_failed state;
+             post :=
+               fun r state' =>
+                 abstraction state' = abstraction state /\
+                 invariant state' /\
+                 match r with
+                 | Working v => forall v0, D.sdisk (abstraction state) a = Some v0 ->
+                                     v = v0
+                 | Failed => False
+                 end;
+             crash := fun state' => abstraction state' = abstraction state;
+           |})
+        (Prim (TD.Read d1 a))
+        TD.step.
   Proof.
     unfold prog_spec; cbn [pre post crash]; intuition.
     inv_exec; eauto.
