@@ -111,3 +111,24 @@ Ltac inv_prim :=
   | [ H: exec _ (Prim _) _ _ |- _ ] =>
     inv_exec' H
   end.
+
+(* [inversion_prim_exec] performs much the same function as inversion on an exec
+relation for a [Prim op] with one key diffence: it re-uses the proof of the
+[Finished v state'] case in the [Crashed state'] case. This allows the crash invariant
+proof to re-use the postcondition in the case that the primitive fully executed
+just before crashing. *)
+Theorem inversion_prim_exec : forall `(op: opT T) `(step: Semantics opT State) state r,
+    exec step (Prim op) state r ->
+    forall (P: _ -> Prop),
+      (forall v state', step _ op state v state' ->
+               P (Finished v state')) ->
+      (forall v state', step _ op state v state' ->
+               P (Finished v state') ->
+               P (Crashed state')) ->
+      (P (Crashed state)) ->
+      P r.
+Proof.
+  intros; inv_exec; eauto.
+Qed.
+
+(* TODO: prove other inversion lemmas as needed *)
