@@ -227,7 +227,9 @@ Module RD.
                                      v = v0
                  | Failed => TD.disk0 state' = None
                  end;
-             crash := fun state' => abstraction state' = abstraction state;
+             crash := fun state' =>
+                        abstraction state' = abstraction state /\
+                        invariant state';
            |})
         (Prim (TD.Read d0 a))
         TD.step.
@@ -256,7 +258,9 @@ Module RD.
                                      v = v0
                  | Failed => False
                  end;
-             crash := fun state' => abstraction state' = abstraction state;
+             crash := fun state' =>
+                        abstraction state' = abstraction state /\
+                        invariant state';
            |})
         (Prim (TD.Read d1 a))
         TD.step.
@@ -268,6 +272,51 @@ Module RD.
       try inv_fwd;
       abstraction_simpl;
       try intuition (eauto; congruence).
+  Qed.
+
+  Ltac rew_abstraction :=
+    repeat match goal with
+           | [ H: abstraction _ = _ |- _ ] =>
+             rewrite H in *
+           end.
+
+  Theorem Read_ok : forall a,
+      prog_spec
+        (fun (_:unit) (state:TD.State) =>
+           {|
+             pre := invariant state;
+             post :=
+               fun r state' =>
+                 (forall v, D.sdisk (abstraction state') a = Some v ->
+                       r = v) /\
+                 abstraction state' = abstraction state /\
+             invariant state';
+             crash :=
+               fun state' => abstraction state' = abstraction state /\
+                      invariant state';
+           |})
+        (Read a)
+        TD.step.
+  Proof.
+    start_spec.
+    - eapply TDRead0_ok in H6; cbn [pre post crash] in *;
+        cleanup.
+      destruct v.
+      inv_exec; cleanup; rew_abstraction; eauto.
+
+      inv_exec; cleanup.
+      eapply TDRead1_ok in H9; cbn [pre post crash] in *;
+        cleanup.
+      destruct v; cleanup.
+
+      inv_exec; rew_abstraction; cleanup.
+
+      eapply TDRead1_ok in H9; cbn [pre post crash] in *;
+        cleanup.
+      intuition eauto.
+      congruence.
+    - eapply TDRead0_ok in H6; cbn [pre post crash] in *;
+        cleanup.
   Qed.
 
   Hint Resolve tt.
@@ -553,28 +602,8 @@ Module RD.
                     abstraction.
   Proof.
     eapply interpret_exec; intros; eauto.
-    - destruct op; simpl in *; unfold Read, Write in *.
-      + inv_exec.
-        eapply TDRead0_ok in H6; cbn [pre post crash] in *;
-          safe_intuition; eauto.
-        destruct v0; safe_intuition;
-          try inv_ret.
-        repeat match goal with
-               | [ H: _ = _ |- _ ] =>
-                 rewrite H in *
-               end.
-        intuition eauto.
-
-        inv_exec.
-        eapply TDRead1_ok in H9; cbn [pre post crash] in *;
-          safe_intuition; eauto.
-        destruct v0; safe_intuition;
-          try inv_ret;
-          try contradiction.
-        repeat match goal with
-               | [ H: _ = _ |- _ ] =>
-                 rewrite H in *
-               end.
+    - destruct op; simpl in *; unfold Write in *.
+      + eapply Read_ok in H0; cleanup; rew_abstraction.
         intuition eauto.
       + inv_exec.
         destruct (D.sdisk (abstraction state) a) eqn:?.
@@ -614,7 +643,9 @@ Module RD.
                    rewrite H
                  end;
           intuition eauto.
-    - (* also need a crash proof *)
+    - destruct op; cleanup.
+      + eapply Read_ok in H0; cleanup.
+      + (* also need a crash proof *)
   Abort.
 
 End RD.
