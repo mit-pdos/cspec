@@ -161,6 +161,28 @@ Module RD.
     destruct state; simpl; eauto.
   Qed.
 
+  Lemma set_abstraction_idem : forall state i,
+      invariant state ->
+      abstraction (TD.set_disk i state (D.sdisk (abstraction state))) = abstraction state.
+  Proof.
+    destruct i, state; simpl in *.
+    destruct disk0, disk1; intros; simpl in *; subst;
+      try solve [ f_equal; eauto using ProofIrrelevance.proof_irrelevance ].
+    destruct disk0, disk1; intros; simpl in *; subst;
+      try solve [ f_equal; eauto using ProofIrrelevance.proof_irrelevance ].
+  Qed.
+
+  Lemma set_abstraction_idem_invariant : forall state i,
+      invariant state ->
+      invariant (TD.set_disk i state (D.sdisk (abstraction state))).
+  Proof.
+    destruct i, state; simpl in *.
+    destruct disk0, disk1; intros; simpl in *; subst;
+      try solve [ f_equal; eauto using ProofIrrelevance.proof_irrelevance ].
+    destruct disk0, disk1; intros; simpl in *; subst;
+      try solve [ f_equal; eauto using ProofIrrelevance.proof_irrelevance ].
+  Qed.
+
   Opaque invariant.
   Opaque abstraction.
 
@@ -475,6 +497,8 @@ Module RD.
     intuition eauto.
   Qed.
 
+  Hint Resolve set_abstraction_idem set_abstraction_idem_invariant.
+
   Theorem TDWrite_oob_ok : forall i a b,
       prog_spec
         (fun (_:unit) (state:TD.State) =>
@@ -497,11 +521,12 @@ Module RD.
     TD.inv_step; subst_var;
       try abstraction_fwd;
       try inv_fwd.
-    destruct i, (abstraction_is_some_disk x); cleanup.
-    admit.
-    destruct (TD.disk1 x) eqn:?; cleanup.
-    admit.
-  Admitted.
+    destruct i, (abstraction_is_some_disk x); cleanup;
+      autorewrite with upd;
+      eauto.
+    destruct (TD.disk1 x) eqn:?; cleanup;
+      autorewrite with upd; eauto.
+  Qed.
 
   Hint Resolve d0_upd_to_invariant.
 
