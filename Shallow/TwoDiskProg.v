@@ -52,7 +52,7 @@ Module TD.
   Inductive op_step : Semantics Op State :=
   | step_read : forall a i r state,
       match get_disk i state with
-      | Some d => match d a with
+      | Some d => match diskMem d a with
                  | Some b0 => r = Working b0
                  | None => exists b, r = Working b
                  end
@@ -62,10 +62,7 @@ Module TD.
   | step_write : forall a i b state,
       let r := if get_disk i state then Working tt else Failed in
       let state' := match get_disk i state with
-                | Some d => match d a with
-                           | Some _ => set_disk i state (upd d a b)
-                           | None => state (* oob writes silently fail *)
-                           end
+                | Some d => set_disk i state (diskUpd d a b)
                 | None => state
                 end in
       op_step (Write i a b) state r state'.

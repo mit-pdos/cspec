@@ -40,7 +40,7 @@ Module RD.
     match state with
     | TD.Disks (Some d) _ _ => D.Disk d
     | TD.Disks None (Some d) _ => D.Disk d
-    | _ => D.Disk Mem.empty_mem (* impossible *)
+    | _ => D.Disk empty_disk (* impossible *)
     end.
 
   Definition invariant (state:TD.State) :=
@@ -223,7 +223,7 @@ Module RD.
                  abstraction state' = abstraction state /\
                  invariant state' /\
                  match r with
-                 | Working v => forall v0, D.sdisk (abstraction state) a = Some v0 ->
+                 | Working v => forall v0, diskMem (D.sdisk (abstraction state)) a = Some v0 ->
                                      v = v0
                  | Failed => TD.disk0 state' = None
                  end;
@@ -254,7 +254,7 @@ Module RD.
                  abstraction state' = abstraction state /\
                  invariant state' /\
                  match r with
-                 | Working v => forall v0, D.sdisk (abstraction state) a = Some v0 ->
+                 | Working v => forall v0, diskMem (D.sdisk (abstraction state)) a = Some v0 ->
                                      v = v0
                  | Failed => False
                  end;
@@ -287,7 +287,7 @@ Module RD.
              pre := invariant state;
              post :=
                fun r state' =>
-                 (forall v, D.sdisk (abstraction state') a = Some v ->
+                 (forall v, diskMem (D.sdisk (abstraction state')) a = Some v ->
                        r = v) /\
                  abstraction state' = abstraction state /\
              invariant state';
@@ -327,7 +327,7 @@ Module RD.
     match state with
     | TD.Disks (Some d_0) (Some d_1) _ =>
       (exists b0, d_1 a = Some b0) /\
-      d_0 = upd d_1 a b
+      d_0 = diskUpd d_1 a b
     | TD.Disks (Some d_0) None _ =>
       d_0 a = Some b
     | TD.Disks None (Some _) _ => False
@@ -338,18 +338,18 @@ Module RD.
       invariant state ->
       TD.disk0 state = Some d ->
       d a = Some b0 ->
-      d0_upd (TD.set_disk d0 state (upd d a b)) a b.
+      d0_upd (TD.set_disk d0 state (diskUpd d a b)) a b.
   Proof.
     intros.
     destruct state; cleanup.
     destruct disk1; cleanup.
-    autorewrite with upd; auto.
+    erewrite diskUpd_eq_some; eauto.
   Qed.
 
   Lemma d0_upd_to_invariant : forall state d a b,
       d0_upd state a b ->
       TD.get_disk d1 state = Some d ->
-      invariant (TD.set_disk d1 state (upd d a b)).
+      invariant (TD.set_disk d1 state (diskUpd d a b)).
   Proof.
     destruct state; cleanup.
     destruct disk0; cleanup.
@@ -402,7 +402,7 @@ Module RD.
                     D.sdisk (abstraction state) a = Some b0;
              post :=
                fun r state' =>
-                 (abstraction state' = D.Disk (upd (D.sdisk (abstraction state)) a b) /\
+                 (abstraction state' = D.Disk (diskUpd (D.sdisk (abstraction state)) a b) /\
                   d0_upd state' a b) \/
                  (abstraction state' = abstraction state /\
                   TD.disk0 state' = None);
@@ -410,7 +410,7 @@ Module RD.
                fun state' =>
                  (abstraction state' = abstraction state /\
                   invariant state') \/
-                 (abstraction state' = D.Disk (upd (D.sdisk (abstraction state)) a b) /\
+                 (abstraction state' = D.Disk (diskUpd (D.sdisk (abstraction state)) a b) /\
                   (* this should be a recoverable property *)
                   d0_upd state' a b)
            |})
@@ -450,8 +450,10 @@ Module RD.
       try abstraction_fwd;
       try inv_fwd.
     destruct i, (abstraction_is_some_disk x); cleanup.
+    admit.
     destruct (TD.disk1 x) eqn:?; cleanup.
-  Qed.
+    admit.
+  Admitted.
 
   Hint Resolve d0_upd_to_invariant.
 
@@ -463,9 +465,11 @@ Module RD.
       (exists b0 d, TD.disk0 state' = None /\
                TD.disk1 state' = Some d /\
                d a = Some b0 /\
-               abstraction state = D.Disk (upd d a b)).
+               abstraction state = D.Disk (diskUpd d a b)).
   Proof.
-    inversion 2; cleanup; autorewrite with upd; eauto 10.
+    inversion 2; cleanup; autorewrite with upd;
+      erewrite ?diskUpd_eq_some by eauto;
+      eauto 10.
   Qed.
 
   Ltac d0_upd_fwd :=
@@ -481,7 +485,7 @@ Module RD.
       TD.disk0 state = Some (D.sdisk (abstraction state)) /\
       (exists b0 d', TD.disk1 state = Some d' /\
                 d' a = Some b0 /\
-                D.sdisk (abstraction state) = upd d' a b) \/
+                D.sdisk (abstraction state) = diskUpd d' a b) \/
       TD.disk1 state = None.
   Proof.
     destruct state; cleanup.
@@ -545,13 +549,13 @@ Module RD.
                     D.sdisk (abstraction state) a = Some b0;
              post :=
                fun r state' =>
-                 abstraction state' = D.Disk (upd (D.sdisk (abstraction state)) a b) /\
+                 abstraction state' = D.Disk (diskUpd (D.sdisk (abstraction state)) a b) /\
                  invariant state';
              crash :=
                fun state' =>
                  (abstraction state' = abstraction state /\
                   invariant state') \/
-                 (abstraction state' = D.Disk (upd (D.sdisk (abstraction state)) a b) /\
+                 (abstraction state' = D.Disk (diskUpd (D.sdisk (abstraction state)) a b) /\
                  invariant state');
            |})
         (Prim (TD.Write d1 a b))
@@ -578,15 +582,15 @@ Module RD.
                     D.sdisk (abstraction state) a = Some b0;
              post :=
                fun r state' =>
-                 abstraction state' = D.Disk (upd (D.sdisk (abstraction state)) a b) /\
+                 abstraction state' = D.Disk (diskUpd (D.sdisk (abstraction state)) a b) /\
                  invariant state';
              crash :=
                fun state' =>
                  (abstraction state' = abstraction state /\
                   invariant state') \/
-                 (abstraction state' = D.Disk (upd (D.sdisk (abstraction state)) a b) /\
+                 (abstraction state' = D.Disk (diskUpd (D.sdisk (abstraction state)) a b) /\
                   d0_upd state' a b) \/
-                 (abstraction state' = D.Disk (upd (D.sdisk (abstraction state)) a b) /\
+                 (abstraction state' = D.Disk (diskUpd (D.sdisk (abstraction state)) a b) /\
                  invariant state');
            |})
         (Write a b)
@@ -649,26 +653,23 @@ Module RD.
     - eapply TDWrite_oob_ok in H6; cleanup.
   Qed.
 
-  Lemma step_write_inbounds : forall state a b0 v b,
-      D.sdisk state a = Some b0 ->
+  Lemma step_write' : forall state a v b,
       D.step (D.Write a b) state v
-             (D.Disk (upd (D.sdisk state) a b)).
+             (D.Disk (diskUpd (D.sdisk state) a b)).
   Proof.
     destruct v; intros.
-    pose proof (D.step_write a b state); simpl in *.
-    simpl_match.
-    auto.
+    eauto.
   Qed.
 
-  Hint Resolve step_write_inbounds.
+  Hint Resolve step_write'.
 
   Lemma step_write_oob : forall state a b v,
       D.sdisk state a = None ->
       D.step (D.Write a b) state v state.
   Proof.
     destruct v; intros.
-    pose proof (D.step_write a b state); simpl in *.
-    simpl_match.
+    pose proof (D.step_write a b state).
+    autorewrite with upd in *.
     destruct state; eauto.
   Qed.
 

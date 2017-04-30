@@ -31,16 +31,13 @@ Module TDSpec.
 
   Definition Read i a : Semantics block :=
     StepRel (fun state r state' =>
-               match get_disk i state a with
+               match diskMem (get_disk i state) a with
                | Some v0 => r = v0
                | None => True
                end /\ state' = state).
 
   Definition Write i a b : Semantics unit :=
     StepRel (fun state r state' =>
-               match get_disk i state a with
-               | Some v0 => state' = upd_disk i (fun d => upd d a b) state
-               | None => state' = state (* silently fails *)
-               end).
+               state' = upd_disk i (fun d => diskUpd d a b) state).
 
 End TDSpec.

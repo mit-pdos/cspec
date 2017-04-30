@@ -16,14 +16,10 @@ Module D.
 
   Inductive step : Semantics Op State :=
   | step_read : forall a b state,
-      (forall b0, sdisk state a = Some b0 -> b = b0) ->
+      (forall b0, diskMem (sdisk state) a = Some b0 -> b = b0) ->
       step (Read a) state b state
   | step_write : forall a b state,
-      let disk' := match sdisk state a with
-                   | Some _ => upd (sdisk state) a b
-                   | None => sdisk state
-                   end in
-      step (Write a b) state tt (Disk disk').
+      step (Write a b) state tt (Disk (diskUpd (sdisk state) a b)).
 
   Definition exec := Prog.exec step.
   Definition exec_recover := Prog.exec_recover step.
