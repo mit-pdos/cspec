@@ -43,6 +43,8 @@ Section Memories.
 
 End Memories.
 
+Definition empty_mem {A AEQ V} : @mem A AEQ V := fun _ => None.
+
 Hint Rewrite upd_eq : upd.
 Hint Rewrite upd_upd : upd.
 Hint Rewrite upd_neq using (solve [ auto ]) : upd.

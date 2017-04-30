@@ -36,16 +36,12 @@ Module RD.
 
   Definition interpret := Interpret.interpret op_impl.
 
-  Definition abstraction (state:TD.State) : D.State.
-  Proof.
-    destruct state.
-    destruct disk0.
-    exact (D.Disk d).
-    destruct disk1.
-    exact (D.Disk d).
-    exfalso.
-    abstract (deex; intuition; congruence).
-  Defined.
+  Definition abstraction (state:TD.State) : D.State :=
+    match state with
+    | TD.Disks (Some d) _ _ => D.Disk d
+    | TD.Disks None (Some d) _ => D.Disk d
+    | _ => D.Disk Mem.empty_mem (* impossible *)
+    end.
 
   Definition invariant (state:TD.State) :=
     match state with
@@ -54,50 +50,168 @@ Module RD.
     | _ => True
     end.
 
-  Lemma invariant_stable_bg_step : forall state state',
+  Lemma abstraction_d0 : forall state d,
+      TD.disk0 state = Some d ->
+      abstraction state = D.Disk d.
+  Proof.
+    unfold abstraction; intros.
+    destruct state; simpl in *; subst; auto.
+  Qed.
+
+  Lemma abstraction_d1 : forall state d,
+      TD.disk0 state = None ->
+      TD.disk1 state = Some d ->
+      abstraction state = D.Disk d.
+  Proof.
+    unfold abstraction; intros.
+    destruct state; simpl in *; subst; auto.
+  Qed.
+
+  Lemma invariant_disks : forall state d,
+      TD.disk0 state = Some d ->
+      TD.disk1 state = Some d ->
+      invariant state.
+  Proof.
+    intros.
+    destruct state; simpl in *; subst; auto.
+  Qed.
+
+  Lemma invariant_d0 : forall state,
+      TD.disk1 state = None ->
+      invariant state.
+  Proof.
+    destruct state; simpl; intros; subst; eauto.
+    destruct disk0; auto.
+  Qed.
+
+  Lemma invariant_d1 : forall state,
+      TD.disk0 state = None ->
+      invariant state.
+  Proof.
+    destruct state; simpl; intros; subst; eauto.
+  Qed.
+
+  Lemma invariant_disks_fwd : forall d_0 d_1 pf,
+      invariant (TD.Disks (Some d_0) (Some d_1) pf) ->
+      d_0 = d_1.
+  Proof.
+    simpl; eauto.
+  Qed.
+
+  Lemma invariant_disks_fwd_eq : forall state d_0 d_1,
+      invariant state ->
+      TD.disk0 state = Some d_0 ->
+      TD.disk1 state = Some d_1 ->
+      d_0 = d_1.
+  Proof.
+    destruct state; simpl; intros; repeat simpl_match; eauto.
+  Qed.
+
+  Lemma abstraction_set_d0 : forall state d',
+      abstraction (TD.set_disk d0 state d') = D.Disk d'.
+  Proof.
+    destruct state; simpl; eauto.
+  Qed.
+
+  Opaque invariant.
+  Opaque abstraction.
+
+  Ltac find_contradiction :=
+    solve [ exfalso; eauto ].
+
+  Ltac cleanup :=
+    repeat match goal with
+           | [ |- forall _, _ ] => intros
+           | _ => progress subst
+           | _ => progress simpl in *
+           | _ => deex
+           | _ => progress destruct_ands
+           | [ |- invariant (TD.Disks None _ _) ] =>
+             now apply invariant_d1
+           | [ |- invariant (TD.Disks _ None _) ] =>
+             now apply invariant_d0
+           | [ H: invariant (TD.Disks (Some _) (Some _) _) |- _ ] =>
+             apply invariant_disks_fwd in H
+           | [ H: invariant ?state,
+                  H0: TD.disk0 ?state = Some _,
+                      H1: TD.disk1 ?state = Some _ |- _ ] =>
+             pose proof (invariant_disks_fwd_eq _ H H0 H1);
+             clear H0 H1;
+             subst
+           | [ H: Some _ = Some _ |- _ ] =>
+             inversion H; subst; clear H
+           | _ => simpl_match
+           | _ => solve [ eauto ]
+           | _ => find_contradiction
+           | _ => congruence
+           end.
+
+  Lemma invariant_stable : forall state state',
       invariant state ->
       TD.bg_step state state' ->
       invariant state'.
   Proof.
-    inversion 2; intros; subst;
-      simpl; eauto.
+    inversion 2; cleanup.
   Qed.
 
-  Hint Resolve invariant_stable_bg_step.
+  Hint Resolve invariant_stable.
 
-  Lemma abstraction_preserved_bg_step : forall state state',
+  Lemma abstraction_stable_invariant : forall state state',
       invariant state ->
       TD.bg_step state state' ->
       abstraction state' = abstraction state.
   Proof.
-    inversion 2; subst; simpl in *; subst; eauto.
+    inversion 2; cleanup.
   Qed.
 
-  Lemma abstraction_d0_eq : forall state d a v,
-      TD.disk0 state = Some d ->
-      d a = v ->
-      D.sdisk (abstraction state) a = v.
+  Ltac abstraction_fwd :=
+    match goal with
+    | [ H: invariant ?state,
+           H': TD.bg_step ?state ?state' |- _ ] =>
+      rewrite <- (abstraction_stable_invariant H H') in *
+    end.
+
+  Lemma d0_failed_fwd : forall state state',
+      TD.disk0 state = None ->
+      TD.bg_step state state' ->
+      state' = state.
   Proof.
-    intros; subst.
-    unfold abstraction.
-    destruct matches; simpl in *; try congruence.
+    inversion 2; cleanup.
   Qed.
 
-  Definition first_disk_failed state :=
-    TD.disk0 state = None.
-
-  Lemma abstraction_d1_eq : forall state d a v,
-      first_disk_failed state ->
-      TD.disk1 state = Some d ->
-      d a = v ->
-      D.sdisk (abstraction state) a = v.
+  Lemma d0_d1_failed : forall state,
+      TD.disk0 state = None ->
+      TD.disk1 state = None ->
+      False.
   Proof.
-    unfold first_disk_failed; intros; subst.
-    unfold abstraction.
-    destruct matches; simpl in *; try congruence.
+    destruct state; cleanup.
+    intuition congruence.
   Qed.
 
-  Hint Resolve abstraction_preserved_bg_step.
+  Hint Resolve d0_d1_failed.
+
+  Ltac inv_fwd :=
+    match goal with
+    | [ H: TD.disk0 ?state = None,
+           H': TD.bg_step ?state ?state' |- _ ] =>
+      eapply d0_failed_fwd in H'; eauto; subst
+    | [ H: invariant ?state,
+           H': TD.bg_step ?state ?state' |- _ ] =>
+      pose proof (invariant_stable H H')
+    end.
+
+  Ltac abstraction_simpl :=
+    try (progress erewrite ?abstraction_d0,
+         ?abstraction_d1 in * by (simpl; eauto);
+         cbn [ D.sdisk ] in * ).
+
+  Ltac start_spec :=
+    unfold prog_spec; cbn [pre post crash] in *; intros;
+    match goal with
+    | [ H: exec _ (Prim _) _ _ |- _ ] =>
+      eapply (inversion_prim_exec H); intros
+    | _ => inv_exec
+    end; try solve [ intuition eauto ].
 
   Theorem TDRead0_ok : forall a,
       prog_spec
@@ -111,49 +225,20 @@ Module RD.
                  match r with
                  | Working v => forall v0, D.sdisk (abstraction state) a = Some v0 ->
                                      v = v0
-                 | Failed => first_disk_failed state'
+                 | Failed => TD.disk0 state' = None
                  end;
              crash := fun state' => abstraction state' = abstraction state;
            |})
         (Prim (TD.Read d0 a))
         TD.step.
   Proof.
-    intros.
-    unfold prog_spec; simpl; intros.
-    inv_exec; eauto.
+    start_spec.
     TD.inv_step; cbn [TD.get_disk] in *.
-    intuition eauto.
-
-    destruct matches in *|-; intros; eauto.
-    eapply abstraction_d0_eq in Heqo; eauto.
-    erewrite abstraction_preserved_bg_step in * by eauto.
-    congruence.
-
-    repeat deex; intros; eauto.
-    eapply abstraction_d0_eq in Heqo; eauto.
-    erewrite abstraction_preserved_bg_step in * by eauto.
-    congruence.
-
-    TD.inv_step.
-    intuition eauto.
-  Qed.
-
-  Lemma bg_step_after_fail : forall state state',
-      first_disk_failed state ->
-      TD.bg_step state state' ->
-      state' = state.
-  Proof.
-    unfold first_disk_failed.
-    inversion 2; subst; simpl in *;
-      congruence.
-  Qed.
-
-  Lemma first_disk_failed_other_not_none : forall state,
-      first_disk_failed state ->
-      ~TD.disk1 state = None.
-  Proof.
-    unfold first_disk_failed; destruct state; simpl; intros.
-    deex; intuition congruence.
+    destruct matches in *|-; cleanup;
+      try abstraction_fwd;
+      try inv_fwd;
+      abstraction_simpl;
+      try intuition (eauto; congruence).
   Qed.
 
   Theorem TDRead1_ok : forall a,
@@ -161,7 +246,7 @@ Module RD.
         (fun (_:unit) (state:TD.State) =>
            {|
              pre := invariant state /\
-                    first_disk_failed state;
+                    TD.disk0 state = None;
              post :=
                fun r state' =>
                  abstraction state' = abstraction state /\
@@ -176,41 +261,20 @@ Module RD.
         (Prim (TD.Read d1 a))
         TD.step.
   Proof.
-    unfold prog_spec; cbn [pre post crash]; intuition.
-    inv_exec; eauto.
+    start_spec.
     TD.inv_step; cbn [TD.get_disk] in *.
-    intuition eauto.
-    eapply bg_step_after_fail in H; eauto; subst.
-
-    destruct matches in *|-; intros; eauto.
-    eapply abstraction_d1_eq in Heqo; eauto.
-    congruence.
-
-    repeat deex; intros; eauto.
-    eapply abstraction_d1_eq in Heqo; eauto.
-    congruence.
-
-    eapply first_disk_failed_other_not_none; eauto.
-
-    TD.inv_step.
-    intuition eauto.
+    destruct matches in *|-; cleanup;
+      try abstraction_fwd;
+      try inv_fwd;
+      abstraction_simpl;
+      try intuition (eauto; congruence).
   Qed.
 
   Hint Resolve tt.
 
   Hint Constructors D.step.
 
-  Lemma abstraction_set_d0 : forall state d a b,
-      TD.get_disk d0 state = Some d ->
-      abstraction (TD.set_disk d0 state (upd d a b)) =
-      D.Disk (upd (D.sdisk (abstraction state)) a b).
-  Proof.
-    intros.
-    destruct state; simpl in *.
-    destruct disk0; simpl; congruence.
-  Qed.
-
-  Definition invariant_except (state:TD.State) a b :=
+  Definition d0_upd (state:TD.State) a b :=
     match state with
     | TD.Disks (Some d_0) (Some d_1) _ =>
       (exists b0, d_1 a = Some b0) /\
@@ -218,74 +282,68 @@ Module RD.
     | TD.Disks (Some d_0) None _ =>
       d_0 a = Some b
     | TD.Disks None (Some _) _ => False
-    | _ => True
+    | _ => False
     end.
 
-  Lemma invariant_except_upd_d0 : forall state d a b0 b,
+  Lemma d0_upd_set_d0 : forall state d a b b0,
       invariant state ->
       TD.disk0 state = Some d ->
       d a = Some b0 ->
-      invariant_except (TD.set_disk d0 state (upd d a b)) a b.
+      d0_upd (TD.set_disk d0 state (upd d a b)) a b.
   Proof.
-    unfold invariant, invariant_except; intros.
-    destruct matches in *|- ;
-      simpl in *;
-      intuition;
-      try congruence.
-    match goal with
-    | [ H: Some _ = Some _ |- _ ] =>
-      inversion H; subst; clear H
-    end; eauto.
+    intros.
+    destruct state; cleanup.
+    destruct disk1; cleanup.
     autorewrite with upd; auto.
   Qed.
 
-  Hint Resolve invariant_except_upd_d0.
+  Lemma d0_upd_to_invariant : forall state d a b,
+      d0_upd state a b ->
+      TD.get_disk d1 state = Some d ->
+      invariant (TD.set_disk d1 state (upd d a b)).
+  Proof.
+    destruct state; cleanup.
+    destruct disk0; cleanup.
+  Qed.
+
+  Lemma abstraction_set_d1_with_d0 : forall state d d',
+      TD.disk0 state = Some d ->
+      abstraction (TD.set_disk d1 state d') = abstraction state.
+  Proof.
+    destruct state; cleanup.
+  Qed.
+
+  Lemma abstraction_set_d1 : forall state d',
+      TD.disk0 state = None ->
+      abstraction (TD.set_disk d1 state d') = D.Disk d'.
+  Proof.
+    destruct state; cleanup.
+  Qed.
+
+  Lemma invariant_set_d1 : forall state d',
+      TD.disk0 state = None ->
+      invariant (TD.set_disk d1 state d').
+  Proof.
+    destruct state; cleanup.
+  Qed.
+
+  Opaque TD.set_disk.
+
+  Hint Resolve invariant_d1.
 
   Lemma abstraction_is_some_disk : forall state,
-      {exists d, TD.get_disk d0 state = Some d /\
-            abstraction state = D.Disk d} +
-      {exists d, TD.get_disk d1 state = Some d /\
-            abstraction state = D.Disk d /\
-            TD.get_disk d0 state = None}.
+      {TD.disk0 state = Some (D.sdisk (abstraction state))} +
+      {TD.disk0 state = None /\
+       TD.disk1 state = Some (D.sdisk (abstraction state))}.
   Proof.
-    intros.
-    destruct state; simpl.
-    destruct matches;
-      eauto.
-    exfalso; repeat deex; intuition congruence.
+    destruct state; cleanup.
+    destruct disk0, disk1; cleanup;
+      abstraction_simpl.
+    exfalso.
+    repeat deex; intuition congruence.
   Qed.
 
-  Ltac case_abstraction :=
-    match goal with
-    | [ H: context[D.sdisk (abstraction ?state)] |- _ ] =>
-      destruct (abstraction_is_some_disk state);
-      repeat deex;
-      match goal with
-      | [ H: abstraction _ = _ |- _ ] =>
-        rewrite H in *; cbn [D.sdisk] in *
-      end
-    end.
-
-  Lemma invariant_stability : forall state state',
-      invariant state ->
-      TD.bg_step state state' ->
-      abstraction state = abstraction state' /\
-      invariant state'.
-  Proof.
-    intros.
-    intuition eauto.
-    symmetry; auto.
-  Qed.
-
-  Ltac inv_stable :=
-    match goal with
-    | [ H: invariant ?state,
-           H': TD.bg_step ?state ?state' |- _ ] =>
-      pose proof (invariant_stability H H');
-      clear H H';
-      safe_intuition;
-      replace (abstraction state) in *
-    end.
+  Hint Resolve d0_upd_set_d0.
 
   Theorem TDWrite0_inbounds_ok : forall a b,
       prog_spec
@@ -296,48 +354,28 @@ Module RD.
              post :=
                fun r state' =>
                  (abstraction state' = D.Disk (upd (D.sdisk (abstraction state)) a b) /\
-                  invariant_except state' a b) \/
+                  d0_upd state' a b) \/
                  (abstraction state' = abstraction state /\
-                  first_disk_failed state');
+                  TD.disk0 state' = None);
              crash :=
                fun state' =>
                  (abstraction state' = abstraction state /\
                   invariant state') \/
                  (abstraction state' = D.Disk (upd (D.sdisk (abstraction state)) a b) /\
                   (* this should be a recoverable property *)
-                  invariant_except state' a b)
+                  d0_upd state' a b)
            |})
         (Prim (TD.Write d0 a b))
         TD.step.
   Proof.
-    unfold prog_spec; cbn [pre post crash]; intuition.
-    inv_exec; eauto.
-    - TD.inv_step.
-      subst_var.
-      inv_stable.
-      case_abstraction;
-        repeat simpl_match;
-        eauto.
-      rewrite abstraction_set_d0 by auto.
-      replace (abstraction x); cbn [D.sdisk]; eauto.
-    - TD.inv_step; subst_var.
-      inv_stable.
-      case_abstraction;
-        repeat simpl_match;
-        eauto.
-      rewrite abstraction_set_d0 by auto.
-      replace (abstraction x); cbn [D.sdisk]; eauto.
-  Qed.
-
-  Lemma invariant_both_disks : forall state d_0 d_1,
-      invariant state ->
-      TD.get_disk d0 state = Some d_0 ->
-      TD.get_disk d1 state = Some d_1 ->
-      d_0 = d_1.
-  Proof.
-    unfold invariant; intros; destruct matches in *;
-      simpl in *;
-      congruence.
+    start_spec.
+    TD.inv_step;
+      subst_var;
+      try abstraction_fwd;
+      try inv_fwd.
+    destruct (abstraction_is_some_disk x); cleanup.
+    rewrite ?abstraction_set_d0 in *.
+    intuition eauto.
   Qed.
 
   Theorem TDWrite_oob_ok : forall i a b,
@@ -358,142 +396,65 @@ Module RD.
         (Prim (TD.Write i a b))
         TD.step.
   Proof.
-    unfold prog_spec; cbn [pre post crash]; intuition.
-    inv_exec; eauto.
-    - TD.inv_step.
-      subst_var.
-      inv_stable.
-      destruct i; case_abstraction;
-        repeat simpl_match;
-        eauto.
-      destruct (TD.get_disk d1 x) eqn:?; eauto.
-      pose proof (invariant_both_disks _ H0 ltac:(eauto) ltac:(eauto));
-        subst.
-      simpl_match; eauto.
-    - TD.inv_step.
-      subst_var.
-      inv_stable.
-      destruct i; case_abstraction;
-        repeat simpl_match;
-        eauto.
-      destruct (TD.get_disk d1 x) eqn:?; eauto.
-      pose proof (invariant_both_disks _ H0 ltac:(eauto) ltac:(eauto));
-        subst.
-      simpl_match; eauto.
+    start_spec.
+    TD.inv_step; subst_var;
+      try abstraction_fwd;
+      try inv_fwd.
+    destruct i, (abstraction_is_some_disk x); cleanup.
+    destruct (TD.disk1 x) eqn:?; cleanup.
   Qed.
 
-  Theorem invariant_except_step : forall state a b state',
-      invariant_except state a b ->
+  Hint Resolve d0_upd_to_invariant.
+
+  Lemma d0_upd_after_step : forall state state' a b,
+      d0_upd state a b ->
       TD.bg_step state state' ->
-      (invariant_except state' a b \/
-       invariant state').
-  Proof.
-    inversion 2; subst; simpl in *; eauto.
-  Qed.
-
-  Hint Resolve invariant_except_step.
-
-  Lemma invariant_except_to_invariant : forall state d a b,
-      invariant_except state a b ->
-      TD.get_disk d1 state = Some d ->
-      invariant (TD.set_disk d1 state (upd d a b)).
-  Proof.
-    unfold invariant_except; intros.
-    destruct state; simpl in *; subst; auto.
-    destruct matches; safe_intuition; eauto.
-  Qed.
-
-  Hint Resolve invariant_except_to_invariant.
-
-  Ltac cleanup :=
-    repeat match goal with
-           | _ => progress safe_intuition
-           | _ => simpl_match
-           | _ => deex
-           | _ => progress subst
-           | _ => progress simpl in *
-           | _ => contradiction
-           | [ H: None = Some _ \/ None = Some _ |- _ ] =>
-             exfalso; destruct H; congruence
-           | [ H: Some _ = Some _ |- _ ] =>
-             inversion H; subst; clear H
-           | _ => progress eauto
-           | _ => congruence
-           end.
-
-  Lemma invariant_except_after_step : forall state state' a b,
-      invariant_except state a b ->
-      TD.bg_step state state' ->
-      (* d0 survived *)
-      (exists d, TD.get_disk d0 state' = Some d /\
-            abstraction state' = D.Disk d /\
-            d a = Some b /\
-            invariant_except state' a b) \/
-      (* only d1 survived *)
-      (exists b0 d, TD.get_disk d1 state' = Some d /\
-               abstraction state' = D.Disk d /\
+      (d0_upd state' a b /\
+       abstraction state' = abstraction state) \/
+      (exists b0 d, TD.disk0 state' = None /\
+               TD.disk1 state' = Some d /\
                d a = Some b0 /\
-               TD.get_disk d0 state' = None).
+               abstraction state = D.Disk (upd d a b)).
   Proof.
-    inversion 2; cleanup; eauto 10 using upd_eq.
-    unfold invariant_except in H; destruct matches in *;
-      cleanup;
-      eauto 10 using upd_eq.
+    inversion 2; cleanup; autorewrite with upd; eauto 10.
   Qed.
 
-  Lemma invariant_except_set_d1 : forall state d' a b,
-      invariant_except state a b ->
-      abstraction (TD.set_disk d1 state d') = abstraction state.
+  Ltac d0_upd_fwd :=
+    match goal with
+    | [ H: d0_upd ?state _ _,
+           H': TD.bg_step ?state _ |- _ ] =>
+      eapply d0_upd_after_step in H; eauto;
+      hyp_intuition
+    end.
+
+  Lemma d0_upd_cases : forall state a b,
+      d0_upd state a b ->
+      TD.disk0 state = Some (D.sdisk (abstraction state)) /\
+      (exists b0 d', TD.disk1 state = Some d' /\
+                d' a = Some b0 /\
+                D.sdisk (abstraction state) = upd d' a b) \/
+      TD.disk1 state = None.
   Proof.
-    intros.
-    unfold invariant_except, abstraction in *;
-      destruct matches in *;
-      simpl in *;
-      try match goal with
-          | [ H: TD.Disks _ _ _ = TD.Disks _ _ _ |- _ ] =>
-            inversion H; subst; clear H
-          end;
-      cleanup.
+    destruct state; cleanup.
+    destruct disk0, disk1; cleanup.
+    intuition eauto.
   Qed.
 
-  Lemma invariant_except_known_d0 : forall state d a b,
-      TD.get_disk d0 state = Some d ->
-      invariant_except state a b ->
-      (TD.get_disk d1 state = None \/
-       exists b0 d', TD.get_disk d1 state = Some d' /\
-             d' a = Some b0 /\
-             d = upd d' a b).
-  Proof.
-    unfold invariant_except; intros.
-    destruct matches in *; cleanup.
-    eauto 10.
-  Qed.
+  Ltac d0_upd_split :=
+    match goal with
+    | [ H: d0_upd _ _ _ |- _ ] =>
+      pose proof (d0_upd_cases _ _ _ H);
+      hyp_intuition
+    end.
 
-  Lemma bg_step_invert : forall state d_0 d_1 pf,
-      TD.bg_step state (TD.Disks (Some d_0) (Some d_1) pf) ->
-      state = TD.Disks (Some d_0) (Some d_1) pf.
-  Proof.
-    intros.
-    inversion H; subst; eauto.
-  Qed.
-
-  Lemma invariant_except_no_d1 : forall state a b,
-      invariant_except state a b ->
-      TD.disk1 state = None ->
-      invariant state.
-  Proof.
-    unfold invariant_except; intros;
-      destruct matches in *;
-      cleanup.
-  Qed.
-
-  Hint Resolve invariant_except_no_d1.
+  Hint Resolve invariant_d0.
+  Hint Resolve invariant_set_d1.
 
   Theorem TDWrite1_inbounds_d0_ok : forall a b,
       prog_spec
         (fun (_:unit) (state:TD.State) =>
            {|
-             pre := invariant_except state a b;
+             pre := d0_upd state a b;
              post :=
                fun r state' =>
                  abstraction state' = abstraction state /\
@@ -501,7 +462,7 @@ Module RD.
              crash :=
                fun state' =>
                  (abstraction state' = abstraction state /\
-                  invariant_except state' a b) \/
+                  d0_upd state' a b) \/
                  (abstraction state' = abstraction state /\
                   invariant state')
                  (* missing crash case: we might actually lose the first disk
@@ -515,45 +476,15 @@ Module RD.
         (Prim (TD.Write d1 a b))
         TD.step.
   Proof.
-    unfold prog_spec; cbn [pre post crash]; intuition.
-    inv_exec; eauto.
-    - TD.inv_step.
-      subst_var.
-      destruct (invariant_except_after_step _ _ H H0);
-        repeat deex.
-      destruct (invariant_except_known_d0 _ _ _ H1 H4);
-        cleanup.
-      inversion H0; cleanup; intuition eauto.
-
-      destruct matches; simpl in *; destruct matches in *;
-        cleanup;
-        intuition eauto.
-      eapply bg_step_invert in H0; subst; simpl; eauto.
-
-      destruct matches; simpl in *; destruct matches in *;
-        cleanup;
-        intuition eauto.
-      destruct disk0, disk1; cleanup.
-      inversion H0; subst; cleanup.
-    - right.
-      TD.inv_step.
-      subst_var.
-      destruct (invariant_except_after_step _ _ H H0);
-        repeat deex.
-      destruct (invariant_except_known_d0 _ _ _ H1 H4);
-        cleanup.
-      inversion H0; cleanup; intuition eauto.
-
-      destruct matches; simpl in *; destruct matches in *;
-        cleanup;
-        intuition eauto.
-      eapply bg_step_invert in H0; subst; simpl; eauto.
-
-      destruct matches; simpl in *; destruct matches in *;
-        cleanup;
-        intuition eauto.
-      destruct disk0, disk1; cleanup.
-      inversion H0; subst; cleanup.
+    start_spec.
+    TD.inv_step;
+      subst_var;
+      cleanup.
+    d0_upd_fwd.
+    - d0_upd_split; cleanup.
+      erewrite abstraction_set_d1_with_d0 by eauto; auto.
+    - cleanup.
+      erewrite abstraction_set_d1 by eauto; auto.
   Qed.
 
   Theorem TDWrite1_inbounds_no_d0_ok : forall a b,
@@ -561,7 +492,7 @@ Module RD.
         (fun b0 (state:TD.State) =>
            {|
              pre := invariant state /\
-                    first_disk_failed state /\
+                    TD.disk0 state = None /\
                     D.sdisk (abstraction state) a = Some b0;
              post :=
                fun r state' =>
@@ -577,26 +508,17 @@ Module RD.
         (Prim (TD.Write d1 a b))
         TD.step.
   Proof.
-    unfold prog_spec; cbn [pre post crash]; intuition.
-    inv_exec; eauto.
-    - TD.inv_step.
-      subst_var.
-      eapply bg_step_after_fail in H1; eauto; subst.
-      case_abstraction;
-        unfold first_disk_failed in *;
-        cleanup.
-      destruct matches in *;
-        cleanup;
-        destruct matches in *.
-    - TD.inv_step.
-      subst_var.
-      eapply bg_step_after_fail in H1; eauto; subst.
-      case_abstraction;
-        unfold first_disk_failed in *;
-        cleanup.
-      destruct matches in *;
-        cleanup;
-        destruct matches in *.
+    start_spec.
+    TD.inv_step;
+      subst_var;
+      inv_fwd;
+      cleanup.
+
+    destruct (TD.disk1 state) eqn:?; cleanup.
+    abstraction_simpl; cleanup.
+    erewrite abstraction_set_d1 by eauto.
+    abstraction_simpl.
+    eauto.
   Qed.
 
   Lemma step_write_inbounds : forall state a b0 b,
@@ -611,18 +533,6 @@ Module RD.
   Qed.
 
   Hint Resolve step_write_inbounds.
-
-  Lemma invariant_first_disk_failed : forall state,
-      first_disk_failed state ->
-      invariant state.
-  Proof.
-    unfold first_disk_failed, invariant;
-      intros;
-      destruct matches in *;
-      cleanup.
-  Qed.
-
-  Hint Resolve invariant_first_disk_failed.
 
   Lemma step_write_oob : forall state a b,
       D.sdisk state a = None ->
