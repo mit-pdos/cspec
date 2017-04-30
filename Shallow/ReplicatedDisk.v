@@ -570,12 +570,91 @@ Module RD.
     eauto.
   Qed.
 
-  Lemma step_write_inbounds : forall state a b0 b,
+  Theorem Write_inbounds_ok : forall a b,
+      prog_spec
+        (fun b0 state =>
+           {|
+             pre := invariant state /\
+                    D.sdisk (abstraction state) a = Some b0;
+             post :=
+               fun r state' =>
+                 abstraction state' = D.Disk (upd (D.sdisk (abstraction state)) a b) /\
+                 invariant state';
+             crash :=
+               fun state' =>
+                 (abstraction state' = abstraction state /\
+                  invariant state') \/
+                 (abstraction state' = D.Disk (upd (D.sdisk (abstraction state)) a b) /\
+                  d0_upd state' a b) \/
+                 (abstraction state' = D.Disk (upd (D.sdisk (abstraction state)) a b) /\
+                 invariant state');
+           |})
+        (Write a b)
+        TD.step.
+  Proof.
+    start_spec.
+    - eapply TDWrite0_inbounds_ok in H6; cleanup.
+      intuition; rew_abstraction.
+      + inv_exec; cleanup; eauto.
+        eapply TDWrite1_inbounds_d0_ok in H9; cleanup;
+          rew_abstraction;
+          eauto.
+        eapply TDWrite1_inbounds_d0_ok in H9; cleanup;
+          rew_abstraction;
+          eauto.
+
+        eapply TDWrite1_inbounds_d0_ok in H9; cleanup;
+          rew_abstraction;
+          eauto.
+      + inv_exec; cleanup; eauto.
+        eapply TDWrite1_inbounds_no_d0_ok in H9; cleanup;
+          rew_abstraction;
+          eauto.
+        eapply TDWrite1_inbounds_no_d0_ok in H9; cleanup;
+          rew_abstraction;
+          eauto.
+
+        eapply TDWrite1_inbounds_no_d0_ok in H9; cleanup;
+          rew_abstraction;
+          intuition eauto.
+    - eapply TDWrite0_inbounds_ok in H6; cleanup;
+        rew_abstraction;
+        intuition eauto.
+  Qed.
+
+  Theorem Write_oob_ok : forall a b,
+      prog_spec
+        (fun (_:unit) state =>
+           {|
+             pre := invariant state /\
+                    D.sdisk (abstraction state) a = None;
+             post :=
+               fun r state' =>
+                 abstraction state' = abstraction state /\
+                 invariant state';
+             crash :=
+               fun state' =>
+                 abstraction state' = abstraction state /\
+                 invariant state';
+           |})
+        (Write a b)
+        TD.step.
+  Proof.
+    start_spec.
+    - eapply TDWrite_oob_ok in H6; cleanup.
+      inv_exec; cleanup; eauto.
+      eapply TDWrite_oob_ok in H9; rew_abstraction; cleanup.
+      eapply TDWrite_oob_ok in H9; rew_abstraction; cleanup.
+      eapply TDWrite_oob_ok in H9; rew_abstraction; cleanup.
+    - eapply TDWrite_oob_ok in H6; cleanup.
+  Qed.
+
+  Lemma step_write_inbounds : forall state a b0 v b,
       D.sdisk state a = Some b0 ->
-      D.step (D.Write a b) state tt
+      D.step (D.Write a b) state v
              (D.Disk (upd (D.sdisk state) a b)).
   Proof.
-    intros.
+    destruct v; intros.
     pose proof (D.step_write a b state); simpl in *.
     simpl_match.
     auto.
@@ -583,11 +662,11 @@ Module RD.
 
   Hint Resolve step_write_inbounds.
 
-  Lemma step_write_oob : forall state a b,
+  Lemma step_write_oob : forall state a b v,
       D.sdisk state a = None ->
-      D.step (D.Write a b) state tt state.
+      D.step (D.Write a b) state v state.
   Proof.
-    intros.
+    destruct v; intros.
     pose proof (D.step_write a b state); simpl in *.
     simpl_match.
     destruct state; eauto.
@@ -602,50 +681,28 @@ Module RD.
                     abstraction.
   Proof.
     eapply interpret_exec; intros; eauto.
-    - destruct op; simpl in *; unfold Write in *.
+    - destruct op; simpl in *.
       + eapply Read_ok in H0; cleanup; rew_abstraction.
         intuition eauto.
-      + inv_exec.
-        destruct (D.sdisk (abstraction state) a) eqn:?.
-        eapply TDWrite0_inbounds_ok in H6; eauto;
-          cbn [pre post crash] in *;
-          cleanup.
-        hyp_intuition.
-        inv_exec.
-        eapply TDWrite1_inbounds_d0_ok in H7; eauto;
-          cbn [pre post crash] in *;
-          cleanup.
-        repeat match goal with
-               | [ H: abstraction _ = _ |- _ ] =>
-                 rewrite H
-               end.
-        intuition eauto.
-
-        inv_exec.
-        eapply TDWrite1_inbounds_no_d0_ok in H7; eauto;
-          cbn [pre post crash] in *;
-          cleanup;
-          repeat match goal with
-                 | [ H: abstraction _ = _ |- _ ] =>
-                   rewrite H
-                 end;
+      + destruct (D.sdisk (abstraction state) a) eqn:?.
+        eapply Write_inbounds_ok in H0; cleanup; rew_abstraction;
           intuition eauto.
 
-        eapply TDWrite_oob_ok in H6; eauto;
-          cbn [pre post crash] in *;
-          cleanup.
-        inv_exec.
-        eapply TDWrite_oob_ok in H7; eauto;
-          cbn [pre post crash] in *;
-          cleanup;
-          repeat match goal with
-                 | [ H: abstraction _ = _ |- _ ] =>
-                   rewrite H
-                 end;
+        eapply Write_oob_ok in H0; cleanup; rew_abstraction;
           intuition eauto.
     - destruct op; cleanup.
       + eapply Read_ok in H0; cleanup.
-      + (* also need a crash proof *)
+      + destruct (D.sdisk (abstraction state) a) eqn:?.
+        eapply Write_inbounds_ok in H0; cleanup; rew_abstraction.
+        hyp_intuition; rew_abstraction; eauto.
+        intuition; eauto.
+        admit. (* TODO: d0_upd state' requires recovery to achieve invariant *)
+
+        eapply Write_oob_ok in H0; cleanup; rew_abstraction;
+          intuition eauto.
+
+    Grab Existential Variables.
+    all: auto.
   Abort.
 
 End RD.
