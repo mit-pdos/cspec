@@ -350,6 +350,22 @@ Module RD.
              rewrite H in *
            end.
 
+  Ltac apply_Read_ok :=
+    match goal with
+    | [ H: exec _ (Prim (TD.Read d0 _)) _ _ |- _ ] =>
+      eapply TDRead0_ok in H; cbn [pre post crash] in *; cleanup;
+      try match goal with
+          | [ H: match ?v with Working _ => _ | Failed => _ end |- _ ] =>
+            destruct v
+          end; rew_abstraction
+    | [ H: exec _ (Prim (TD.Read d1 _)) _ _ |- _ ] =>
+      eapply TDRead1_ok in H; cbn [pre post crash] in *; cleanup;
+      try match goal with
+          | [ H: match ?v with Working _ => _ | Failed => _ end |- _ ] =>
+            destruct v
+          end; rew_abstraction
+    end.
+
   Theorem Read_ok : forall a,
       prog_spec
         (fun (_:unit) (state:TD.State) =>
@@ -369,24 +385,15 @@ Module RD.
         TD.step.
   Proof.
     start_spec.
-    - eapply TDRead0_ok in H6; cbn [pre post crash] in *;
-        cleanup.
-      destruct v.
+    - apply_Read_ok; cleanup.
       inv_exec; cleanup; rew_abstraction; eauto.
 
-      inv_exec; cleanup.
-      eapply TDRead1_ok in H9; cbn [pre post crash] in *;
-        cleanup.
-      destruct v; cleanup.
-
+      inv_exec.
+      apply_Read_ok; cleanup.
       inv_exec; rew_abstraction; cleanup.
 
-      eapply TDRead1_ok in H9; cbn [pre post crash] in *;
-        cleanup.
-      intuition eauto.
-      congruence.
-    - eapply TDRead0_ok in H6; cbn [pre post crash] in *;
-        cleanup.
+      apply_Read_ok; cleanup.
+    - apply_Read_ok.
   Qed.
 
   Hint Resolve tt.
