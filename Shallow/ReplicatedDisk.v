@@ -39,7 +39,7 @@ Module RD.
   | RepairDone
   (* one of the disks has failed, so don't bother continuing recovery since the
   invariant is now trivially satisfied *)
-  | DiskFailed.
+  | DiskFailed (i:diskId).
 
   Definition fixup (a:addr) : TD.prog RecStatus :=
     mv0 <- Prim (TD.Read d0 a);
@@ -52,11 +52,11 @@ Module RD.
                                        mu <- Prim (TD.Write d1 a v);
                                        Ret (match mu with
                                             | Working _ => RepairDone
-                                            | Failed => DiskFailed
+                                            | Failed => DiskFailed d1
                                             end)
-                      | Failed => Ret DiskFailed
+                      | Failed => Ret (DiskFailed d1)
                       end
-      | Failed => Ret DiskFailed
+      | Failed => Ret (DiskFailed d0)
       end.
 
   (* recursively performs recovery at [a-1], [a-2], down to 0 *)
@@ -67,7 +67,7 @@ Module RD.
               match s with
               | Continue => recover_at n
               | RepairDone => Ret RepairDone
-              | DiskFailed => Ret DiskFailed
+              | DiskFailed i => Ret (DiskFailed i)
               end
     end.
 
@@ -653,6 +653,36 @@ Module RD.
     abstraction_simpl.
     eauto.
   Qed.
+
+  Theorem fixup_at_upd_ok : forall a,
+      prog_spec
+        (fun b0 (state:TD.State) =>
+           {|
+             pre := d0_upd state a b0;
+             post :=
+               fun r state' =>
+                 invariant state' /\
+                 match r with
+                 | RepairDone =>
+                   abstraction state' = abstraction state
+                 | DiskFailed d0 =>
+                   exists d, TD.disk1 state = Some d /\
+                        abstraction state' = D.Disk d
+                 | DiskFailed d1 =>
+                   abstraction state' = abstraction state
+                 | Continue => False
+                 end;
+             crash :=
+               fun state' =>
+                 invariant state' \/
+                 d0_upd state' a b0;
+           |})
+        (fixup a)
+        TD.step.
+  Proof.
+    start_spec.
+    (* TODO: need specs for reading with d0_upd and not invariant *)
+  Abort.
 
   Theorem Write_inbounds_ok : forall a b,
       prog_spec
