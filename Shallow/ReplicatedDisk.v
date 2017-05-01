@@ -545,7 +545,8 @@ Module RD.
       (exists b0 d, TD.disk0 state' = None /\
                TD.disk1 state' = Some d /\
                d a = Some b0 /\
-               abstraction state = D.Disk (diskUpd d a b)).
+               abstraction state = D.Disk (diskUpd d a b) /\
+               abstraction state' = D.Disk d).
   Proof.
     inversion 2; cleanup; autorewrite with upd;
       erewrite ?diskUpd_eq_some by eauto;
@@ -653,6 +654,85 @@ Module RD.
     abstraction_simpl.
     eauto.
   Qed.
+
+  Theorem TDRead0_upd_ok : forall a,
+      prog_spec
+        (fun '(a0, b0) (state:TD.State) =>
+           {|
+             pre := d0_upd state a0 b0;
+             post :=
+               fun r state' =>
+                 match r with
+                 | Working v => (forall v0, D.sdisk (abstraction state) a = Some v0 ->
+                                      v = v0) /\
+                               abstraction state' = abstraction state /\
+                               d0_upd state' a0 b0
+                 | Failed => TD.disk0 state' = None /\
+                            exists d, TD.disk1 state = Some d /\
+                                 abstraction state' = D.Disk d
+                 end;
+             crash := fun state' =>
+                        (d0_upd state' a0 b0 /\
+                         abstraction state' = abstraction state) \/
+                        (TD.disk0 state' = None /\
+                         exists d, TD.disk1 state = Some d /\
+                              abstraction state' = D.Disk d);
+           |})
+        (Prim (TD.Read d0 a))
+        TD.step.
+  Proof.
+    start_spec;
+      destruct a0 as [a0 b0]; cleanup.
+    - TD.inv_step; cbn [TD.get_disk] in *.
+      destruct matches in *|-; cleanup;
+        try abstraction_fwd;
+        try inv_fwd.
+      d0_upd_fwd; abstraction_simpl; cleanup.
+      replace (abstraction state) in *; simpl in *; abstraction_simpl.
+      intuition (eauto; try congruence).
+
+      d0_upd_fwd; abstraction_simpl; cleanup.
+      replace (abstraction state) in *; simpl in *; abstraction_simpl.
+      intuition (eauto; try congruence).
+
+      destruct state'; cleanup.
+      destruct disk1; abstraction_simpl; cleanup.
+      inversion H1; cleanup.
+      destruct o; cleanup.
+    - destruct v; intuition eauto.
+  Qed.
+
+  Theorem TDRead1_upd_ok : forall a,
+      prog_spec
+        (fun '(a0, b0) (state:TD.State) =>
+           {|
+             pre := d0_upd state a0 b0;
+             post :=
+               fun r state' =>
+                 match r with
+                 | Working v => (forall v0, D.sdisk (abstraction state) a = Some v0 ->
+                                      v <> v0 ->
+                                      a = a0) /\
+                               (abstraction state' = abstraction state /\
+                                d0_upd state' a0 b0) \/
+                               (TD.disk0 state' = None /\
+                                exists d, TD.disk1 state = Some d /\
+                                     abstraction state' = D.Disk d)
+                 | Failed => TD.disk1 state' = None /\
+                            exists d, TD.disk1 state' = Some d /\
+                                 abstraction state' = D.Disk d
+                 end;
+             crash := fun state' =>
+                        (d0_upd state' a0 b0 /\
+                         abstraction state' = abstraction state) \/
+                        (TD.disk0 state' = None /\
+                         exists d, TD.disk1 state = Some d /\
+                              abstraction state' = D.Disk d);
+           |})
+        (Prim (TD.Read d1 a))
+        TD.step.
+  Proof.
+  Abort.
 
   Theorem fixup_at_upd_ok : forall a,
       prog_spec
