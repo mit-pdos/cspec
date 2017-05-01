@@ -1,5 +1,4 @@
 Require Export EquivDec.
-Require Import FunctionalExtensionality.
 
 Require Import Automation.
 Require Import SepLogic.Mem.Def.

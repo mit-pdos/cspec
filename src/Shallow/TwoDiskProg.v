@@ -23,7 +23,7 @@ Module TD.
   Record State :=
     Disks { disk0 : option disk;
             disk1 : option disk;
-            some_disk_works : exists d, disk0 = Some d \/ disk1 = Some d }.
+            some_disk_works : disk0 = None -> disk1 = None -> False }.
 
   Arguments Disks disk0 disk1 some_disk_works : clear implicits.
 
@@ -36,18 +36,18 @@ Module TD.
 
   Definition set_disk (i:diskId) (state:State) (d:disk) : State :=
     match i with
-    | d0 => let 'Disks _ d_1 _ := state in Disks (Some d) d_1 ltac:(eauto)
-    | d1 => let 'Disks d_0 _ _ := state in Disks d_0 (Some d) ltac:(eauto)
+    | d0 => let 'Disks _ d_1 _ := state in Disks (Some d) d_1 ltac:(congruence)
+    | d1 => let 'Disks d_0 _ _ := state in Disks d_0 (Some d) ltac:(congruence)
     end.
 
   Inductive bg_step : State -> State -> Prop :=
   | step_id : forall state, bg_step state state
   | step_fail0 : forall d_0 d_1 pf,
       bg_step (Disks (Some d_0) (Some d_1) pf)
-              (Disks None (Some d_1) ltac:(eauto))
+              (Disks None (Some d_1) ltac:(congruence))
   | step_fail1 : forall d_0 d_1 pf,
       bg_step (Disks (Some d_0) (Some d_1) pf)
-              (Disks (Some d_0) None ltac:(eauto)).
+              (Disks (Some d_0) None ltac:(congruence)).
 
   Inductive op_step : Semantics Op State :=
   | step_read : forall a i r state,

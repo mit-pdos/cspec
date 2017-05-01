@@ -1,1 +1,3 @@
-Require Export Mem.
+Require Export
+        SepLogic.Mem
+        SepLogic.Pred.

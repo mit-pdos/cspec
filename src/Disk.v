@@ -1,5 +1,6 @@
 Require Import Bytes.
 Require Export SepLogic.Mem.
+Require Import SepLogic.Pred.
 
 Definition addr := nat.
 
@@ -13,8 +14,10 @@ Opaque block.
 
 Record disk :=
   mkDisk { size: nat;
-           diskMem : mem addr block;
+           diskMem :> mem addr block;
            diskMem_domain: sized_domain diskMem size; }.
+
+Definition dpred := pred addr block.
 
 (* this coercion allows disks to be directly accessed with a function
 application: [d a] will implicitly call [disk_get d a] due to the coercion,
