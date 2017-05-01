@@ -31,7 +31,7 @@ Module TDSpec.
 
   Definition Read i a : Semantics block :=
     StepRel (fun state r state' =>
-               match diskMem (get_disk i state) a with
+               match get_disk i state a with
                | Some v0 => r = v0
                | None => True
                end /\ state' = state).

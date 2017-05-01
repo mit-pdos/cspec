@@ -52,7 +52,7 @@ Module TD.
   Inductive op_step : Semantics Op State :=
   | step_read : forall a i r state,
       match get_disk i state with
-      | Some d => match diskMem d a with
+      | Some d => match d a with
                  | Some b0 => r = Working b0
                  | None => exists b, r = Working b
                  end

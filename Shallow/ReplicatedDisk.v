@@ -293,7 +293,7 @@ Module RD.
                  abstraction state' = abstraction state /\
                  invariant state' /\
                  match r with
-                 | Working v => forall v0, diskMem (D.sdisk (abstraction state)) a = Some v0 ->
+                 | Working v => forall v0, D.sdisk (abstraction state) a = Some v0 ->
                                      v = v0
                  | Failed => TD.disk0 state' = None
                  end;
@@ -324,7 +324,7 @@ Module RD.
                  abstraction state' = abstraction state /\
                  invariant state' /\
                  match r with
-                 | Working v => forall v0, diskMem (D.sdisk (abstraction state)) a = Some v0 ->
+                 | Working v => forall v0, D.sdisk (abstraction state) a = Some v0 ->
                                      v = v0
                  | Failed => False
                  end;
@@ -373,7 +373,7 @@ Module RD.
              pre := invariant state;
              post :=
                fun r state' =>
-                 (forall v, diskMem (D.sdisk (abstraction state')) a = Some v ->
+                 (forall v, D.sdisk (abstraction state') a = Some v ->
                        r = v) /\
                  abstraction state' = abstraction state /\
              invariant state';

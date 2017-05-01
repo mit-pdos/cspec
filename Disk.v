@@ -13,18 +13,22 @@ Opaque block.
 
 Record disk :=
   mkDisk { size: nat;
-           diskMem :> mem addr block;
+           diskMem : mem addr block;
            diskMem_domain: sized_domain diskMem size; }.
 
-(* this is an alternative to make fetching from a disk completely transparent *)
-Definition diskMem_fun (d:disk) : addr -> option block := diskMem d.
-Coercion diskMem_fun : disk >-> Funclass.
+(* this coercion allows disks to be directly accessed with a function
+application: [d a] will implicitly call [disk_get d a] due to the coercion,
+which is [(diskMem d) a]. *)
+Definition disk_get (d:disk) : addr -> option block := diskMem d.
+Coercion disk_get : disk >-> Funclass.
 
 Arguments mkDisk size diskMem diskMem_domain : clear implicits.
 
 Definition empty_disk : disk := mkDisk 0 empty_mem (sized_domain_empty _).
 
-Definition diskUpd (d: disk) (a: addr) (b: block) : disk.
+Implicit Type (d:disk).
+
+Definition diskUpd d (a: addr) (b: block) : disk.
 Proof.
   destruct (lt_dec a (size d)).
   - refine (mkDisk (size d) (upd d a b) _).
@@ -34,20 +38,21 @@ Proof.
 Defined.
 
 Lemma diskUpd_eq_some : forall d a b0 b,
-    diskMem d a = Some b0 ->
-    diskMem (diskUpd d a b) a = Some b.
+    disk_get d a = Some b0 ->
+    disk_get (diskUpd d a b) a = Some b.
 Proof.
   intros.
   pose proof (diskMem_domain d a).
   unfold diskUpd.
   destruct (lt_dec a (size d)); try contradiction; simpl.
   autorewrite with upd; auto.
+  unfold disk_get in *.
   congruence.
 Qed.
 
 Lemma diskUpd_eq : forall d a b,
     a < size d ->
-    diskMem (diskUpd d a b) a = Some b.
+    diskUpd d a b a = Some b.
 Proof.
   intros.
   unfold diskUpd.
@@ -57,7 +62,7 @@ Qed.
 
 Lemma diskUpd_oob_eq : forall d a b,
     ~a < size d ->
-    diskMem (diskUpd d a b) a = None.
+    diskUpd d a b a = None.
 Proof.
   intros.
   unfold diskUpd.
@@ -67,7 +72,7 @@ Qed.
 
 Lemma diskUpd_neq : forall d a b a',
     a <> a' ->
-    diskMem (diskUpd d a b) a' = diskMem d a'.
+    diskUpd d a b a' = d a'.
 Proof.
   intros.
   unfold diskUpd.
@@ -83,13 +88,13 @@ Proof.
 Qed.
 
 Lemma diskUpd_none : forall d a b,
-    diskMem d a = None ->
+    d a = None ->
     diskUpd d a b = d.
 Proof.
   unfold diskUpd; intros.
   pose proof (diskMem_domain d a).
   destruct (lt_dec a (size d)); eauto.
-  destruct H0; congruence.
+  destruct H0; unfold disk_get in *; try congruence.
 Qed.
 
 Hint Rewrite diskUpd_eq using (solve [ auto ]) : upd.

@@ -9,7 +9,7 @@ Module DSpec.
 
   Lemma state_eq : forall (state state':State),
       size (sdisk state) = size (sdisk state') ->
-      (forall a, diskMem (sdisk state) a = diskMem (sdisk state') a) ->
+      (forall a, sdisk state a = sdisk state' a) ->
       state = state'.
   Proof.
     intros.
@@ -27,7 +27,7 @@ Module DSpec.
 
   Definition Read a : Semantics block :=
     StepRel (fun state r state' =>
-               match diskMem (sdisk state) a with
+               match sdisk state a with
                | Some v0 => r = v0
                | None => True
                end /\ state' = state).
