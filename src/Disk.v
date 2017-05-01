@@ -1,3 +1,5 @@
+Require Import Automation.
+
 Require Import Bytes.
 Require Export SepLogic.Mem.
 Require Import SepLogic.Pred.
@@ -98,6 +100,19 @@ Proof.
   pose proof (diskMem_domain d a).
   destruct (lt_dec a (size d)); eauto.
   destruct H0; unfold disk_get in *; try congruence.
+Qed.
+
+Lemma ptsto_diskUpd : forall d a b0 b F,
+    d |= F * a |-> b0 ->
+    diskUpd d a b |= F * a |-> b.
+Proof.
+  intros.
+  pose proof (ptsto_valid H).
+  pose proof (diskMem_domain d a).
+  unfold diskUpd.
+  destruct matches.
+  cbn [diskMem].
+  eapply ptsto_upd; eauto.
 Qed.
 
 Hint Rewrite diskUpd_eq using (solve [ auto ]) : upd.

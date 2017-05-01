@@ -1,4 +1,5 @@
 Require Eqdep.
+Require Import EquivDec.
 
 (** * Simplify matches when possible. *)
 Ltac simpl_match :=
@@ -175,3 +176,8 @@ Tactic Notation "hide_fn" constr(fn) :=
          | |- context[fn ?arg] => hide_fn_call fn arg
          | H: context[fn ?arg] |- _ => hide_fn_call fn arg
          end.
+
+(** * Handling == equivalences *)
+
+Ltac is_eq a a' :=
+  destruct (a == a'); unfold equiv, complement in *; subst.
