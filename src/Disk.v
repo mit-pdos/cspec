@@ -1,5 +1,5 @@
 Require Import Bytes.
-Require Export Mem.
+Require Export SepLogic.Mem.
 
 Definition addr := nat.
 
