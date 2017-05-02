@@ -20,7 +20,7 @@ conditions and crash invariant specialized to a particular initial state. (This
 is why [pre] above is just a [Prop].) *)
 Definition Specification A T State := A -> State -> Quadruple T State.
 
-Definition prog_spec A `(spec: Specification A T State) `(p: prog opT T)
+Definition prog_spec `(spec: Specification A T State) `(p: prog opT T)
            `(step: Semantics opT State) :=
   forall a state,
     pre (spec a state) ->
@@ -50,7 +50,7 @@ Definition prog_double `(pre: DoublePre T State) `(p: prog opT T)
          | Crashed state' => crashinv state'
          end.
 
-Definition prog_ok A `(spec: Specification A T State) `(p: prog opT T)
+Definition prog_ok `(spec: Specification A T State) `(p: prog opT T)
            `(step: Semantics opT State) :=
   forall T' (rx: T -> prog opT T'),
     prog_double
@@ -66,7 +66,7 @@ Definition prog_ok A `(spec: Specification A T State) `(p: prog opT T)
                      crashinv state')) (Bind p rx) step.
 
 Theorem prog_ok_to_spec : forall `(step: Semantics opT State)
-                            A `(spec: Specification A T State) (p: prog opT T),
+                            `(spec: Specification A T State) (p: prog opT T),
     (forall a state r state', pre (spec a state) ->
                  post (spec a state) r state' ->
                  crash (spec a state) state') ->
@@ -86,7 +86,7 @@ Proof.
 Qed.
 
 Theorem prog_spec_to_ok : forall `(step: Semantics opT State)
-                            A `(spec: Specification A T State) (p: prog opT T),
+                            `(spec: Specification A T State) (p: prog opT T),
     prog_spec spec p step -> prog_ok spec p step.
 Proof.
   unfold prog_ok, prog_double, prog_spec; intros.
@@ -103,7 +103,7 @@ Qed.
 
 Remark crash_invariants_must_handle_pre :
   forall `(step: Semantics opT State)
-    A `(spec: Specification A T State) (p: prog opT T),
+    `(spec: Specification A T State) (p: prog opT T),
     prog_spec spec p step ->
     forall a state, pre (spec a state) ->
            crash (spec a state) state.
