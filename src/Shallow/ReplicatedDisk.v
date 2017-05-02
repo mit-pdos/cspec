@@ -164,6 +164,47 @@ Module RD.
     exfalso; eauto using md_pred_false.
   Qed.
 
+  Theorem Write_ok : forall a b,
+      prog_ok
+        (fun '(F, b0) state =>
+           {|
+             pre := md_pred (TD.disk0 state) (F * a |-> b0) True /\
+                    md_pred (TD.disk1 state) (F * a |-> b0) True;
+             post :=
+               fun r state' =>
+                 r = tt /\
+                 md_pred (TD.disk0 state') (F * a |-> b) True /\
+                 md_pred (TD.disk1 state') (F * a |-> b) True;
+             crash :=
+               fun state' =>
+                 md_pred (TD.disk0 state) (F * a |-> b0) True /\
+                 md_pred (TD.disk1 state) (F * a |-> b0) True;
+           |})
+        (Write a b)
+        TD.step.
+  Proof.
+    unfold Write.
+    step.
+    descend; intuition eauto.
+    destruct r; step.
+    repeat apply exists_tuple2; simpl.
+    descend; intuition eauto.
+
+    step.
+    destruct r; intuition eauto.
+    eapply md_pred_impl; eauto.
+    apply lift1_left; contradiction.
+
+    repeat apply exists_tuple2; simpl.
+    descend; intuition eauto.
+
+    destruct r; step.
+    intuition eauto.
+    eapply md_pred_impl; eauto.
+    apply lift1_left; contradiction.
+    exfalso; eauto using md_pred_false.
+  Qed.
+
   Theorem RD_ok : interpretation
                     op_impl
                     TD.step D.step
