@@ -48,7 +48,7 @@ Section Predicates.
     firstorder.
   Qed.
 
-  Add Parametric Relation :
+  Global Add Parametric Relation :
     (pred A V) pimpl
       reflexivity proved by pimpl_refl
       transitivity proved by pimpl_trans
@@ -83,18 +83,25 @@ Section Predicates.
     descend; intuition eauto.
   Qed.
 
-  Add Parametric Morphism : star
+  Global Add Parametric Morphism : star
       with signature peq ==> peq ==> peq
         as star_mor.
   Proof.
     unfold peq; intuition auto using star_cancel.
   Qed.
 
-  Add Parametric Morphism : star
+  Global Add Parametric Morphism : star
       with signature pimpl ==> pimpl ==> pimpl
         as star_mor'.
   Proof.
     auto using star_cancel.
+  Qed.
+
+  Global Instance pimpl_peq_mor : Proper (peq ==> peq ==> iff) pimpl.
+  Proof.
+    hnf; intros; hnf; intros.
+    unfold peq in *; safe_intuition.
+    intuition eauto using pimpl_trans.
   Qed.
 
   Theorem star_assoc : forall p q r,
