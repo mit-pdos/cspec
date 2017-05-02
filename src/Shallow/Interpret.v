@@ -1,4 +1,5 @@
 Require Import ProgLang.Prog.
+Require Import ProgLang.ProgTheorems.
 Require Import Automation.
 
 (* Language 1 is the implementation, language 2 is the spec:
@@ -106,3 +107,21 @@ Section Interpreter.
   Qed.
 
 End Interpreter.
+
+Theorem interpretation_weaken : forall `(step1: Semantics opT1 State1)
+                                  `(step2: Semantics opT2 State2)
+                                  (step2': Semantics opT2 State2)
+                                  op_impl
+                                  invariant
+                                  abstraction,
+    forall (Hstep: forall T (op: opT2 T) state v state',
+          step2 _ op state v state' -> step2' _ op state v state'),
+      interpretation op_impl step1 step2 invariant abstraction ->
+      interpretation op_impl step1 step2' invariant abstraction.
+Proof.
+  unfold interpretation; intros.
+  intuition.
+  eapply exec_weaken; eauto.
+  eapply H; eauto.
+  eapply H; eauto.
+Qed.

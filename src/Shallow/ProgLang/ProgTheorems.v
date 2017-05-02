@@ -88,3 +88,12 @@ Proof.
   intros.
   inv_exec; eauto.
 Qed.
+
+Lemma exec_weaken : forall `(p: prog opT T) `(step: Semantics opT State) (step': Semantics opT State),
+    forall (Hstep: forall T (op: opT T) state v state',
+          step _ op state v state' -> step' _ op state v state'),
+    forall state r, exec step p state r ->
+           exec step' p state r.
+Proof.
+  induction 2; intros; eauto.
+Qed.
