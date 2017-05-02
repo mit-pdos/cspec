@@ -32,25 +32,20 @@ Qed.
 
 Hint Resolve md_pred_weaken md_pred_none.
 
-Ltac start_spec :=
-  unfold prog_spec; intros;
-    repeat match goal with
-           | [ H: context[let '(a, b) := ?p in _] |- _ ] =>
-             let a := fresh a in
-             let b := fresh b in
-             destruct p as [a b]
-           end;
-    simpl in *;
-    safe_intuition;
-    try match goal with
-        | [ H: exec _ (Prim _) _ _ |- _ ] =>
-          eapply (inversion_prim_exec H); intros
-        end;
-    repeat deex;
-    try solve [ intuition eauto ].
+Ltac start_prim :=
+  intros; eapply prim_ok; intros;
+  repeat match goal with
+         | [ H: context[let '(a, b) := ?p in _] |- _ ] =>
+           let a := fresh a in
+           let b := fresh b in
+           destruct p as [a b]
+         end;
+  simpl in *;
+  safe_intuition;
+  try solve [ intuition eauto ].
 
 Theorem Read0_ok : forall a,
-    prog_spec
+    prog_ok
       (fun '(F0, F1, v0) state =>
          {|
            pre := md_pred (TD.disk0 state) (F0 * a |-> v0)%pred True /\
@@ -72,25 +67,22 @@ Theorem Read0_ok : forall a,
       (Prim (TD.Read d0 a))
       TD.step.
 Proof.
-  start_spec.
-  - TD.inv_step.
-    inversion H2; subst; clear H2; simpl in *; repeat simpl_match; eauto.
-    destruct (TD.disk0 state') eqn:?; simpl in *; subst.
-    pose proof (ptsto_valid H).
-    unfold disk_get in *.
-    simpl_match; subst; intuition eauto.
-    destruct state'; simpl in *; subst; intuition eauto.
-    destruct disk1; simpl; intuition eauto.
-    pose proof (ptsto_valid H).
-    unfold disk_get in *.
-    simpl_match; subst; intuition eauto.
-  - destruct v; subst; intuition eauto.
-    destruct (TD.disk0 state'); simpl in *; eauto.
-    apply lift_extract in H4; contradiction.
+  start_prim.
+  TD.inv_step.
+  TD.inv_bg; simpl in *; repeat simpl_match; eauto.
+  destruct (TD.disk0 state') eqn:?; simpl in *; subst.
+  pose proof (ptsto_valid H).
+  unfold disk_get in *.
+  simpl_match; subst; intuition eauto.
+  destruct state'; simpl in *; subst; intuition eauto.
+  destruct disk1; simpl; intuition eauto.
+  pose proof (ptsto_valid H).
+  unfold disk_get in *.
+  simpl_match; subst; intuition eauto.
 Qed.
 
 Theorem Read1_ok : forall a,
-    prog_spec
+    prog_ok
       (fun '(F0, F1, v0) state =>
          {|
            pre := md_pred (TD.disk0 state) F0 True /\
@@ -112,27 +104,24 @@ Theorem Read1_ok : forall a,
       (Prim (TD.Read d1 a))
       TD.step.
 Proof.
-  start_spec.
-  - TD.inv_step.
-    inversion H2; subst; clear H2; simpl in *; repeat simpl_match; eauto.
-    destruct (TD.disk1 state') eqn:?; simpl in *; subst.
-    pose proof (ptsto_valid H1).
-    unfold disk_get in *.
-    simpl_match; subst; intuition eauto.
-    destruct state'; simpl in *; subst; intuition eauto.
-    destruct disk0; simpl; intuition eauto.
-    pose proof (ptsto_valid H1).
-    unfold disk_get in *.
-    simpl_match; subst; intuition eauto.
-  - destruct v; subst; intuition eauto.
-    destruct (TD.disk1 state'); simpl in *; eauto.
-    apply lift_extract in H5; contradiction.
+  start_prim.
+  TD.inv_step.
+  TD.inv_bg; simpl in *; repeat simpl_match; eauto.
+  destruct (TD.disk1 state') eqn:?; simpl in *; subst.
+  pose proof (ptsto_valid H1).
+  unfold disk_get in *.
+  simpl_match; subst; intuition eauto.
+  destruct state'; simpl in *; subst; intuition eauto.
+  destruct disk0; simpl; intuition eauto.
+  pose proof (ptsto_valid H1).
+  unfold disk_get in *.
+  simpl_match; subst; intuition eauto.
 Qed.
 
 Hint Resolve ptsto_diskUpd.
 
 Theorem Write0_ok : forall a b,
-    prog_spec
+    prog_ok
       (fun '(F0, F1, v0) state =>
          {|
            pre := md_pred (TD.disk0 state) (F0 * a |-> v0)%pred True /\
@@ -147,26 +136,22 @@ Theorem Write0_ok : forall a b,
                end;
            crash :=
              fun state' =>
-               (md_pred (TD.disk0 state') (F0 * a |-> v0)%pred True \/
-                md_pred (TD.disk0 state') (F0 * a |-> b)%pred True) /\
+               md_pred (TD.disk0 state') (F0 * a |-> v0)%pred True /\
                md_pred (TD.disk1 state') F1 True;
          |})
       (Prim (TD.Write d0 a b))
       TD.step.
 Proof.
-  start_spec.
-  - TD.inv_step; repeat subst_var; simpl.
-    inversion H2; subst; clear H2; simpl in *; eauto.
-    destruct matches; simpl in *; intuition eauto.
-    destruct (TD.disk1 x) eqn:?; simpl; eauto.
-    destruct x; eauto.
-  - destruct v; intuition eauto.
-    destruct (TD.disk0 state'); simpl in *; eauto.
-    apply lift_extract in H4; contradiction.
+  start_prim.
+  TD.inv_step; repeat subst_var; simpl.
+  TD.inv_bg; simpl in *; eauto.
+  destruct matches; simpl in *; intuition eauto.
+  destruct (TD.disk1 x) eqn:?; simpl; eauto.
+  destruct x; eauto.
 Qed.
 
 Theorem Write1_ok : forall a b,
-    prog_spec
+    prog_ok
       (fun '(F0, F1, v0) state =>
          {|
            pre := md_pred (TD.disk0 state) F0 True /\
@@ -182,19 +167,15 @@ Theorem Write1_ok : forall a b,
            crash :=
              fun state' =>
                md_pred (TD.disk0 state') F0 True /\
-               (md_pred (TD.disk1 state') (F1 * a |-> v0)%pred True \/
-                md_pred (TD.disk1 state') (F1 * a |-> b)%pred True);
+               md_pred (TD.disk1 state') (F1 * a |-> v0)%pred True;
          |})
       (Prim (TD.Write d1 a b))
       TD.step.
 Proof.
-  start_spec.
-  - TD.inv_step; repeat subst_var; simpl.
-    inversion H2; subst; clear H2; simpl in *; eauto.
-    destruct matches; simpl in *; intuition eauto.
-    destruct (TD.disk0 x) eqn:?; simpl; eauto.
-    destruct x; eauto.
-  - destruct v; intuition eauto.
-    destruct (TD.disk1 state'); simpl in *; eauto.
-    apply lift_extract in H5; contradiction.
+  start_prim.
+  TD.inv_step; repeat subst_var; simpl.
+  TD.inv_bg; simpl in *; eauto.
+  destruct matches; simpl in *; intuition eauto.
+  destruct (TD.disk0 x) eqn:?; simpl; eauto.
+  destruct x; eauto.
 Qed.

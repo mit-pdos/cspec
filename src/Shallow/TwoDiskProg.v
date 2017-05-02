@@ -98,4 +98,10 @@ Module TD.
       end
     end.
 
+  Ltac inv_bg :=
+    match goal with
+    | [ H: TD.bg_step _ _ |- _ ] =>
+      inversion H; subst; clear H
+    end.
+
 End TD.

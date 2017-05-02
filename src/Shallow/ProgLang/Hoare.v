@@ -124,3 +124,30 @@ Proof.
   unfold prog_double at 2; intros.
   eapply H0; eauto.
 Qed.
+
+Theorem prim_ok : forall `(op: opT T) `(step: Semantics opT State) `(spec: Specification A T State),
+    (forall a state, pre (spec a state) ->
+            forall v state', step _ op state v state' ->
+                    post (spec a state) v state') ->
+    (forall a state, pre (spec a state) ->
+            crash (spec a state) state) ->
+    prog_ok spec (Prim op) step.
+Proof.
+  unfold prog_ok, prog_double; intros.
+  repeat deex.
+  inv_exec;
+    match goal with
+      | [ H: exec _ (Prim _) _ _ |- _ ] =>
+        inversion H; repeat sigT_eq; clear H
+    end;
+    eauto.
+  eapply H3; eauto.
+
+  (* we prove this by using the crash proof for the continuation when it crashes
+  at the beginning, using forward reasoning *)
+  specialize (H3 v state' postcond crashinv); intuition eauto.
+  specialize (H2 ltac:(eauto)).
+  intuition eauto.
+  eapply (H3 (Crashed state')); eauto.
+  eapply can_crash_at_begin.
+Qed.
