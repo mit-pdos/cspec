@@ -111,24 +111,38 @@ Module RD.
     repeat deex; eauto.
   Qed.
 
-  Ltac step := step_prog; intros;
-               repeat deex;
-               repeat destruct_tuple;
-               (* TODO: extract the match pattern inside the exists on a0 and
-                  use those names in exists_tuple *)
-               repeat match goal with
-                      | [ |- exists (_:_*_), _ ] =>
-                        apply exists_tuple2
-                      end;
-               simpl in *;
-               safe_intuition;
-               subst.
+  Ltac step :=
+    step_prog;
+    repeat match goal with
+           | |- forall _, _ => intros
+           | _ => deex
+           | _ => destruct_tuple
+           (* TODO: extract the match pattern inside the exists on a0 and use
+              those names in exists_tuple *)
+           | |- exists (_: _*_), _ => apply exists_tuple2
+           | _ => progress simpl in *
+           | _ => progress safe_intuition
+           | _ => progress subst
+           end;
+    try solve [ (intuition eauto);
+                try solve_false ].
+
+  Ltac cancel :=
+    match goal with
+    | [ |- lift ?P ===> _ ] =>
+      lazymatch P with
+      | True => fail
+      | _ => apply lift1_left; intro; try congruence; try contradiction
+      end
+    end.
 
   Lemma md_pred_false : forall d, md_pred d [|False|] False -> False.
   Proof.
     destruct d; simpl; intros; eauto.
     apply lift_extract in H; auto.
   Qed.
+
+  Hint Resolve md_pred_false.
 
   Theorem Read_ok : forall a,
       prog_ok
@@ -153,15 +167,14 @@ Module RD.
     step.
     descend; intuition eauto.
 
-    destruct r; step; try solve [ intuition eauto ].
-    repeat apply exists_tuple2; simpl.
+    destruct r; step.
     descend; intuition eauto.
 
     destruct r; step.
     intuition eauto.
+
     eapply md_pred_impl; eauto.
-    apply lift1_left; contradiction.
-    exfalso; eauto using md_pred_false.
+    cancel.
   Qed.
 
   Theorem Write_ok : forall a b,
@@ -187,22 +200,18 @@ Module RD.
     step.
     descend; intuition eauto.
     destruct r; step.
-    repeat apply exists_tuple2; simpl.
     descend; intuition eauto.
 
     step.
     destruct r; intuition eauto.
     eapply md_pred_impl; eauto.
-    apply lift1_left; contradiction.
+    cancel.
 
-    repeat apply exists_tuple2; simpl.
     descend; intuition eauto.
-
     destruct r; step.
     intuition eauto.
     eapply md_pred_impl; eauto.
-    apply lift1_left; contradiction.
-    exfalso; eauto using md_pred_false.
+    cancel.
   Qed.
 
   Theorem RD_ok : interpretation

@@ -193,3 +193,8 @@ Tactic Notation "hide_fn" constr(fn) :=
 
 Ltac is_eq a a' :=
   destruct (a == a'); unfold equiv, complement in *; subst.
+
+(** * Uncategorized *)
+
+Ltac solve_false :=
+  solve [ exfalso; eauto ].
