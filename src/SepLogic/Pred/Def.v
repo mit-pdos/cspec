@@ -54,6 +54,22 @@ Section Predicates.
       transitivity proved by pimpl_trans
         as pimpl_rel.
 
+  Lemma peq_refl : forall p, p === p.
+  Proof.
+    firstorder.
+  Qed.
+
+  Lemma peq_trans : forall p q r, p === q -> q === r -> p === r.
+  Proof.
+    firstorder.
+  Qed.
+
+  Global Add Parametric Relation :
+    (pred A V) peq
+      reflexivity proved by peq_refl
+      transitivity proved by peq_trans
+        as peq_rel.
+
   Hint Resolve mem_disjoint_comm.
   Hint Resolve mem_union_comm.
 

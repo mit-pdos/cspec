@@ -1,4 +1,5 @@
 Require Arith.
+Require Import Omega.
 
 Require Import Automation.
 Require Import SepLogic.Mem.Def.
@@ -41,4 +42,28 @@ Proof.
   unfold sized_domain; intros.
   destruct (lt_dec a 0); auto.
   inversion l.
+Qed.
+
+Lemma sized_domain_not_lt : forall `(m: mem _ V) sz sz',
+    sized_domain m sz ->
+    sized_domain m sz' ->
+    sz < sz' ->
+    False.
+Proof.
+  intros.
+  specialize (H sz).
+  specialize (H0 sz).
+  destruct (lt_dec sz sz); try omega.
+  destruct (lt_dec sz sz'); try omega.
+  repeat deex; congruence.
+Qed.
+
+Lemma sized_domain_unique_sz : forall `(m: mem _ V) sz sz',
+    sized_domain m sz ->
+    sized_domain m sz' ->
+    sz = sz'.
+Proof.
+  intros.
+  destruct (lt_eq_lt_dec sz sz') as [ [] | ]; auto;
+    solve [ exfalso; eauto using sized_domain_not_lt ].
 Qed.

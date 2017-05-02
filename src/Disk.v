@@ -120,3 +120,15 @@ Hint Rewrite diskUpd_oob_eq using (solve [ auto ]) : upd.
 Hint Rewrite diskUpd_size : upd.
 Hint Rewrite diskUpd_neq using (solve [ auto ]) : upd.
 Hint Rewrite diskUpd_none using (solve [ auto ]) : upd.
+
+(* disks are actually equal when their memories are equal *)
+Theorem diskMem_ext_eq : forall d d',
+    diskMem d = diskMem d' ->
+    d = d'.
+Proof.
+  intros.
+  destruct d, d'; simpl in *; subst.
+  pose proof (sized_domain_unique_sz diskMem_domain0 diskMem_domain1); subst.
+  f_equal.
+  apply ProofIrrelevance.proof_irrelevance.
+Qed.

@@ -240,6 +240,38 @@ Module RD.
     finish.
   Qed.
 
+  Theorem TDRead0_oob_ok : forall a,
+      prog_ok
+        (fun F state =>
+           {|
+             pre := md_pred (TD.disk0 state) F True /\
+                    md_pred (TD.disk1 state) F True /\
+                    abstraction state a = None;
+             post :=
+               fun r state' =>
+                 match r with
+                 | Working v => md_pred (TD.disk0 state') F False /\
+                               md_pred (TD.disk1 state') F True
+                 | Failed => md_pred (TD.disk0 state') (lift False) True /\
+                            md_pred (TD.disk1 state') F False
+                 end;
+             crash :=
+               fun state' =>
+                 md_pred (TD.disk0 state') F True /\
+                 md_pred (TD.disk1 state') F True;
+           |})
+        (Prim (TD.Read d0 a))
+        TD.step.
+  Proof.
+    start_prim.
+    TD.inv_step.
+    TD.inv_bg; simpl in *; subst; eauto.
+    destruct state'.
+    destruct disk0; simpl in *; repeat (simpl_match || deex || subst); eauto.
+    destruct disk1; eauto.
+    simpl_match; repeat deex; eauto.
+  Qed.
+
   Theorem prog_spec_exec : forall `(spec: Specification A T State) `(p: prog opT T)
                              `(step: Semantics opT State),
       prog_spec spec p step ->
@@ -271,28 +303,35 @@ Module RD.
       simpl in H
     end.
 
-  (* TODO: currently this just re-states the D.step semantics in a functional
-  rather than inductive way; want to make it based on separation logic *)
-  Definition sl_spec : Semantics D.Op D.State :=
-    fun T op state =>
-      match op with
-      | D.Read a =>
-        match state a with
-        | Some v0 => fun v state' => v = v0 /\ state' = state
-        | None => fun v state' => state' = state
-        end
-      | D.Write a b =>
-        fun v state' => state' = diskUpd state a b
-      end.
-
-  Theorem sl_spec_ok : semantics_impl sl_spec D.step.
+  Lemma invariant_abstraction_pred : forall state F,
+      invariant state ->
+      abstraction state |= F ->
+      md_pred (TD.disk0 state) F True /\
+      md_pred (TD.disk1 state) F True.
   Proof.
-    unfold semantics_impl, sl_spec; intros.
-    destruct matches in *; intuition (subst; eauto).
-    constructor; intros; congruence.
-    constructor; intros; congruence.
-    destruct v.
-    constructor.
+    destruct state; simpl; intros.
+    destruct disk0, disk1; simpl; subst; intuition.
+  Qed.
+
+  Lemma invariant_abstraction_pred' : forall state F,
+      md_pred (TD.disk0 state) F True ->
+      md_pred (TD.disk1 state) F True ->
+      abstraction state |= F.
+  Proof.
+    destruct state; simpl; intros.
+    destruct disk0, disk1; simpl; subst; intuition.
+  Qed.
+
+  (* for the invariant, it is sufficient to consider only states where both
+  disks are present *)
+  Lemma invariant_both_disks : forall state,
+      (forall d d', TD.disk0 state = Some d ->
+               TD.disk1 state = Some d' ->
+               d = d') ->
+      invariant state.
+  Proof.
+    destruct state; simpl in *; intros; eauto.
+    destruct disk0, disk1; eauto.
   Qed.
 
   Theorem RD_ok : interpretation
@@ -301,14 +340,39 @@ Module RD.
                     invariant
                     abstraction.
   Proof.
-    apply interpretation_weaken with sl_spec.
-    apply sl_spec_ok.
     eapply interpret_exec; intros; eauto.
     - destruct op; simpl in *.
       + destruct (abstraction state a) eqn:?.
         pose proof (prog_spec_exec (@Read_ok a) H0).
         repeat expand_forall.
-        admit.
+        (* TODO: factor out process of threading this particular frame
+        through *)
+        specialize (H1 (pred_except (mem_is (abstraction state)) a b) b).
+        match type of H1 with
+        | ?P -> _ => assert P
+        end.
+        eapply invariant_abstraction_pred; eauto.
+        eapply mem_is_except; eauto.
+        safe_intuition.
+        pose proof (invariant_abstraction_pred' _ _ H4 H5).
+        match goal with
+        | [ H: _ |= pred_except _ ?a _ * ?a |-> _ |- _ ] =>
+          apply pred_except_ptsto in H;
+            apply mem_is_extract in H;
+            apply diskMem_ext_eq in H
+        end.
+        replace (abstraction state').
+        intuition eauto.
+        constructor; intros; congruence.
+        eapply invariant_both_disks; intros.
+        unfold md_pred in *; repeat simpl_match.
+        repeat match goal with
+               | [ H: _ |= pred_except _ ?a _ * ?a |-> _ |- _ ] =>
+                 apply pred_except_ptsto in H;
+                   apply mem_is_extract in H;
+                   apply diskMem_ext_eq in H
+               end.
+        congruence.
         admit. (* TODO: need a spec for OOB reads *)
       + destruct (abstraction state a) eqn:?.
         pose proof (prog_spec_exec (@Write_ok a b) H0).
