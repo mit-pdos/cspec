@@ -12,7 +12,7 @@ Section Upd.
   Implicit Type (m:mem A V).
 
   Definition upd m a v : mem A V :=
-    fun a' => if AEQ a a' then Some v else m a'.
+    fun a' => if a == a' then Some v else m a'.
 
   Theorem upd_eq : forall m a v,
       upd m a v a = Some v.

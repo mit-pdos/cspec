@@ -2,6 +2,7 @@ Require Import EquivDec.
 Require Import Automation.
 
 Require Import SepLogic.Mem.Def.
+Require Import SepLogic.Mem.Upd.
 Require Import SepLogic.Pred.Def.
 Require Import SepLogic.Pred.MemIs.
 Require Import SepLogic.Pred.Ptsto.
@@ -17,14 +18,23 @@ Proof.
   exists (singleton a v), (mem_except m a); intuition.
   eapply mem_is_eq.
   extensionality a'.
-  unfold insert, mem_except.
+  unfold upd, mem_except.
   is_eq a a'; eauto.
-  is_eq a' a'; eauto; try congruence.
 
   unfold mem_disjoint, singleton, mem_except; intros.
   is_eq a a0; congruence.
 
   extensionality a'.
   unfold mem_union, singleton, mem_except.
+  is_eq a a'; eauto.
+Qed.
+
+Theorem mem_is_upd : forall `(m: mem A V) {AEQ:EqDec A eq} a v v',
+    pred_except (mem_is m) a v ===>
+                pred_except (mem_is (upd m a v')) a v'.
+Proof.
+  unfold pimpl, pred_except; simpl; intros; subst.
+  extensionality a'.
+  unfold upd, upd in *.
   is_eq a a'; eauto.
 Qed.
