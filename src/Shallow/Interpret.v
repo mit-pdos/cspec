@@ -114,14 +114,13 @@ Theorem interpretation_weaken : forall `(step1: Semantics opT1 State1)
                                   op_impl
                                   invariant
                                   abstraction,
-    forall (Hstep: forall T (op: opT2 T) state v state',
-          step2 _ op state v state' -> step2' _ op state v state'),
-      interpretation op_impl step1 step2 invariant abstraction ->
-      interpretation op_impl step1 step2' invariant abstraction.
+    semantics_impl step2 step2' ->
+    interpretation op_impl step1 step2 invariant abstraction ->
+    interpretation op_impl step1 step2' invariant abstraction.
 Proof.
   unfold interpretation; intros.
   intuition.
   eapply exec_weaken; eauto.
-  eapply H; eauto.
-  eapply H; eauto.
+  eapply H0; eauto.
+  eapply H0; eauto.
 Qed.

@@ -90,6 +90,11 @@ Definition background_step `(bg_step: State -> State -> Prop) `(step: Semantics 
     exists state', bg_step state state' /\
           step _ op state' v state''.
 
+(* definition of when one semantics implies a weaker one *)
+Definition semantics_impl opT State (step step': Semantics opT State) :=
+  forall T (op: opT T) state v state',
+    step _ op state v state' -> step' _ op state v state'.
+
 Local Ltac inv_exec' H :=
   inversion H; subst; clear H; repeat sigT_eq.
 

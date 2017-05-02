@@ -111,8 +111,7 @@ Module RD.
     repeat deex; eauto.
   Qed.
 
-  Ltac step :=
-    step_prog;
+  Ltac simplify :=
     repeat match goal with
            | |- forall _, _ => intros
            | _ => deex
@@ -123,9 +122,13 @@ Module RD.
            | _ => progress simpl in *
            | _ => progress safe_intuition
            | _ => progress subst
-           end;
-    try solve [ (intuition eauto);
-                try solve_false ].
+           | [ crashinv: _ -> Prop |- _ ] =>
+             match goal with
+             | [ H: forall _, _ -> crashinv _ |-
+                 crashinv _ ] =>
+               eapply H
+             end
+           end.
 
   Ltac cancel :=
     match goal with
@@ -136,6 +139,19 @@ Module RD.
       end
     end.
 
+  (* TODO: this is slow, need to debug *)
+  Ltac finish :=
+    repeat match goal with
+           | _ => solve_false
+           | [ H: md_pred ?d _ _ |-
+               md_pred ?d _ _ ] =>
+             eapply md_pred_impl; [ apply H | cancel ]
+           | _ => solve [ intuition eauto ]
+           end.
+
+  Ltac step :=
+    step_prog; simplify; finish.
+
   Lemma md_pred_false : forall d, md_pred d [|False|] False -> False.
   Proof.
     destruct d; simpl; intros; eauto.
@@ -145,7 +161,7 @@ Module RD.
   Hint Resolve md_pred_false.
 
   Theorem Read_ok : forall a,
-      prog_ok
+      prog_spec
         (fun '(F, b0) state =>
            {|
              pre := md_pred (TD.disk0 state) (F * a |-> b0) True /\
@@ -157,32 +173,34 @@ Module RD.
                  md_pred (TD.disk1 state') (F * a |-> b0) True;
              crash :=
                fun state' =>
-                 md_pred (TD.disk0 state) (F * a |-> b0) True /\
-                 md_pred (TD.disk1 state) (F * a |-> b0) True;
+                 md_pred (TD.disk0 state') (F * a |-> b0) True /\
+                 md_pred (TD.disk1 state') (F * a |-> b0) True;
            |})
         (Read a)
         TD.step.
   Proof.
     unfold Read.
+    intros; eapply prog_ok_to_spec; simplify; finish.
+
     step.
     descend; intuition eauto.
 
     destruct r; step.
-    descend; intuition eauto.
+    descend; intuition eauto; simplify.
 
     destruct r; step.
-    intuition eauto.
+    (intuition eauto); finish.
 
-    eapply md_pred_impl; eauto.
-    cancel.
+    (intuition eauto); finish.
   Qed.
 
   Theorem Write_ok : forall a b,
-      prog_ok
+      prog_spec
         (fun '(F, b0) state =>
            {|
-             pre := md_pred (TD.disk0 state) (F * a |-> b0) True /\
-                    md_pred (TD.disk1 state) (F * a |-> b0) True;
+             pre :=
+               md_pred (TD.disk0 state) (F * a |-> b0) True /\
+               md_pred (TD.disk1 state) (F * a |-> b0) True;
              post :=
                fun r state' =>
                  r = tt /\
@@ -190,13 +208,19 @@ Module RD.
                  md_pred (TD.disk1 state') (F * a |-> b) True;
              crash :=
                fun state' =>
-                 md_pred (TD.disk0 state) (F * a |-> b0) True /\
-                 md_pred (TD.disk1 state) (F * a |-> b0) True;
+                 (md_pred (TD.disk0 state') (F * a |-> b0) True /\
+                  md_pred (TD.disk1 state') (F * a |-> b0) True) \/
+                 (md_pred (TD.disk0 state') (F * a |-> b) True /\
+                  md_pred (TD.disk1 state') (F * a |-> b0) True) \/
+                 (md_pred (TD.disk0 state') (F * a |-> b) True /\
+                  md_pred (TD.disk1 state') (F * a |-> b) True);
            |})
         (Write a b)
         TD.step.
   Proof.
     unfold Write.
+    intros; eapply prog_ok_to_spec; simplify; finish.
+
     step.
     descend; intuition eauto.
     destruct r; step.
@@ -207,11 +231,68 @@ Module RD.
     eapply md_pred_impl; eauto.
     cancel.
 
-    descend; intuition eauto.
+    descend; intuition eauto; simplify.
     destruct r; step.
     intuition eauto.
-    eapply md_pred_impl; eauto.
-    cancel.
+    finish.
+
+    left; intuition eauto.
+    finish.
+  Qed.
+
+  Theorem prog_spec_exec : forall `(spec: Specification A T State) `(p: prog opT T)
+                             `(step: Semantics opT State),
+      prog_spec spec p step ->
+      forall state r, exec step p state r ->
+             forall a, pre (spec a state) ->
+                  match r with
+                  | Finished v state' => post (spec a state) v state'
+                  | Crashed state' => crash (spec a state) state'
+                  end.
+  Proof.
+    unfold prog_spec; intros.
+    eapply H; eauto.
+  Qed.
+
+  Lemma forall_tuple : forall A B {P: A*B -> Prop},
+      (forall p, P p) ->
+      (forall a b, P (a, b)).
+  Proof.
+    intuition.
+  Qed.
+
+  Ltac expand_forall :=
+    match goal with
+    | [ H: forall _:_ * _, _ |- _ ] =>
+      let H' := fresh in
+      pose proof (forall_tuple H) as H';
+      clear H;
+      rename H' into H;
+      simpl in H
+    end.
+
+  (* TODO: currently this just re-states the D.step semantics in a functional
+  rather than inductive way; want to make it based on separation logic *)
+  Definition sl_spec : Semantics D.Op D.State :=
+    fun T op state =>
+      match op with
+      | D.Read a =>
+        match state a with
+        | Some v0 => fun v state' => v = v0 /\ state' = state
+        | None => fun v state' => state' = state
+        end
+      | D.Write a b =>
+        fun v state' => state' = diskUpd state a b
+      end.
+
+  Theorem sl_spec_ok : semantics_impl sl_spec D.step.
+  Proof.
+    unfold semantics_impl, sl_spec; intros.
+    destruct matches in *; intuition (subst; eauto).
+    constructor; intros; congruence.
+    constructor; intros; congruence.
+    destruct v.
+    constructor.
   Qed.
 
   Theorem RD_ok : interpretation
@@ -220,13 +301,33 @@ Module RD.
                     invariant
                     abstraction.
   Proof.
+    apply interpretation_weaken with sl_spec.
+    apply sl_spec_ok.
     eapply interpret_exec; intros; eauto.
     - destruct op; simpl in *.
-      + admit.
-      + admit.
+      + destruct (abstraction state a) eqn:?.
+        pose proof (prog_spec_exec (@Read_ok a) H0).
+        repeat expand_forall.
+        admit.
+        admit. (* TODO: need a spec for OOB reads *)
+      + destruct (abstraction state a) eqn:?.
+        pose proof (prog_spec_exec (@Write_ok a b) H0).
+        repeat expand_forall.
+        admit.
+        admit. (* TODO: need a spec for OOB writes *)
     - destruct op in *; simpl in *.
-      + admit.
-      + admit.
+      + destruct (abstraction state a) eqn:?.
+        pose proof (prog_spec_exec (@Read_ok a) H0).
+        repeat expand_forall.
+        admit.
+        admit. (* TODO: need a spec for OOB reads *)
+      + destruct (abstraction state a) eqn:?.
+        pose proof (prog_spec_exec (@Write_ok a b) H0).
+        repeat expand_forall.
+        (* can't prove invariant, need a weaker crash invariant for refinement,
+         which should be chained to a recovery procedure *)
+        admit.
+        admit. (* TODO: need a spec for OOB writes *)
   Abort.
 
 End RD.
