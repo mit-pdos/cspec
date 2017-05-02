@@ -14,6 +14,8 @@ Definition md_pred (md: option disk) (F: dpred) (P: Prop) :=
   | None => P
   end.
 
+Arguments md_pred md F%pred P.
+
 Theorem md_pred_weaken : forall md F (P P':Prop),
     md_pred md F P ->
     (P -> P') ->
@@ -30,38 +32,41 @@ Proof.
   intros; subst; intuition.
 Qed.
 
+Theorem md_pred_impl : forall md F F' P,
+    md_pred md F P ->
+    (F ===> F') ->
+    md_pred md F' P.
+Proof.
+  destruct md; simpl in *; intros; eauto.
+Qed.
+
 Hint Resolve md_pred_weaken md_pred_none.
 
 Ltac start_prim :=
   intros; eapply prim_ok; intros;
-  repeat match goal with
-         | [ H: context[let '(a, b) := ?p in _] |- _ ] =>
-           let a := fresh a in
-           let b := fresh b in
-           destruct p as [a b]
-         end;
+  repeat destruct_tuple;
   simpl in *;
   safe_intuition;
   try solve [ intuition eauto ].
 
-Theorem Read0_ok : forall a,
+Theorem TDRead0_ok : forall a,
     prog_ok
       (fun '(F0, F1, v0) state =>
          {|
-           pre := md_pred (TD.disk0 state) (F0 * a |-> v0)%pred True /\
+           pre := md_pred (TD.disk0 state) (F0 * a |-> v0) True /\
                   md_pred (TD.disk1 state) F1 True;
            post :=
              fun r state' =>
                match r with
                | Working v => v = v0 /\
-                             md_pred (TD.disk0 state') (F0 * a |-> v0)%pred False /\
+                             md_pred (TD.disk0 state') (F0 * a |-> v0) False /\
                              md_pred (TD.disk1 state') F1 True
                | Failed => md_pred (TD.disk0 state') (lift False) True /\
                           md_pred (TD.disk1 state') F1 False
                end;
            crash :=
              fun state' =>
-               md_pred (TD.disk0 state') (F0 * a |-> v0)%pred True /\
+               md_pred (TD.disk0 state') (F0 * a |-> v0) True /\
                md_pred (TD.disk1 state') F1 True;
          |})
       (Prim (TD.Read d0 a))
@@ -81,25 +86,25 @@ Proof.
   simpl_match; subst; intuition eauto.
 Qed.
 
-Theorem Read1_ok : forall a,
+Theorem TDRead1_ok : forall a,
     prog_ok
       (fun '(F0, F1, v0) state =>
          {|
            pre := md_pred (TD.disk0 state) F0 True /\
-                  md_pred (TD.disk1 state) (F1 * a |-> v0)%pred True;
+                  md_pred (TD.disk1 state) (F1 * a |-> v0) True;
            post :=
              fun r state' =>
                match r with
                | Working v => v = v0 /\
                              md_pred (TD.disk0 state') F0 True /\
-                             md_pred (TD.disk1 state') (F1 * a |-> v0)%pred False
+                             md_pred (TD.disk1 state') (F1 * a |-> v0) False
                | Failed => md_pred (TD.disk0 state') F0 False /\
                           md_pred (TD.disk1 state') (lift False) True
                end;
            crash :=
              fun state' =>
                md_pred (TD.disk0 state') F0 True /\
-               md_pred (TD.disk1 state') (F1 * a |-> v0)%pred True;
+               md_pred (TD.disk1 state') (F1 * a |-> v0) True;
          |})
       (Prim (TD.Read d1 a))
       TD.step.
@@ -120,23 +125,23 @@ Qed.
 
 Hint Resolve ptsto_diskUpd.
 
-Theorem Write0_ok : forall a b,
+Theorem TDWrite0_ok : forall a b,
     prog_ok
       (fun '(F0, F1, v0) state =>
          {|
-           pre := md_pred (TD.disk0 state) (F0 * a |-> v0)%pred True /\
+           pre := md_pred (TD.disk0 state) (F0 * a |-> v0) True /\
                   md_pred (TD.disk1 state) F1 True;
            post :=
              fun r state' =>
                match r with
-               | Working _ => md_pred (TD.disk0 state') (F0 * a |-> b)%pred False /\
+               | Working _ => md_pred (TD.disk0 state') (F0 * a |-> b) False /\
                              md_pred (TD.disk1 state') F1 True
                | Failed => md_pred (TD.disk0 state') (lift False) True /\
                           md_pred (TD.disk1 state') F1 False
                end;
            crash :=
              fun state' =>
-               md_pred (TD.disk0 state') (F0 * a |-> v0)%pred True /\
+               md_pred (TD.disk0 state') (F0 * a |-> v0) True /\
                md_pred (TD.disk1 state') F1 True;
          |})
       (Prim (TD.Write d0 a b))
@@ -150,24 +155,24 @@ Proof.
   destruct x; eauto.
 Qed.
 
-Theorem Write1_ok : forall a b,
+Theorem TDWrite1_ok : forall a b,
     prog_ok
       (fun '(F0, F1, v0) state =>
          {|
            pre := md_pred (TD.disk0 state) F0 True /\
-                  md_pred (TD.disk1 state) (F1 * a |-> v0)%pred True;
+                  md_pred (TD.disk1 state) (F1 * a |-> v0) True;
            post :=
              fun r state' =>
                match r with
                | Working _ => md_pred (TD.disk0 state') F0 True /\
-                             md_pred (TD.disk1 state') (F1 * a |-> b)%pred False
+                             md_pred (TD.disk1 state') (F1 * a |-> b) False
                | Failed => md_pred (TD.disk0 state') F0 False /\
                           md_pred (TD.disk1 state') (lift False) True
                end;
            crash :=
              fun state' =>
                md_pred (TD.disk0 state') F0 True /\
-               md_pred (TD.disk1 state') (F1 * a |-> v0)%pred True;
+               md_pred (TD.disk1 state') (F1 * a |-> v0) True;
          |})
       (Prim (TD.Write d1 a b))
       TD.step.
@@ -179,3 +184,8 @@ Proof.
   destruct (TD.disk0 x) eqn:?; simpl; eauto.
   destruct x; eauto.
 Qed.
+
+Hint Extern 1 {{ Prim (TD.Read d0 _); _}} => apply TDRead0_ok : prog.
+Hint Extern 1 {{ Prim (TD.Read d1 _); _}} => apply TDRead1_ok : prog.
+Hint Extern 1 {{ Prim (TD.Write d0 _ _); _}} => apply TDWrite0_ok : prog.
+Hint Extern 1 {{ Prim (TD.Write d1 _ _); _}} => apply TDWrite1_ok : prog.

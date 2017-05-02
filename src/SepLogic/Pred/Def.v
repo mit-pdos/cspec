@@ -119,23 +119,24 @@ Section Predicates.
   Qed.
 
   Theorem lift_extract : forall m P,
-      pred_prop [|P|] m -> P.
+      [|P|] m -> P.
   Proof.
     unfold lift; simpl in *; intuition.
   Qed.
 
 End Predicates.
 
+Delimit Scope pred_scope with pred.
+
 Notation "[| P |]" := (lift P) (at level 0) : pred_scope.
-Infix "*" := star : pred_scope.
+Notation "p * q" := (star p%pred q%pred) : pred_scope.
 
-Infix "===" := peq (no associativity, at level 70) : pred_scope.
-Infix "===>" := pimpl (no associativity, at level 70) : pred_scope.
+Notation "p === q" := (peq p%pred q%pred) (no associativity, at level 70).
+Notation "p ===> q" := (pimpl p%pred q%pred) (no associativity, at level 70).
 
-Notation "'exists' x .. y , p" := (exis (fun x => .. (exis (fun y => p)) ..)) : pred_scope.
+Notation "'exists' x .. y , p" := (exis (fun x => .. (exis (fun y => p%pred)) ..)) : pred_scope.
 
 Infix "|->" := ptsto (no associativity, at level 30) : pred_scope.
 
 Add Printing Coercion pred_prop.
-Delimit Scope pred_scope with pred.
 Notation "m |= F" := (pred_prop F%pred m) (at level 20, F at level 50).

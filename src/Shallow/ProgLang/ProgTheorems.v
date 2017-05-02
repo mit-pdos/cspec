@@ -66,6 +66,17 @@ Proof.
   - destruct r; eauto.
 Qed.
 
+Theorem monad_assoc : forall `(p1: prog opT T)
+                        `(p2: T -> prog opT T')
+                        `(p3: T' -> prog opT T'')
+                        `(step: Semantics opT State),
+    exec_equiv step (Bind (Bind p1 p2) p3) (Bind p1 (fun v => Bind (p2 v) p3)).
+Proof.
+  unfold exec_equiv; split; intros.
+  - destruct r; repeat (inv_exec; eauto).
+  - destruct r; repeat (inv_exec; eauto).
+Qed.
+
 Lemma exec_bind : forall T T' `(p: prog opT T) (p': T -> prog opT T')
                     `(step: Semantics opT State) state r,
     exec step (Bind p p') state r ->

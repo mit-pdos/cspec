@@ -6,9 +6,14 @@ Require Import Automation.
 Require Import Shallow.ProgLang.Prog.
 Require Import Shallow.ProgLang.Hoare.
 Require Import Shallow.TwoDiskProg.
+Require Import Shallow.TwoDiskProg Shallow.TwoDiskProgTheorems.
 Require Import Shallow.SeqDiskProg.
 
+Require Import SepLogic.Pred.
 Require Import Interpret.
+
+(* TODO: why is opacity not preserved from imports? *)
+Opaque star ptsto pred_prop.
 
 Module RD.
 
@@ -86,9 +91,9 @@ Module RD.
 
   Definition abstraction (state:TD.State) : D.State :=
     match state with
-    | TD.Disks (Some d) _ _ => D.Disk d
-    | TD.Disks None (Some d) _ => D.Disk d
-    | _ => D.Disk empty_disk (* impossible *)
+    | TD.Disks (Some d) _ _ => d
+    | TD.Disks None (Some d) _ => d
+    | _ => empty_disk (* impossible *)
     end.
 
   Definition invariant (state:TD.State) :=
@@ -97,6 +102,67 @@ Module RD.
       d_0 = d_1
     | _ => True
     end.
+
+  Lemma exists_tuple2 : forall A B (P: A * B -> Prop),
+      (exists a b, P (a, b)) ->
+      (exists p, P p).
+  Proof.
+    intros.
+    repeat deex; eauto.
+  Qed.
+
+  Ltac step := step_prog; intros;
+               repeat deex;
+               repeat destruct_tuple;
+               (* TODO: extract the match pattern inside the exists on a0 and
+                  use those names in exists_tuple *)
+               repeat match goal with
+                      | [ |- exists (_:_*_), _ ] =>
+                        apply exists_tuple2
+                      end;
+               simpl in *;
+               safe_intuition;
+               subst.
+
+  Lemma md_pred_false : forall d, md_pred d [|False|] False -> False.
+  Proof.
+    destruct d; simpl; intros; eauto.
+    apply lift_extract in H; auto.
+  Qed.
+
+  Theorem Read_ok : forall a,
+      prog_ok
+        (fun '(F, b0) state =>
+           {|
+             pre := md_pred (TD.disk0 state) (F * a |-> b0) True /\
+                    md_pred (TD.disk1 state) (F * a |-> b0) True;
+             post :=
+               fun r state' =>
+                 r = b0 /\
+                 md_pred (TD.disk0 state') (F * a |-> b0) True /\
+                 md_pred (TD.disk1 state') (F * a |-> b0) True;
+             crash :=
+               fun state' =>
+                 md_pred (TD.disk0 state) (F * a |-> b0) True /\
+                 md_pred (TD.disk1 state) (F * a |-> b0) True;
+           |})
+        (Read a)
+        TD.step.
+  Proof.
+    unfold Read.
+    step.
+    descend; intuition eauto.
+
+    destruct r; step; try solve [ intuition eauto ].
+    repeat apply exists_tuple2; simpl.
+    descend; intuition eauto.
+
+    destruct r; step.
+    intuition eauto.
+    eapply md_pred_impl; eauto.
+    apply lift1_left; contradiction.
+    exfalso; eauto using md_pred_false.
+  Qed.
 
   Theorem RD_ok : interpretation
                     op_impl

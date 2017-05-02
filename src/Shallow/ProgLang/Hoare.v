@@ -116,13 +116,13 @@ Qed.
 
 Theorem double_weaken : forall `(step: Semantics opT State)
                           T (pre pre': DoublePre T State) (p: prog opT T),
+    prog_double pre' p step ->
     (forall state postcond crashinv, pre state postcond crashinv ->
                             pre' state postcond crashinv) ->
-    prog_double pre' p step ->
     prog_double pre p step.
 Proof.
   unfold prog_double at 2; intros.
-  eapply H0; eauto.
+  eapply H; eauto.
 Qed.
 
 Theorem prim_ok : forall `(op: opT T) `(step: Semantics opT State) `(spec: Specification A T State),
@@ -151,3 +151,36 @@ Proof.
   eapply (H3 (Crashed state')); eauto.
   eapply can_crash_at_begin.
 Qed.
+
+Theorem double_exec_equiv : forall `(step: Semantics opT State)
+                              `(pre: DoublePre T State) (p p': prog opT T),
+    exec_equiv step p p' ->
+    prog_double pre p' step ->
+    prog_double pre p step.
+Proof.
+  unfold prog_double; intros.
+  eapply H in H2; eauto.
+  eapply H0; eauto.
+Qed.
+
+Ltac monad_simpl :=
+  repeat match goal with
+         | |- prog_double _ (Bind (Ret _) _) _ =>
+           eapply double_exec_equiv; [ apply monad_left_id | ]
+         | |- prog_double _ (Bind (Bind _ _) _) _ =>
+           eapply double_exec_equiv; [ apply monad_assoc | ]
+         end.
+
+Ltac step_prog :=
+  match goal with
+  | |- prog_double _ _ _ =>
+    monad_simpl;
+    eapply double_weaken; [ solve [ eauto with prog ] | ]
+  | |- forall _, _ => intros; step_prog
+  | |- prog_ok _ _ _ => unfold prog_ok; step_prog
+  end.
+
+(* This notation builds a pattern; use it as [Hint Extern 1 {{ p; _}} => apply
+p_ok : prog] to associated p_ok as the specification for the program (pattern).
+Such patterns are used by [step_prog] via the prog hint database. *)
+Notation "{{ p ; '_' }}" := (prog_double _ (Bind p _) _) (only parsing, at level 0).

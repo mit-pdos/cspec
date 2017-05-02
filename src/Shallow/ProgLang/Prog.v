@@ -101,9 +101,11 @@ Ltac inv_ret :=
 
 Ltac inv_exec :=
   match goal with
+  | _ => inv_ret
+  | [ H: exec _ (Bind _ _) _ _ |- _ ] =>
+    inv_exec' H; repeat inv_ret
   | [ H: exec _ _ _ _ |- _ ] =>
-    inv_exec' H;
-    repeat inv_ret
+    inv_exec' H; repeat inv_ret
   end.
 
 Ltac inv_prim :=
