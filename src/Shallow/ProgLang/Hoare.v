@@ -8,6 +8,8 @@ Require Import ProgTheorems.
 
 Set Implicit Arguments.
 
+(* quadruple is a low-level type; these will appear inside [Specification]s
+using record builder syntax, which is already reasonably nice. *)
 Record Quadruple T State :=
   Spec {
       pre: Prop;
@@ -20,6 +22,16 @@ conditions and crash invariant specialized to a particular initial state. (This
 is why [pre] above is just a [Prop].) *)
 Definition Specification A T State := A -> State -> Quadruple T State.
 
+(** [prog_spec] defines what it means for a program to meet its specification,
+under a particular semantics defined by [step].
+
+This is the natural interpretation of a Hoare triple, extended with crashes to
+Hoare quadruples: if the program is run in a state satisfying the precondition,
+if it runs to completion normally, it will satisfy the postcondition, while if
+it crashes it will satisfy the crash invariant. Not mentioned is that the
+program might get stuck (for example, an operation cannot make progress
+according to [step]), in which case the spec has nothing to say for that initial
+state. *)
 Definition prog_spec `(spec: Specification A T State) `(p: prog opT T)
            `(step: Semantics opT State) :=
   forall a state,
@@ -40,6 +52,8 @@ Definition DoublePre T State :=
   (State -> Prop) ->
   Prop.
 
+(** [prog_double] defines correctness in terms of a higher-order precondition.
+*)
 Definition prog_double `(pre: DoublePre T State) `(p: prog opT T)
            `(step: Semantics opT State) :=
   forall state postcond crashinv,
@@ -50,6 +64,9 @@ Definition prog_double `(pre: DoublePre T State) `(p: prog opT T)
          | Crashed state' => crashinv state'
          end.
 
+(** [prog_ok] defines correctness by encoding a naturally stated specification
+(with separate precondition, postcondition, and crash invariants) into a Hoare
+double. *)
 Definition prog_ok `(spec: Specification A T State) `(p: prog opT T)
            `(step: Semantics opT State) :=
   forall T' (rx: T -> prog opT T'),
@@ -65,6 +82,15 @@ Definition prog_ok `(spec: Specification A T State) `(p: prog opT T)
               (forall state', crash (spec a state) state' ->
                      crashinv state')) (Bind p rx) step.
 
+(** We prove a conversion theorem from the Hoare double-based correctness
+statement to the more natural quadruple interpretation. This theorem reveals a
+subtlety in the double-based encoding: because it assumes the continuation is
+safe in any state satisfying the postcondition, it is assumed in the
+precondition that the crash invariant (crashinv in the Hoare double) is handled
+by the continuation's proof. We cannot make that assumption here when
+establishing the crash invariant in the case that [p] crashes just before
+finishing, so we explicitly assume that the postcondition implies the crash
+invariant. *)
 Theorem prog_ok_to_spec : forall `(step: Semantics opT State)
                             `(spec: Specification A T State) (p: prog opT T),
     (forall a state r state', pre (spec a state) ->
