@@ -18,27 +18,41 @@ subdirectories.
 * `Automation.v`: a bunch of nice Ltac
 * `Bytes.v`: (currently axiomatic) definition of byte strings of known lengths.
   These will nicely extract to Haskell's `Data.ByteString.Strict`.
-* `Mem.v`: as in FSCQ, a `mem A V` is a `A -> option V`, where addresses are
-  required to have deciable equality in order to update memories.
-* `Disk.v`: self-explanatory; just defines `disk` as an appropriate memory,
-  using `nat` addresses and 4KB values.
+* `SepLogic/`: (the start of) a separation logic library, somewhat modelled
+  after FSCQ's separation logic but mostly influenced by FRAP. There is little
+  automation so far as it has not yet been necessary.
+  * `Mem/`: as in FSCQ, a `mem A V` is a `A -> option V`, where addresses are
+    required to have deciable equality in order to update memories.
+  * `Pred/`: predicates over memories, including separation logic connectives
+    and primitives (`star`, `ptsto`, etc.)
+* `Disk.v`: defines `disk`, a memory with fixed size that always maps addresses
+  [0, size).
 * `Shallow/`
 
-  FSCQ-like programming languages at each layer. We avoid abstraction and thus
-  repeat the definitions of `prog`, `exec`, and `exec_recover` at every layer.
+  FSCQ-like programming languages at each layer. We have a generic `prog` and
+  semantics, so that each layer specifies some operations and how they execute
+  but gets the rest of the semantics for free.
 
-  - `Prog.v`: programs over three disks (`prog3 T`).
-  - `ProgTheorems.v`: some sample theorems about the execution semantics,
+  - `ProgLang/Prog.v`: programs over generic operations, parametrized by the operations'
+    semantics.
+  - `ProgLang/ProgTheorems.v`: some sample theorems about the execution semantics,
     including the monad laws
-  - `Hoare.v`: (currently unused) Hoare quadruples and doubles, with desugaring
+  - `ProgLang/Hoare.v`: Hoare quadruples and doubles, with desugaring
     from quadruples to doubles and some equivalence proofs between the different
     spec definitions.
-  - `SequentialDisk.v`: programs over a single, sequential disk (`sprog T`).
-  - `ReplicatedDisk.v`: implements each operation in `sprog` with a program in
-    `prog3`, defines a simple translation/interpreter from `sprog` to `prog3`
-    that uses these operations, and then proves that the translated code
-    faithfully simulates the original. Follows much of the same approach as the
-    optimistic translator in CFSCQ.
+  - `Interpret.v`: implementing one language (the "spec language") in terms of
+    another (the "implementation language") by providing implementations for
+    each spec operation and proving semantics preservation in a refinement-based
+    approach. Produces a theorem about spec programs translated to
+    implementation programs.
+  - `TwoDiskProg.v`: instantiation of `prog` for programs that manipulate two
+    disks, where one might fail at any time.
+  - `SeqDiskProg.v`: programs over a single disk without failures.
+  - `ReplicatedDisk.v`: implements the `SeqDiskProg` interface using
+    `TwoDiskProg`, using replication to handle failure of a single disk
+    seamlessly. Requires recovery to patch up an inconsistency that might be
+    created due to a crash between writing to the two disks. When this proof is
+    finished, recovery at this layer should be completely hidden from clients.
 
 * `Refinement/`
   * `Implements/` defines an IO monad and the notion of an implementation
