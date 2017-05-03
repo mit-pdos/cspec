@@ -79,32 +79,45 @@ Section Prog.
   | RFinished (v:T) (state:State)
   | Recovered (v:R) (state:State).
 
-  (** Mark a result from recovery execution as being recovered (note the types
-  especially). *)
-  Definition to_recovered {T R} (r:RResult R R) : RResult T R :=
-    match r with
-    | RFinished _ v pstate => Recovered _ v pstate
-    | Recovered _ v pstate => Recovered _ v pstate
-    end.
+  Arguments RFinished {T R} v state.
+  Arguments Recovered {T R} v state.
 
-  (** [exec_recover] gives semantics for running a program and using some
-  recovery procedure on crashes, including crashes during recovery.
+  (** Run rec in state until it finishes, restarting whenever it crashes.
+
+   This models running rec in an infinite retry loop.
+
+   TODO: after every crash should insert a crash relation step
+   *)
+  Inductive exec_recover R (rec:prog R) (state:State) : R -> State -> Prop :=
+  | ExecRecoverExec : forall v state',
+      exec rec state (Finished v state') ->
+      exec_recover rec state v state'
+  | ExecRecoverCrashDuringRecovery : forall state' v state'',
+      exec rec state (Crashed state') ->
+      exec_recover rec state' v state'' ->
+      exec_recover rec state v state''.
+
+  (** [rexec] gives semantics for running a program and using some recovery
+      procedure on crashes, including crashes during recovery.
 
      Similar to [exec] above, behavior for recovery is specified entirely here.
      In particular, note that we (currently) recovery from exactly the crash
      state - in practice, some semantics record mutable state as some subset of
      [State]s, which should be discarded before recovery.
 
+     Note that this is a thin wrapper that chains execution and recovery
+     self-execution - the constructors are not recursive.
+
      TODO: add a parameter for a crash relation here.
    *)
-  Inductive exec_recover T R : prog T -> prog R -> State -> RResult T R -> Prop :=
+  Inductive rexec T R : prog T -> prog R -> State -> RResult T R -> Prop :=
   | RExec : forall (p:prog T) (rec:prog R) state v state',
       exec p state (Finished v state') ->
-      exec_recover p rec state (RFinished _ v state')
-  | RExecCrash : forall (p:prog T) (rec:prog R) state state' r,
+      rexec p rec state (RFinished v state')
+  | RExecCrash : forall (p:prog T) (rec:prog R) state state' rv state'',
       exec p state (Crashed state') ->
-      exec_recover (T:=R) rec rec state' r ->
-      exec_recover p rec state (to_recovered r).
+      exec_recover rec state' rv state'' ->
+      rexec p rec state (Recovered rv state'').
 
 End Prog.
 
@@ -114,7 +127,10 @@ Notation "x <- p1 ; p2" := (Bind p1 (fun x => p2))
 Arguments Prim {opT T} op.
 Arguments Ret {opT T} v.
 Arguments Bind {opT T T'} p p'.
+
 Arguments Crashed {State T} state.
+Arguments RFinished {State T R} v state.
+Arguments Recovered {State T R} v state.
 
 Global Generalizable Variables T opT State step.
 
