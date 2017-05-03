@@ -16,6 +16,9 @@ Opaque block.
 
 Record disk :=
   mkDisk { size: nat;
+           (* The :> makes [diskMem] a coercion, allowing disks to be used in a
+           few contexts where memories are expected (for example, in separation
+           logic judgements). *)
            diskMem :> mem addr block;
            diskMem_domain: sized_domain diskMem size; }.
 
@@ -121,7 +124,10 @@ Hint Rewrite diskUpd_size : upd.
 Hint Rewrite diskUpd_neq using (solve [ auto ]) : upd.
 Hint Rewrite diskUpd_none using (solve [ auto ]) : upd.
 
-(* disks are actually equal when their memories are equal *)
+(* disks are actually equal when their memories are equal; besides being useful
+ in practice, this to some extent justifies the diskMem coercion, since disks
+ are uniquely determined by their memories, subject to the sized_domain
+ proofs. *)
 Theorem diskMem_ext_eq : forall d d',
     diskMem d = diskMem d' ->
     d = d'.
