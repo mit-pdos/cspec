@@ -9,18 +9,36 @@ Global Set Implicit Arguments.
 
 Section Prog.
 
+  (** The type of operations (more precisely, the family of operation). An [opT
+  T] is a primitive operation that produces a T-typed result. Of course, there
+  need not be an [opT T] for every T. *)
   Variable opT: Type -> Type.
 
+  (** Our minimal, generic programming language. Operations are provided as
+  primitives using [Prim], and programs can be combined with [Bind] and include
+  arbitrary intermediate values using [Ret]. *)
   Inductive prog : forall T:Type, Type :=
   | Prim : forall T, opT T -> prog T
   | Ret : forall T, T -> prog T
   | Bind : forall T T', prog T -> (T -> prog T') -> prog T'.
 
+  (** The type of state that programs manipulate. Will vary depending on the
+  operations involved,and the same operations could in principle operate on
+  different types of state. *)
   Variable State:Type.
 
+  (** A Semantics for a particular operation family and state type specifies
+  what each primitive returns and how it changes the state.
+
+  For some [step] of type [Semantics], [step op state v state'] means that operation
+  [op] when executed from state [state] returns [v] and leaves the state at [state'].
+  Note that the semantics might not specify any behavior for some input states -
+  these are similar to non-termination, in that these states are ignored by any
+  Hoare specification. *)
   Definition Semantics :=
     forall T, opT T -> State -> T -> State -> Prop.
 
+  (** The outcome of an execution, including intermediate crash points. *)
   Inductive Result T :=
   | Finished (v:T) (state:State)
   | Crashed (state:State).
@@ -28,6 +46,11 @@ Section Prog.
 
   Variable step:Semantics.
 
+  (** [exec] specifies the execution semantics of complete programs using [step]
+  as the small-step semantics of the primitive operations.
+
+   Note that crashing is entirely modeled here: operations are always atomic,
+   but otherwise crashes can occur before or after any operation. *)
   Inductive exec : forall T, prog T -> State -> Result T -> Prop :=
   | ExecOp : forall T (op: opT T) state v state',
       step op state v state' ->
@@ -56,12 +79,24 @@ Section Prog.
   | RFinished (v:T) (state:State)
   | Recovered (v:R) (state:State).
 
+  (** Mark a result from recovery execution as being recovered (note the types
+  especially). *)
   Definition to_recovered {T R} (r:RResult R R) : RResult T R :=
     match r with
     | RFinished _ v pstate => Recovered _ v pstate
     | Recovered _ v pstate => Recovered _ v pstate
     end.
 
+  (** [exec_recover] gives semantics for running a program and using some
+  recovery procedure on crashes, including crashes during recovery.
+
+     Similar to [exec] above, behavior for recovery is specified entirely here.
+     In particular, note that we (currently) recovery from exactly the crash
+     state - in practice, some semantics record mutable state as some subset of
+     [State]s, which should be discarded before recovery.
+
+     TODO: add a parameter for a crash relation here.
+   *)
   Inductive exec_recover T R : prog T -> prog R -> State -> RResult T R -> Prop :=
   | RExec : forall (p:prog T) (rec:prog R) state v state',
       exec p state (Finished v state') ->
@@ -94,6 +129,8 @@ Definition background_step `(bg_step: State -> State -> Prop) `(step: Semantics 
 Definition semantics_impl opT State (step step': Semantics opT State) :=
   forall T (op: opT T) state v state',
     step _ op state v state' -> step' _ op state v state'.
+
+(** * Automation for inverting execution behavior. *)
 
 Local Ltac inv_exec' H :=
   inversion H; subst; clear H; repeat sigT_eq.
@@ -137,5 +174,3 @@ Theorem inversion_prim_exec : forall `(op: opT T) `(step: Semantics opT State) s
 Proof.
   intros; inv_exec; eauto.
 Qed.
-
-(* TODO: prove other inversion lemmas as needed *)
