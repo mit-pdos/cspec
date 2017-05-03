@@ -139,13 +139,12 @@ Module RD.
       end
     end.
 
-  (* TODO: this is slow, need to debug *)
   Ltac finish :=
     repeat match goal with
-           | _ => solve_false
            | [ H: md_pred ?d _ _ |-
                md_pred ?d _ _ ] =>
              eapply md_pred_impl; [ apply H | cancel ]
+           | _ => solve_false
            | _ => solve [ intuition eauto ]
            end.
 
@@ -158,7 +157,10 @@ Module RD.
     apply lift_extract in H; auto.
   Qed.
 
-  Hint Resolve md_pred_false.
+  Hint Extern 1 False => match goal with
+                    | [ H: md_pred ?d [|False|] False |- _ ] =>
+                      apply (md_pred_false d H)
+                    end : false.
 
   Theorem Read_ok : forall a,
       prog_spec

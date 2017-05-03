@@ -196,5 +196,7 @@ Ltac is_eq a a' :=
 
 (** * Uncategorized *)
 
+Create HintDb false.
+
 Ltac solve_false :=
-  solve [ exfalso; eauto ].
+  solve [ exfalso; eauto with false ].
