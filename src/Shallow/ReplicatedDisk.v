@@ -242,7 +242,30 @@ Module RD.
     finish.
   Qed.
 
-  Theorem TDRead0_oob_ok : forall a,
+  Theorem TDRead_oob_ok : forall i a,
+      prog_ok
+        (fun F state =>
+           {|
+             pre := md_pred (TD.disk0 state) F True /\
+                    md_pred (TD.disk1 state) F True;
+             post :=
+               fun r state' =>
+                 md_pred (TD.disk0 state') F True /\
+                 md_pred (TD.disk1 state') F True;
+             crash :=
+               fun state' =>
+                 md_pred (TD.disk0 state') F True /\
+                 md_pred (TD.disk1 state') F True;
+           |})
+        (Prim (TD.Read i a))
+        TD.step.
+  Proof.
+    start_prim.
+    TD.inv_step.
+    TD.inv_bg; simpl in *; subst; eauto.
+  Qed.
+
+  Theorem Read_oob_ok : forall a,
       prog_ok
         (fun F state =>
            {|
@@ -251,27 +274,22 @@ Module RD.
                     abstraction state a = None;
              post :=
                fun r state' =>
-                 match r with
-                 | Working v => md_pred (TD.disk0 state') F False /\
-                               md_pred (TD.disk1 state') F True
-                 | Failed => md_pred (TD.disk0 state') (lift False) True /\
-                            md_pred (TD.disk1 state') F False
-                 end;
+                 md_pred (TD.disk0 state') F True /\
+                 md_pred (TD.disk1 state') F True;
              crash :=
                fun state' =>
                  md_pred (TD.disk0 state') F True /\
                  md_pred (TD.disk1 state') F True;
            |})
-        (Prim (TD.Read d0 a))
+        (Read a)
         TD.step.
   Proof.
-    start_prim.
-    TD.inv_step.
-    TD.inv_bg; simpl in *; subst; eauto.
-    destruct state'.
-    destruct disk0; simpl in *; repeat (simpl_match || deex || subst); eauto.
-    destruct disk1; eauto.
-    simpl_match; repeat deex; eauto.
+    unfold Read; intros.
+    step_prog_with ltac:(apply TDRead_oob_ok); simplify; finish.
+    descend; intuition eauto.
+    destruct r; step_prog_with ltac:(eauto; apply TDRead_oob_ok); simplify; finish.
+    descend; intuition eauto.
+    destruct r; step.
   Qed.
 
   Theorem prog_spec_exec : forall `(spec: Specification A T State) `(p: prog opT T)

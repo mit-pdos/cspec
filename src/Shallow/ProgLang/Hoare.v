@@ -197,14 +197,16 @@ Ltac monad_simpl :=
            eapply double_exec_equiv; [ apply monad_assoc | ]
          end.
 
-Ltac step_prog :=
+Ltac step_prog_with t :=
   match goal with
   | |- prog_double _ _ _ =>
     monad_simpl;
-    eapply double_weaken; [ solve [ eauto with prog ] | ]
-  | |- forall _, _ => intros; step_prog
-  | |- prog_ok _ _ _ => unfold prog_ok; step_prog
+    eapply double_weaken; [ solve [ t ] | ]
+  | |- forall _, _ => intros; step_prog_with t
+  | |- prog_ok _ _ _ => unfold prog_ok; step_prog_with t
   end.
+
+Ltac step_prog := step_prog_with ltac:(eauto with prog).
 
 (* This notation builds a pattern; use it as [Hint Extern 1 {{ p; _}} => apply
 p_ok : prog] to associated p_ok as the specification for the program (pattern).
