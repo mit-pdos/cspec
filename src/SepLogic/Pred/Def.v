@@ -2,6 +2,16 @@ Require Import Automation.
 Require Import Setoid Classes.Morphisms.
 Require Import SepLogic.Mem.Def.
 
+(* [pred A V] is a predicate over [mem A V]; we wrap it in a record to make
+judgements explicit rather than mere function applications.
+
+ However, using [pred_prop] to construct a judgement would be tedious; when
+ shorthand is desired, we use :> to supply a coercion from pred to Funclass, so
+ that predicates can be directly applied to memories to produce propositions.
+
+ TODO: Arguably we should never use this coercion and always prefer the explicit
+ m |= F syntax, but it is really nice for short general lemmas about
+ predicates. *)
 Record pred A V :=
   mkPred { pred_prop :> mem A V -> Prop }.
 
@@ -10,16 +20,23 @@ Section Predicates.
   Context {A V:Type}.
   Implicit Types p q:pred A V.
 
+  (** [lift P] (denoted [|P|]) states that m is empty, and that the proposition
+  P holds. *)
   Definition lift (P:Prop) : pred A V :=
     mkPred (fun m => P /\ m = empty_mem).
   Definition emp := lift True.
   Definition exis X (P: X -> pred A V) :=
-    mkPred (fun m => exists x, P x m).
+    mkPred (fun m => exists x, pred_prop (P x) m).
 
+  (** [ptsto a v] (denoted a |-> v) states that address [a] maps to [v], and no
+  other addresses map to anything. *)
   Definition ptsto (a:A) (v:V) : pred A V :=
     mkPred (fun m => m a = Some v /\
                   forall a', a <> a' -> m a' = None).
 
+  (** The core connective of separation logic, also called the separating
+  conjunction. [star p q] (denoted p * q) says that the heap can be split into
+  disjoint pieces which satisfy [p] and [q] respectively. *)
   Definition star p q : pred A V :=
     mkPred (fun m => exists m1 m2, p m1 /\
                            q m2 /\
@@ -141,6 +158,8 @@ Section Predicates.
   Qed.
 
 End Predicates.
+
+(** * Notation magic to make separation logic easy to write in Coq. *)
 
 Delimit Scope pred_scope with pred.
 
