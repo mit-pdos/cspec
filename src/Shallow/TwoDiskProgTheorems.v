@@ -148,11 +148,13 @@ Theorem TDWrite0_ok : forall a b,
       TD.step.
 Proof.
   start_prim.
-  TD.inv_step; repeat subst_var; simpl.
-  TD.inv_bg; simpl in *; eauto.
-  destruct matches; simpl in *; intuition eauto.
+  TD.inv_step; simpl.
+  TD.inv_bg; simpl in *; intuition (subst; eauto).
+  destruct matches in *; simpl in *; intuition (subst; simpl; eauto);
+    try congruence.
   destruct (TD.disk1 x) eqn:?; simpl; eauto.
   destruct x; eauto.
+  destruct (d_0 a); intuition (subst; simpl; eauto).
 Qed.
 
 Theorem TDWrite1_ok : forall a b,
@@ -178,11 +180,13 @@ Theorem TDWrite1_ok : forall a b,
       TD.step.
 Proof.
   start_prim.
-  TD.inv_step; repeat subst_var; simpl.
-  TD.inv_bg; simpl in *; eauto.
-  destruct matches; simpl in *; intuition eauto.
+  TD.inv_step; simpl.
+  TD.inv_bg; simpl in *; intuition (subst; eauto).
+  destruct matches in *; simpl in *; intuition (subst; simpl; eauto);
+    try congruence.
   destruct (TD.disk0 x) eqn:?; simpl; eauto.
   destruct x; eauto.
+  destruct (d_1 a); intuition (subst; simpl; eauto).
 Qed.
 
 Hint Extern 1 {{ Prim (TD.Read d0 _); _}} => apply TDRead0_ok : prog.

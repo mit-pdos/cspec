@@ -259,56 +259,6 @@ Module RD.
     finish.
   Qed.
 
-  Theorem TDRead_oob_ok : forall i a,
-      prog_ok
-        (fun F state =>
-           {|
-             pre := md_pred (TD.disk0 state) F True /\
-                    md_pred (TD.disk1 state) F True;
-             post :=
-               fun r state' =>
-                 md_pred (TD.disk0 state') F True /\
-                 md_pred (TD.disk1 state') F True;
-             crash :=
-               fun state' =>
-                 md_pred (TD.disk0 state') F True /\
-                 md_pred (TD.disk1 state') F True;
-           |})
-        (Prim (TD.Read i a))
-        TD.step.
-  Proof.
-    start_prim.
-    TD.inv_step.
-    TD.inv_bg; simpl in *; subst; eauto.
-  Qed.
-
-  Theorem Read_oob_ok : forall a,
-      prog_ok
-        (fun F state =>
-           {|
-             pre := md_pred (TD.disk0 state) F True /\
-                    md_pred (TD.disk1 state) F True /\
-                    abstraction state a = None;
-             post :=
-               fun r state' =>
-                 md_pred (TD.disk0 state') F True /\
-                 md_pred (TD.disk1 state') F True;
-             crash :=
-               fun state' =>
-                 md_pred (TD.disk0 state') F True /\
-                 md_pred (TD.disk1 state') F True;
-           |})
-        (Read a)
-        TD.step.
-  Proof.
-    unfold Read; intros.
-    step_prog_with ltac:(apply TDRead_oob_ok); simplify; finish.
-    descend; intuition eauto.
-    destruct r; step_prog_with ltac:(eauto; apply TDRead_oob_ok); simplify; finish.
-    descend; intuition eauto.
-    destruct r; step.
-  Qed.
-
   Theorem prog_spec_exec : forall `(spec: Specification A T State) `(p: prog opT T)
                              `(step: Semantics opT State),
       prog_spec spec p step ->

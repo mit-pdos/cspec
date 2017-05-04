@@ -15,9 +15,10 @@ Module D.
 
   Inductive step : Semantics Op State :=
   | step_read : forall a b (state: State),
-      (forall b0, state a = Some b0 -> b = b0) ->
+      state a = Some b ->
       step (Read a) state b state
-  | step_write : forall a b state,
+  | step_write : forall a b0 b (state: State),
+      state a = Some b0 ->
       step (Write a b) state tt (diskUpd state a b).
 
   Definition exec := Prog.exec step.
