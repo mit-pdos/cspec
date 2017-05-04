@@ -122,6 +122,11 @@ Section Interpreter.
     | Recovered _ state => invariant state
     end.
 
+  (* for now, recovery must make all changes to state and cannot preserve
+     its return value
+
+     TODO: for log, need to generalize this or have recovery store result in
+     variable *)
   Variable rec: prog1 unit.
 
   Definition exec_recover_interpretation :=
@@ -138,50 +143,13 @@ Section Interpreter.
       rexec2 p pr (abstraction state) (rres_abstraction r) /\
       rres_invariant r.
 
-End Interpreter.
-
-Theorem interpretation_weaken : forall `(step1: Semantics opT1 State1)
-                                  `(step2: Semantics opT2 State2)
-                                  (step2': Semantics opT2 State2)
-                                  op_impl
-                                  invariant
-                                  abstraction,
-    semantics_impl step2 step2' ->
-    interpretation op_impl step1 step2 invariant abstraction ->
-    interpretation op_impl step1 step2' invariant abstraction.
-Proof.
-  unfold interpretation; intros.
-  intuition.
-  eapply exec_weaken; eauto.
-  eapply H0; eauto.
-  eapply H0; eauto.
-Qed.
-
-Section InterpretRexec.
-
-  Context `(step1: Semantics opT1 State1) `(step2: Semantics opT2 State2)
-          (op_impl: forall T, opT2 T -> prog opT1 T)
-          (invariant: State1 -> Prop)
-          (abstraction: State1 -> State2).
-
-  (* for now, recovery must make all changes to state and cannot preserve
-     its return value
-
-     TODO: for log, need to generalize this or have recovery store result in
-     variable *)
-  Variable (rec: prog opT1 unit).
-
-  Hypothesis
-    (Hinterp:
-       interpretation op_impl step1 step2 invariant abstraction).
+  Hypothesis (Hinterp: interpretation).
 
   Hypothesis
       (Hrec: forall state r, exec step1 rec state r ->
                     (* TODO: should be crash invariant *)
                     invariant state ->
-                    (* TODO: should mix invariant for Finished and crash
-                    invariant for Crashed *)
-                    res_invariant invariant r /\
+                    res_invariant r /\
                     match r with
                     | Finished _ state' =>
                       (* TODO: too strong - what the recovery procedure needs to
@@ -216,7 +184,7 @@ Section InterpretRexec.
     repeat match goal with
            | [ H: exec _ rec _ _ |- _ ] =>
              eapply Hrec in H; cleanup
-           | [ H: exec _ (interpret _ _) _ _ |- _ ] =>
+           | [ H: exec _ (interpret _) _ _ |- _ ] =>
              eapply Hinterp in H; cleanup
            end;
     repeat match goal with
@@ -227,8 +195,7 @@ Section InterpretRexec.
            end;
     eauto.
 
-  Theorem interpret_exec_recover :
-      exec_recover_interpretation op_impl step1 step2 invariant abstraction rec.
+  Theorem interpret_exec_recover : exec_recover_interpretation.
   Proof.
     unfold interpretation, exec_recover_interpretation; intros.
     induction H0.
@@ -238,8 +205,7 @@ Section InterpretRexec.
 
   Hint Constructors rexec.
 
-  Theorem interpret_rexec :
-      rexec_interpretation op_impl step1 step2 invariant abstraction rec.
+  Theorem interpret_rexec : rexec_interpretation.
   Proof.
     unfold interpretation, rexec_interpretation; intros.
     match goal with
@@ -252,4 +218,21 @@ Section InterpretRexec.
       eauto.
   Qed.
 
-End InterpretRexec.
+End Interpreter.
+
+Theorem interpretation_weaken : forall `(step1: Semantics opT1 State1)
+                                  `(step2: Semantics opT2 State2)
+                                  (step2': Semantics opT2 State2)
+                                  op_impl
+                                  invariant
+                                  abstraction,
+    semantics_impl step2 step2' ->
+    interpretation op_impl step1 step2 invariant abstraction ->
+    interpretation op_impl step1 step2' invariant abstraction.
+Proof.
+  unfold interpretation; intros.
+  intuition.
+  eapply exec_weaken; eauto.
+  eapply H0; eauto.
+  eapply H0; eauto.
+Qed.
