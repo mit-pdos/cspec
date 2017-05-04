@@ -255,37 +255,6 @@ Module RD.
     finish.
   Qed.
 
-  Theorem prog_spec_exec : forall `(spec: Specification A T State) `(p: prog opT T)
-                             `(step: Semantics opT State),
-      prog_spec spec p step ->
-      forall state r, exec step p state r ->
-             forall a, pre (spec a state) ->
-                  match r with
-                  | Finished v state' => post (spec a state) v state'
-                  | Crashed state' => crash (spec a state) state'
-                  end.
-  Proof.
-    unfold prog_spec; intros.
-    eapply H; eauto.
-  Qed.
-
-  Lemma forall_tuple : forall A B {P: A*B -> Prop},
-      (forall p, P p) ->
-      (forall a b, P (a, b)).
-  Proof.
-    intuition.
-  Qed.
-
-  Ltac forall_tuple :=
-    match goal with
-    | [ H: forall _:_ * _, _ |- _ ] =>
-      let H' := fresh in
-      pose proof (forall_tuple H) as H';
-      clear H;
-      rename H' into H;
-      simpl in H
-    end.
-
   Lemma invariant_abstraction_pred : forall state F,
       invariant state ->
       abstraction state |= F ->
@@ -406,14 +375,6 @@ Module RD.
              end; auto.
   Qed.
 
-  Lemma pimpl_apply : forall A V (m: mem A V) F F',
-      m |= F ->
-      F ===> F' ->
-      m |= F'.
-  Proof.
-    unfold pimpl; simpl; eauto.
-  Qed.
-
   Lemma pred_except_upd_combine : forall (d d':disk) a v v',
       d' a = Some v ->
       diskMem d |= pred_except (mem_is (diskMem d')) a v * a |-> v' ->
@@ -440,6 +401,23 @@ Module RD.
     destruct disk0, disk1; simpl in *; eauto.
     exfalso; eauto.
   Qed.
+
+  Lemma forall_tuple : forall A B {P: A*B -> Prop},
+      (forall p, P p) ->
+      (forall a b, P (a, b)).
+  Proof.
+    intuition.
+  Qed.
+
+  Ltac forall_tuple :=
+    match goal with
+    | [ H: forall _:_ * _, _ |- _ ] =>
+      let H' := fresh in
+      pose proof (forall_tuple H) as H';
+      clear H;
+      rename H' into H;
+      simpl in H
+    end.
 
   Theorem Write_abstraction_ok : forall a b,
       prog_spec
@@ -550,6 +528,20 @@ Module RD.
 
   Hint Resolve read_step write_step.
   Hint Resolve tt.
+
+  Theorem prog_spec_exec : forall `(spec: Specification A T State) `(p: prog opT T)
+                             `(step: Semantics opT State),
+      prog_spec spec p step ->
+      forall state r, exec step p state r ->
+             forall a, pre (spec a state) ->
+                  match r with
+                  | Finished v state' => post (spec a state) v state'
+                  | Crashed state' => crash (spec a state) state'
+                  end.
+  Proof.
+    unfold prog_spec; intros.
+    eapply H; eauto.
+  Qed.
 
   Theorem RD_ok : interpretation
                     op_impl

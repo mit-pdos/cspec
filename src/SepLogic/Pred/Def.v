@@ -151,6 +151,14 @@ Section Predicates.
       descend; intuition eauto.
   Qed.
 
+  Lemma pimpl_apply : forall m F F',
+      pred_prop F m ->
+      F ===> F' ->
+      pred_prop F' m.
+  Proof.
+    unfold pimpl; simpl; eauto.
+  Qed.
+
   Theorem lift_extract : forall m P,
       [|P|] m -> P.
   Proof.
