@@ -118,6 +118,17 @@ Proof.
   eapply ptsto_upd; eauto.
 Qed.
 
+Lemma diskUpd_diskMem_commute : forall d a b0 b,
+    d a = Some b0 ->
+    diskMem (diskUpd d a b) = upd (diskMem d) a b.
+Proof.
+  intros.
+  extensionality a'.
+  is_eq a a'; autorewrite with upd; eauto.
+  erewrite diskUpd_eq_some; eauto.
+  rewrite diskUpd_neq; auto.
+Qed.
+
 Hint Rewrite diskUpd_eq using (solve [ auto ]) : upd.
 Hint Rewrite diskUpd_oob_eq using (solve [ auto ]) : upd.
 Hint Rewrite diskUpd_size : upd.

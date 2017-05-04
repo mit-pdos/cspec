@@ -180,7 +180,7 @@ Module RD.
                     end : false.
 
   Theorem Read_ok : forall a,
-      prog_spec
+      prog_ok
         (fun '(F, b0) state =>
            {|
              pre := md_pred (TD.disk0 state) (F * a |-> b0) True /\
@@ -199,7 +199,6 @@ Module RD.
         TD.step.
   Proof.
     unfold Read.
-    intros; eapply prog_ok_to_spec; simplify; finish.
 
     step.
     descend; intuition eauto.
@@ -214,7 +213,7 @@ Module RD.
   Qed.
 
   Theorem Write_ok : forall a b,
-      prog_spec
+      prog_ok
         (fun '(F, b0) state =>
            {|
              pre :=
@@ -230,15 +229,12 @@ Module RD.
                  (md_pred (TD.disk0 state') (F * a |-> b0) True /\
                   md_pred (TD.disk1 state') (F * a |-> b0) True) \/
                  (md_pred (TD.disk0 state') (F * a |-> b) True /\
-                  md_pred (TD.disk1 state') (F * a |-> b0) True) \/
-                 (md_pred (TD.disk0 state') (F * a |-> b) True /\
-                  md_pred (TD.disk1 state') (F * a |-> b) True);
+                  md_pred (TD.disk1 state') (F * a |-> b0) True);
            |})
         (Write a b)
         TD.step.
   Proof.
     unfold Write.
-    intros; eapply prog_ok_to_spec; simplify; finish.
 
     step.
     descend; intuition eauto.
@@ -280,7 +276,7 @@ Module RD.
     intuition.
   Qed.
 
-  Ltac expand_forall :=
+  Ltac forall_tuple :=
     match goal with
     | [ H: forall _:_ * _, _ |- _ ] =>
       let H' := fresh in
@@ -321,7 +317,239 @@ Module RD.
     destruct disk0, disk1; eauto.
   Qed.
 
+  (* same for crash invariant: only interesting when both disks are present *)
+  Lemma crash_invariant_both_disks : forall state,
+      (forall d d', TD.disk0 state = Some d ->
+               TD.disk1 state = Some d' ->
+               d = d' \/
+               exists a b0 b, d' a = Some b0 /\
+                         diskMem d = upd d' a b) ->
+      crash_invariant state.
+  Proof.
+    destruct state; simpl in *; intros; eauto.
+    destruct disk0, disk1; eauto.
+    specialize (H d d0); intuition.
+    repeat deex; eauto 10.
+  Qed.
+
+  Hint Resolve mem_is_except.
+
+  Lemma pred_except_combine : forall d d' a v,
+      diskMem d |= pred_except (mem_is (diskMem d')) a v * a |-> v ->
+      d = d'.
+  Proof.
+    intros.
+    apply pred_except_ptsto in H.
+    apply mem_is_extract in H.
+    apply diskMem_ext_eq in H.
+    assumption.
+  Qed.
+
+  Theorem Read_abstraction_ok : forall a,
+      prog_spec
+        (fun b0 state =>
+           {|
+             pre := invariant state /\
+                    abstraction state a = Some b0;
+             post :=
+               fun r state' =>
+                 r = b0 /\
+                 invariant state' /\
+                 abstraction state' = abstraction state;
+             crash :=
+               fun state' =>
+                 invariant state' /\
+                 abstraction state' = abstraction state;
+           |})
+        (Read a)
+        TD.step.
+  Proof.
+    intros.
+    eapply prog_ok_to_spec; simplify; finish.
+
+    step_prog_with ltac:(apply Read_ok); simplify; finish.
+    rename a0 into b0.
+    exists (pred_except (mem_is (abstraction state)) a b0), b0.
+    split; [ | split ].
+    - eapply invariant_abstraction_pred; eauto.
+    - step.
+      intuition.
+      eapply invariant_both_disks; simplify.
+      repeat match goal with
+             | [ H: md_pred ?d _ _, H': ?d = Some _ |- _ ] =>
+               apply (md_pred_some _ _ H') in H
+             end.
+      repeat match goal with
+             | [ H: _ |= pred_except _ ?a _ * ?a |-> _ |- _ ] =>
+               apply pred_except_combine in H; subst
+             end; auto.
+      pose proof (invariant_abstraction_pred' _ _ H6 H7).
+      repeat match goal with
+             | [ H: _ |= pred_except _ ?a _ * ?a |-> _ |- _ ] =>
+               apply pred_except_combine in H; subst
+             end; auto.
+    - simplify.
+      intuition.
+      eapply invariant_both_disks; simplify.
+      repeat match goal with
+             | [ H: md_pred ?d _ _, H': ?d = Some _ |- _ ] =>
+               apply (md_pred_some _ _ H') in H
+             end.
+      repeat match goal with
+             | [ H: _ |= pred_except _ ?a _ * ?a |-> _ |- _ ] =>
+               apply pred_except_combine in H; subst
+             end; auto.
+      pose proof (invariant_abstraction_pred' _ _ H3 H4).
+      repeat match goal with
+             | [ H: _ |= pred_except _ ?a _ * ?a |-> _ |- _ ] =>
+               apply pred_except_combine in H; subst
+             end; auto.
+  Qed.
+
+  Lemma pimpl_apply : forall A V (m: mem A V) F F',
+      m |= F ->
+      F ===> F' ->
+      m |= F'.
+  Proof.
+    unfold pimpl; simpl; eauto.
+  Qed.
+
+  Lemma pred_except_upd_combine : forall (d d':disk) a v v',
+      d' a = Some v ->
+      diskMem d |= pred_except (mem_is (diskMem d')) a v * a |-> v' ->
+      d = diskUpd d' a v'.
+  Proof.
+    intros.
+    eapply pimpl_apply in H0; [ | rewrite mem_is_upd; reflexivity ].
+    apply pred_except_ptsto in H0.
+    apply mem_is_extract in H0.
+    eapply diskMem_ext_eq.
+    erewrite diskUpd_diskMem_commute; eauto.
+  Qed.
+
   Hint Resolve crash_invariant_weakens_invariant.
+
+  Lemma abstraction_satisfies_some_pred : forall state F F' (P P':Prop),
+      md_pred (TD.disk0 state) F P ->
+      md_pred (TD.disk1 state) F' P' ->
+      abstraction state |= F \/
+      abstraction state |= F' /\ P.
+  Proof.
+    intros.
+    destruct state.
+    destruct disk0, disk1; simpl in *; eauto.
+    exfalso; eauto.
+  Qed.
+
+  Theorem Write_abstraction_ok : forall a b,
+      prog_spec
+        (fun b0 state =>
+           {|
+             pre := invariant state /\
+                    abstraction state a = Some b0;
+             post :=
+               fun r state' =>
+                 r = tt /\
+                 invariant state' /\
+                 abstraction state' = diskUpd (abstraction state) a b;
+             crash :=
+               fun state' =>
+                 crash_invariant state' /\
+                 (abstraction state' = abstraction state \/
+                 abstraction state' = diskUpd (abstraction state) a b);
+           |})
+        (Write a b)
+        TD.step.
+  Proof.
+    intros.
+    eapply prog_ok_to_spec; simplify; finish.
+    step_prog_with ltac:(apply Write_ok); simplify.
+    rename a0 into b0.
+    exists (pred_except (mem_is (abstraction state)) a b0), b0.
+    split; [ | split ].
+    - eapply invariant_abstraction_pred; eauto.
+    - step.
+      intuition.
+      eapply invariant_both_disks; simplify.
+      repeat match goal with
+             | [ H: md_pred ?d _ _, H': ?d = Some _ |- _ ] =>
+               apply (md_pred_some _ _ H') in H
+             end.
+      repeat match goal with
+             | [ H: _ |= pred_except _ ?a _ * ?a |-> _ |- _ ] =>
+               apply pred_except_upd_combine in H; auto; subst
+             end; auto.
+      pose proof (invariant_abstraction_pred' _ _ H6 H7).
+      repeat match goal with
+             | [ H: _ |= pred_except _ ?a _ * ?a |-> _ |- _ ] =>
+               apply pred_except_upd_combine in H; auto; subst
+             end; auto.
+    - simplify.
+      intuition.
+      apply crash_invariant_weakens_invariant.
+      eapply invariant_both_disks; simplify.
+      repeat match goal with
+             | [ H: md_pred ?d _ _, H': ?d = Some _ |- _ ] =>
+               apply (md_pred_some _ _ H') in H
+             end.
+      repeat match goal with
+             | [ H: _ |= pred_except _ ?a _ * ?a |-> _ |- _ ] =>
+               apply pred_except_combine in H; subst
+             end; auto.
+      pose proof (invariant_abstraction_pred' _ _ H3 H5).
+      repeat match goal with
+             | [ H: _ |= pred_except _ ?a _ * ?a |-> _ |- _ ] =>
+               apply pred_except_combine in H; subst
+             end; auto.
+
+      (* the interesting case: we're going to prove the upd case in the crash
+      invariant *)
+      eapply crash_invariant_both_disks; simplify.
+      repeat match goal with
+             | [ H: md_pred ?d _ _, H': ?d = Some _ |- _ ] =>
+               apply (md_pred_some _ _ H') in H
+             end.
+      repeat match goal with
+             | [ H: _ |= pred_except _ ?a _ * ?a |-> _ |- _ ] =>
+               apply pred_except_combine in H; subst
+             | [ H: _ |= pred_except _ ?a _ * ?a |-> _ |- _ ] =>
+               apply pred_except_upd_combine in H; auto; subst
+             end; auto.
+      right; descend; intuition eauto.
+      (* maybe the invariant should just use diskUpd *)
+      eapply diskUpd_diskMem_commute; eauto.
+
+      pose proof (abstraction_satisfies_some_pred _ _ _ _ _ H3 H5).
+      intuition;
+      repeat match goal with
+             | [ H: _ |= pred_except _ ?a _ * ?a |-> _ |- _ ] =>
+               apply pred_except_combine in H; subst
+             | [ H: _ |= pred_except _ ?a _ * ?a |-> _ |- _ ] =>
+               apply pred_except_upd_combine in H; auto; subst
+             end; eauto.
+  Qed.
+
+  Lemma read_step : forall a (state state':D.State) b,
+      state a = Some b ->
+      state' = state ->
+      D.step (D.Read a) state b state'.
+  Proof.
+    intros; subst.
+    constructor; auto.
+  Qed.
+
+  Lemma write_step : forall a b (state state':D.State) b0 u,
+      state a = Some b0 ->
+      state' = diskUpd state a b ->
+      D.step (D.Write a b) state u state'.
+  Proof.
+    intros; subst.
+    destruct u.
+    econstructor; eauto.
+  Qed.
+
+  Hint Resolve read_step write_step.
+  Hint Resolve tt.
 
   Theorem RD_ok : interpretation
                     op_impl
@@ -332,55 +560,25 @@ Module RD.
     eapply interpret_exec; intros; eauto.
     - destruct op; simpl in *.
       + destruct (abstraction state a) eqn:?.
-        pose proof (prog_spec_exec (@Read_ok a) H0).
-        repeat expand_forall.
-        (* TODO: factor out process of threading this particular frame
-        through *)
-        specialize (H1 (pred_except (mem_is (abstraction state)) a b) b).
-        match type of H1 with
-        | ?P -> _ => assert P
-        end.
-        eapply invariant_abstraction_pred; eauto.
-        eapply mem_is_except; eauto.
-        safe_intuition.
-        pose proof (invariant_abstraction_pred' _ _ H4 H5).
-        match goal with
-        | [ H: _ |= pred_except _ ?a _ * ?a |-> _ |- _ ] =>
-          apply pred_except_ptsto in H;
-            apply mem_is_extract in H;
-            apply diskMem_ext_eq in H
-        end.
-        replace (abstraction state').
-        intuition eauto.
-        constructor; intros; congruence.
-        eapply invariant_both_disks; intros.
-        unfold md_pred in *; repeat simpl_match.
-        repeat match goal with
-               | [ H: _ |= pred_except _ ?a _ * ?a |-> _ |- _ ] =>
-                 apply pred_except_ptsto in H;
-                   apply mem_is_extract in H;
-                   apply diskMem_ext_eq in H
-               end.
-        congruence.
-        admit. (* TODO: need a spec for OOB reads *)
+        pose proof (prog_spec_exec (@Read_abstraction_ok a) H0).
+        specialize (H1 b); simplify; finish.
+        admit. (* TODO: deal with OOB reads *)
       + destruct (abstraction state a) eqn:?.
-        pose proof (prog_spec_exec (@Write_ok a b) H0).
-        repeat expand_forall.
-        admit.
+        pose proof (prog_spec_exec (@Write_abstraction_ok a b) H0).
+        specialize (H1 b0); simplify; finish.
         admit. (* TODO: need a spec for OOB writes *)
     - destruct op in *; simpl in *.
       + destruct (abstraction state a) eqn:?.
-        pose proof (prog_spec_exec (@Read_ok a) H0).
-        repeat expand_forall.
-        admit.
+        pose proof (prog_spec_exec (@Read_abstraction_ok a) H0).
+        specialize (H1 b); simplify; finish.
         admit. (* TODO: need a spec for OOB reads *)
       + destruct (abstraction state a) eqn:?.
-        pose proof (prog_spec_exec (@Write_ok a b) H0).
-        repeat expand_forall.
-        (* can't prove invariant, need a weaker crash invariant for refinement,
-         which should be chained to a recovery procedure *)
-        admit.
+        pose proof (prog_spec_exec (@Write_abstraction_ok a b) H0).
+        specialize (H1 b0); simplify; finish.
         admit. (* TODO: need a spec for OOB writes *)
+
+        Grab Existential Variables.
+        all: auto.
   Abort.
 
 End RD.

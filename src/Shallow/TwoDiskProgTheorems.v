@@ -40,6 +40,14 @@ Proof.
   destruct md; simpl in *; intros; eauto.
 Qed.
 
+Theorem md_pred_some : forall md F (P:Prop) m,
+    md = Some m ->
+    md_pred md F P ->
+    m |= F.
+Proof.
+  unfold md_pred; intros; simpl_match; auto.
+Qed.
+
 Hint Resolve md_pred_weaken md_pred_none.
 
 Ltac start_prim :=
