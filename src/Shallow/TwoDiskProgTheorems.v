@@ -83,15 +83,15 @@ Proof.
   start_prim.
   TD.inv_step.
   TD.inv_bg; simpl in *; repeat simpl_match; eauto.
-  destruct (TD.disk0 state') eqn:?; simpl in *; subst.
-  pose proof (ptsto_valid H).
-  unfold disk_get in *.
-  simpl_match; subst; intuition eauto.
-  destruct state'; simpl in *; subst; intuition eauto.
-  destruct disk1; simpl; intuition eauto.
-  pose proof (ptsto_valid H).
-  unfold disk_get in *.
-  simpl_match; subst; intuition eauto.
+  - destruct (TD.disk0 state') eqn:?; simpl in *; subst.
+    + pose proof (ptsto_valid H).
+      unfold disk_get in *.
+      simpl_match; subst; intuition eauto.
+    + destruct state'; simpl in *; subst; intuition eauto.
+      destruct disk1; simpl; intuition eauto.
+  - pose proof (ptsto_valid H).
+    unfold disk_get in *.
+    simpl_match; subst; intuition eauto.
 Qed.
 
 Theorem TDRead1_ok : forall a,

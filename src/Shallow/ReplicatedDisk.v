@@ -133,6 +133,8 @@ Module RD.
            | |- forall _, _ => intros
            | _ => deex
            | _ => destruct_tuple
+           | |- _ /\ _ => split; [ solve [auto] | ]
+           | |- _ /\ _ => split; [ | solve [auto] ]
            (* TODO: extract the match pattern inside the exists on a0 and use
               those names in exists_tuple *)
            | |- exists (_: _*_), _ => apply exists_tuple2
@@ -253,6 +255,51 @@ Module RD.
 
     left; intuition eauto.
     finish.
+  Qed.
+
+  Theorem fixup_correct_addr_ok : forall a,
+      prog_ok
+        (fun '(F, b, b') state =>
+           {|
+             pre :=
+               md_pred (TD.disk0 state) (F * a |-> b') True /\
+               md_pred (TD.disk1 state) (F * a |-> b) True;
+             post :=
+               fun r state' =>
+                match r with
+                | Continue => b = b'
+                | RepairDone =>
+                  md_pred (TD.disk0 state') (F * a |-> b') True /\
+                  md_pred (TD.disk1 state') (F * a |-> b') True
+                | DiskFailed i =>
+                  match i with
+                  | d0 => md_pred (TD.disk0 state') (F * a |-> b) True /\
+                         md_pred (TD.disk1 state') (F * a |-> b) False
+                  | d1 => md_pred (TD.disk0 state') (F * a |-> b') False /\
+                         md_pred (TD.disk1 state') (F * a |-> b') True
+                  end
+                end;
+             crash :=
+               fun state' =>
+               md_pred (TD.disk0 state) (F * a |-> b') True /\
+               md_pred (TD.disk1 state) (F * a |-> b) True;
+           |})
+        (fixup a)
+        TD.step.
+  Proof.
+    unfold fixup; intros.
+    step.
+    descend; intuition eauto.
+
+    destruct r; try step.
+    descend; intuition eauto.
+
+    destruct r; try step.
+    is_eq b' v; try step.
+    descend; intuition eauto.
+
+    step.
+    destruct r; intuition eauto; simplify; finish.
   Qed.
 
   Lemma invariant_abstraction_pred : forall state F,
