@@ -103,6 +103,23 @@ Module RD.
     | _ => True
     end.
 
+  Definition crash_invariant (state:TD.State) :=
+    match state with
+    | TD.Disks (Some d_0) (Some d_1) _ =>
+      d_0 = d_1 \/
+      exists a b0 b1,
+        d_1 a = Some b1 /\
+        diskMem d_0 = upd d_1 a b0
+    | _ => True
+    end.
+
+  Theorem crash_invariant_weakens_invariant : forall state,
+      invariant state -> crash_invariant state.
+  Proof.
+    unfold invariant, crash_invariant; intros.
+    destruct matches; intuition eauto.
+  Qed.
+
   Lemma exists_tuple2 : forall A B (P: A * B -> Prop),
       (exists a b, P (a, b)) ->
       (exists p, P p).
@@ -354,10 +371,12 @@ Module RD.
     destruct disk0, disk1; eauto.
   Qed.
 
+  Hint Resolve crash_invariant_weakens_invariant.
+
   Theorem RD_ok : interpretation
                     op_impl
                     TD.step D.step
-                    invariant
+                    invariant crash_invariant
                     abstraction.
   Proof.
     eapply interpret_exec; intros; eauto.

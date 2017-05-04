@@ -26,12 +26,15 @@ Section Interpreter.
   Variable step2: Semantics opT2 State2.
 
   Variable invariant: State1 -> Prop.
+  Variable crash_invariant: State1 -> Prop.
   Variable abstraction: State1 -> State2.
 
   Notation exec1 := (exec step1).
   Notation exec2 := (exec step2).
   Notation rexec1 := (rexec step1).
   Notation rexec2 := (rexec step2).
+
+  Set Default Proof Using "All".
 
   (* TODO: in general, it might not be the case that crash states line up with
   abstract states as desired; there might be states that are only exposed by
@@ -42,12 +45,10 @@ Section Interpreter.
     | Crashed state => Crashed (abstraction state)
     end.
 
-  (* TODO: similar problem here, where there might be a weaker crash
-  invariant *)
   Definition res_invariant T (r: Result State1 T) : Prop :=
     match r with
     | Finished _ state => invariant state
-    | Crashed state => invariant state
+    | Crashed state => crash_invariant state
     end.
 
   (* TODO: this property shouldn't be called interpretation, need a more
@@ -61,6 +62,8 @@ Section Interpreter.
 
   Hint Constructors exec.
 
+  Hypothesis (Hcrash_invariant: forall state, invariant state -> crash_invariant state).
+
   Theorem interpret_exec :
     (* every operation is implemented according to the step semantics of the
     spec language *)
@@ -69,18 +72,13 @@ Section Interpreter.
           exec1 (op_impl op) state (Finished v state') ->
           step2 op (abstraction state) v (abstraction state') /\ invariant state')
       (* every implementation crashes in states that are abstractly either the
-        pre state or the post state
-
-        TODO: this is too strong, we only need this property after a crash
-        transform and recovery; the intermediate states can satisfy some weaker
-        crash invariant
-       *)
+        pre state or the post state *)
       (Hop_crash: forall T (op: opT2 T) state state',
           invariant state ->
           exec1 (op_impl op) state (Crashed state') ->
           (abstraction state' = abstraction state \/
            exists v, step2 op (abstraction state) v (abstraction state')) /\
-          invariant state'),
+          crash_invariant state'),
       interpretation.
   Proof.
     unfold interpretation.
@@ -131,7 +129,7 @@ Section Interpreter.
 
   Definition exec_recover_interpretation :=
     forall R (pr: prog2 R) state rv state',
-      invariant state ->
+      crash_invariant state ->
       exec_recover step1 (Bind rec (fun _ => interpret pr)) state rv state' ->
       exec_recover step2 pr (abstraction state) rv (abstraction state') /\
       invariant state'.
@@ -147,8 +145,7 @@ Section Interpreter.
 
   Hypothesis
       (Hrec: forall state r, exec step1 rec state r ->
-                    (* TODO: should be crash invariant *)
-                    invariant state ->
+                    crash_invariant state ->
                     res_invariant r /\
                     match r with
                     | Finished _ state' =>
@@ -164,13 +161,9 @@ Section Interpreter.
                       abstraction state' = abstraction state
                     | Crashed state' =>
                       (* TODO: in this case, similar to Finished case we will
-                      guarantee the abstraction is from some crash state, but
-                      will not guarantee the invariant in res_invariant but only
-                      the crash invariant (sufficient for idempotency) *)
+                      guarantee the abstraction is from some crash state *)
                       abstraction state' = abstraction state
                     end).
-
-  Set Default Proof Using "All".
 
   Ltac cleanup := simpl in *; eauto; safe_intuition;
                   try match goal with
@@ -224,11 +217,11 @@ Theorem interpretation_weaken : forall `(step1: Semantics opT1 State1)
                                   `(step2: Semantics opT2 State2)
                                   (step2': Semantics opT2 State2)
                                   op_impl
-                                  invariant
+                                  invariant crash_invariant
                                   abstraction,
     semantics_impl step2 step2' ->
-    interpretation op_impl step1 step2 invariant abstraction ->
-    interpretation op_impl step1 step2' invariant abstraction.
+    interpretation op_impl step1 step2 invariant crash_invariant abstraction ->
+    interpretation op_impl step1 step2' invariant crash_invariant abstraction.
 Proof.
   unfold interpretation; intros.
   intuition.
