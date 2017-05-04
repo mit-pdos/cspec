@@ -202,6 +202,26 @@ Proof.
   eapply can_crash_at_begin.
 Qed.
 
+Definition ret_ok : forall T (v:T) `(step: Semantics opT State),
+    prog_ok
+      (fun (_:unit) (state:State) =>
+         {| pre := True;
+            post := fun r state' => r = v /\ state' = state;
+            crash := fun state' => False; |})
+      (Ret v)
+      step.
+Proof.
+  unfold prog_ok, prog_double; intros.
+  repeat deex; simpl in *.
+  inv_exec; eauto.
+  eapply H1; eauto.
+
+  specialize (H1 v state' postcond crashinv); intuition.
+  specialize (H0 (Crashed state')).
+  eapply H0.
+  eapply can_crash_at_begin.
+Qed.
+
 Theorem double_exec_equiv : forall `(step: Semantics opT State)
                               `(pre: DoublePre T State) (p p': prog opT T),
     exec_equiv step p p' ->
@@ -236,3 +256,8 @@ Ltac step_prog := step_prog_with ltac:(eauto with prog).
 p_ok : prog] to associated p_ok as the specification for the program (pattern).
 Such patterns are used by [step_prog] via the prog hint database. *)
 Notation "{{ p ; '_' }}" := (prog_double _ (Bind p _) _) (only parsing, at level 0).
+
+(* this hack lets us do a case-split on the initial state *)
+Definition begin {opT} := Ret (opT:=opT) tt.
+
+Hint Extern 1 {{ begin; _ }} => apply ret_ok : prog.

@@ -91,4 +91,12 @@ Section Memories.
     destruct matches.
   Qed.
 
+  Lemma mem_union_empty : forall m,
+      mem_union empty_mem m = m.
+  Proof.
+    intros.
+    extensionality a.
+    reflexivity.
+  Qed.
+
 End Memories.

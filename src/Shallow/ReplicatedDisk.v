@@ -267,16 +267,18 @@ Module RD.
              post :=
                fun r state' =>
                 match r with
-                | Continue => b = b'
+                | Continue => b = b' /\
+                  md_pred (TD.disk0 state') (F * a |-> b) True /\
+                  md_pred (TD.disk1 state') (F * a |-> b) True
                 | RepairDone =>
                   md_pred (TD.disk0 state') (F * a |-> b') True /\
                   md_pred (TD.disk1 state') (F * a |-> b') True
                 | DiskFailed i =>
                   match i with
-                  | d0 => md_pred (TD.disk0 state') (F * a |-> b) True /\
+                  | d0 => md_pred (TD.disk0 state') [|False|] True /\
                          md_pred (TD.disk1 state') (F * a |-> b) False
                   | d1 => md_pred (TD.disk0 state') (F * a |-> b') False /\
-                         md_pred (TD.disk1 state') (F * a |-> b') True
+                         md_pred (TD.disk1 state') [|False|] True
                   end
                 end;
              crash :=
@@ -301,6 +303,245 @@ Module RD.
     step.
     destruct r; intuition eauto; simplify; finish.
   Qed.
+
+  Lemma md_pred_false_ptsto : forall d a b,
+      md_pred d ([|False|] * a |-> b) False ->
+      False.
+  Proof.
+    intros.
+    destruct d; simpl in *; eauto.
+    apply lift_star_left in H; intuition.
+  Qed.
+
+  Lemma abstraction_satisfies_some_pred {state F F'} {P P':Prop} :
+      md_pred (TD.disk0 state) F P ->
+      md_pred (TD.disk1 state) F' P' ->
+      abstraction state |= F \/
+      abstraction state |= F' /\ P.
+  Proof.
+    intros.
+    destruct state.
+    destruct disk0, disk1; simpl in *; eauto.
+    exfalso; eauto.
+  Qed.
+
+  Lemma pred_except_combine : forall d d' a v,
+      diskMem d |= pred_except (mem_is (diskMem d')) a v * a |-> v ->
+      d = d'.
+  Proof.
+    intros.
+    apply pred_except_ptsto in H.
+    apply mem_is_extract in H.
+    apply diskMem_ext_eq in H.
+    assumption.
+  Qed.
+
+  Lemma invariant_disk0_failed : forall state P,
+      md_pred (TD.disk0 state) [|False|] P ->
+      invariant state.
+  Proof.
+    unfold md_pred, invariant; intros.
+    destruct matches in *; simpl in *; try congruence.
+    apply lift_extract in H; exfalso; auto.
+  Qed.
+
+  Lemma invariant_disk0_ptsto_failed : forall state P a b,
+      md_pred (TD.disk0 state) ([|False|] * a |-> b) P ->
+      invariant state.
+  Proof.
+    unfold md_pred, invariant; intros.
+    destruct matches in *; simpl in *; try congruence.
+    apply lift_star_left in H; exfalso; intuition.
+  Qed.
+
+  Lemma invariant_disk1_failed : forall state P,
+      md_pred (TD.disk1 state) [|False|] P ->
+      invariant state.
+  Proof.
+    unfold md_pred, invariant; intros.
+    destruct matches in *; simpl in *; try congruence.
+    apply lift_extract in H; exfalso; auto.
+  Qed.
+
+  Lemma invariant_disk1_ptsto_failed : forall state P a b,
+      md_pred (TD.disk1 state) ([|False|] * a |-> b) P ->
+      invariant state.
+  Proof.
+    unfold md_pred, invariant; intros.
+    destruct matches in *; simpl in *; try congruence.
+    apply lift_star_left in H; exfalso; intuition.
+  Qed.
+
+  Hint Resolve invariant_disk0_failed invariant_disk1_failed.
+  Hint Resolve invariant_disk0_ptsto_failed invariant_disk1_ptsto_failed.
+
+  Theorem fixup_disk_failure0_ok : forall a,
+      prog_ok
+        (fun '(b0, P0, P1) state =>
+           {|
+             pre :=
+               md_pred (TD.disk0 state) [|False|] P0 /\
+               md_pred (TD.disk1 state) (pred_except (mem_is (abstraction state)) a b0 * a |-> b0) P1;
+             post :=
+               fun r state' =>
+                match r with
+                | Continue => False
+                | RepairDone => False
+                | DiskFailed i =>
+                  i = d0 /\
+                  invariant state' /\
+                  abstraction state' = abstraction state
+                end;
+             crash :=
+               fun state' =>
+                 invariant state' /\
+                 abstraction state' = abstraction state
+           |})
+        (fixup a)
+        TD.step.
+  Proof.
+    unfold fixup; intros.
+    step.
+    descend; intuition eauto; simplify; finish.
+    instantiate (1 := b0).
+    instantiate (1 := [|False|]%pred).
+    apply md_pred_weaken with (P := P0); eauto.
+    finish.
+
+    destruct r; step.
+    exfalso; eauto using md_pred_false_ptsto.
+    intuition eauto.
+    pose proof (abstraction_satisfies_some_pred H3 H6).
+    hyp_intuition.
+    apply lift_extract in H4; exfalso; auto.
+    apply pred_except_combine in H4; auto.
+
+    intuition eauto.
+    pose proof (abstraction_satisfies_some_pred H4 H5).
+    hyp_intuition.
+    apply lift_star_left in H3; exfalso; intuition auto.
+    apply pred_except_combine in H3; auto.
+  Qed.
+
+  Theorem fixup_disk_failure1_ok : forall a,
+      prog_ok
+        (fun '(b0, P0, P1) state =>
+           {|
+             pre :=
+               md_pred (TD.disk0 state)
+                       (pred_except (mem_is (abstraction state)) a b0 * a |-> b0) P0 /\
+               md_pred (TD.disk1 state) [|False|] P1;
+             post :=
+               fun r state' =>
+                match r with
+                | Continue => False
+                | RepairDone => False
+                | DiskFailed i =>
+                  i = d1 /\
+                  invariant state' /\
+                  abstraction state' = abstraction state
+                end;
+             crash :=
+               fun state' =>
+                 invariant state' /\
+                 abstraction state' = abstraction state
+           |})
+        (fixup a)
+        TD.step.
+  Proof.
+    unfold fixup; intros.
+    step.
+    descend; intuition eauto; simplify; finish.
+    destruct r; step.
+    descend; intuition eauto.
+    instantiate (1 := b0).
+    instantiate (1 := [|False|]%pred).
+    finish.
+
+    destruct r; try step.
+    is_eq b0 v; step.
+    exfalso; eauto using md_pred_false_ptsto.
+    pose proof (abstraction_satisfies_some_pred H3 H8).
+    hyp_intuition.
+    apply pred_except_combine in H4; auto.
+    intuition eauto.
+    exfalso; auto.
+
+    simplify.
+    intuition eauto.
+    pose proof (abstraction_satisfies_some_pred H4 H5).
+    hyp_intuition.
+    apply pred_except_combine in H3; auto.
+    apply lift_star_left in H3; exfalso; intuition auto.
+
+    intuition eauto.
+    pose proof (abstraction_satisfies_some_pred H4 H5).
+    hyp_intuition.
+    apply pred_except_combine in H3; auto.
+    apply lift_extract in H3; exfalso; intuition auto.
+  Qed.
+
+  Definition crash_invariant_at (state:TD.State) (a:addr) :=
+    match state with
+    | TD.Disks (Some d_0) (Some d_1) _ =>
+      d_0 = d_1 \/
+      exists b0 b1,
+        d_1 a = Some b1 /\
+        diskMem d_0 = upd d_1 a b0
+    | _ => True
+    end.
+
+  Lemma crash_invariant_at_split : forall state a a' b',
+      abstraction state a = Some b' ->
+      crash_invariant_at state a' ->
+      (exists b,
+        md_pred (TD.disk0 state) (pred_except (mem_is (abstraction state)) a b' * a |-> b') True /\
+         md_pred (TD.disk1 state) (pred_except (mem_is (abstraction state)) a b * a |-> b) True) \/
+      (md_pred (TD.disk0 state) (pred_except (mem_is (abstraction state)) a b' * a |-> b') True /\
+       md_pred (TD.disk1 state) [|False|] True) /\
+      (md_pred (TD.disk0 state) [|False|] True /\
+       md_pred (TD.disk1 state) (pred_except (mem_is (abstraction state)) a b' * a |-> b') True).
+  Proof.
+    destruct state; simpl in *; intros.
+    destruct disk0, disk1.
+    hyp_intuition; simplify.
+    left.
+    exists b'.
+    intuition eauto using mem_is_except.
+    left.
+  Abort.
+
+  Theorem fixup_ok : forall a,
+      prog_ok
+        (fun a' state =>
+           {|
+             pre :=
+               a < size (abstraction state) /\
+               crash_invariant_at state a' /\ a' <= a;
+             post :=
+               fun r state' =>
+                match r with
+                | Continue => crash_invariant_at state' a' /\ a' < a
+                | RepairDone => invariant state' /\ abstraction state' = abstraction state
+                | DiskFailed i =>
+                  invariant state' /\
+                  match i with
+                  | d0 => exists d_1, TD.disk1 state = Some d_1 /\
+                                abstraction state' = d_1
+                  | d1 => abstraction state' = abstraction state
+                  end
+                end;
+             crash :=
+               fun state' =>
+                 crash_invariant_at state' a' /\
+                 abstraction state' = abstraction state;
+           |})
+        (_ <- begin; fixup a)
+        TD.step.
+  Proof.
+    step.
+    descend; intuition eauto.
+  Abort.
 
   Lemma invariant_abstraction_pred : forall state F,
       invariant state ->
@@ -349,17 +590,6 @@ Module RD.
   Qed.
 
   Hint Resolve mem_is_except.
-
-  Lemma pred_except_combine : forall d d' a v,
-      diskMem d |= pred_except (mem_is (diskMem d')) a v * a |-> v ->
-      d = d'.
-  Proof.
-    intros.
-    apply pred_except_ptsto in H.
-    apply mem_is_extract in H.
-    apply diskMem_ext_eq in H.
-    assumption.
-  Qed.
 
   Theorem Read_abstraction_ok : forall a,
       prog_spec
@@ -436,18 +666,6 @@ Module RD.
   Qed.
 
   Hint Resolve crash_invariant_weakens_invariant.
-
-  Lemma abstraction_satisfies_some_pred : forall state F F' (P P':Prop),
-      md_pred (TD.disk0 state) F P ->
-      md_pred (TD.disk1 state) F' P' ->
-      abstraction state |= F \/
-      abstraction state |= F' /\ P.
-  Proof.
-    intros.
-    destruct state.
-    destruct disk0, disk1; simpl in *; eauto.
-    exfalso; eauto.
-  Qed.
 
   Lemma forall_tuple : forall A B {P: A*B -> Prop},
       (forall p, P p) ->
@@ -544,7 +762,7 @@ Module RD.
       (* maybe the invariant should just use diskUpd *)
       eapply diskUpd_diskMem_commute; eauto.
 
-      pose proof (abstraction_satisfies_some_pred _ _ _ _ _ H3 H5).
+      pose proof (abstraction_satisfies_some_pred H3 H5).
       intuition;
       repeat match goal with
              | [ H: _ |= pred_except _ ?a _ * ?a |-> _ |- _ ] =>

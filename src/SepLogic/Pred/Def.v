@@ -165,6 +165,15 @@ Section Predicates.
     unfold lift; simpl in *; intuition.
   Qed.
 
+  Theorem lift_star_left : forall (P: Prop) p m,
+      (star [|P|] p) m ->
+      P /\ p m.
+  Proof.
+    simpl; intros.
+    repeat deex.
+    rewrite mem_union_empty; eauto.
+  Qed.
+
 End Predicates.
 
 (** * Notation magic to make separation logic easy to write in Coq. *)
