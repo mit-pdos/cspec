@@ -151,6 +151,30 @@ Proof.
   eapply H; eauto.
 Qed.
 
+Theorem spec_weaken : forall `(step: Semantics opT State)
+                        `(spec1: Specification A' T State)
+                        `(spec2: Specification A T State)
+                        (p: prog opT T),
+    prog_spec spec1 p step ->
+    forall (Himpl: forall a state, pre (spec2 a state) ->
+                      exists a', pre (spec1 a' state) /\
+                           (forall v state', post (spec1 a' state) v state' ->
+                                    post (spec2 a state) v state') /\
+                           (forall state', crash (spec1 a' state) state' ->
+                                  crash (spec2 a state) state')),
+      prog_spec spec2 p step.
+Proof.
+  unfold prog_spec; intros.
+  specialize (Himpl a state); intuition.
+  repeat deex; intuition eauto.
+  specialize (H a' state); intuition.
+  match goal with
+  | [ r: Result _ _, H: forall (r: Result _ _), _ |- _ ] =>
+    specialize (H r)
+  end; intuition.
+  destruct r; eauto.
+Qed.
+
 Theorem prim_ok : forall `(op: opT T) `(step: Semantics opT State) `(spec: Specification A T State),
     (forall a state, pre (spec a state) ->
             forall v state', step _ op state v state' ->
