@@ -132,7 +132,7 @@ Arguments Crashed {State T} state.
 Arguments RFinished {State T R} v state.
 Arguments Recovered {State T R} v state.
 
-Global Generalizable Variables T opT State step.
+Global Generalizable Variables T R opT State step.
 
 (* modify a semantics by adding a background step before every operation *)
 Definition background_step `(bg_step: State -> State -> Prop) `(step: Semantics opT State) :
