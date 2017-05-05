@@ -96,3 +96,15 @@ Lemma exec_weaken : forall `(p: prog opT T) `(step: Semantics opT State) (step':
 Proof.
   induction 2; intros; eauto.
 Qed.
+
+Theorem rexec_ret : forall `(v:T) `(step: Semantics opT State) `(rec: prog opT R) state r,
+  rexec step (Ret v) rec state r ->
+  match r with
+  | RFinished v' state' => v' = v /\ state' = state
+  | Recovered v' state' => exec_recover step rec state v' state'
+  end.
+Proof.
+  intros.
+  inversion H; subst;
+    inv_exec; eauto.
+Qed.
