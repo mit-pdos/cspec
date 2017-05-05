@@ -3,7 +3,7 @@ Require Import Prog.
 
 (** Here we prove some basic sanity checks on prog and its semantics. *)
 
-Hint Constructors exec.
+Local Hint Constructors exec.
 
 Theorem can_crash_at_begin : forall `(p: prog opT T) `(step: Semantics opT State) state,
     exec step p state (Crashed state).
@@ -109,7 +109,19 @@ Proof.
     inv_exec; eauto.
 Qed.
 
-Hint Constructors rexec.
+Local Hint Constructors rexec.
+
+Lemma rexec_finish_any_rec : forall `(p: prog opT T)
+                               `(rec: prog opT R)
+                               `(rec': prog opT R')
+                               `(step: Semantics opT State)
+                               state v state',
+    rexec step p rec state (RFinished v state') ->
+    rexec step p rec' state (RFinished v state').
+Proof.
+  intros.
+  inversion H; subst; eauto.
+Qed.
 
 Lemma rexec_recover_bind_inv : forall `(p: prog opT T)
                                  `(p': T -> prog opT T')
@@ -127,4 +139,42 @@ Proof.
   - right.
     descend; intuition eauto.
   - left; eauto.
+Qed.
+
+Local Hint Constructors exec_recover.
+
+Lemma exec_recover_bind_inv : forall `(p: prog opT R)
+                                `(p': R -> prog opT R')
+                                `(step: Semantics opT State)
+                                state rv' state'',
+    exec_recover step (Bind p p') state rv' state'' ->
+    (exists rv state', exec_recover step p state rv state' /\
+              exec_recover step (p' rv) state' rv' state'').
+Proof.
+  induction 1.
+  - inv_exec; eauto 10.
+  - repeat deex.
+    inv_exec; eauto 10.
+    (* Oops, there are two paths we can go down - is this theorem false, or do
+    we need to generalize the inductive hypothesis? Double checking the
+    semantics of [exec Bind] and [exec_recover] didn't reveal any obvious
+    problems. *)
+    exists v0; descend; intuition eauto.
+    Undo.
+    exists rv; descend; intuition eauto.
+Admitted.
+
+Theorem rexec_rec_bind_inv : forall `(p: prog opT T)
+                             `(rec: prog opT R)
+                             `(rec': R -> prog opT R')
+                             `(step: Semantics opT State)
+                             state rv' state'',
+    rexec step p (Bind rec rec') state (Recovered rv' state'') ->
+    exists rv state', rexec step p rec state (Recovered rv state') /\
+             rexec step (Ret tt) (rec' rv) state' (Recovered rv' state'').
+Proof.
+  intros.
+  inversion H; subst.
+  eapply exec_recover_bind_inv in H6; repeat deex.
+  descend; intuition eauto.
 Qed.

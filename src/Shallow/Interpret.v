@@ -123,22 +123,16 @@ Section Interpreter.
     eapply Hop_recover_ok in H0; simpl in *; intuition.
   Qed.
 
+  Hint Constructors exec rexec.
+
   (* TODO: this property shouldn't be called interpretation, need a more
   intuitive name *)
   Definition interpretation :=
     forall T (p: prog2 T) state r,
       invariant state ->
-      (* TODO: is this the right phrasing? will it chain between layers
-      correctly?
-
-       It does have the advantage of being somewhat minimal: the implementation
-       + recovery will implement the crash behavior of the upper layer, which
-       implies something about running with rec >> interpret r hopefully. *)
       rexec1 (interpret p) rec state r ->
       exec2 p (abstraction state) (res_abstraction r) /\
       res_invariant r.
-
-  Hint Constructors exec.
 
   Theorem interpret_exec : interpretation.
   Proof.
@@ -171,5 +165,37 @@ Section Interpreter.
         eapply IHp in H1; safe_intuition; eauto.
         eapply H in H4; safe_intuition; eauto.
   Qed.
+
+  Definition rres_abstraction `(r: RResult State1 T R) : RResult State2 T R :=
+    match r with
+    | RFinished v state => RFinished v (abstraction state)
+    | Recovered v state => Recovered v (abstraction state)
+    end.
+
+  (* TODO: prove this more general correctness theorem to give some confidence
+  that [interpretation] is enough to guarantee that even the higher-level
+  recovery execution is correct. *)
+  Definition interpretation_rexec :=
+    forall T (p: prog2 T) R (rec2: prog2 R) state r,
+      invariant state ->
+      rexec1 (interpret p) (Bind rec (fun _ => interpret rec2)) state r ->
+      rexec2 p rec2 (abstraction state) (rres_abstraction r) /\
+      res_invariant r.
+
+  Theorem interpret_rexec :
+    interpretation -> interpretation_rexec.
+  Proof.
+    unfold interpretation, interpretation_rexec; intros.
+    destruct r; simpl.
+    - eapply rexec_finish_any_rec in H1.
+      eapply H in H1; safe_intuition; eauto.
+    - eapply rexec_rec_bind_inv in H1; repeat deex.
+      eapply H in H1; simpl in *; safe_intuition; eauto.
+      (* this output from [rexec_rec_bind_inv] is not quite what we need: we
+         need to lift the interpretation statement to one about exec_recover by
+         induction over the crashing executions, in order to show an
+         [exec_recover step2] that is used to prove rexec2 here. *)
+      admit.
+  Abort.
 
 End Interpreter.
