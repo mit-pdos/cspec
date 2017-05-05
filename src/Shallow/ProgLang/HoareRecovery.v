@@ -48,7 +48,7 @@ Definition idempotent `(spec: Specification A R State) :=
         post (spec a state') rv state'' ->
         post (spec a state) rv state'').
 
-Lemma exec_recover_idempotent : forall `(spec: Specification A R State)
+Lemma idempotent_loopspec : forall `(spec: Specification A R State)
                                   `(rec: prog opT R)
                                   `(step: Semantics opT State),
     forall (Hspec: prog_spec spec rec step),
@@ -67,8 +67,7 @@ Theorem prog_spec_from_crash : forall `(spec: RecSpecification A T R State)
                                  `(pspec: Specification A1 T State)
                                  `(rspec: Specification A2 R State),
     forall (Hpspec: prog_spec pspec p step)
-      (Hrspec: prog_spec rspec rec step),
-      idempotent rspec ->
+      (Hrspec: prog_loopspec rspec rec step),
       (forall a state, rec_pre (spec a state) ->
               (* program's precondition holds *)
               exists a1, pre (pspec a1 state) /\
@@ -85,15 +84,15 @@ Theorem prog_spec_from_crash : forall `(spec: RecSpecification A T R State)
                                              pre (rspec a2 state'')))) ->
       prog_rspec spec p rec step.
 Proof.
-  unfold prog_rspec; intros.
-  inversion H2; subst.
-  - eapply H0 in H1; eauto.
+  unfold prog_rspec, prog_loopspec; intuition.
+  inversion H1; subst.
+  - eapply H in H0; eauto.
     deex.
-    eapply Hpspec in H3; eauto.
-  - eapply H0 in H1; eauto.
+    eapply Hpspec in H2; eauto.
+  - eapply H in H0; eauto.
     deex.
-    eapply Hpspec in H3; eauto.
-    eapply H6 in H3.
+    eapply Hpspec in H2; eauto.
+    eapply H5 in H2.
     deex.
-    eapply exec_recover_idempotent in H4; eauto.
+    eauto.
 Qed.

@@ -828,7 +828,7 @@ Module RD.
         all: admit.
     - (* prove recovery correctly works when not doing anything (the invariant
          is already true) *)
-      eapply exec_recover_idempotent.
+      eapply idempotent_loopspec.
       all: admit.
   Abort.
 
