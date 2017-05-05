@@ -4,7 +4,7 @@ Require Import Disk.
 Require Import Automation.
 
 Require Import Shallow.ProgLang.Prog.
-Require Import Shallow.ProgLang.Hoare.
+Require Import Shallow.ProgLang.Hoare Shallow.ProgLang.HoareRecovery.
 Require Import Shallow.TwoDiskProg.
 Require Import Shallow.TwoDiskProg Shallow.TwoDiskProgTheorems.
 Require Import Shallow.SeqDiskProg.
@@ -808,34 +808,28 @@ Module RD.
     eapply H; eauto.
   Qed.
 
+  (* TODO: get this in recovery through the programming language *)
+  Axiom disk_size : nat.
+
   Theorem RD_ok : interpretation
                     op_impl
+                    (Recover disk_size)
                     TD.step D.step
-                    invariant crash_invariant
+                    invariant
                     abstraction.
   Proof.
     eapply interpret_exec; intros; eauto.
     - destruct op; simpl in *.
-      + destruct (abstraction state a) eqn:?.
-        pose proof (prog_spec_exec (@Read_abstraction_ok a) H0).
-        specialize (H1 b); simplify; finish.
-        admit. (* TODO: deal with OOB reads *)
-      + destruct (abstraction state a) eqn:?.
-        pose proof (prog_spec_exec (@Write_abstraction_ok a b) H0).
-        specialize (H1 b0); simplify; finish.
-        admit. (* TODO: need a spec for OOB writes *)
-    - destruct op in *; simpl in *.
-      + destruct (abstraction state a) eqn:?.
-        pose proof (prog_spec_exec (@Read_abstraction_ok a) H0).
-        specialize (H1 b); simplify; finish.
-        admit. (* TODO: need a spec for OOB reads *)
-      + destruct (abstraction state a) eqn:?.
-        pose proof (prog_spec_exec (@Write_abstraction_ok a b) H0).
-        specialize (H1 b0); simplify; finish.
-        admit. (* TODO: need a spec for OOB writes *)
-
-        Grab Existential Variables.
-        all: auto.
+      + eapply prog_spec_from_crash.
+        eapply Read_abstraction_ok.
+        all: admit.
+      + eapply prog_spec_from_crash.
+        eapply Write_abstraction_ok.
+        all: admit.
+    - (* prove recovery correctly works when not doing anything (the invariant
+         is already true) *)
+      eapply exec_recover_idempotent.
+      all: admit.
   Abort.
 
 End RD.

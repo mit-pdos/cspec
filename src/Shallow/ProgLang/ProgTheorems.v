@@ -108,3 +108,23 @@ Proof.
   inversion H; subst;
     inv_exec; eauto.
 Qed.
+
+Hint Constructors rexec.
+
+Lemma rexec_recover_bind_inv : forall `(p: prog opT T)
+                                 `(p': T -> prog opT T')
+                                 `(rec: prog opT R)
+                                 `(step: Semantics opT State)
+                                 state rv state'',
+    rexec step (Bind p p') rec state (Recovered rv state'') ->
+    rexec step p rec state (Recovered rv state'') \/
+    exists v state', rexec step p rec state (RFinished v state') /\
+            rexec step (p' v) rec state' (Recovered rv state'').
+Proof.
+  intros.
+  inversion H; subst.
+  inv_exec.
+  - right.
+    descend; intuition eauto.
+  - left; eauto.
+Qed.

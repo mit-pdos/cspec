@@ -24,6 +24,14 @@ Definition prog_rspec `(spec: RecSpecification A T R State) `(p: prog opT T) `(r
          | Recovered v state' => recover_post (spec a state) v state'
          end.
 
+Definition prog_loopspec
+           `(spec: Specification A R State)
+           `(rec: prog opT R)
+           `(step: Semantics opT State) :=
+  forall a state, pre (spec a state) ->
+         forall rv state', exec_recover step rec state rv state' ->
+                  post (spec a state) rv state'.
+
 Definition idempotent `(spec: Specification A R State) :=
   (* idempotency: crash invariant implies precondition to re-run on every
   crash *)
@@ -45,11 +53,9 @@ Lemma exec_recover_idempotent : forall `(spec: Specification A R State)
                                   `(step: Semantics opT State),
     forall (Hspec: prog_spec spec rec step),
       idempotent spec ->
-      forall a state, pre (spec a state) ->
-             forall rv state', exec_recover step rec state rv state' ->
-                      post (spec a state) rv state'.
+      prog_loopspec spec rec step.
 Proof.
-  unfold idempotent; intuition.
+  unfold idempotent, prog_loopspec; intuition.
   induction H2.
   - eapply Hspec in H2; eauto.
   - eapply Hspec in H2; eauto.
@@ -89,5 +95,5 @@ Proof.
     eapply Hpspec in H3; eauto.
     eapply H6 in H3.
     deex.
-    eauto using exec_recover_idempotent.
+    eapply exec_recover_idempotent in H4; eauto.
 Qed.
