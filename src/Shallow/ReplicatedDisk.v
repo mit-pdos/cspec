@@ -450,10 +450,10 @@ Module RD.
                  end;
              crash :=
                fun state' =>
-                 (TD.disk0 state |= eq (diskUpd d a' b) /\
-                  TD.disk1 state |= eq d) \/
-                 (TD.disk0 state |= eq d /\
-                  TD.disk1 state |= eq d);
+                 (TD.disk0 state' |= eq (diskUpd d a' b) /\
+                  TD.disk1 state' |= eq d) \/
+                 (TD.disk0 state' |= eq d /\
+                  TD.disk1 state' |= eq d);
            |})
         (fixup a)
         TD.step.
@@ -519,10 +519,10 @@ Module RD.
                  end;
              crash :=
                fun state' =>
-                 (TD.disk0 state |= eq (diskUpd d a' b) /\
-                  TD.disk1 state |= eq d) \/
-                 (TD.disk0 state |= eq d /\
-                  TD.disk1 state |= eq d);
+                 (TD.disk0 state' |= eq (diskUpd d a' b) /\
+                  TD.disk1 state' |= eq d) \/
+                 (TD.disk0 state' |= eq d /\
+                  TD.disk1 state' |= eq d);
            |})
         (recover_at a)
         TD.step.
