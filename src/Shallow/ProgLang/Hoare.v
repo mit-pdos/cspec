@@ -285,3 +285,23 @@ Ltac intro_begin :=
          | [ |- _ /\ (forall _, False -> _) ] => split; [ | intros; contradiction ]
          | [ |- forall _, _ ] => intros
          end.
+
+(* for programs that are pure the step automation doesn't work, since there is
+no bind in the program *)
+
+Theorem ret_prog_ok : forall `(step: Semantics opT State)
+                        `(spec: Specification A T State) (v:T),
+    (forall a state, pre (spec a state) ->
+            post (spec a state) v state /\
+            crash (spec a state) state) ->
+    prog_ok spec (Ret v) step.
+Proof.
+  intros.
+  unfold prog_ok, prog_double; intros.
+  repeat deex.
+  eapply H in H0; intuition eauto.
+  specialize (H2 v state postcond crashinv); intuition.
+  inv_exec.
+  eapply H0; eauto.
+  eapply H3; eauto.
+Qed.
