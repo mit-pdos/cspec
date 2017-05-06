@@ -408,6 +408,79 @@ Module RD.
     contradiction.
   Qed.
 
+  Theorem fixup_ok : forall a,
+      prog_ok
+        (fun '(d, b, a') state =>
+           {|
+             pre :=
+               a < size d /\
+               ((a' <= a /\
+                 TD.disk0 state |= eq (diskUpd d a' b) /\
+                 TD.disk1 state |= eq d) \/
+                (TD.disk0 state |= eq d /\
+                 TD.disk1 state |= eq d));
+             post :=
+               fun r state' =>
+                 match r with
+                 | Continue =>
+                   (a' < a /\
+                    TD.disk0 state' |= eq (diskUpd d a' b) /\
+                    TD.disk1 state' |= eq d) \/
+                   (TD.disk0 state' |= eq d /\
+                    TD.disk1 state' |= eq d) \/
+                   (TD.disk0 state' |= eq (diskUpd d a' b) /\
+                    TD.disk1 state' |= eq (diskUpd d a' b))
+                 | RepairDone =>
+                   (TD.disk0 state' |= eq d /\
+                    TD.disk1 state' |= eq d) \/
+                   (a = a' /\ (* not necessary, but nice to document *)
+                    TD.disk0 state' |= eq (diskUpd d a' b) /\
+                    TD.disk1 state' |= eq (diskUpd d a' b))
+                 | DiskFailed i =>
+                   match i with
+                   | d0 => TD.disk0 state' |= eq d /\
+                          TD.disk1 state' |= eq d
+                   | d1 => (TD.disk0 state' |= eq (diskUpd d a' b) /\
+                           TD.disk1 state' |= eq (diskUpd d a' b)) \/
+                          (* needed for precondition where both disks are just
+                          d *)
+                          (TD.disk0 state' |= eq d /\
+                           TD.disk0 state' |= eq d)
+                   end
+                 end;
+             crash :=
+               fun state' =>
+                 (TD.disk0 state |= eq (diskUpd d a' b) /\
+                  TD.disk1 state |= eq d) \/
+                 (TD.disk0 state |= eq d /\
+                  TD.disk1 state |= eq d);
+           |})
+        (_ <- begin; fixup a)
+        TD.step.
+  Proof.
+    step.
+    descend; intuition eauto.
+    apply PeanoNat.Nat.lt_eq_cases in H2; intuition.
+    - step_prog_with ltac:(eapply fixup_wrong_addr_ok); simplify; finish.
+      descend; intuition eauto.
+
+      step.
+      destruct r; intuition eauto.
+      destruct i; intuition eauto.
+    - step_prog_with ltac:(eapply fixup_correct_addr_ok); simplify; finish.
+      descend; intuition eauto.
+
+      step.
+      destruct r; intuition eauto.
+      destruct i; intuition eauto.
+    - step_prog_with ltac:(eapply fixup_equal_ok); simplify; finish.
+      descend; intuition eauto.
+
+      step.
+      destruct r; intuition eauto.
+      destruct i; intuition eauto.
+  Qed.
+
   Lemma read_step : forall a (state state':D.State) b,
       state a = Some b ->
       state' = state ->
