@@ -1,54 +1,10 @@
-Require Import SepLogic.
 Require Import Automation.
+Require Import MaybeHolds.
 Require Import Disk.
 
 Require Import Shallow.ProgLang.Hoare.
 Require Import Shallow.ProgLang.Prog.
 Require Import TwoDiskProg.
-
-Opaque pred_prop.
-
-Definition md_pred (md: option disk) (F: dpred) (P: Prop) :=
-  match md with
-  | Some d => d |= F
-  | None => P
-  end.
-
-Arguments md_pred md F%pred P.
-
-Theorem md_pred_weaken : forall md F (P P':Prop),
-    md_pred md F P ->
-    (P -> P') ->
-    md_pred md F P'.
-Proof.
-  destruct md; intuition.
-Qed.
-
-Theorem md_pred_none : forall md F (P:Prop),
-    P ->
-    md = None ->
-    md_pred md F P.
-Proof.
-  intros; subst; intuition.
-Qed.
-
-Theorem md_pred_impl : forall md F F' P,
-    md_pred md F P ->
-    (F ===> F') ->
-    md_pred md F' P.
-Proof.
-  destruct md; simpl in *; intros; eauto.
-Qed.
-
-Theorem md_pred_some : forall md F (P:Prop) m,
-    md = Some m ->
-    md_pred md F P ->
-    m |= F.
-Proof.
-  unfold md_pred; intros; simpl_match; auto.
-Qed.
-
-Hint Resolve md_pred_weaken md_pred_none.
 
 Ltac start_prim :=
   intros; eapply prim_ok; intros;
@@ -57,144 +13,135 @@ Ltac start_prim :=
   safe_intuition;
   try solve [ intuition eauto ].
 
+Hint Resolve holds_in_some.
+
+Ltac cleanup :=
+  repeat match goal with
+         | _ => progress simpl in *
+         | _ => progress safe_intuition
+         | _ => progress subst
+         | _ => deex
+         | _ => simpl_match
+         | |- _ /\ _ => split; [ solve [ eauto || congruence ] | ]
+         | |- _ /\ _ => split; [ | solve [ eauto || congruence ] ]
+         | [ H: Working _ = Working _ |- _ ] => inversion H; subst; clear H
+         | _ => solve [ eauto ]
+         | _ => congruence
+         end.
+
+Hint Resolve holds_in_some_eq.
+Hint Resolve holds_in_none_eq.
+
 Theorem TDRead0_ok : forall a,
     prog_ok
-      (fun '(F0, F1, v0) state =>
+      (fun '(d_0, F) state =>
          {|
-           pre := md_pred (TD.disk0 state) (F0 * a |-> v0) True /\
-                  md_pred (TD.disk1 state) F1 True;
+           pre := TD.disk0 state |= eq d_0 /\
+                  TD.disk1 state |= F;
            post :=
              fun r state' =>
                match r with
-               | Working v => v = v0 /\
-                             md_pred (TD.disk0 state') (F0 * a |-> v0) False /\
-                             md_pred (TD.disk1 state') F1 True
-               | Failed => md_pred (TD.disk0 state') (lift False) True /\
-                          md_pred (TD.disk1 state') F1 False
+               | Working v => TD.disk0 state' |= eq d_0 /\
+                             TD.disk1 state' |= F /\
+                             d_0 a |= eq v
+               | Failed => TD.disk0 state' |= [|False|] /\
+                          TD.disk1 state' |= F
                end;
            crash :=
-             fun state' =>
-               md_pred (TD.disk0 state') (F0 * a |-> v0) True /\
-               md_pred (TD.disk1 state') F1 True;
+             fun state' => TD.disk0 state' |= eq d_0 /\
+                    TD.disk1 state' |= F;
          |})
       (Prim (TD.Read d0 a))
       TD.step.
 Proof.
   start_prim.
   TD.inv_step.
-  TD.inv_bg; simpl in *; repeat simpl_match; eauto.
-  - destruct (TD.disk0 state') eqn:?; simpl in *; subst.
-    + pose proof (ptsto_valid H).
-      unfold disk_get in *.
-      simpl_match; subst; intuition eauto.
-    + destruct state'; simpl in *; subst; intuition eauto.
-      destruct disk1; simpl; intuition eauto.
-  - pose proof (ptsto_valid H).
-    unfold disk_get in *.
-    simpl_match; subst; intuition eauto.
+  TD.inv_bg; cleanup;
+    repeat (destruct matches in *; cleanup).
 Qed.
 
 Theorem TDRead1_ok : forall a,
     prog_ok
-      (fun '(F0, F1, v0) state =>
+      (fun '(F, d_1) state =>
          {|
-           pre := md_pred (TD.disk0 state) F0 True /\
-                  md_pred (TD.disk1 state) (F1 * a |-> v0) True;
+           pre := TD.disk0 state |= F /\
+                  TD.disk1 state |= eq d_1;
            post :=
              fun r state' =>
                match r with
-               | Working v => v = v0 /\
-                             md_pred (TD.disk0 state') F0 True /\
-                             md_pred (TD.disk1 state') (F1 * a |-> v0) False
-               | Failed => md_pred (TD.disk0 state') F0 False /\
-                          md_pred (TD.disk1 state') (lift False) True
+               | Working v => TD.disk0 state' |= F /\
+                             TD.disk1 state' |= eq d_1 /\
+                             d_1 a |= eq v
+               | Failed => TD.disk0 state' |= F /\
+                          TD.disk1 state' |= [|False|]
                end;
            crash :=
-             fun state' =>
-               md_pred (TD.disk0 state') F0 True /\
-               md_pred (TD.disk1 state') (F1 * a |-> v0) True;
+             fun state' => TD.disk0 state' |= F /\
+                    TD.disk1 state' |= eq d_1;
          |})
       (Prim (TD.Read d1 a))
       TD.step.
 Proof.
   start_prim.
   TD.inv_step.
-  TD.inv_bg; simpl in *; repeat simpl_match; eauto.
-  destruct (TD.disk1 state') eqn:?; simpl in *; subst.
-  pose proof (ptsto_valid H1).
-  unfold disk_get in *.
-  simpl_match; subst; intuition eauto.
-  destruct state'; simpl in *; subst; intuition eauto.
-  destruct disk0; simpl; intuition eauto.
-  pose proof (ptsto_valid H1).
-  unfold disk_get in *.
-  simpl_match; subst; intuition eauto.
+  TD.inv_bg; cleanup;
+    repeat (destruct matches in *; cleanup).
 Qed.
-
-Hint Resolve ptsto_diskUpd.
 
 Theorem TDWrite0_ok : forall a b,
     prog_ok
-      (fun '(F0, F1, v0) state =>
+      (fun '(d_0, F) state =>
          {|
-           pre := md_pred (TD.disk0 state) (F0 * a |-> v0) True /\
-                  md_pred (TD.disk1 state) F1 True;
+           pre := TD.disk0 state |= eq d_0 /\
+                  TD.disk1 state |= F;
            post :=
              fun r state' =>
                match r with
-               | Working _ => md_pred (TD.disk0 state') (F0 * a |-> b) False /\
-                             md_pred (TD.disk1 state') F1 True
-               | Failed => md_pred (TD.disk0 state') (lift False) True /\
-                          md_pred (TD.disk1 state') F1 False
+               | Working _ => TD.disk0 state' |= eq (diskUpd d_0 a b) /\
+                             TD.disk1 state' |= F
+               | Failed => TD.disk0 state' |= [|False|] /\
+                          TD.disk1 state' |= F
                end;
            crash :=
              fun state' =>
-               md_pred (TD.disk0 state') (F0 * a |-> v0) True /\
-               md_pred (TD.disk1 state') F1 True;
+               TD.disk0 state' |= eq d_0 /\
+               TD.disk1 state' |= F;
          |})
       (Prim (TD.Write d0 a b))
       TD.step.
 Proof.
   start_prim.
   TD.inv_step; simpl.
-  TD.inv_bg; simpl in *; intuition (subst; eauto).
-  destruct matches in *; simpl in *; intuition (subst; simpl; eauto);
-    try congruence.
-  destruct (TD.disk1 x) eqn:?; simpl; eauto.
-  destruct x; eauto.
-  destruct (d_0 a); intuition (subst; simpl; eauto).
+  TD.inv_bg; cleanup;
+    repeat (destruct matches in *; cleanup).
 Qed.
 
 Theorem TDWrite1_ok : forall a b,
     prog_ok
-      (fun '(F0, F1, v0) state =>
+      (fun '(F, d_1) state =>
          {|
-           pre := md_pred (TD.disk0 state) F0 True /\
-                  md_pred (TD.disk1 state) (F1 * a |-> v0) True;
+           pre := TD.disk0 state |= F /\
+                  TD.disk1 state |= eq d_1;
            post :=
              fun r state' =>
                match r with
-               | Working _ => md_pred (TD.disk0 state') F0 True /\
-                             md_pred (TD.disk1 state') (F1 * a |-> b) False
-               | Failed => md_pred (TD.disk0 state') F0 False /\
-                          md_pred (TD.disk1 state') (lift False) True
+               | Working _ => TD.disk0 state' |= F /\
+                             TD.disk1 state' |= eq (diskUpd d_1 a b)
+               | Failed => TD.disk0 state' |= F /\
+                          TD.disk1 state' |= [|False|]
                end;
            crash :=
              fun state' =>
-               md_pred (TD.disk0 state') F0 True /\
-               md_pred (TD.disk1 state') (F1 * a |-> v0) True;
+               TD.disk0 state' |= F /\
+               TD.disk1 state' |= eq d_1;
          |})
       (Prim (TD.Write d1 a b))
       TD.step.
 Proof.
   start_prim.
   TD.inv_step; simpl.
-  TD.inv_bg; simpl in *; intuition (subst; eauto).
-  destruct matches in *; simpl in *; intuition (subst; simpl; eauto);
-    try congruence.
-  destruct (TD.disk0 x) eqn:?; simpl; eauto.
-  destruct x; eauto.
-  destruct (d_1 a); intuition (subst; simpl; eauto).
+  TD.inv_bg; cleanup;
+    repeat (destruct matches in *; cleanup).
 Qed.
 
 Hint Extern 1 {{ Prim (TD.Read d0 _); _}} => apply TDRead0_ok : prog.

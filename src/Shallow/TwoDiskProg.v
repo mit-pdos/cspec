@@ -67,18 +67,15 @@ Module TD.
       match get_disk i state with
       | Some d => match d a with
                  | Some b0 => r = Working b0
-                 | None => False
+                 | None => exists b, r = Working b
                  end
       | None => r = Failed
       end ->
       op_step (Read i a) state r state
   | step_write : forall a i b state r state',
       match get_disk i state with
-      | Some d => match d a with
-                 | Some b0 => state' = set_disk i state (diskUpd d a b) /\
-                             r = Working tt
-                 | None => False
-                 end
+      | Some d => state' = set_disk i state (diskUpd d a b) /\
+                 r = Working tt
       | None => r = Failed /\ state' = state
       end ->
       op_step (Write i a b) state r state'.
