@@ -121,6 +121,7 @@ Module RD.
            | _ => progress simpl in *
            | _ => progress safe_intuition
            | _ => progress subst
+           | _ => autorewrite with upd in *
            | [ crashinv: _ -> Prop |- _ ] =>
              match goal with
              | [ H: forall _, _ -> crashinv _ |-
@@ -217,11 +218,93 @@ Module RD.
     destruct r; step.
   Qed.
 
+  Lemma if_lt_dec : forall A n m (a a':A),
+      n < m ->
+      (if lt_dec n m then a else a') = a.
+  Proof.
+    intros.
+    destruct (lt_dec n m); auto.
+    contradiction.
+  Qed.
+
+  Lemma disks_eq_inbounds : forall d a v v',
+      a < size d ->
+      d a |= eq v ->
+      d a |= eq v' ->
+      v = v'.
+  Proof.
+    unfold disk_get; intros.
+    pose proof (diskMem_domain d a).
+    rewrite if_lt_dec in H2 by auto.
+    repeat deex.
+    rewrite H2 in H0.
+    replace (d a) in *; simpl in *; subst; auto.
+  Qed.
+
+  (* we will show that fixup does nothing once the disks are the same *)
+  Theorem fixup_equal_ok : forall a,
+      prog_ok
+        (fun d state =>
+           {|
+             pre :=
+               (* for simplicity we only consider in-bounds addresses, though if
+                  a is out-of-bounds fixup just might uselessly write to disk and not do
+                  anything *)
+               a < size d /\
+               TD.disk0 state |= eq d /\
+               TD.disk1 state |= eq d;
+             post :=
+               fun r state' =>
+                match r with
+                | Continue =>
+                  TD.disk0 state' |= eq d /\
+                  TD.disk1 state' |= eq d
+                | RepairDone =>
+                  TD.disk0 state' |= eq d /\
+                  TD.disk1 state' |= eq d
+                | DiskFailed i =>
+                  TD.disk0 state' |= eq d /\
+                  TD.disk1 state' |= eq d
+                end;
+             crash :=
+               fun state' =>
+                 TD.disk0 state' |= eq d /\
+                 TD.disk1 state' |= eq d;
+           |})
+        (fixup a)
+        TD.step.
+  Proof.
+    unfold fixup.
+    step.
+    descend; intuition eauto.
+
+    destruct r; step.
+    descend; intuition eauto.
+
+    destruct r; try step.
+    is_eq v v0; try step.
+    assert (v = v0) by eauto using disks_eq_inbounds.
+    contradiction.
+  Qed.
+
+  Lemma diskUpd_maybe_same : forall (d:disk) a b,
+      d a |= eq b ->
+      diskUpd d a b = d.
+  Proof.
+    intros.
+    destruct (d a) eqn:?; simpl in *; subst;
+      autorewrite with upd;
+      auto.
+  Qed.
+
+  Hint Rewrite diskUpd_maybe_same using (solve [ auto ]) : upd.
+
   Theorem fixup_correct_addr_ok : forall a,
       prog_ok
         (fun '(d, b) state =>
            {|
              pre :=
+               a < size d /\
                TD.disk0 state |= eq (diskUpd d a b) /\
                TD.disk1 state |= eq d;
              post :=
@@ -260,16 +343,70 @@ Module RD.
     descend; intuition eauto.
 
     destruct r; try step.
-    is_eq v v0; try step.
-    admit. (* updated to same address *)
+    is_eq b v; try step.
     descend; intuition eauto.
 
     step.
     destruct r; intuition eauto; simplify; finish.
-    (* diskUpd d a b a |= eq v -> b = v (or a is out-of-bounds and all diskUpds
-    are no-ops) *)
-    admit.
-  Abort.
+  Qed.
+
+  Theorem fixup_wrong_addr_ok : forall a,
+      prog_ok
+        (fun '(d, b, a') state =>
+           {|
+             pre :=
+               a < size d /\
+               (* recovery, working from end of disk, has not yet reached the
+                  correct address *)
+               a' < a /\
+               TD.disk0 state |= eq (diskUpd d a' b) /\
+               TD.disk1 state |= eq d;
+             post :=
+               fun r state' =>
+                match r with
+                | Continue =>
+                  TD.disk0 state' |= eq (diskUpd d a' b) /\
+                  TD.disk1 state' |= eq d
+                | RepairDone =>
+                  (* since the address is wrong, the only way we finish is if a
+                  disk fails, which we explicitly report *)
+                  False
+                | DiskFailed i =>
+                  match i with
+                  | d0 => TD.disk0 state' |= eq d /\
+                         TD.disk1 state' |= eq d
+                  | d1 => TD.disk0 state' |= eq (diskUpd d a' b) /\
+                         TD.disk1 state' |= eq (diskUpd d a' b)
+                  end
+                end;
+             crash :=
+               fun state' =>
+               (TD.disk0 state' |= eq (diskUpd d a' b) /\
+                TD.disk1 state' |= eq d) \/
+               (TD.disk0 state' |= eq d /\
+                TD.disk1 state' |= eq d);
+           |})
+        (fixup a)
+        TD.step.
+  Proof.
+    unfold fixup; intros.
+    step.
+    descend; intuition eauto.
+
+    destruct r; try step.
+    descend; intuition eauto.
+
+    destruct r; try step.
+    is_eq v v0; try step.
+    descend; intuition eauto.
+
+    step.
+    destruct r; intuition eauto; simplify; finish.
+    assert (a' <> a) by eauto using PeanoNat.Nat.lt_neq.
+    autorewrite with upd in *.
+    assert (v = v0) by eauto using disks_eq_inbounds.
+    contradiction.
+  Qed.
 
   Lemma read_step : forall a (state state':D.State) b,
       state a = Some b ->

@@ -133,3 +133,16 @@ Proof.
   f_equal.
   apply ProofIrrelevance.proof_irrelevance.
 Qed.
+
+Theorem diskUpd_same : forall d a b,
+    d a = Some b ->
+    diskUpd d a b = d.
+Proof.
+  intros.
+  apply diskMem_ext_eq.
+  extensionality a'.
+  is_eq a a'; autorewrite with upd; auto.
+  erewrite diskUpd_eq_some; eauto.
+Qed.
+
+Hint Rewrite diskUpd_same using (solve [ auto ]) : upd.
