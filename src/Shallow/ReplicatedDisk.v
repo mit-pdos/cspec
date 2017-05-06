@@ -455,11 +455,11 @@ Module RD.
                  (TD.disk0 state |= eq d /\
                   TD.disk1 state |= eq d);
            |})
-        (_ <- begin; fixup a)
+        (fixup a)
         TD.step.
   Proof.
-    step.
-    descend; intuition eauto.
+    intro_begin; simplify.
+    intuition eauto.
     apply PeanoNat.Nat.lt_eq_cases in H2; intuition.
     - step_prog_with ltac:(eapply fixup_wrong_addr_ok); simplify; finish.
       descend; intuition eauto.

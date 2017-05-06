@@ -259,5 +259,29 @@ Notation "{{ p ; '_' }}" := (prog_double _ (Bind p _) _) (only parsing, at level
 
 (* this hack lets us do a case-split on the initial state *)
 Definition begin {opT} := Ret (opT:=opT) tt.
-
 Hint Extern 1 {{ begin; _ }} => apply ret_ok : prog.
+
+Lemma begin_prog_ok : forall `(step: Semantics opT State)
+                        `(spec: Specification A T State)
+                        `(p: prog opT T),
+    prog_ok spec (_ <- begin; p) step ->
+    prog_ok spec p step.
+Proof.
+  unfold prog_ok, prog_double; intros.
+  repeat deex.
+  eapply H; eauto.
+  eapply monad_assoc.
+  unfold begin; apply monad_left_id.
+  auto.
+Qed.
+
+Ltac intro_begin :=
+  intros; apply begin_prog_ok;
+  step_prog; simpl;
+  repeat match goal with
+         | [ |- exists (_:unit), _ ] => exists tt
+         | [ u: unit |- _ ] => destruct u
+         | [ |- True /\ _ ] => split; [ auto | ]
+         | [ |- _ /\ (forall _, False -> _) ] => split; [ | intros; contradiction ]
+         | [ |- forall _, _ ] => intros
+         end.
