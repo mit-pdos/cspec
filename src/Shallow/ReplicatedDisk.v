@@ -723,20 +723,6 @@ Module RD.
     destruct matches in *; eauto.
   Qed.
 
-  Lemma invariant_to_disks_eq0 : forall state,
-      invariant state ->
-      TD.disk0 state |= eq (abstraction state).
-  Proof.
-    intros; apply invariant_to_disks_eq; auto.
-  Qed.
-
-  Lemma invariant_to_disks_eq1 : forall state,
-      invariant state ->
-      TD.disk1 state |= eq (abstraction state).
-  Proof.
-    intros; apply invariant_to_disks_eq; auto.
-  Qed.
-
   Lemma disks_eq_to_invariant : forall state d,
       TD.disk0 state |= eq d ->
       TD.disk1 state |= eq d ->
@@ -756,10 +742,9 @@ Module RD.
     exfalso; eauto.
   Qed.
 
-  Hint Resolve
-       invariant_to_disks_eq0 invariant_to_disks_eq1
-       disks_eq_to_invariant
-       disks_eq_to_abstraction.
+  Hint Extern 1 (TD.disk0 _ |= eq (abstraction _)) => apply invariant_to_disks_eq.
+  Hint Extern 1 (TD.disk1 _ |= eq (abstraction _)) => apply invariant_to_disks_eq.
+  Hint Resolve disks_eq_to_invariant disks_eq_to_abstraction.
 
   Theorem RD_ok : interpretation
                     op_impl
