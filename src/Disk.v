@@ -145,4 +145,15 @@ Proof.
   erewrite diskUpd_eq_some; eauto.
 Qed.
 
+Lemma diskUpd_oob_noop : forall d a b,
+    ~a < size d ->
+    diskUpd d a b = d.
+Proof.
+  intros.
+  unfold diskUpd.
+  pose proof (diskMem_domain d a).
+  destruct (lt_dec a (size d)); try contradiction; simpl; eauto.
+Qed.
+
 Hint Rewrite diskUpd_same using (solve [ auto ]) : upd.
+Hint Rewrite diskUpd_oob_noop using (solve [ auto ]) : upd.

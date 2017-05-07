@@ -101,9 +101,7 @@ Theorem prog_rspec_from_crash : forall `(spec: RecSpecification A T R State)
                            exists a2, pre (rspec a2 state') /\
                                  (* and recovery establishes recovery postcondition *)
                                  (forall rv state'', post (rspec a2 state') rv state'' ->
-                                                recover_post (spec a state) rv state'') /\
-                                 (forall state'', crash (rspec a2 state') state'' ->
-                                             pre (rspec a2 state'')))) ->
+                                                recover_post (spec a state) rv state''))) ->
       prog_rspec spec p rec step.
 Proof.
   unfold prog_rspec, prog_loopspec; intuition.
