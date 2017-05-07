@@ -133,6 +133,7 @@ Module RD.
   Ltac finish :=
     repeat match goal with
            | _ => solve_false
+           | _ => congruence
            | _ => solve [ intuition eauto ]
            end.
 
@@ -259,9 +260,7 @@ Module RD.
                 | Continue =>
                   TD.disk0 state' |= eq d /\
                   TD.disk1 state' |= eq d
-                | RepairDone =>
-                  TD.disk0 state' |= eq d /\
-                  TD.disk1 state' |= eq d
+                | RepairDone => False
                 | DiskFailed i =>
                   TD.disk0 state' |= eq d /\
                   TD.disk1 state' |= eq d
@@ -408,77 +407,86 @@ Module RD.
     contradiction.
   Qed.
 
+  Inductive DiskStatus :=
+  | FullySynced
+  | OutOfSync (a:addr) (b:block).
+
   Theorem fixup_ok : forall a,
       prog_ok
-        (fun '(d, b, a') state =>
+        (fun '(d, s) state =>
            {|
              pre :=
                a < size d /\
-               ((a' <= a /\
-                 TD.disk0 state |= eq (diskUpd d a' b) /\
-                 TD.disk1 state |= eq d) \/
-                (TD.disk0 state |= eq d /\
-                 TD.disk1 state |= eq d));
+               match s with
+               | FullySynced => TD.disk0 state |= eq d /\
+                               TD.disk1 state |= eq d
+               | OutOfSync a' b => a' <= a /\
+                                  TD.disk0 state |= eq (diskUpd d a' b) /\
+                                  TD.disk1 state |= eq d
+               end;
              post :=
                fun r state' =>
-                 match r with
-                 | Continue =>
-                   (a' < a /\
-                    TD.disk0 state' |= eq (diskUpd d a' b) /\
-                    TD.disk1 state' |= eq d) \/
-                   (TD.disk0 state' |= eq d /\
-                    TD.disk1 state' |= eq d) \/
-                   (TD.disk0 state' |= eq (diskUpd d a' b) /\
-                    TD.disk1 state' |= eq (diskUpd d a' b))
-                 | RepairDone =>
-                   (TD.disk0 state' |= eq d /\
-                    TD.disk1 state' |= eq d) \/
-                   (a = a' /\ (* not necessary, but nice to document *)
-                    TD.disk0 state' |= eq (diskUpd d a' b) /\
-                    TD.disk1 state' |= eq (diskUpd d a' b))
-                 | DiskFailed i =>
-                   match i with
-                   | d0 => TD.disk0 state' |= eq d /\
-                          TD.disk1 state' |= eq d
-                   | d1 => (TD.disk0 state' |= eq (diskUpd d a' b) /\
-                           TD.disk1 state' |= eq (diskUpd d a' b)) \/
-                          (* needed for precondition where both disks are just
-                          d *)
-                          (TD.disk0 state' |= eq d /\
-                           TD.disk0 state' |= eq d)
+                 match s with
+                 | FullySynced => TD.disk0 state' |= eq d /\
+                                 TD.disk1 state' |= eq d /\
+                                 (* not actually useful *)
+                                 r <> RepairDone
+                 | OutOfSync a' b =>
+                   match r with
+                   | Continue =>
+                     (a' < a /\
+                      TD.disk0 state' |= eq (diskUpd d a' b) /\
+                      TD.disk1 state' |= eq d) \/
+                     (TD.disk0 state' |= eq (diskUpd d a' b) /\
+                      TD.disk1 state' |= eq (diskUpd d a' b))
+                   | RepairDone =>
+                     (TD.disk0 state' |= eq d /\
+                      TD.disk1 state' |= eq d) \/
+                     (a = a' /\ (* not necessary, but nice to document *)
+                      TD.disk0 state' |= eq (diskUpd d a' b) /\
+                      TD.disk1 state' |= eq (diskUpd d a' b))
+                   | DiskFailed i =>
+                     match i with
+                     | d0 => TD.disk0 state' |= eq d /\
+                            TD.disk1 state' |= eq d
+                     | d1 => TD.disk0 state' |= eq (diskUpd d a' b) /\
+                            TD.disk1 state' |= eq (diskUpd d a' b)
+                     end
                    end
                  end;
              crash :=
                fun state' =>
-                 (TD.disk0 state' |= eq (diskUpd d a' b) /\
-                  TD.disk1 state' |= eq d) \/
-                 (TD.disk0 state' |= eq d /\
-                  TD.disk1 state' |= eq d);
+                 match s with
+                 | FullySynced => TD.disk0 state' |= eq d /\
+                                 TD.disk1 state' |= eq d
+                 | OutOfSync a' b =>
+                   (TD.disk0 state' |= eq (diskUpd d a' b) /\
+                    TD.disk1 state' |= eq d) \/
+                   (TD.disk0 state' |= eq d /\
+                    TD.disk1 state' |= eq d)
+                 end;
            |})
         (fixup a)
         TD.step.
   Proof.
     intro_begin; simplify.
-    intuition eauto.
-    apply PeanoNat.Nat.lt_eq_cases in H2; intuition.
-    - step_prog_with ltac:(eapply fixup_wrong_addr_ok); simplify; finish.
-      descend; intuition eauto.
-
-      step.
-      destruct r; intuition eauto.
-      destruct i; intuition eauto.
-    - step_prog_with ltac:(eapply fixup_correct_addr_ok); simplify; finish.
-      descend; intuition eauto.
-
-      step.
-      destruct r; intuition eauto.
-      destruct i; intuition eauto.
+    destruct s; intuition eauto.
     - step_prog_with ltac:(eapply fixup_equal_ok); simplify; finish.
       descend; intuition eauto.
 
       step.
-      destruct r; intuition eauto.
-      destruct i; intuition eauto.
+      destruct r; intuition eauto; try congruence.
+    - apply PeanoNat.Nat.lt_eq_cases in H3; intuition.
+      + step_prog_with ltac:(eapply fixup_wrong_addr_ok); simplify; finish.
+        descend; intuition eauto.
+
+        step.
+        destruct r; intuition eauto.
+      + step_prog_with ltac:(eapply fixup_correct_addr_ok); simplify; finish.
+        descend; intuition eauto.
+
+        step.
+        destruct r; intuition eauto.
   Qed.
 
   Hint Extern 1 {{ fixup _; _ }} => apply fixup_ok : prog.
@@ -487,93 +495,118 @@ Module RD.
 
   Theorem recover_at_ok : forall a,
       prog_ok
-        (fun '(d, b, a') state =>
+        (fun '(d, s) state =>
            {|
              pre :=
-               a <= size d /\
-               ((a' < a /\
-                 TD.disk0 state |= eq (diskUpd d a' b) /\
-                 TD.disk1 state |= eq d) \/
-                (TD.disk0 state |= eq d /\
-                 TD.disk1 state |= eq d));
+               a < size d /\
+               match s with
+               | FullySynced => TD.disk0 state |= eq d /\
+                               TD.disk1 state |= eq d
+               | OutOfSync a' b => a' < a /\
+                                  TD.disk0 state |= eq (diskUpd d a' b) /\
+                                  TD.disk1 state |= eq d
+               end;
              post :=
                fun r state' =>
-                 match r with
-                 | Continue => False
-                 | RepairDone =>
-                   (TD.disk0 state' |= eq d /\
-                    TD.disk1 state' |= eq d) \/
-                   (TD.disk0 state' |= eq (diskUpd d a' b) /\
-                    TD.disk1 state' |= eq (diskUpd d a' b))
-                 | DiskFailed i =>
-                   match i with
-                   | d0 => TD.disk0 state' |= eq d /\
-                          TD.disk1 state' |= eq d
-                   | d1 => (TD.disk0 state' |= eq (diskUpd d a' b) /\
-                           TD.disk1 state' |= eq (diskUpd d a' b)) \/
-                          (* needed for precondition where both disks are just
-                          d *)
-                          (TD.disk0 state' |= eq d /\
-                           TD.disk0 state' |= eq d)
+                 match s with
+                 | FullySynced => TD.disk0 state' |= eq d /\
+                                 TD.disk1 state' |= eq d /\
+                                 r <> Continue
+                 | OutOfSync a' b =>
+                   match r with
+                   | Continue => False
+                   | RepairDone =>
+                     (TD.disk0 state' |= eq d /\
+                      TD.disk1 state' |= eq d) \/
+                     (TD.disk0 state' |= eq (diskUpd d a' b) /\
+                      TD.disk1 state' |= eq (diskUpd d a' b))
+                   | DiskFailed i =>
+                     match i with
+                     | d0 => (TD.disk0 state' |= eq d /\
+                             TD.disk1 state' |= eq d) \/
+                            (TD.disk0 state' |= eq (diskUpd d a' b) /\
+                             TD.disk1 state' |= eq (diskUpd d a' b))
+                     | d1 => TD.disk0 state' |= eq (diskUpd d a' b) /\
+                            TD.disk1 state' |= eq (diskUpd d a' b)
+                     end
                    end
                  end;
              crash :=
                fun state' =>
-                 (TD.disk0 state' |= eq (diskUpd d a' b) /\
-                  TD.disk1 state' |= eq d) \/
-                 (TD.disk0 state' |= eq d /\
-                  TD.disk1 state' |= eq d);
+                 match s with
+                 | FullySynced => TD.disk0 state' |= eq d /\
+                                 TD.disk1 state' |= eq d
+                 | OutOfSync a' b =>
+                   (TD.disk0 state' |= eq d /\
+                    TD.disk1 state' |= eq d) \/
+                   (TD.disk0 state' |= eq (diskUpd d a' b) /\
+                    TD.disk1 state' |= eq d) \/
+                   (TD.disk0 state' |= eq (diskUpd d a' b) /\
+                    TD.disk1 state' |= eq (diskUpd d a' b))
+                 end;
            |})
         (recover_at a)
         TD.step.
   Proof.
     induction a; simpl; intros.
     - eapply ret_prog_ok; simplify; finish.
-      intuition eauto.
-      inversion H0.
+      destruct s; intuition eauto.
+      congruence.
+      inversion H1.
     - step.
-      descend; intuition eauto.
+      destruct s; intuition.
+      exists d, FullySynced; intuition eauto.
+      destruct r; step.
+
+      exists d, FullySynced; intuition eauto.
+      exists d, (OutOfSync a0 b); intuition eauto.
 
       destruct r; step.
-      intuition (eauto);
-        try solve [ descend; intuition eauto ].
-      exists (diskUpd d a' b), block0, 0; intuition eauto.
-      autorewrite with upd; eauto.
-
-      destruct r; step.
-      intuition eauto.
-      (* actually, need some correlation between precondition cases and
-      postcondition cases for fixup *)
-  Abort.
+      intuition.
+      exists d, (OutOfSync a0 b); intuition eauto.
+      exists (diskUpd d a0 b), FullySynced; intuition eauto.
+      simplify; finish.
+      step.
+      destruct r; intuition eauto.
+      destruct i; intuition eauto.
+      destruct i; intuition eauto.
+  Qed.
 
   (* TODO: get this in recovery through the programming language *)
   Axiom disk_size : nat.
 
   Theorem Recover_ok :
     prog_loopspec
-      (fun '(d, a, b) state =>
+      (fun '(d, s) state =>
          {|
            pre :=
-             a < size d /\
              disk_size = size d /\
-             ((TD.disk0 state |= eq (diskUpd d a b) /\
-               TD.disk1 state |= eq d) \/
-              (TD.disk0 state |= eq d /\
-               TD.disk1 state |= eq d));
+             match s with
+             | FullySynced => TD.disk0 state |= eq d /\
+                             TD.disk1 state |= eq d
+             | OutOfSync a b => a < size d /\
+                               TD.disk0 state |= eq (diskUpd d a b) /\
+                               TD.disk1 state |= eq d
+             end;
            post :=
              fun _ state' =>
-               (TD.disk0 state' |= eq d /\
-                TD.disk1 state' |= eq d) \/
-               (TD.disk0 state' |= eq (diskUpd d a b) /\
-                TD.disk1 state' |= eq (diskUpd d a b));
+               match s with
+               | FullySynced => TD.disk0 state' |= eq d /\
+                               TD.disk1 state' |= eq d
+               | OutOfSync a b => TD.disk0 state' |= eq (diskUpd d a b) /\
+                                 TD.disk1 state' |= eq (diskUpd d a b)
+               end;
            crash :=
-             fun state' =>
-               (TD.disk0 state' |= eq d /\
-                TD.disk1 state' |= eq d) \/
-               (TD.disk0 state' |= eq (diskUpd d a b) /\
-                TD.disk1 state' |= eq d) \/
-               (TD.disk0 state' |= eq (diskUpd d a b) /\
-                TD.disk1 state' |= eq (diskUpd d a b));
+               fun state' =>
+               match s with
+               | FullySynced => TD.disk0 state' |= eq d /\
+                               TD.disk1 state' |= eq d
+               | OutOfSync a b =>
+                 (TD.disk0 state' |= eq (diskUpd d a b) /\
+                  TD.disk1 state' |= eq d) \/
+                 (TD.disk0 state' |= eq (diskUpd d a b) /\
+                  TD.disk1 state' |= eq (diskUpd d a b))
+               end;
          |})
       (Recover disk_size)
       TD.step.
