@@ -45,23 +45,19 @@ Proof.
   eapply Himpl in H0; repeat deex; eauto.
 Qed.
 
-(* TODO: generalize this definition to allow changes to ghost state (but the
-original somehow still has to show up) *)
 Definition idempotent `(spec: Specification A R State) :=
-  (* idempotency: crash invariant implies precondition to re-run on every
-  crash *)
-  (forall a state, pre (spec a state) ->
-          forall state', crash (spec a state) state' ->
-                pre (spec a state')) /\
-  (* postcondition transitivity: establishing the postcondition from a crash
-  state is sufficient to establish it with respect to the original initial state
-  (note all with the same ghost state) *)
-  (forall a state,
+  forall a state,
       pre (spec a state) ->
-      forall state' rv state'',
-        crash (spec a state) state' ->
-        post (spec a state') rv state'' ->
-        post (spec a state) rv state'').
+      forall state', crash (spec a state) state' ->
+            (* idempotency: crash invariant implies precondition to re-run on
+               every crash *)
+            exists a', pre (spec a' state') /\
+                  (* postcondition transitivity: establishing the postcondition
+                     from a crash state is sufficient to establish it with
+                     respect to the original initial state (note all with the
+                     same ghost state) *)
+                  forall rv state'', post (spec a' state') rv state'' ->
+                                post (spec a state) rv state''.
 
 Lemma idempotent_loopspec : forall `(spec: Specification A R State)
                               `(rec: prog opT R)
@@ -71,9 +67,20 @@ Lemma idempotent_loopspec : forall `(spec: Specification A R State)
       prog_loopspec spec rec step.
 Proof.
   unfold idempotent, prog_loopspec; intuition.
-  induction H2.
-  - eapply Hspec in H2; eauto.
-  - eapply Hspec in H2; eauto.
+  generalize dependent a.
+  induction H1; intros.
+  - match goal with
+    | [ Hexec: exec _ _ _ (Finished _ _) |- _ ] =>
+      eapply Hspec in Hexec; eauto
+    end.
+  - match goal with
+    | [ Hexec: exec _ _ _ (Crashed _) |- _ ] =>
+      eapply Hspec in Hexec; eauto
+    end.
+    match goal with
+    | [ Hpre: pre (spec _ _) |- _ ] =>
+      eapply H in Hpre; repeat deex; eauto
+    end.
 Qed.
 
 Theorem prog_spec_from_crash : forall `(spec: RecSpecification A T R State)

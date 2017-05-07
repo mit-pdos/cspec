@@ -614,7 +614,12 @@ Module RD.
     eapply idempotent_loopspec; simpl.
     - admit. (* actual correctness proof *)
     - unfold idempotent; intuition; simplify.
-      intuition eauto.
+      rename a0 into d.
+      destruct b; intuition eauto.
+      exists d, FullySynced; intuition eauto.
+      exists d, (OutOfSync a b); intuition eauto.
+      exists (diskUpd d a b), FullySynced; intuition eauto.
+      autorewrite with upd; auto.
   Admitted.
 
   Lemma read_step : forall a (state state':D.State) b,
@@ -653,6 +658,53 @@ Module RD.
     eapply H; eauto.
   Qed.
 
+  Lemma invariant_to_disks_eq : forall state,
+      invariant state ->
+      TD.disk0 state |= eq (abstraction state) /\
+      TD.disk1 state |= eq (abstraction state).
+  Proof.
+    destruct state; simpl; intros.
+    destruct matches in *; eauto.
+  Qed.
+
+  Lemma invariant_to_disks_eq0 : forall state,
+      invariant state ->
+      TD.disk0 state |= eq (abstraction state).
+  Proof.
+    intros; apply invariant_to_disks_eq; auto.
+  Qed.
+
+  Lemma invariant_to_disks_eq1 : forall state,
+      invariant state ->
+      TD.disk1 state |= eq (abstraction state).
+  Proof.
+    intros; apply invariant_to_disks_eq; auto.
+  Qed.
+
+  Lemma disks_eq_to_invariant : forall state d,
+      TD.disk0 state |= eq d ->
+      TD.disk1 state |= eq d ->
+      invariant state.
+  Proof.
+    destruct state; simpl; intros.
+    destruct matches in *; eauto.
+  Qed.
+
+  Lemma disks_eq_to_abstraction : forall state d,
+      TD.disk0 state |= eq d ->
+      TD.disk1 state |= eq d ->
+      abstraction state = d.
+  Proof.
+    destruct state; simpl; intros.
+    destruct matches in *; eauto.
+    exfalso; eauto.
+  Qed.
+
+  Hint Resolve
+       invariant_to_disks_eq0 invariant_to_disks_eq1
+       disks_eq_to_invariant
+       disks_eq_to_abstraction.
+
   Theorem RD_ok : interpretation
                     op_impl
                     (Recover disk_size)
@@ -669,9 +721,10 @@ Module RD.
       eapply prog_loopspec_weaken.
       eapply Recover_ok.
       unfold spec_impl; simplify.
-      (* TODO: need a way of correlating the branch in the precondition with the
-         postcondition, for a stronger statement in the case of starting with
-         equal disks.  *)
+      exists (abstraction state), FullySynced; intuition eauto.
+      match goal with
+      | |- disk_size = size (abstraction state) => admit
+      end.
   Abort.
 
 End RD.
