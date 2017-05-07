@@ -30,6 +30,17 @@ Module RD.
       _ <- Prim (TD.Write d1 a b);
       Ret tt.
 
+  Definition DiskSize : TD.prog nat :=
+    msz <- Prim (TD.DiskSize d0);
+      match msz with
+      | Working sz => Ret sz
+      | Failed => msz <- Prim (TD.DiskSize d1);
+                   match msz with
+                   | Working sz => Ret sz
+                   | Failed => Ret 0
+                   end
+      end.
+
   (* Recovery tracks what happens at each step in order to implement control
   flow. *)
   Inductive RecStatus :=
@@ -73,15 +84,16 @@ Module RD.
               end
     end.
 
-  (* recovery for a disk of size [sz] *)
-  Definition Recover (sz:nat) : TD.prog unit :=
-    _ <- recover_at sz;
+  Definition Recover : TD.prog unit :=
+    sz <- DiskSize;
+      _ <- recover_at sz;
       Ret tt.
 
   Definition op_impl T (op:D.Op T) : TD.prog T :=
     match op with
     | D.Read a => Read a
     | D.Write a b => Write a b
+    | D.DiskSize => DiskSize
     end.
 
   Definition interpret := Interpret.interpret op_impl.
@@ -572,15 +584,60 @@ Module RD.
       destruct i; intuition eauto.
   Qed.
 
-  (* TODO: get this in recovery through the programming language *)
-  Axiom disk_size : nat.
+  Theorem DiskSize_ok :
+    prog_ok
+      (fun '(d, s) state =>
+         {|
+           pre :=
+             match s with
+             | FullySynced => TD.disk0 state |= eq d /\
+                             TD.disk1 state |= eq d
+             | OutOfSync a b => a < size d /\
+                               TD.disk0 state |= eq (diskUpd d a b) /\
+                               TD.disk1 state |= eq d
+             end;
+           post :=
+             fun r state' =>
+               r = size d /\
+               match s with
+               | FullySynced => TD.disk0 state' |= eq d /\
+                               TD.disk1 state' |= eq d
+               | OutOfSync a b => a < size d /\
+                                 TD.disk0 state' |= eq (diskUpd d a b) /\
+                                 TD.disk1 state' |= eq d
+               end;
+           crash :=
+             fun state' =>
+               match s with
+               | FullySynced => TD.disk0 state' |= eq d /\
+                               TD.disk1 state' |= eq d
+               | OutOfSync a b => a < size d /\
+                                 TD.disk0 state' |= eq (diskUpd d a b) /\
+                                 TD.disk1 state' |= eq d
+               end;
+         |})
+      (DiskSize)
+      TD.step.
+  Proof.
+    unfold DiskSize.
+
+    step.
+    destruct s; descend; intuition eauto.
+    - destruct r; step.
+      descend; intuition eauto.
+
+      destruct r; step.
+    - destruct r; step.
+      descend; intuition eauto.
+
+      destruct r; step.
+  Qed.
 
   Theorem Recover_ok :
     prog_loopspec
       (fun '(d, s) state =>
          {|
            pre :=
-             disk_size = size d /\
              match s with
              | FullySynced => TD.disk0 state |= eq d /\
                              TD.disk1 state |= eq d
@@ -608,7 +665,7 @@ Module RD.
                   TD.disk1 state' |= eq (diskUpd d a b))
                end;
          |})
-      (Recover disk_size)
+      (Recover)
       TD.step.
   Proof.
     eapply idempotent_loopspec; simpl.
@@ -619,7 +676,6 @@ Module RD.
       exists d, FullySynced; intuition eauto.
       exists d, (OutOfSync a b); intuition eauto.
       exists (diskUpd d a b), FullySynced; intuition eauto.
-      autorewrite with upd; auto.
   Admitted.
 
   Lemma read_step : forall a (state state':D.State) b,
@@ -707,7 +763,7 @@ Module RD.
 
   Theorem RD_ok : interpretation
                     op_impl
-                    (Recover disk_size)
+                    Recover
                     TD.step D.step
                     invariant
                     abstraction.
@@ -716,15 +772,13 @@ Module RD.
     - destruct op; simpl in *.
       + admit. (* need a recovery spec for Read *)
       + admit. (* need a recovery spec for Write *)
+      + admit. (* need a recovery spec for DiskSize *)
     - (* prove recovery correctly works when not doing anything (the invariant
          is already true) *)
       eapply prog_loopspec_weaken.
       eapply Recover_ok.
       unfold spec_impl; simplify.
       exists (abstraction state), FullySynced; intuition eauto.
-      match goal with
-      | |- disk_size = size (abstraction state) => admit
-      end.
   Abort.
 
 End RD.
