@@ -151,17 +151,23 @@ Proof.
   eapply H; eauto.
 Qed.
 
+Definition spec_impl
+           `(spec1: Specification A' T State)
+           `(spec2: Specification A T State) :=
+  forall a state, pre (spec2 a state) ->
+         exists a', pre (spec1 a' state) /\
+               (forall v state', post (spec1 a' state) v state' ->
+                        post (spec2 a state) v state') /\
+               (forall state', crash (spec1 a' state) state' ->
+                      crash (spec2 a state) state').
+
+
 Theorem spec_weaken : forall `(step: Semantics opT State)
                         `(spec1: Specification A' T State)
                         `(spec2: Specification A T State)
                         (p: prog opT T),
     prog_spec spec1 p step ->
-    forall (Himpl: forall a state, pre (spec2 a state) ->
-                      exists a', pre (spec1 a' state) /\
-                           (forall v state', post (spec1 a' state) v state' ->
-                                    post (spec2 a state) v state') /\
-                           (forall state', crash (spec1 a' state) state' ->
-                                  crash (spec2 a state) state')),
+    forall (Himpl: spec_impl spec1 spec2),
       prog_spec spec2 p step.
 Proof.
   unfold prog_spec; intros.

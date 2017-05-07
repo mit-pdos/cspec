@@ -546,6 +546,44 @@ Module RD.
       postcondition cases for fixup *)
   Abort.
 
+  (* TODO: get this in recovery through the programming language *)
+  Axiom disk_size : nat.
+
+  Theorem Recover_ok :
+    prog_loopspec
+      (fun '(d, a, b) state =>
+         {|
+           pre :=
+             a < size d /\
+             disk_size = size d /\
+             ((TD.disk0 state |= eq (diskUpd d a b) /\
+               TD.disk1 state |= eq d) \/
+              (TD.disk0 state |= eq d /\
+               TD.disk1 state |= eq d));
+           post :=
+             fun _ state' =>
+               (TD.disk0 state' |= eq d /\
+                TD.disk1 state' |= eq d) \/
+               (TD.disk0 state' |= eq (diskUpd d a b) /\
+                TD.disk1 state' |= eq (diskUpd d a b));
+           crash :=
+             fun state' =>
+               (TD.disk0 state' |= eq d /\
+                TD.disk1 state' |= eq d) \/
+               (TD.disk0 state' |= eq (diskUpd d a b) /\
+                TD.disk1 state' |= eq d) \/
+               (TD.disk0 state' |= eq (diskUpd d a b) /\
+                TD.disk1 state' |= eq (diskUpd d a b));
+         |})
+      (Recover disk_size)
+      TD.step.
+  Proof.
+    eapply idempotent_loopspec; simpl.
+    - admit. (* actual correctness proof *)
+    - unfold idempotent; intuition; simplify.
+      intuition eauto.
+  Admitted.
+
   Lemma read_step : forall a (state state':D.State) b,
       state a = Some b ->
       state' = state ->
@@ -582,9 +620,6 @@ Module RD.
     eapply H; eauto.
   Qed.
 
-  (* TODO: get this in recovery through the programming language *)
-  Axiom disk_size : nat.
-
   Theorem RD_ok : interpretation
                     op_impl
                     (Recover disk_size)
@@ -598,8 +633,12 @@ Module RD.
       + admit. (* need a recovery spec for Write *)
     - (* prove recovery correctly works when not doing anything (the invariant
          is already true) *)
-      eapply idempotent_loopspec.
-      all: admit.
+      eapply prog_loopspec_weaken.
+      eapply Recover_ok.
+      unfold spec_impl; simplify.
+      (* TODO: need a way of correlating the branch in the precondition with the
+         postcondition, for a stronger statement in the case of starting with
+         equal disks.  *)
   Abort.
 
 End RD.

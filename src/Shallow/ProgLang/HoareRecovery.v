@@ -32,6 +32,21 @@ Definition prog_loopspec
          forall rv state', exec_recover step rec state rv state' ->
                   post (spec a state) rv state'.
 
+Theorem prog_loopspec_weaken
+        `(spec1: Specification A1 R State)
+        `(spec2: Specification A2 R State)
+        `(rec: prog opT R)
+        `(step: Semantics opT State) :
+  prog_loopspec spec1 rec step ->
+  forall (Himpl: spec_impl spec1 spec2),
+    prog_loopspec spec2 rec step.
+Proof.
+  unfold prog_loopspec; intros.
+  eapply Himpl in H0; repeat deex; eauto.
+Qed.
+
+(* TODO: generalize this definition to allow changes to ghost state (but the
+original somehow still has to show up) *)
 Definition idempotent `(spec: Specification A R State) :=
   (* idempotency: crash invariant implies precondition to re-run on every
   crash *)
@@ -49,8 +64,8 @@ Definition idempotent `(spec: Specification A R State) :=
         post (spec a state) rv state'').
 
 Lemma idempotent_loopspec : forall `(spec: Specification A R State)
-                                  `(rec: prog opT R)
-                                  `(step: Semantics opT State),
+                              `(rec: prog opT R)
+                              `(step: Semantics opT State),
     forall (Hspec: prog_spec spec rec step),
       idempotent spec ->
       prog_loopspec spec rec step.
