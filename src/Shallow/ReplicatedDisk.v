@@ -166,7 +166,7 @@ Module RD.
   Hint Resolve both_disks_not_false : false.
 
   Theorem Read_ok : forall a,
-      prog_ok
+      prog_spec
         (fun d state =>
            {|
              pre := TD.disk0 state |= eq d /\
@@ -184,6 +184,9 @@ Module RD.
         (Read a)
         TD.step.
   Proof.
+    intros; eapply prog_ok_to_spec; simplify.
+    eauto.
+
     unfold Read.
 
     step.
@@ -704,17 +707,79 @@ Module RD.
       exists (diskUpd d a b), FullySynced; intuition eauto.
   Qed.
 
+  Theorem Read_rok : forall a,
+      prog_rspec
+        (fun d state =>
+           {|
+             rec_pre := TD.disk0 state |= eq d /\
+                        TD.disk1 state |= eq d;
+             rec_post :=
+               fun r state' =>
+                 d a |= eq r /\
+                 TD.disk0 state' |= eq d /\
+                 TD.disk1 state' |= eq d;
+             recover_post :=
+               fun _ state' =>
+                 TD.disk0 state' |= eq d /\
+                 TD.disk1 state' |= eq d;
+           |})
+        (Read a) Recover
+        TD.step.
+  Proof.
+    intros.
+    eapply prog_rspec_from_crash.
+    eapply Read_ok.
+    eapply Recover_ok.
+    simplify.
+    rename a0 into d.
+    descend; intuition eauto.
+    simplify.
+    exists d, FullySynced; intuition eauto.
+  Qed.
+
+  Theorem DiskSize_rok :
+      prog_rspec
+        (fun d state =>
+           {|
+             rec_pre := TD.disk0 state |= eq d /\
+                        TD.disk1 state |= eq d;
+             rec_post :=
+               fun r state' =>
+                 r = size d /\
+                 TD.disk0 state' |= eq d /\
+                 TD.disk1 state' |= eq d;
+             recover_post :=
+               fun _ state' =>
+                 TD.disk0 state' |= eq d /\
+                 TD.disk1 state' |= eq d;
+           |})
+        (DiskSize) Recover
+        TD.step.
+  Proof.
+    eapply prog_rspec_from_crash.
+    eapply prog_ok_to_spec; [ | apply DiskSize_ok ]; simplify.
+    destruct s; intuition eauto.
+    eapply Recover_ok.
+    simplify.
+
+    rename a into d.
+    exists d, FullySynced; intuition eauto.
+    simplify.
+    exists d, FullySynced; intuition eauto.
+  Qed.
+
   Lemma read_step : forall a (state state':D.State) b,
-      state a = Some b ->
+      state a |= eq b ->
       state' = state ->
       D.step (D.Read a) state b state'.
   Proof.
     intros; subst.
     constructor; auto.
+    intros.
+    replace (state a) in *; auto.
   Qed.
 
-  Lemma write_step : forall a b (state state':D.State) b0 u,
-      state a = Some b0 ->
+  Lemma write_step : forall a b (state state':D.State) u,
       state' = diskUpd state a b ->
       D.step (D.Write a b) state u state'.
   Proof.
@@ -723,7 +788,16 @@ Module RD.
     econstructor; eauto.
   Qed.
 
-  Hint Resolve read_step write_step.
+  Lemma disk_size_step : forall (state state':D.State) r,
+      r = size state ->
+      state' = state ->
+      D.step (D.DiskSize) state r state'.
+  Proof.
+    intros; subst.
+    econstructor; eauto.
+  Qed.
+
+  Hint Resolve read_step write_step disk_size_step.
   Hint Resolve tt.
 
   Theorem prog_spec_exec : forall `(spec: Specification A T State) `(p: prog opT T)
@@ -781,9 +855,15 @@ Module RD.
   Proof.
     eapply interpret_exec; intros; eauto.
     - destruct op; simpl in *.
-      + admit. (* need a recovery spec for Read *)
+      + eapply prog_rspec_weaken.
+        eapply Read_rok.
+        unfold rspec_impl; simplify.
+        exists (abstraction state); intuition eauto.
       + admit. (* need a recovery spec for Write *)
-      + admit. (* need a recovery spec for DiskSize *)
+      + eapply prog_rspec_weaken.
+        eapply DiskSize_rok.
+        unfold rspec_impl; simplify.
+        exists (abstraction state); intuition eauto.
     - (* prove recovery correctly works when not doing anything (the invariant
          is already true) *)
       eapply prog_loopspec_weaken.

@@ -15,11 +15,10 @@ Module D.
   Definition State := disk.
 
   Inductive step : Semantics Op State :=
-  | step_read : forall a b (state: State),
-      state a = Some b ->
-      step (Read a) state b state
-  | step_write : forall a b0 b (state: State),
-      state a = Some b0 ->
+  | step_read : forall a r (state: State),
+      (forall b, state a = Some b -> r = b) ->
+      step (Read a) state r state
+  | step_write : forall a b (state: State),
       step (Write a b) state tt (diskUpd state a b)
   | step_disk_size : forall (state: State),
       step (DiskSize) state (size state) state.

@@ -83,11 +83,11 @@ Proof.
     end.
 Qed.
 
-Theorem prog_spec_from_crash : forall `(spec: RecSpecification A T R State)
-                                 `(p: prog opT T) `(rec: prog opT R)
-                                 (step: Semantics opT State)
-                                 `(pspec: Specification A1 T State)
-                                 `(rspec: Specification A2 R State),
+Theorem prog_rspec_from_crash : forall `(spec: RecSpecification A T R State)
+                                  `(p: prog opT T) `(rec: prog opT R)
+                                  (step: Semantics opT State)
+                                  `(pspec: Specification A1 T State)
+                                  `(rspec: Specification A2 R State),
     forall (Hpspec: prog_spec pspec p step)
       (Hrspec: prog_loopspec rspec rec step),
       (forall a state, rec_pre (spec a state) ->
@@ -117,4 +117,28 @@ Proof.
     eapply H5 in H2.
     deex.
     eauto.
+Qed.
+
+Definition rspec_impl
+           `(spec1: RecSpecification A' T R State)
+           `(spec2: RecSpecification A T R State) :=
+  forall a state, rec_pre (spec2 a state) ->
+         exists a', rec_pre (spec1 a' state) /\
+               (forall v state', rec_post (spec1 a' state) v state' ->
+                        rec_post (spec2 a state) v state') /\
+               (forall rv state', recover_post (spec1 a' state) rv state' ->
+                         recover_post (spec2 a state) rv state').
+
+Theorem prog_rspec_weaken : forall `(spec1: RecSpecification A T R State)
+                              `(spec2: RecSpecification A' T R State)
+                              `(p: prog opT T) `(rec: prog opT R)
+                              (step: Semantics opT State),
+    prog_rspec spec1 p rec step ->
+    rspec_impl spec1 spec2 ->
+    prog_rspec spec2 p rec step.
+Proof.
+  unfold prog_rspec at 2; intros.
+  eapply H0 in H1; eauto; repeat deex.
+  eapply H in H2; eauto.
+  destruct r; eauto.
 Qed.
