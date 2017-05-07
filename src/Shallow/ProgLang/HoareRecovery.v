@@ -47,17 +47,17 @@ Qed.
 
 Definition idempotent `(spec: Specification A R State) :=
   forall a state,
-      pre (spec a state) ->
-      forall state', crash (spec a state) state' ->
-            (* idempotency: crash invariant implies precondition to re-run on
+    pre (spec a state) ->
+    forall state', crash (spec a state) state' ->
+          (* idempotency: crash invariant implies precondition to re-run on
                every crash *)
-            exists a', pre (spec a' state') /\
-                  (* postcondition transitivity: establishing the postcondition
-                     from a crash state is sufficient to establish it with
-                     respect to the original initial state (note all with the
-                     same ghost state) *)
-                  forall rv state'', post (spec a' state') rv state'' ->
-                                post (spec a state) rv state''.
+          exists a', pre (spec a' state') /\
+                (* postcondition transitivity: establishing the postcondition
+                   from a crash state is sufficient to establish it with respect
+                   to the original initial state (note all with the same ghost
+                   state) *)
+                forall rv state'', post (spec a' state') rv state'' ->
+                              post (spec a state) rv state''.
 
 Lemma idempotent_loopspec : forall `(spec: Specification A R State)
                               `(rec: prog opT R)
