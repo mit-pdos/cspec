@@ -510,7 +510,7 @@ Module RD.
         (fun '(d, s) state =>
            {|
              pre :=
-               a < size d /\
+               a <= size d /\
                match s with
                | FullySynced => TD.disk0 state |= eq d /\
                                TD.disk1 state |= eq d
@@ -584,6 +584,8 @@ Module RD.
       destruct i; intuition eauto.
   Qed.
 
+  Hint Extern 1 {{ recover_at _; _ }} => apply recover_at_ok : prog.
+
   Theorem DiskSize_ok :
     prog_ok
       (fun '(d, s) state =>
@@ -633,6 +635,8 @@ Module RD.
       destruct r; step.
   Qed.
 
+  Hint Extern 1 {{ DiskSize; _ }} => apply DiskSize_ok : prog.
+
   Theorem Recover_ok :
     prog_loopspec
       (fun '(d, s) state =>
@@ -650,8 +654,11 @@ Module RD.
                match s with
                | FullySynced => TD.disk0 state' |= eq d /\
                                TD.disk1 state' |= eq d
-               | OutOfSync a b => TD.disk0 state' |= eq (diskUpd d a b) /\
-                                 TD.disk1 state' |= eq (diskUpd d a b)
+               | OutOfSync a b =>
+                 (TD.disk0 state' |= eq d /\
+                  TD.disk1 state' |= eq d) \/
+                 (TD.disk0 state' |= eq (diskUpd d a b) /\
+                  TD.disk1 state' |= eq (diskUpd d a b))
                end;
            crash :=
                fun state' =>
@@ -659,6 +666,8 @@ Module RD.
                | FullySynced => TD.disk0 state' |= eq d /\
                                TD.disk1 state' |= eq d
                | OutOfSync a b =>
+                 (TD.disk0 state' |= eq d /\
+                  TD.disk1 state' |= eq d) \/
                  (TD.disk0 state' |= eq (diskUpd d a b) /\
                   TD.disk1 state' |= eq d) \/
                  (TD.disk0 state' |= eq (diskUpd d a b) /\
@@ -669,14 +678,31 @@ Module RD.
       TD.step.
   Proof.
     eapply idempotent_loopspec; simpl.
-    - admit. (* actual correctness proof *)
+    - unfold Recover; intros.
+      eapply prog_ok_to_spec; simplify.
+      + destruct s; intuition eauto.
+      + step.
+        descend; intuition eauto.
+
+        step.
+        destruct s; intuition.
+        exists d, FullySynced; intuition eauto.
+        step.
+
+        exists d, (OutOfSync a b); intuition eauto.
+        step.
+
+        destruct r; intuition eauto.
+        destruct i; intuition eauto.
+        destruct s; simplify; eauto.
     - unfold idempotent; intuition; simplify.
       rename a0 into d.
       destruct b; intuition eauto.
       exists d, FullySynced; intuition eauto.
+      exists d, FullySynced; intuition eauto.
       exists d, (OutOfSync a b); intuition eauto.
       exists (diskUpd d a b), FullySynced; intuition eauto.
-  Admitted.
+  Qed.
 
   Lemma read_step : forall a (state state':D.State) b,
       state a = Some b ->
