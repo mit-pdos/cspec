@@ -144,7 +144,6 @@ Proof.
 Qed.
 
 Local Hint Constructors exec_recover.
-Local Hint Constructors clos_refl_trans_1n.
 
 Lemma exec_recover_bind_inv : forall `(p: prog opT R)
                                 `(p': R -> prog opT R')
@@ -155,18 +154,17 @@ Lemma exec_recover_bind_inv : forall `(p: prog opT R)
                   exists rv2 state2,
                     clos_refl_trans_1n
                       _
-                      (fun '(rv, state) '(rv', state'') =>
-                         exists state',
-                           exec step (p' rv) state (Crashed state') /\
-                           exec_recover step p state' rv' state'') (rv1, state1) (rv2, state2) /\
+                      (fun '(rv, state) '(rv', state') =>
+                         rexec step (p' rv) p state (Recovered rv' state'))
+                      (rv1, state1) (rv2, state2) /\
                     exec step (p' rv2) state2 (Finished rv' state'').
 Proof.
   induction 1.
-  - inv_exec; eauto 10.
+  - inv_exec; eauto 10 using rt1n_refl.
   - repeat deex.
     inv_exec; eauto 10.
-    exists v0, state'0; intuition eauto.
-    exists rv2, state2; intuition eauto.
+    descend; intuition eauto.
+    descend; intuition eauto.
     eapply rt1n_trans; eauto.
     simpl; eauto.
 Qed.

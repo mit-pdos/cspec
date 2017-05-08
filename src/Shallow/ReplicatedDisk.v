@@ -890,14 +890,14 @@ Module RD.
   Hint Extern 1 (TD.disk1 _ |= eq (abstraction _)) => apply invariant_to_disks_eq.
   Hint Resolve disks_eq_to_invariant disks_eq_to_abstraction.
 
-  Theorem RD_ok : interpretation
+  Theorem RD_ok : interpretation_rexec
                     op_impl
                     Recover
                     TD.step D.step
                     invariant
                     abstraction.
   Proof.
-    eapply interpret_exec; intros; eauto.
+    eapply interpret_rexec; intros; eauto.
     - destruct op; simpl in *.
       + eapply prog_rspec_weaken.
         eapply Read_rok.

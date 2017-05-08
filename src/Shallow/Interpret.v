@@ -184,6 +184,62 @@ Section Interpreter.
       rexec2 p rec2 (abstraction state) (rres_abstraction r) /\
       res_invariant r.
 
+  Section ClosReflTransImp.
+
+    Hint Constructors clos_refl_trans_1n.
+
+    Lemma clos_refl_trans_1n_imp : forall A (R R':A -> A -> Prop) a a',
+        clos_refl_trans_1n A R a a' ->
+        (forall a a', R a a' -> R' a a') ->
+        clos_refl_trans_1n A R' a a'.
+    Proof.
+      induction 1; intros; eauto.
+    Qed.
+
+  End ClosReflTransImp.
+
+  Local Hint Constructors exec_recover.
+
+  Lemma rexec2_exec2_star:
+    forall (T : Type) (p : prog2 T) (R : Type) (rec2 : prog2 R) (state : State1)
+      (v : R) (state0 : State1) (rv1 : unit) (state1 : State1) (rv2 : unit)
+      (state2 : State1),
+      invariant state1 ->
+      exec2 (T:=T) p (abstraction state) (Crashed (abstraction state1)) ->
+      clos_refl_trans_1n (unit * State1)
+                         (fun '(_, state3) '(_, state') =>
+                            invariant state3 ->
+                            exec2 (T:=R) rec2 (abstraction state3) (Crashed (abstraction state')) /\ invariant state')
+                         (rv1, state1) (rv2, state2) ->
+      (invariant state2 ->
+       exec2 (T:=R) rec2 (abstraction state2) (Finished v (abstraction state0)) /\
+       invariant state0) ->
+      rexec2 (R:=R) p rec2 (abstraction state) (Recovered v (abstraction state0)) /\
+      invariant state0.
+  Proof.
+    intros.
+    assert (exec_recover step2 rec2 (abstraction state1) v (abstraction state0) /\
+            invariant state0).
+    clear dependent H0.
+    remember (rv1, state1).
+    remember (rv2, state2).
+    generalize dependent state0.
+    generalize dependent state1.
+    generalize dependent rv1.
+    generalize dependent rv2.
+    induction H1; intros; subst;
+      repeat match goal with
+             | [ H: (_, _) = (_, _) |- _ ] =>
+               inversion H; subst; clear H
+             end; eauto; safe_intuition.
+    intuition eauto.
+    destruct y; intuition eauto.
+    econstructor 2; eauto.
+    eapply IHclos_refl_trans_1n; eauto.
+    eapply IHclos_refl_trans_1n; eauto.
+    intuition eauto.
+  Qed.
+
   Theorem interpret_rexec :
     interpretation_rexec.
   Proof.
@@ -198,7 +254,24 @@ Section Interpreter.
         eapply exec_recover_bind_inv in H; eauto
       end.
       repeat deex.
-      admit.
-  Abort.
+      assert (rexec1 (interpret p) rec state (Recovered rv1 state1)) by eauto.
+      eapply H in H5; eauto; safe_intuition; simpl in *.
+
+      assert (clos_refl_trans_1n
+                (unit * State1)
+                (fun '(_, state) '(rv', state') =>
+                   invariant state ->
+                   exec2 rec2 (abstraction state) (Crashed (abstraction state')) /\
+                   invariant state') (rv1, state1) (rv2, state2)).
+      { eapply clos_refl_trans_1n_imp; eauto.
+        destruct a, a'; intros.
+        eapply H in H8; eauto. }
+      assert (invariant state2 -> exec2 rec2 (abstraction state2) (Finished v (abstraction state0)) /\ invariant state0).
+      intros.
+      assert (rexec1 (interpret rec2) rec state2 (RFinished v state0)) by eauto.
+      eapply H in H10; simpl in *; intuition eauto.
+
+      eauto using rexec2_exec2_star.
+  Qed.
 
 End Interpreter.
