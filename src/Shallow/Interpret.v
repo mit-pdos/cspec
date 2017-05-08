@@ -1,3 +1,5 @@
+Require Import Relations.Relation_Operators.
+
 Require Import ProgLang.Prog.
 Require Import ProgLang.ProgTheorems.
 Require Import ProgLang.Hoare.
@@ -183,18 +185,19 @@ Section Interpreter.
       res_invariant r.
 
   Theorem interpret_rexec :
-    interpretation -> interpretation_rexec.
+    interpretation_rexec.
   Proof.
-    unfold interpretation, interpretation_rexec; intros.
+    pose proof interpret_exec.
+    unfold interpretation, interpretation_rexec in *; intros.
     destruct r; simpl.
     - eapply rexec_finish_any_rec in H1.
       eapply H in H1; safe_intuition; eauto.
-    - eapply rexec_rec_bind_inv in H1; repeat deex.
-      eapply H in H1; simpl in *; safe_intuition; eauto.
-      (* this output from [rexec_rec_bind_inv] is not quite what we need: we
-         need to lift the interpretation statement to one about exec_recover by
-         induction over the crashing executions, in order to show an
-         [exec_recover step2] that is used to prove rexec2 here. *)
+    - inversion H1; subst.
+      match goal with
+      | [ H: exec_recover _ (Bind _ _) _ _ _ |- _ ] =>
+        eapply exec_recover_bind_inv in H; eauto
+      end.
+      repeat deex.
       admit.
   Abort.
 

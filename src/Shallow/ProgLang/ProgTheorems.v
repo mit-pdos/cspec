@@ -1,3 +1,5 @@
+Require Import Relations.Relation_Operators.
+
 Require Import Automation.
 Require Import Prog.
 
@@ -142,39 +144,29 @@ Proof.
 Qed.
 
 Local Hint Constructors exec_recover.
+Local Hint Constructors clos_refl_trans_1n.
 
 Lemma exec_recover_bind_inv : forall `(p: prog opT R)
                                 `(p': R -> prog opT R')
                                 `(step: Semantics opT State)
                                 state rv' state'',
     exec_recover step (Bind p p') state rv' state'' ->
-    (exists rv state', exec_recover step p state rv state' /\
-              exec_recover step (p' rv) state' rv' state'').
+    exists rv1 state1, exec_recover step p state rv1 state1 /\
+                  exists rv2 state2,
+                    clos_refl_trans_1n
+                      _
+                      (fun '(rv, state) '(rv', state'') =>
+                         exists state',
+                           exec step (p' rv) state (Crashed state') /\
+                           exec_recover step p state' rv' state'') (rv1, state1) (rv2, state2) /\
+                    exec step (p' rv2) state2 (Finished rv' state'').
 Proof.
   induction 1.
   - inv_exec; eauto 10.
   - repeat deex.
     inv_exec; eauto 10.
-    (* Oops, there are two paths we can go down - is this theorem false, or do
-    we need to generalize the inductive hypothesis? Double checking the
-    semantics of [exec Bind] and [exec_recover] didn't reveal any obvious
-    problems. *)
-    exists v0; descend; intuition eauto.
-    Undo.
-    exists rv; descend; intuition eauto.
-Admitted.
-
-Theorem rexec_rec_bind_inv : forall `(p: prog opT T)
-                             `(rec: prog opT R)
-                             `(rec': R -> prog opT R')
-                             `(step: Semantics opT State)
-                             state rv' state'',
-    rexec step p (Bind rec rec') state (Recovered rv' state'') ->
-    exists rv state', rexec step p rec state (Recovered rv state') /\
-             rexec step (Ret tt) (rec' rv) state' (Recovered rv' state'').
-Proof.
-  intros.
-  inversion H; subst.
-  eapply exec_recover_bind_inv in H6; repeat deex.
-  descend; intuition eauto.
+    exists v0, state'0; intuition eauto.
+    exists rv2, state2; intuition eauto.
+    eapply rt1n_trans; eauto.
+    simpl; eauto.
 Qed.
