@@ -1,5 +1,15 @@
 Set Implicit Arguments.
 
+(** Definition of [maybe_holds], stating a predicate holds over an optional
+value if the value is present.
+
+    To reflect the expected usage of this primitive, we also define two notations:
+    - [mv |= p] states that p holds on mv, if mv is present (the notation
+    desugars to [maybe_holds p mv])
+    - to state that an optional value is definitely missing, we provide a
+      predicate [|False|], so that [mv |= [|False|]] implies that mv is None.
+*)
+
 Definition maybe_holds T (p:T -> Prop) : option T -> Prop :=
   fun mt => match mt with
          | Some t => p t
@@ -47,6 +57,8 @@ Proof.
   unfold maybe_holds; destruct mt; eauto.
 Qed.
 
+(* TODO: maybe we should just define [missing := fun _ => False] rather than this more
+general property, since only [lift False] is used so far. *)
 Definition lift {T} (P:Prop) : T -> Prop := fun _ => P.
 
 Corollary pred_false : forall T (p: T -> Prop) mt,

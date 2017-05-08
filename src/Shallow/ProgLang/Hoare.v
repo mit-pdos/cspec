@@ -181,6 +181,10 @@ Proof.
   destruct r; eauto.
 Qed.
 
+(* primitive _ok theorems only need to handle a postcondition based on the step
+semantics of the operation, and can have crash conditions that are the same as
+the precondition since _ok theorems guarantee crashes after the program finishes
+are handled by the continuation. *)
 Theorem prim_ok : forall `(op: opT T) `(step: Semantics opT State) `(spec: Specification A T State),
     (forall a state, pre (spec a state) ->
             forall v state', step _ op state v state' ->
@@ -247,6 +251,7 @@ Ltac monad_simpl :=
            eapply double_exec_equiv; [ apply monad_assoc | ]
          end.
 
+(** step_prog_with t handles the first program in a bind by applying tactic t *)
 Ltac step_prog_with t :=
   match goal with
   | |- prog_double _ _ _ =>
@@ -256,6 +261,8 @@ Ltac step_prog_with t :=
   | |- prog_ok _ _ _ => unfold prog_ok; step_prog_with t
   end.
 
+(** step_prog applies a registered prog_ok theorem (in the prog hint database)
+to the first program in a sequence of binds. *)
 Ltac step_prog := step_prog_with ltac:(eauto with prog).
 
 (* This notation builds a pattern; use it as [Hint Extern 1 {{ p; _}} => apply
@@ -263,7 +270,13 @@ p_ok : prog] to associated p_ok as the specification for the program (pattern).
 Such patterns are used by [step_prog] via the prog hint database. *)
 Notation "{{ p ; '_' }}" := (prog_double _ (Bind p _) _) (only parsing, at level 0).
 
-(* this hack lets us do a case-split on the initial state *)
+(** * begin
+
+This hack lets us do a case-split on the initial state, by adding a no-op to the
+beginning of the program and stepping over it. The whole thing could probably be
+reduced to a single theorem that appropriately unfolds [prog_double], but we
+haven't made this simplification. *)
+
 Definition begin {opT} := Ret (opT:=opT) tt.
 Hint Extern 1 {{ begin; _ }} => apply ret_ok : prog.
 

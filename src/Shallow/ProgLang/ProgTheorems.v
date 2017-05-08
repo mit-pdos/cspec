@@ -17,9 +17,15 @@ Theorem can_crash_at_end : forall `(p: prog opT T) `(step: Semantics opT State) 
     exec step p state (Finished v state') ->
     exec step p state (Crashed state').
 Proof.
-  induction p; intros;
-    inv_exec;
-    eauto.
+  (* This is a slightly harder proof strategy (induction over the programs is
+  more straightforward), but this proof doesn't require finite programs! *)
+  intros.
+  remember (Finished v state').
+  induction H;
+    try match goal with
+        | [ H: _ = Finished _ _ |- _ ] =>
+          inversion H; subst; clear H
+        end; eauto.
 Qed.
 
 Local Hint Resolve can_crash_at_begin can_crash_at_end.
@@ -79,6 +85,7 @@ Proof.
   - destruct r; repeat (inv_exec; eauto).
 Qed.
 
+(** invert a bind execution *)
 Lemma exec_bind : forall T T' `(p: prog opT T) (p': T -> prog opT T')
                     `(step: Semantics opT State) state r,
     exec step (Bind p p') state r ->
@@ -145,6 +152,9 @@ Qed.
 
 Local Hint Constructors exec_recover.
 
+(** Invert looped recovery execution for a bind in the recovery procedure. The
+statement essentially breaks down the execution of recovering with [_ <- p; p']
+into three stages: first, p runs until it finishes without crashing. Next  *)
 Lemma exec_recover_bind_inv : forall `(p: prog opT R)
                                 `(p': R -> prog opT R')
                                 `(step: Semantics opT State)

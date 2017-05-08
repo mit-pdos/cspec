@@ -128,7 +128,20 @@ Section Interpreter.
   Hint Constructors exec rexec.
 
   (* TODO: this property shouldn't be called interpretation, need a more
-  intuitive name *)
+  intuitive name
+
+     This statement defines trace refinement between any spec program [p] and
+     its implementation, [interpret p], where each spec primitive is replaced
+     with an implementation provided by [op_impl op]. We do not actually track
+     any trace of operations (the primitives or some other events produced by
+     the primitives); instead, the trace of a program is just its return value.
+
+     Proving trace refinement directly for all states is not likely to be
+     possible; instead, the implementation (that is, all of [op_impl]) can
+     expect to run from certain "good" initial states and maintain some
+     invariant during execution. We add this to the definition of trace
+     refinement so it more obviously holds inductively.
+   *)
   Definition interpretation :=
     forall T (p: prog2 T) state r,
       invariant state ->
@@ -174,9 +187,6 @@ Section Interpreter.
     | Recovered v state => Recovered v (abstraction state)
     end.
 
-  (* TODO: prove this more general correctness theorem to give some confidence
-  that [interpretation] is enough to guarantee that even the higher-level
-  recovery execution is correct. *)
   Definition interpretation_rexec :=
     forall T (p: prog2 T) R (rec2: prog2 R) state r,
       invariant state ->
