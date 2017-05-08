@@ -194,21 +194,15 @@ Section Interpreter.
       rexec2 p rec2 (abstraction state) (rres_abstraction r) /\
       res_invariant r.
 
-  Section ClosReflTransImp.
+  Lemma clos_refl_trans_1n_imp : forall A (R R':A -> A -> Prop) a a',
+      clos_refl_trans_1n A R a a' ->
+      (forall a a', R a a' -> R' a a') ->
+      clos_refl_trans_1n A R' a a'.
+  Proof.
+    induction 1; intros; eauto using rt1n_refl, rt1n_trans.
+  Qed.
 
-    Hint Constructors clos_refl_trans_1n.
-
-    Lemma clos_refl_trans_1n_imp : forall A (R R':A -> A -> Prop) a a',
-        clos_refl_trans_1n A R a a' ->
-        (forall a a', R a a' -> R' a a') ->
-        clos_refl_trans_1n A R' a a'.
-    Proof.
-      induction 1; intros; eauto.
-    Qed.
-
-  End ClosReflTransImp.
-
-  Local Hint Constructors exec_recover.
+  Hint Constructors exec_recover.
 
   Lemma rexec2_exec2_star:
     forall (T : Type) (p : prog2 T) (R : Type) (rec2 : prog2 R) (state : State1)
