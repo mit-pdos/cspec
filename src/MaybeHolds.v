@@ -7,7 +7,7 @@ value if the value is present.
     - [mv |= p] states that p holds on mv, if mv is present (the notation
     desugars to [maybe_holds p mv])
     - to state that an optional value is definitely missing, we provide a
-      predicate [|False|], so that [mv |= [|False|]] implies that mv is None.
+      predicate [missing], so that [mv |= missing] implies that mv is None.
 *)
 
 Definition maybe_holds T (p:T -> Prop) : option T -> Prop :=
@@ -50,27 +50,24 @@ Proof.
 Qed.
 
 Theorem pred_weaken : forall T (p p': T -> Prop) mt,
-    (forall t, p t -> p' t) ->
     maybe_holds p mt ->
+    (forall t, p t -> p' t) ->
     maybe_holds p' mt.
 Proof.
   unfold maybe_holds; destruct mt; eauto.
 Qed.
 
-(* TODO: maybe we should just define [missing := fun _ => False] rather than this more
-general property, since only [lift False] is used so far. *)
-Definition lift {T} (P:Prop) : T -> Prop := fun _ => P.
+Definition missing {T} : T -> Prop := fun _ => False.
 
-Corollary pred_false : forall T (p: T -> Prop) mt,
-    maybe_holds (lift False) mt ->
+Corollary pred_missing : forall T (p: T -> Prop) mt,
+    maybe_holds missing mt ->
     maybe_holds p mt.
 Proof.
-  unfold maybe_holds, lift; destruct mt; intros.
+  unfold missing; intros.
+  eapply pred_weaken; eauto.
   contradiction.
-  auto.
 Qed.
 
 Delimit Scope pred_scope with pred.
 
-Notation "[| P |]" := (lift P) (at level 0) : pred_scope.
 Notation "m |= F" := (maybe_holds F%pred m) (at level 20, F at level 50).

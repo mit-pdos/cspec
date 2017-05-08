@@ -152,18 +152,18 @@ Module RD.
   Ltac step :=
     step_prog; simplify; finish.
 
-  Hint Resolve pred_false.
+  Hint Resolve pred_missing.
 
-  Lemma both_disks_not_false : forall state,
-      TD.disk0 state |= [|False|] ->
-      TD.disk1 state |= [|False|] ->
+  Lemma both_disks_not_missing : forall state,
+      TD.disk0 state |= missing ->
+      TD.disk1 state |= missing ->
       False.
   Proof.
     destruct state; simpl; intros.
     destruct disk0, disk1; simpl in *; eauto.
   Qed.
 
-  Hint Resolve both_disks_not_false : false.
+  Hint Resolve both_disks_not_missing : false.
 
   Theorem Read_ok : forall a,
       prog_spec

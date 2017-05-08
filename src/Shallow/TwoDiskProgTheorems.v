@@ -44,7 +44,7 @@ Theorem TDRead0_ok : forall a,
                | Working v => TD.disk0 state' |= eq d_0 /\
                              TD.disk1 state' |= F /\
                              d_0 a |= eq v
-               | Failed => TD.disk0 state' |= [|False|] /\
+               | Failed => TD.disk0 state' |= missing /\
                           TD.disk1 state' |= F
                end;
            crash :=
@@ -73,7 +73,7 @@ Theorem TDRead1_ok : forall a,
                              TD.disk1 state' |= eq d_1 /\
                              d_1 a |= eq v
                | Failed => TD.disk0 state' |= F /\
-                          TD.disk1 state' |= [|False|]
+                          TD.disk1 state' |= missing
                end;
            crash :=
              fun state' => TD.disk0 state' |= F /\
@@ -99,7 +99,7 @@ Theorem TDWrite0_ok : forall a b,
                match r with
                | Working _ => TD.disk0 state' |= eq (diskUpd d_0 a b) /\
                              TD.disk1 state' |= F
-               | Failed => TD.disk0 state' |= [|False|] /\
+               | Failed => TD.disk0 state' |= missing /\
                           TD.disk1 state' |= F
                end;
            crash :=
@@ -128,7 +128,7 @@ Theorem TDWrite1_ok : forall a b,
                | Working _ => TD.disk0 state' |= F /\
                              TD.disk1 state' |= eq (diskUpd d_1 a b)
                | Failed => TD.disk0 state' |= F /\
-                          TD.disk1 state' |= [|False|]
+                          TD.disk1 state' |= missing
                end;
            crash :=
              fun state' =>
@@ -156,7 +156,7 @@ Theorem TDDiskSize0_ok :
                | Working n => n = size d_0 /\
                              TD.disk0 state' |= eq d_0 /\
                              TD.disk1 state' |= F
-               | Failed => TD.disk0 state' |= [|False|] /\
+               | Failed => TD.disk0 state' |= missing /\
                           TD.disk1 state' |= F
                end;
            crash :=
@@ -186,7 +186,7 @@ Theorem TDDiskSize1_ok :
                              TD.disk0 state' |= F /\
                              TD.disk1 state' |= eq d_1
                | Failed => TD.disk0 state' |= F /\
-                          TD.disk1 state' |= [|False|]
+                          TD.disk1 state' |= missing
                end;
            crash :=
              fun state' =>
