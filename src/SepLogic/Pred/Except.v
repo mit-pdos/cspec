@@ -8,7 +8,7 @@ Require Import SepLogic.Pred.Def.
 Require Import SepLogic.Pred.Ptsto.
 
 Definition pred_except `(F: pred A V) {AEQ: EqDec A eq} a v : pred A V :=
-  mkPred (fun m => F (upd m a v)).
+  mkPred (fun m => upd m a v |= F).
 
 Definition mem_except `(m: mem A V) {AEQ: EqDec A eq} a : mem A V :=
   fun a' => if a == a' then None

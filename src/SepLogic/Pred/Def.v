@@ -8,17 +8,19 @@ judgements explicit rather than mere function applications.
  However, using [pred_prop] to construct a judgement would be tedious; when
  shorthand is desired, we use :> to supply a coercion from pred to Funclass, so
  that predicates can be directly applied to memories to produce propositions.
-
- TODO: Arguably we should never use this coercion and always prefer the explicit
- m |= F syntax, but it is really nice for short general lemmas about
- predicates. *)
+*)
 Record pred A V :=
-  mkPred { pred_prop :> mem A V -> Prop }.
+  mkPred { pred_prop : mem A V -> Prop }.
 
 Section Predicates.
 
   Context {A V:Type}.
   Implicit Types p q:pred A V.
+
+  (* for shorthand while writing basic lemmas, we allow predicates to be applied
+  directly to memories via this coercion (due to the Local modifier it will be
+  removed at the end of the section) *)
+  Local Coercion pred_prop : pred >-> Funclass.
 
   (** [lift P] (denoted [|P|]) states that m is empty, and that the proposition
   P holds. *)
@@ -190,5 +192,4 @@ Notation "'exists' x .. y , p" := (exis (fun x => .. (exis (fun y => p%pred)) ..
 
 Infix "|->" := ptsto (no associativity, at level 30) : pred_scope.
 
-Add Printing Coercion pred_prop.
 Notation "m |= F" := (pred_prop F%pred m) (at level 20, F at level 50).
