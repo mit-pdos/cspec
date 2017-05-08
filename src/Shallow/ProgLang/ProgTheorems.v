@@ -154,7 +154,14 @@ Local Hint Constructors exec_recover.
 
 (** Invert looped recovery execution for a bind in the recovery procedure. The
 statement essentially breaks down the execution of recovering with [_ <- p; p']
-into three stages: first, p runs until it finishes without crashing. Next  *)
+into three stages:
+
+- First, p runs until it finishes without crashing.
+- Next, p' is repeatedly run using p as the recovery procedure, crashing and
+  recovering in a loop. The return value in [p' rv] comes from p and is passed
+  from iteration to the next, initialized with the run of p in the first step.
+- Finally, the computer stops crashing and [p' rv] can run to completion.
+ *)
 Lemma exec_recover_bind_inv : forall `(p: prog opT R)
                                 `(p': R -> prog opT R')
                                 `(step: Semantics opT State)
