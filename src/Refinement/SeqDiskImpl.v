@@ -19,18 +19,6 @@ Module D.
   Definition invariant (ds:TDSpec.State) :=
     size (TDSpec.disk0 ds) = size (TDSpec.disk1 ds).
 
-  (* we need this lemma due to some terrible behavior in congruence:
-   https://coq.inria.fr/bugs/show_bug.cgi?id=5394 *)
-  Lemma invariant_respects_eq : forall ds ds',
-      ds = ds' ->
-      invariant ds ->
-      invariant ds'.
-  Proof.
-    intros; subst; auto.
-  Qed.
-
-  Hint Resolve invariant_respects_eq.
-
   Theorem Read_ok : forall a,
       implements
         (DSpec.Read a)
