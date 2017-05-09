@@ -44,15 +44,15 @@ subdirectories.
     another (the "implementation language") by providing implementations for
     each spec operation and proving semantics preservation in a refinement-based
     approach. Produces a theorem about spec programs translated to
-    implementation programs.
+    implementation programs, including a hidden recovery procedure that is
+    specific to the language implementation.
   - `TwoDiskProg.v`: instantiation of `prog` for programs that manipulate two
     disks, where one might fail at any time.
   - `SeqDiskProg.v`: programs over a single disk without failures.
   - `ReplicatedDisk.v`: implements the `SeqDiskProg` interface using
     `TwoDiskProg`, using replication to handle failure of a single disk
-    seamlessly. Requires recovery to patch up an inconsistency that might be
-    created due to a crash between writing to the two disks. When this proof is
-    finished, recovery at this layer should be completely hidden from clients.
+    seamlessly. Includes a recovery procedure to patch up any inconsistency
+    created due to a crash in the middle of writing to the two disks.
 
 * `Refinement/`
   * `Implements/` defines an IO monad and the notion of an implementation
