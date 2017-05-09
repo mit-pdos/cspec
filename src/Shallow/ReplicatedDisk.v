@@ -120,6 +120,10 @@ Module RD.
     repeat deex; eauto.
   Qed.
 
+  (* we use a focused hint database for rewriting because autorewrite becomes
+  very slow with just a handful of patterns *)
+  Create HintDb rd.
+
   Ltac simplify :=
     repeat match goal with
            | |- forall _, _ => intros
@@ -133,7 +137,7 @@ Module RD.
            | _ => progress simpl in *
            | _ => progress safe_intuition
            | _ => progress subst
-           | _ => autorewrite with upd in *
+           | _ => progress autorewrite with rd in *
            | [ crashinv: _ -> Prop |- _ ] =>
              match goal with
              | [ H: forall _, _ -> crashinv _ |-
@@ -193,7 +197,7 @@ Module RD.
     descend; intuition eauto.
 
     destruct r; step.
-    descend; intuition eauto; simplify.
+    descend; (intuition eauto); simplify.
 
     destruct r; step.
   Qed.
@@ -234,13 +238,12 @@ Module RD.
     descend; intuition eauto.
 
     step.
-    destruct r; intuition eauto.
+    destruct r; (intuition eauto); simplify.
     destruct (lt_dec a (size a0)).
     eauto 10.
-    autorewrite with upd in *.
-    eauto.
+    autorewrite with upd in *; eauto.
 
-    descend; intuition eauto; simplify.
+    descend; (intuition eauto); simplify.
     destruct r; step.
   Qed.
 
@@ -321,7 +324,8 @@ Module RD.
       auto.
   Qed.
 
-  Hint Rewrite diskUpd_maybe_same using (solve [ auto ]) : upd.
+  Hint Rewrite diskUpd_maybe_same using (solve [ auto ]) : rd.
+  Hint Rewrite diskUpd_eq using (solve [ auto ]) : rd.
 
   Theorem fixup_correct_addr_ok : forall a,
       prog_ok
@@ -371,7 +375,7 @@ Module RD.
     descend; intuition eauto.
 
     step.
-    destruct r; intuition eauto; simplify; finish.
+    destruct r; (intuition eauto); simplify; finish.
   Qed.
 
   Theorem fixup_wrong_addr_ok : forall a,
@@ -425,7 +429,7 @@ Module RD.
     descend; intuition eauto.
 
     step.
-    destruct r; intuition eauto; simplify; finish.
+    destruct r; (intuition eauto); simplify; finish.
     assert (a' <> a) by eauto using PeanoNat.Nat.lt_neq.
     autorewrite with upd in *.
     assert (v = v0) by eauto using disks_eq_inbounds.
@@ -500,7 +504,7 @@ Module RD.
       descend; intuition eauto.
 
       step.
-      destruct r; intuition eauto; try congruence.
+      destruct r; (intuition eauto); try congruence.
     - apply PeanoNat.Nat.lt_eq_cases in H3; intuition.
       + step_prog_with ltac:(eapply fixup_wrong_addr_ok); simplify; finish.
         descend; intuition eauto.
@@ -517,6 +521,8 @@ Module RD.
   Hint Extern 1 {{ fixup _; _ }} => apply fixup_ok : prog.
 
   Hint Resolve Lt.lt_n_Sm_le.
+
+  Hint Rewrite diskUpd_size : rd.
 
   Theorem recover_at_ok : forall a,
       prog_ok
