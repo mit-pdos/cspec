@@ -5,10 +5,15 @@ Require Import Automation.
 Require Import SepLogic.Mem.Def.
 Require Import SepLogic.Mem.Upd.
 
-Definition lt_dec (a b:nat) : {a < b} + {~a < b}.
-Proof.
-  apply Compare_dec.lt_dec.
-Defined.
+(** We define [sized_domain], which specifies that a [mem nat V] has a contiguous
+domain from 0 through some bound sz (that is, 0 through (sz-1) map to something,
+and nothing above maps to anything).
+
+ In addition we prove a number of properties of sized memories.
+ *)
+
+(* abbreviation for Arith's decidable < function *)
+Definition lt_dec (a b:nat) : {a < b} + {~a < b} := Compare_dec.lt_dec a b.
 
 Definition sized_domain V (m: mem nat V) sz :=
   forall a, if lt_dec a sz then

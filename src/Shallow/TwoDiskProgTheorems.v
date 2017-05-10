@@ -6,6 +6,22 @@ Require Import Shallow.ProgLang.Hoare.
 Require Import Shallow.ProgLang.Prog.
 Require Import TwoDiskProg.
 
+(** Hoare-style specifications for the TwoDisk primitives.
+
+These specifications are written in a stylized manner using the notation from
+MaybeHolds. The preconditions relate both disks to the provided ghost state, and
+then the postconditions are expressed entirely in terms of ghost state. This
+style of specification automates well, easily carrying forward information in
+proofs across several operations.
+
+These proofs should completely specify the behavior of the TwoDisk operations,
+in that any step the primitives could do can be expressed using these
+specifications. The proofs of course guarantee that the primitives follow the
+specifications here, but there is a possibility that the specifications are more
+restrictive. While we have tried to avoid doing so, we do not prove completeness
+below.
+ *)
+
 Ltac start_prim :=
   intros; eapply prim_ok; intros;
   repeat destruct_tuple;
