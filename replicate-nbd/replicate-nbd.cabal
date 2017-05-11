@@ -17,23 +17,14 @@ library
   hs-source-dirs:      src
   exposed-modules:     Lib
                      , ReplicatedDisk
-  other-modules:       Bool
-                     , Bytes
-                     , Compare_dec
+  other-modules:       Bytes
                      , CoqUtils
                      , Datatypes
-                     , Def
                      , Disk
                      , EquivDec
-                     , Interpret
-                     , Logic
-                     , PeanoNat
                      , Prog
-                     , SeqDiskProg
-                     , Sized
                      , Specif
                      , TwoDiskProg
-                     , Upd
   build-depends:       base >= 4.7 && < 5
                      , ghc-prim
                      , bytestring
