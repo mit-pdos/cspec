@@ -1,1 +1,3 @@
-/ReplicatedDisk/
+*.hs
+!Lib.hs
+!CoqUtils.hs

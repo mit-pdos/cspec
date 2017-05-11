@@ -16,7 +16,27 @@ cabal-version:       >=1.10
 library
   hs-source-dirs:      src
   exposed-modules:     Lib
+                     , ReplicatedDisk
+  other-modules:       Bool
+                     , Bytes
+                     , Compare_dec
+                     , CoqUtils
+                     , Datatypes
+                     , Def
+                     , Disk
+                     , EquivDec
+                     , Interpret
+                     , Logic
+                     , PeanoNat
+                     , Prog
+                     , SeqDiskProg
+                     , Sized
+                     , Specif
+                     , TwoDiskProg
+                     , Upd
   build-depends:       base >= 4.7 && < 5
+                     , ghc-prim
+                     , bytestring
   default-language:    Haskell2010
 
 executable replicate-nbd-exe
