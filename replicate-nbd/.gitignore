@@ -1,1 +1,4 @@
 .stack-work/
+# created by replicate-nbd
+/disk0.img
+/disk1.img

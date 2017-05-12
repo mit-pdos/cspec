@@ -15,6 +15,8 @@ import           Data.Text (Text)
 import           Data.Text.Encoding (decodeUtf8)
 import           Data.Typeable (Typeable)
 import           GHC.Word
+import           Interpreter.TwoDisk
+import qualified Replication.DiskOps as RD
 
 -- amazingly enough, the expression inside this annotation is of ambiguous type
 -- due to OverloadedStrings
@@ -189,41 +191,50 @@ sendReply h err = sourcePut $ do
   putWord32be (errCode err)
   putWord64be h
 
-handleCommands :: (MonadThrow m, MonadIO m) => ByteConduit m ()
-handleCommands = do
+handleCommands :: (MonadThrow m, MonadIO m) => Interpreter -> ByteConduit m ()
+handleCommands run = do
   cmd <- getCommand
   case cmd of
     -- TODO: insert bounds checks
     Read h off len -> do
-      liftIO $ putStrLn $ "fake read from " ++ show off ++
-        " length " ++ show len
+      bs <- liftIO $ RD.readBytes run off len
       sendReply h NoError
-      sourcePut $ putByteString (BS.replicate len 0)
-      handleCommands
+      sourcePut $ putByteString bs
+      handleCommands run
     Write h off dat -> do
-      liftIO $ putStrLn $ "fake write to " ++ show off ++
-        " length " ++ show (BS.length dat)
+      liftIO $ RD.writeBytes run off dat
       sendReply h NoError
-      handleCommands
+      handleCommands run
     Disconnect -> do
       liftIO $ putStrLn "disconnect command"
       return ()
     UnknownCommand _ h _ _ -> do
       liftIO $ putStrLn $ "unknown command " ++ show cmd
       sendReply h EInval
-      handleCommands
+      handleCommands run
 
-runServer :: IO ()
-runServer =
+data SizeMismatchException =
+  SizeMismatchException { size0 :: Integer
+                        , size1 :: Integer  }
+  deriving (Eq, Show)
+
+instance Exception SizeMismatchException
+
+runServer :: FilePath -> FilePath -> IO ()
+runServer fn0 fn1 = do
+  config <- newConfig fn0 fn1
   let settings = serverSettings 10809 "127.0.0.1" in
-  runTCPServer settings $ \ad -> do
-    runConduit $ appSource ad .| do
-      liftIO $ putStrLn "received connection"
-      name <- negotiateNewstyle
-      liftIO $ when (name /= "") $
-        putStrLn $ "ignoring non-default export name " ++ show name
-      sendExportInformation (1024*1024)
-      liftIO $ putStrLn "finished negotiation"
-      handleCommands
-      .| appSink ad
-    putStrLn "client disconnect"
+    runTCPServer settings $ \ad -> do
+      runConduit $ appSource ad .| do
+        liftIO $ putStrLn "received connection"
+        name <- negotiateNewstyle
+        liftIO $ when (name /= "") $
+          putStrLn $ "ignoring non-default export name " ++ show name
+        (sz0, sz1) <- liftIO $ diskSizes config
+        when (sz0 /= sz1) $ throwM $ SizeMismatchException sz0 sz1
+        sendExportInformation (fromIntegral sz1)
+        liftIO $ putStrLn "finished negotiation"
+        handleCommands (interpreter config)
+        .| appSink ad
+      putStrLn "client disconnect"
+      closeConfig config

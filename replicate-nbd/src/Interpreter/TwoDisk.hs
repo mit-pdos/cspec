@@ -18,8 +18,11 @@ data Config =
 newConfig :: FilePath -> FilePath -> IO Config
 newConfig fn0 fn1 =
   Config <$>
-    openFile fn0 ReadWriteMode <*>
-    openFile fn1 ReadWriteMode
+    openBinaryFile fn0 ReadWriteMode <*>
+    openBinaryFile fn1 ReadWriteMode
+
+diskSizes :: Config -> IO (Integer, Integer)
+diskSizes c = (,) <$> hSize (disk0 c) <*> hSize (disk1 c)
 
 pread :: Handle -> Int -> FileOffset -> IO BS.ByteString
 pread h len off = do
@@ -36,12 +39,17 @@ hSize h = do
   hSeek h SeekFromEnd 0
   hTell h
 
+closeConfig :: Config -> IO ()
+closeConfig c = do
+  hClose (disk0 c)
+  hClose (disk1 c)
+
 interpreter :: Config -> Interpreter
 interpreter c = interp
   where
     getDisk :: Coq_diskId -> Handle
     getDisk Coq_d0 = disk0 c
-    getDisk Coq_d1 = disk0 c
+    getDisk Coq_d1 = disk1 c
 
     interp :: Interpreter
     interp (Prim op) = case op of
