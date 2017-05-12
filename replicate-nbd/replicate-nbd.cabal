@@ -18,6 +18,9 @@ library
   exposed-modules:     ReplicatedDisk
                      , Network.NBD
   other-modules:       Utils.Coq
+                     , Utils.Conversion
+                     , Interpreter.TwoDisk
+                     , Replication.DiskOps
                      , Bytes
                      , Datatypes
                      , Disk

@@ -2,8 +2,8 @@ module Utils.Coq where
 
 import qualified Datatypes
 
-natToInt :: Datatypes.Coq_nat -> Int
-natToInt n =
+natToNum :: Num a => Datatypes.Coq_nat -> a
+natToNum n =
   case n of
     Datatypes.O -> 0
-    Datatypes.S n' -> 1+natToInt n'
+    Datatypes.S n' -> 1+natToNum n'

@@ -8,7 +8,7 @@ Require Import Bytes.
 
 Extract Constant bytes => "BS.ByteString".
 Extract Constant bytes_dec => "(\n b1 b2 -> if b1 Prelude.== b2 then Specif.Coq_left else Specif.Coq_right)".
-Extract Constant bytes0 => "(\n -> BS.replicate (natToInt n) 0)".
+Extract Constant bytes0 => "(\n -> BS.replicate (natToNum n) 0)".
 
 (* TODO: add the following to the imports of Bytes:
 
