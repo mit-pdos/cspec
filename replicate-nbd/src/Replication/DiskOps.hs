@@ -3,7 +3,7 @@ module Replication.DiskOps where
 
 import           Control.Monad (unless)
 import qualified Data.ByteString as BS
-import           Interpreter.TwoDisk
+import           Replication.Interpreter
 import           ReplicatedDisk
 import           Utils.Conversion
 

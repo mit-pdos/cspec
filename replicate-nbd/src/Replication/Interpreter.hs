@@ -1,5 +1,5 @@
 {-# LANGUAGE Rank2Types #-}
-module Interpreter.TwoDisk where
+module Replication.Interpreter where
 
 import qualified Data.ByteString as BS
 import           Datatypes (Coq_nat)
