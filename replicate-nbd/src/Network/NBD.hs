@@ -1,5 +1,4 @@
 {-# LANGUAGE OverloadedStrings, Rank2Types  #-}
-{-# LANGUAGE DeriveDataTypeable #-}
 
 module Network.NBD where
 
@@ -13,35 +12,13 @@ import           Data.Conduit.Network
 import           Data.Serialize
 import           Data.Text (Text)
 import           Data.Text.Encoding (decodeUtf8)
-import           Data.Typeable (Typeable)
-import           GHC.Word
-import           Interpreter.TwoDisk
+import           Network.NBD.Data
 import qualified Replication.DiskOps as RD
-
--- amazingly enough, the expression inside this annotation is of ambiguous type
--- due to OverloadedStrings
-{-# ANN module ("HLint: ignore Use camelCase"::String) #-}
-
-nbd_INIT_PASSWD :: Word64
-nbd_INIT_PASSWD = 0x4e42444d41474943
-
-nbd_NEW_MAGIC :: Word64
-nbd_NEW_MAGIC = 0x49484156454F5054
-
-nbd_FLAG_FIXED_NEWSTYLE :: Bits a => a
-nbd_FLAG_FIXED_NEWSTYLE = bit 0
-
-nbd_FLAG_C_FIXED_NEWSTYLE :: Bits a => a
-nbd_FLAG_C_FIXED_NEWSTYLE = bit 0
-
-data ProtocolException =
-  InvalidClientFlags !Word32
-  | InvalidMagic String !Word64
-  deriving (Show, Typeable)
-
-instance Exception ProtocolException
+import           Replication.Interpreter
 
 -- IANA reserved port 10809
+--
+-- high-level overview of protocol:
 -- on connection:
 -- negotiate
 --   S: INIT_PASSWD, NEW_MAGIC, NBD_FLAG_FIXED_NEWSTYLE
@@ -56,28 +33,9 @@ instance Exception ProtocolException
 --     (for write) C: data (length bytes)
 --     S: NBD_REPLY_MAGIC, error, (same) handle
 --     (for read) S: data (length bytes)
-
-data NbdOption = ExportName
-               | Abort
-               | ListExports
-               | UnknownOption
-  deriving (Show, Eq)
-
-instance Enum NbdOption where
-  toEnum n = case n of
-    1 -> ExportName
-    2 -> Abort
-    3 -> ListExports
-    _ -> UnknownOption
-
-  fromEnum a = case a of
-    ExportName -> 1
-    Abort -> 2
-    ListExports -> 3
-    UnknownOption -> 4
-
-nbd_C_OPT_MAGIC :: Word64
-nbd_C_OPT_MAGIC = 0x49484156454F5054 -- same as nbd_NEW_MAGIC
+--
+-- see https://sourceforge.net/p/nbd/code/ci/master/tree/doc/proto.md for a
+-- detailed protocol description
 
 type ByteConduit m r = ConduitM BS.ByteString BS.ByteString m r
 
@@ -118,12 +76,6 @@ negotiateNewstyle = do
           -- we actually ignore all options
           handleOptions
 
-type ByteCount = Int
-
--- if we supported other flags (including read-only, flush), then we would want
--- to have an enum(set) for export flags
-nbd_FLAG_HAS_FLAGS :: Bits a => a
-nbd_FLAG_HAS_FLAGS = bit 0
 
 sendExportInformation :: Monad m => ByteCount -> ByteConduit m ()
 sendExportInformation len = sourcePut $ do
@@ -133,25 +85,6 @@ sendExportInformation len = sourcePut $ do
   where
     zeroes = BS.replicate 124 0
     flags = nbd_FLAG_HAS_FLAGS
-
-type Handle = Word64
-type FileOffset = Int
-
-data Command = Read { readHandle :: !Handle
-                    , readFrom :: !FileOffset
-                    , readLength :: !ByteCount }
-             | Write { writeHandle :: !Handle
-                     , writeFrom :: !FileOffset
-                     , writeData :: !BS.ByteString }
-             | Disconnect
-             | UnknownCommand { unknownCommandId :: !Word16
-                              , unknownCommandHandle :: !Handle
-                              , unknownCommandOffset :: !FileOffset
-                              , unknownCommandLength :: !ByteCount }
-  deriving (Show, Eq)
-
-nbd_REQUEST_MAGIC :: Word32
-nbd_REQUEST_MAGIC = 0x25609513
 
 getCommand :: (MonadThrow m, MonadIO m) => ByteConduit m Command
 getCommand = do
@@ -171,19 +104,6 @@ getCommand = do
       return $ Write handle offset dat
     2 -> return Disconnect
     _ -> return $ UnknownCommand typ handle offset len
-
-nbd_REPLY_MAGIC :: Word32
-nbd_REPLY_MAGIC = 0x67446698
-
-data ErrorCode = NoError
-               | EInval
-               | ENospc
-
-errCode :: ErrorCode -> Word32
-errCode err = case err of
-  NoError -> 0
-  EInval -> 22
-  ENospc -> 28
 
 sendReply :: Monad m => Handle -> ErrorCode -> ByteConduit m ()
 sendReply h err = sourcePut $ do

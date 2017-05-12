@@ -19,8 +19,9 @@ library
                      , Network.NBD
   other-modules:       Utils.Coq
                      , Utils.Conversion
-                     , Interpreter.TwoDisk
+                     , Replication.Interpreter
                      , Replication.DiskOps
+                     , Network.NBD.Data
                      , Bytes
                      , Datatypes
                      , Disk
