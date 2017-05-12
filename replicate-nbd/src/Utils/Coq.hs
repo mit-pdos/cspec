@@ -1,4 +1,4 @@
-module CoqUtils where
+module Utils.Coq where
 
 import qualified Datatypes
 
