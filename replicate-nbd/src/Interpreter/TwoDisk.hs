@@ -55,7 +55,7 @@ interpreter c = interp
     interp (Prim op) = case op of
       -- TODO: catch exceptions and return Failed
       TD__Read d a -> do
-        b <- pread (getDisk d) 4096 (addrToOffset a)
+        b <- pread (getDisk d) blocksize (addrToOffset a)
         return $ unsafeCoerce (Working (b::BS.ByteString))
       TD__Write d a b -> do
         pwrite (getDisk d) b (addrToOffset a)

@@ -6,6 +6,10 @@ import Datatypes
 import Disk
 import Utils.Coq
 
+-- size of a block in bytes
+blocksize :: Num a => a
+blocksize = natToNum blockbytes
+
 numToNat :: (Num a, Eq a) => a -> Coq_nat
 numToNat n =
   case n of
@@ -15,7 +19,7 @@ numToNat n =
 type FileOffset = Integer
 
 addrToOffset :: Coq_addr -> FileOffset
-addrToOffset a = natToNum a * 4096
+addrToOffset a = natToNum a * blocksize
 
 unit :: Coq_unit -> ()
 unit _ = ()

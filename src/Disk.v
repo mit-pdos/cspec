@@ -7,10 +7,10 @@ Definition addr := nat.
 
 (* We introduce this definition to make the large constant opaque, for
 performance reasons. *)
-Definition fourkilobytes := 4096.
-Opaque fourkilobytes.
-Definition block := bytes fourkilobytes.
-Definition block0 : block := bytes0 fourkilobytes.
+Definition blockbytes := 1024.
+Opaque blockbytes.
+Definition block := bytes blockbytes.
+Definition block0 : block := bytes0 blockbytes.
 Opaque block.
 
 Record disk :=
