@@ -132,6 +132,87 @@ sendExportInformation len = sourcePut $ do
     zeroes = BS.replicate 124 0
     flags = nbd_FLAG_HAS_FLAGS
 
+type Handle = Word64
+type FileOffset = Int
+
+data Command = Read { readHandle :: !Handle
+                    , readFrom :: !FileOffset
+                    , readLength :: !ByteCount }
+             | Write { writeHandle :: !Handle
+                     , writeFrom :: !FileOffset
+                     , writeData :: !BS.ByteString }
+             | Disconnect
+             | UnknownCommand { unknownCommandId :: !Word16
+                              , unknownCommandHandle :: !Handle
+                              , unknownCommandOffset :: !FileOffset
+                              , unknownCommandLength :: !ByteCount }
+  deriving (Show, Eq)
+
+nbd_REQUEST_MAGIC :: Word32
+nbd_REQUEST_MAGIC = 0x25609513
+
+getCommand :: (MonadThrow m, MonadIO m) => ByteConduit m Command
+getCommand = do
+  magic <- sinkGet getWord32be
+  when (magic /= nbd_REQUEST_MAGIC) $
+    throwM $ InvalidMagic "request" (fromIntegral magic)
+  (_, typ, handle, offset, len) <- sinkGet $ label "request header" $ (,,,,) <$>
+    getWord16be <*> -- flags (ignored)
+    getWord16be <*> -- type
+    getWord64be <*> -- handle
+    (fromIntegral <$> getWord64be) <*> -- offset
+    (fromIntegral <$> getWord32be) -- length
+  case typ of
+    0 -> return $ Read handle offset len
+    1 -> do
+      dat <- sinkGet $ getBytes len
+      return $ Write handle offset dat
+    2 -> return Disconnect
+    _ -> return $ UnknownCommand typ handle offset len
+
+nbd_REPLY_MAGIC :: Word32
+nbd_REPLY_MAGIC = 0x67446698
+
+data ErrorCode = NoError
+               | EInval
+               | ENospc
+
+errCode :: ErrorCode -> Word32
+errCode err = case err of
+  NoError -> 0
+  EInval -> 22
+  ENospc -> 28
+
+sendReply :: Monad m => Handle -> ErrorCode -> ByteConduit m ()
+sendReply h err = sourcePut $ do
+  putWord32be nbd_REPLY_MAGIC
+  putWord32be (errCode err)
+  putWord64be h
+
+handleCommands :: (MonadThrow m, MonadIO m) => ByteConduit m ()
+handleCommands = do
+  cmd <- getCommand
+  case cmd of
+    -- TODO: insert bounds checks
+    Read h off len -> do
+      liftIO $ putStrLn $ "fake read from " ++ show off ++
+        " length " ++ show len
+      sendReply h NoError
+      sourcePut $ putByteString (BS.replicate len 0)
+      handleCommands
+    Write h off dat -> do
+      liftIO $ putStrLn $ "fake write to " ++ show off ++
+        " length " ++ show (BS.length dat)
+      sendReply h NoError
+      handleCommands
+    Disconnect -> do
+      liftIO $ putStrLn "disconnect command"
+      return ()
+    UnknownCommand _ h _ _ -> do
+      liftIO $ putStrLn $ "unknown command " ++ show cmd
+      sendReply h EInval
+      handleCommands
+
 runServer :: IO ()
 runServer =
   let settings = serverSettings 10809 "127.0.0.1" in
@@ -143,5 +224,6 @@ runServer =
         putStrLn $ "ignoring non-default export name " ++ show name
       sendExportInformation (1024*1024)
       liftIO $ putStrLn "finished negotiation"
+      handleCommands
       .| appSink ad
-    putStrLn "disconnect"
+    putStrLn "client disconnect"
