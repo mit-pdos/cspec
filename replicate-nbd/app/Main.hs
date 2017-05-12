@@ -14,7 +14,7 @@ fn1 = "disk1.img"
 
 -- if creating empty disk0.img, disk1.img, size to set in bytes
 size :: Integer
-size = 1024*1024
+size = 100*1024*1024
 
 main :: IO ()
 main = do
