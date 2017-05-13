@@ -9,7 +9,6 @@ import os, sys
 imports = """
 import qualified Specif
 import qualified Data.ByteString as BS
-import Utils.Coq
 """
 
 fs_filename = sys.argv[1]

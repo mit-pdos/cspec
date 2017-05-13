@@ -13,10 +13,10 @@ type BlockOffset = Int
 type ByteOffset = Int
 
 rdRead :: Interpreter -> BlockOffset -> IO BS.ByteString
-rdRead run off = run $ _RD__coq_Read (numToNat off)
+rdRead run off = run $ _RD__coq_Read (fromIntegral off)
 
 rdWrite :: Interpreter -> BlockOffset -> BS.ByteString -> IO ()
-rdWrite run off dat = fmap unit . run $ _RD__coq_Write (numToNat off) dat
+rdWrite run off dat = fmap unit . run $ _RD__coq_Write (fromIntegral off) dat
 
 readBytes :: Interpreter -> ByteOffset -> Int -> IO BS.ByteString
 readBytes run off len =

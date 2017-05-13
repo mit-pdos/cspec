@@ -2,7 +2,6 @@
 module Replication.Interpreter where
 
 import qualified Data.ByteString as BS
-import           Datatypes (Coq_nat)
 import           Prog
 import           System.IO
 import           TwoDiskProg
@@ -62,7 +61,7 @@ interpreter c = interp
         return $ unsafeCoerce (Working ())
       TD__DiskSize d -> do
         sz <- hSize (getDisk d)
-        return $ unsafeCoerce (Working (numToNat sz::Coq_nat))
+        return $ unsafeCoerce (Working (sz::Integer))
     interp (Ret t) = return t
     interp (Bind p1 p2) = do
       r <- interp p1

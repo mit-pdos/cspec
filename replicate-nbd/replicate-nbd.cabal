@@ -17,8 +17,7 @@ library
   hs-source-dirs:      src
   exposed-modules:     ReplicatedDisk
                      , Network.NBD
-  other-modules:       Utils.Coq
-                     , Utils.Conversion
+  other-modules:       Utils.Conversion
                      , Replication.Interpreter
                      , Replication.DiskOps
                      , Network.NBD.Data
