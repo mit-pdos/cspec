@@ -37,7 +37,6 @@ library
                      , cereal-conduit
                      , text
   default-language:    Haskell2010
-  ghc-options:         -F -pgmF ./fiximports.py
 
 executable replicate-nbd
   hs-source-dirs:      app

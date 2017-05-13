@@ -1,5 +1,3 @@
-(** uncomment for interactive usage *)
-(* Cd "../../". *)
 Cd "replicate-nbd/src/".
 
 Extraction Language Haskell.
@@ -21,5 +19,4 @@ import CoqUtils
 Require Import ReplicatedDisk.
 Separate Extraction RD.Read RD.Write RD.Recover.
 
-(* this appears to be needed to compile this file *)
 Cd "../../".
