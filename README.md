@@ -3,21 +3,89 @@ Labs for 6.826 (POCS)
 
 ## Hacking
 
-`make` generates `Makefile.coq` and then compiles the default rule, which
-compiles all the `.vo` files. `make -jN` will work correctly (`make` natively
-handles parallelism across sub-makes correctly). To compile a specific file
-you'll need to use `make -f Makefile.coq`.
+```
+make [-jN]
+make -f Makefile.coq src/Shallow/ReplicatedDisk.vo
+```
 
-`make clean` calls out to `Makefile.coq`'s clean rule.
+The Makefile generates a `_CoqProject` listing out the files in the project
+using `git`, then `Makefile.coq`, and it calls that. The fact that files are
+retrieved using `git` means you need to `git add` before a file will be built.
 
-## Reading guide
+`make` also runs extraction by compiling `ExtractReplicatedDisk.v`. This process
+is still a bit hacky - I'd like to fix it by determining some useful features
+for Coq to have, implementing those, and getting them merged upstream.
+
+## Running the replicated disk as an nbd server
+
+The only tools you need are `stack` for building the server and `nbd-client` for
+connecting to it. If you're not familiar with Stack, it's a build tool for
+Haskell aiming for reproducable, sandboxed builds. Using Stack, the project will
+fetch, build, and use stable versions of all its dependencies (including GHC
+itself), independent of the rest of your Haskell setup.
+
+```
+make
+cd replicate-nbd
+stack setup
+stack build
+```
+
+TODO: what does `stack setup` do? Supposedly it downloads the compiler, but is
+this necessary on a clean setup, or is `stack build` sufficient?
+
+Once you've compiled, run the server:
+
+```
+stack exec replicate-nbd
+```
+
+The underlying disks will be `disk0.img` and `disk1.img` in the current
+directory, which are initialized to two empty 100MB files if they don't exist.
+This will eventually be customizable using options to `replicate-nbd`.
+
+Connect to it from a client:
+
+```
+sudo nbd-client localhost /dev/nbd0
+```
+
+Note that you can use `nbd` over the network (this is what it's intended for). I
+use this to run the server from my Mac but mount it in a Linux virtual machine,
+by accessing the host machine over a VirtualBox NAT. I believe this just entails
+setting your VM's Network Adapter's "Attached to:" setting to "NAT" and then
+using 10.0.2.2 as the hostname for `nbd-client` rather than `localhost`.
+
+Use it a bit (you can do this without sudo by adding yourself to the disk
+group: `sudo usermod -a -G disk $USER`) (TODO: possibly Arch-specific):
+
+```
+mkfs.ext4 -E root_owner /dev/nbd0
+sudo mkdir /mnt/nbd
+sudo mount /dev/nbd0 /mnt/nbd
+mkdir /mnt/nbd/dir
+ls /mnt/nbd
+sudo umount /mnt/nbd
+```
+
+Disconnect the block device:
+
+```
+sudo nbd-client -d /dev/nbd0
+```
+
+The server won't exit since it continually accepts new connections, but you can
+send an interrupt signal with `Ctrl-C`.
+
+# Reading guide
 
 There are two distinct experiments, in the `Shallow` and `Refinement`
 subdirectories.
 
 * `Automation.v`: a bunch of nice Ltac
 * `Bytes.v`: (currently axiomatic) definition of byte strings of known lengths.
-  These will nicely extract to Haskell's `Data.ByteString.Strict`.
+* `ExtrBytes.v`: extraction of axiomatic `bytes` definitions to Haskell
+  `Data.ByteString`.
 * `SepLogic/`: (the start of) a separation logic library, somewhat modelled
   after FSCQ's separation logic but mostly influenced by FRAP. There is little
   automation so far as it has not yet been necessary.
