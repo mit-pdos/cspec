@@ -61,7 +61,7 @@ interpreter c = interp
         return $ unsafeCoerce (Working ())
       TD__DiskSize d -> do
         sz <- hSize (getDisk d)
-        return $ unsafeCoerce (Working (sz::Integer))
+        return $ unsafeCoerce (Working (sz `div` blocksize::Integer))
     interp (Ret t) = return t
     interp (Bind p1 p2) = do
       r <- interp p1
