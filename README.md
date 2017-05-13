@@ -38,12 +38,19 @@ this necessary on a clean setup, or is `stack build` sufficient?
 Once you've compiled, run the server:
 
 ```
-stack exec replicate-nbd
+stack exec -- replicate-nbd [--debug]
 ```
 
 The underlying disks will be `disk0.img` and `disk1.img` in the current
 directory, which are initialized to two empty 100MB files if they don't exist.
-This will eventually be customizable using options to `replicate-nbd`.
+Run with `--help` to see how to customize these.
+
+First, load the `nbd` kernel module (TODO: is this Arch-specific? what happens
+on Ubuntu?)
+
+```
+sudo modprobe nbd
+```
 
 Connect to it from a client:
 

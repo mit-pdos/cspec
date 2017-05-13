@@ -35,6 +35,10 @@ import           Replication.Interpreter
 -- see https://sourceforge.net/p/nbd/code/ci/master/tree/doc/proto.md for a
 -- detailed protocol description
 
+data ServerOptions = ServerOptions
+  { diskPaths :: (FilePath, FilePath)
+  , logCommands :: Bool }
+
 type ByteConduit m r = ConduitM BS.ByteString BS.ByteString m r
 
 type ExportName = BS.ByteString
@@ -109,29 +113,32 @@ sendReply h err = sourcePut $ do
   putWord32be (errCode err)
   putWord64be h
 
-handleCommands :: (MonadThrow m, MonadIO m) => Interpreter -> ByteConduit m ()
-handleCommands run = do
-  cmd <- getCommand
-  case cmd of
-    -- TODO: insert bounds checks
-    Read h off len -> do
-      liftIO $ putStrLn $ "read at " ++ show off ++ " len " ++ show len
-      bs <- liftIO $ RD.readBytes run off len
-      sendReply h NoError
-      sourcePut $ putByteString bs
-      handleCommands run
-    Write h off dat -> do
-      liftIO $ putStrLn $ "write at " ++ show off ++ " len " ++ show (BS.length dat)
-      liftIO $ RD.writeBytes run off dat
-      sendReply h NoError
-      handleCommands run
-    Disconnect -> do
-      liftIO $ putStrLn "disconnect command"
-      return ()
-    UnknownCommand _ h _ _ -> do
-      liftIO $ putStrLn $ "unknown command " ++ show cmd
-      sendReply h EInval
-      handleCommands run
+handleCommands :: (MonadThrow m, MonadIO m) => Bool -> Interpreter -> ByteConduit m ()
+handleCommands doLog run = handle
+  where
+    debug = liftIO . when doLog . putStrLn
+    handle = do
+      cmd <- getCommand
+      case cmd of
+        -- TODO: insert bounds checks
+        Read h off len -> do
+          debug $ "read at " ++ show off ++ " len " ++ show len
+          bs <- liftIO $ RD.readBytes run off len
+          sendReply h NoError
+          sourcePut $ putByteString bs
+          handle
+        Write h off dat -> do
+          debug $ "write at " ++ show off ++ " len " ++ show (BS.length dat)
+          liftIO $ RD.writeBytes run off dat
+          sendReply h NoError
+          handle
+        Disconnect -> do
+          debug "disconnect command"
+          return ()
+        UnknownCommand _ h _ _ -> do
+          debug $ "unknown command " ++ show cmd
+          sendReply h EInval
+          handle
 
 data SizeMismatchException =
   SizeMismatchException { size0 :: Integer
@@ -140,8 +147,8 @@ data SizeMismatchException =
 
 instance Exception SizeMismatchException
 
-runServer :: FilePath -> FilePath -> IO ()
-runServer fn0 fn1 = do
+runServer :: ServerOptions -> IO ()
+runServer ServerOptions {diskPaths=(fn0, fn1), logCommands=doLog} = do
   withConfig fn0 fn1 $ \c -> do
     putStrLn "recovering..."
     RD.recover (interpreter c)
@@ -158,6 +165,6 @@ runServer fn0 fn1 = do
           when (sz0 /= sz1) $ throwM $ SizeMismatchException sz0 sz1
           sendExportInformation (fromIntegral sz1)
           liftIO $ putStrLn "finished negotiation"
-          handleCommands (interpreter config)
+          handleCommands doLog (interpreter config)
           .| appSink ad
       putStrLn "client disconnect"
