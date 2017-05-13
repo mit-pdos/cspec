@@ -44,6 +44,7 @@ executable replicate-nbd
   build-depends:       base
                      , replicate-nbd
                      , directory
+                     , optparse-applicative
   default-language:    Haskell2010
 
 test-suite replicate-nbd-test
