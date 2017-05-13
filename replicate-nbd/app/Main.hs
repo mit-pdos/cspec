@@ -20,8 +20,18 @@ options = Options
       <> showDefault
       <> value (100*1024)
       <> metavar "KB" )
-  <*> argument str (metavar "DISK0")
-  <*> argument str (metavar "DISK1")
+  <*> strOption
+    ( long "disk0"
+      <> metavar "FILE"
+      <> help "file to use as disk0"
+      <> showDefault
+      <> value "disk0.img" )
+  <*> strOption
+    ( long "disk1"
+      <> metavar "FILE"
+      <> help "file to use as disk1"
+      <> showDefault
+      <> value "disk1.img" )
 
 main :: IO ()
 main = execParser opts >>= run
