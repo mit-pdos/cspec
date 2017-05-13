@@ -9,8 +9,7 @@ import System.IO
 
 data Options = Options
   { defaultSizeKB :: Int
-  , disk0Path :: FilePath
-  , disk1Path :: FilePath }
+  , diskPaths :: (FilePath, FilePath) }
 
 options :: Parser Options
 options = Options
@@ -20,18 +19,10 @@ options = Options
       <> showDefault
       <> value (100*1024)
       <> metavar "KB" )
-  <*> strOption
-    ( long "disk0"
-      <> metavar "FILE"
-      <> help "file to use as disk0"
-      <> showDefault
-      <> value "disk0.img" )
-  <*> strOption
-    ( long "disk1"
-      <> metavar "FILE"
-      <> help "file to use as disk1"
-      <> showDefault
-      <> value "disk1.img" )
+  <*> (( (,)
+         <$> argument str (metavar "FILE0")
+         <*> argument str (metavar "FILE1") )
+       <|> pure ("disk0.img", "disk1.img"))
 
 main :: IO ()
 main = execParser opts >>= run
@@ -39,10 +30,11 @@ main = execParser opts >>= run
     opts = info (options <**> helper)
       (fullDesc
        <> progDesc "start an nbd server that replicates over two disks"
-       <> header "replicate-nbd - replicating network block device")
+       <> header "replicate-nbd - replicating network block device"
+       <> footer "disks default to disk0.img and disk1.img if not provided")
 
 run :: Options -> IO ()
-run Options {defaultSizeKB=size, disk0Path=fn0, disk1Path=fn1} = do
+run Options {defaultSizeKB=size, diskPaths=(fn0,fn1)} = do
   exists0 <- doesFileExist fn0
   exists1 <- doesFileExist fn1
   unless (exists0 && exists1) $
