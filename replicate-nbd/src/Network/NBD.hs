@@ -117,11 +117,13 @@ handleCommands run = do
   case cmd of
     -- TODO: insert bounds checks
     Read h off len -> do
+      liftIO $ putStrLn $ "read at " ++ show off ++ " len " ++ show len
       bs <- liftIO $ RD.readBytes run off len
       sendReply h NoError
       sourcePut $ putByteString bs
       handleCommands run
     Write h off dat -> do
+      liftIO $ putStrLn $ "write at " ++ show off ++ " len " ++ show (BS.length dat)
       liftIO $ RD.writeBytes run off dat
       sendReply h NoError
       handleCommands run
