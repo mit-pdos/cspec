@@ -19,9 +19,10 @@ for Coq to have, implementing those, and getting them merged upstream.
 ## Running the replicated disk as an nbd server
 
 The only tools you need are `stack` for building the server and `nbd-client` for
-connecting to it. If you're not familiar with Stack, it's a build tool for
-Haskell aiming for reproducable, sandboxed builds. Using Stack, the project will
-fetch, build, and use stable versions of all its dependencies (including GHC
+connecting to it. If you're not familiar
+with [Stack](https://docs.haskellstack.org/en/stable/GUIDE/), it's a build tool
+for Haskell aiming for reproducible, local builds. Using Stack, compiling will
+fetch, build, and use stable versions of all dependencies (including GHC
 itself), independent of the rest of your Haskell setup.
 
 ```
