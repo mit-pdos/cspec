@@ -10,8 +10,6 @@ import qualified Data.ByteString as BS
 import           Data.Conduit.Cereal
 import           Data.Conduit.Network
 import           Data.Serialize
-import           Data.Text (Text)
-import           Data.Text.Encoding (decodeUtf8)
 import           Network.NBD.Data
 import qualified Replication.DiskOps as RD
 import           Replication.Interpreter
@@ -39,7 +37,7 @@ import           Replication.Interpreter
 
 type ByteConduit m r = ConduitM BS.ByteString BS.ByteString m r
 
-type ExportName = Text
+type ExportName = BS.ByteString
 
 -- get an option, or return an export name
 getOption :: MonadThrow m => ByteConduit m (Either ExportName NbdOption)
@@ -51,7 +49,7 @@ getOption = do
     opt <- toEnum . fromIntegral <$> getWord32be
     len <- fromIntegral <$> getWord32be
     case opt of
-      ExportName -> Left . decodeUtf8 <$> getBytes len
+      ExportName -> Left <$> getBytes len
       _ -> getBytes len >> return (Right opt)
 
 negotiateNewstyle :: MonadThrow m => ByteConduit m ExportName
