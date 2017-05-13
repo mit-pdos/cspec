@@ -20,6 +20,18 @@ newConfig fn0 fn1 =
     openBinaryFile fn0 ReadWriteMode <*>
     openBinaryFile fn1 ReadWriteMode
 
+closeConfig :: Config -> IO ()
+closeConfig c = do
+  hClose (disk0 c)
+  hClose (disk1 c)
+
+withConfig :: FilePath -> FilePath -> (Config -> IO a) -> IO a
+withConfig fn0 fn1 a = do
+  c <- newConfig fn0 fn1
+  r <- a c
+  closeConfig c
+  return r
+
 diskSizes :: Config -> IO (Integer, Integer)
 diskSizes c = (,) <$> hSize (disk0 c) <*> hSize (disk1 c)
 
@@ -37,11 +49,6 @@ hSize :: Handle -> IO FileOffset
 hSize h = do
   hSeek h SeekFromEnd 0
   hTell h
-
-closeConfig :: Config -> IO ()
-closeConfig c = do
-  hClose (disk0 c)
-  hClose (disk1 c)
 
 interpreter :: Config -> Interpreter
 interpreter c = interp

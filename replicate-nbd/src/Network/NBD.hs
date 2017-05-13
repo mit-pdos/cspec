@@ -141,20 +141,23 @@ data SizeMismatchException =
 instance Exception SizeMismatchException
 
 runServer :: FilePath -> FilePath -> IO ()
-runServer fn0 fn1 =
+runServer fn0 fn1 = do
+  withConfig fn0 fn1 $ \c -> do
+    putStrLn "recovering..."
+    RD.recover (interpreter c)
+  putStrLn "serving on localhost:10809"
   let settings = serverSettings 10809 "127.0.0.1" in
-  runTCPServer settings $ \ad -> do
-    config <- newConfig fn0 fn1
-    runConduit $ appSource ad .| do
-      liftIO $ putStrLn "received connection"
-      name <- negotiateNewstyle
-      liftIO $ when (name /= "") $
-        putStrLn $ "ignoring non-default export name " ++ show name
-      (sz0, sz1) <- liftIO $ diskSizes config
-      when (sz0 /= sz1) $ throwM $ SizeMismatchException sz0 sz1
-      sendExportInformation (fromIntegral sz1)
-      liftIO $ putStrLn "finished negotiation"
-      handleCommands (interpreter config)
-      .| appSink ad
-    putStrLn "client disconnect"
-    closeConfig config
+    runTCPServer settings $ \ad -> do
+      withConfig fn0 fn1 $ \config ->
+        runConduit $ appSource ad .| do
+          liftIO $ putStrLn "received connection"
+          name <- negotiateNewstyle
+          liftIO $ when (name /= "") $
+            putStrLn $ "ignoring non-default export name " ++ show name
+          (sz0, sz1) <- liftIO $ diskSizes config
+          when (sz0 /= sz1) $ throwM $ SizeMismatchException sz0 sz1
+          sendExportInformation (fromIntegral sz1)
+          liftIO $ putStrLn "finished negotiation"
+          handleCommands (interpreter config)
+          .| appSink ad
+      putStrLn "client disconnect"

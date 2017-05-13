@@ -37,3 +37,6 @@ writeBytes run off dat =
   where loop blockOff s = unless (BS.length s == 0) $ do
           rdWrite run blockOff (BS.take blocksize s)
           loop (blockOff+1) (BS.drop blocksize s)
+
+recover :: Interpreter -> IO ()
+recover run = fmap unit . run $ _RD__coq_Recover
