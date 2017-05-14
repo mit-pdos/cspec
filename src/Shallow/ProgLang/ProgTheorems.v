@@ -141,6 +141,8 @@ Qed.
 
 Local Hint Constructors exec_recover.
 
+Arguments clos_refl_trans_1n {A} R _ _.
+
 (** Invert looped recovery execution for a bind in the recovery procedure. The
 wment essentially breaks down the execution of recovering with [_ <- p; p']
 into three stages:
@@ -158,7 +160,6 @@ Lemma exec_recover_bind_inv : forall `(p: prog R)
     exists rv1 w1, exec_recover p w rv1 w1 /\
                   exists rv2 w2,
                     clos_refl_trans_1n
-                      _
                       (fun '(rv, w) '(rv', w') =>
                          rexec (p' rv) p w (Recovered rv' w'))
                       (rv1, w1) (rv2, w2) /\
@@ -172,4 +173,36 @@ Proof.
     descend; intuition eauto.
     eapply rt1n_trans; eauto.
     simpl; eauto.
+Qed.
+
+Lemma impl_and1 : forall (P P' Q:Prop),
+    (P' -> P) ->
+    P' /\ Q ->
+    P /\ Q.
+Proof.
+  intuition.
+Qed.
+
+(* this theorem was a part of the interpret_rexec proof *)
+Theorem rexec_to_exec_crash_star_invariant :
+  forall `(p: prog T) `(rec: prog R) `(invariant: world -> Prop),
+    forall w w1 w2 v w',
+      invariant w1 ->
+      exec p w (Crashed w1) ->
+      clos_refl_trans_1n
+        (fun w w' => invariant w ->
+                  exec rec w (Crashed w') /\
+                  invariant w') w1 w2  ->
+      (invariant w2 -> exec rec w2 (Finished v w') /\
+                      invariant w') ->
+      rexec p rec w (Recovered v w') /\
+      invariant w'.
+Proof.
+  intros.
+  eapply impl_and1.
+  eapply RExecCrash; eauto.
+
+  clear dependent w.
+  induction H1; intros;
+    intuition eauto.
 Qed.
