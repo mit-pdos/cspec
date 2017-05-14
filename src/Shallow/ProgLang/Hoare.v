@@ -22,6 +22,8 @@ conditions and crash invariant specialized to a particular initial state. (This
 is why [pre] above is just a [Prop].) *)
 Definition Specification A T State := A -> State -> Quadruple T State.
 
+(* TODO: come up with a good, short name for terms of type Refinement (currently
+using [rf], which I'm not too happy with) *)
 Record Refinement State :=
   { invariant: world -> Prop;
     abstraction: world -> State }.
