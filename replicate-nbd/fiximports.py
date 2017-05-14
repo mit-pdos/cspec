@@ -21,14 +21,14 @@ MODULE_RE = re.compile("module (?P<module>.*) where\n")
 
 out.write("{-# LINE 1 \"%s\" #-}\n" % (filename))
 for n, line in enumerate(open(filename), 1):
-        m = MODULE_RE.match(line)
-        if m:
-            module_name = m.group("module")
-	if (line.strip() == "import qualified Prelude" and
-                module_name == "Bytes"):
-		out.write(imports)
-		out.write("{-# LINE %d \"%s\" #-}\n" % (n, filename))
-	line = line.replace('__FILE__', '"%s"' % sys.argv[2])
-	line = line.replace('__LINE__', '%d' % n)
-	out.write(line)
+    m = MODULE_RE.match(line)
+    if m:
+        module_name = m.group("module")
+    if (line.strip() == "import qualified Prelude" and
+        module_name == "Bytes"):
+        out.write(imports)
+        out.write("{-# LINE %d \"%s\" #-}\n" % (n, filename))
+    line = line.replace('__FILE__', '"%s"' % sys.argv[2])
+    line = line.replace('__LINE__', '%d' % n)
+    out.write(line)
 out.close()
