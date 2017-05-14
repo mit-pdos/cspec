@@ -28,12 +28,9 @@ itself), independent of the rest of your Haskell setup.
 ```
 make
 cd replicate-nbd
-stack setup
+stack setup # one-time download of compiler
 stack build
 ```
-
-TODO: what does `stack setup` do? Supposedly it downloads the compiler, but is
-this necessary on a clean setup, or is `stack build` sufficient?
 
 Once you've compiled, run the server:
 
@@ -46,7 +43,9 @@ directory, which are initialized to two empty 100MB files if they don't exist.
 Run with `--help` to see how to customize these.
 
 First, load the `nbd` kernel module (TODO: is this Arch-specific? what happens
-on Ubuntu?)
+on Ubuntu?). On Arch, you can do this on boot by creating a file
+`/etc/modules-load.d/nbd.conf` with just 'nbd' (see
+https://wiki.archlinux.org/index.php/kernel_modules).
 
 ```
 sudo modprobe nbd
@@ -61,8 +60,9 @@ sudo nbd-client localhost /dev/nbd0
 Note that you can use `nbd` over the network (this is what it's intended for). I
 use this to run the server from my Mac but mount it in a Linux virtual machine,
 by accessing the host machine over a VirtualBox NAT. I believe this just entails
-setting your VM's Network Adapter's "Attached to:" setting to "NAT" and then
-using 10.0.2.2 as the hostname for `nbd-client` rather than `localhost`.
+using 10.0.2.2 as the hostname for `nbd-client` rather than `localhost` (this is
+with the default networking configuration, where under "Network" the adapter has
+"Attached to:" set to "NAT").
 
 Use it a bit (you can do this without sudo by adding yourself to the disk
 group: `sudo usermod -a -G disk $USER`) (TODO: possibly Arch-specific):
