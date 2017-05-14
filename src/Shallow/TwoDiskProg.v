@@ -18,8 +18,6 @@ Module TD.
   (* get disk size in blocks *)
   | DiskSize (i:diskId) : Op (DiskResult nat).
 
-  Definition prog := Prog.prog Op.
-
   (** The state the program manipulates as it executes. *)
   Record State :=
     Disks { disk0 : option disk;

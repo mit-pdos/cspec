@@ -14,35 +14,51 @@ Record RecQuadruple T R State :=
 
 Definition RecSpecification A T R State := A -> State -> RecQuadruple T R State.
 
-Definition prog_rspec `(spec: RecSpecification A T R State) `(p: prog opT T) `(rec: prog opT R)
-           `(step: Semantics opT State) :=
-  forall a state,
+Definition prog_rspec `(spec: RecSpecification A T R State) `(p: prog T)
+           `(rec: prog R)
+           `(rf: Refinement State)
+           `(step: Semantics State) :=
+  forall a w,
+    let state := abstraction rf w in
     rec_pre (spec a state) ->
-    forall r, rexec step p rec state r ->
+    invariant rf w ->
+    forall r, rexec p rec w r ->
          match r with
-         | RFinished v state' => rec_post (spec a state) v state'
-         | Recovered v state' => recover_post (spec a state) v state'
+         | RFinished v w' => let state' := abstraction rf w' in
+                            rec_post (spec a state) v state' /\
+                            invariant rf w'
+         | Recovered v w' => let state' := abstraction rf w' in
+                            recover_post (spec a state) v state' /\
+                            invariant rf w'
          end.
 
 Definition prog_loopspec
            `(spec: Specification A R State)
-           `(rec: prog opT R)
-           `(step: Semantics opT State) :=
-  forall a state, pre (spec a state) ->
-         forall rv state', exec_recover step rec state rv state' ->
-                  post (spec a state) rv state'.
+           `(rec: prog R)
+           `(rf: Refinement State)
+           `(step: Semantics State)
+            :=
+  forall a w, let state := abstraction rf w in
+         pre (spec a state) ->
+         invariant rf w ->
+         forall rv w', exec_recover rec w rv w' ->
+                  let state' := abstraction rf w' in
+                  post (spec a state) rv state' /\
+                  invariant rf w'.
 
 Theorem prog_loopspec_weaken
         `(spec1: Specification A1 R State)
         `(spec2: Specification A2 R State)
-        `(rec: prog opT R)
-        `(step: Semantics opT State) :
-  prog_loopspec spec1 rec step ->
+        `(rec: prog R)
+        `(rf: Refinement State)
+        `(step: Semantics State) :
+  prog_loopspec spec1 rec rf step ->
   forall (Himpl: spec_impl spec1 spec2),
-    prog_loopspec spec2 rec step.
+    prog_loopspec spec2 rec rf step.
 Proof.
   unfold prog_loopspec; intros.
   eapply Himpl in H0; repeat deex; eauto.
+  eapply H in H2; intuition eauto.
 Qed.
 
 Definition idempotent `(spec: Specification A R State) :=
@@ -60,36 +76,40 @@ Definition idempotent `(spec: Specification A R State) :=
                               post (spec a state) rv state''.
 
 Lemma idempotent_loopspec : forall `(spec: Specification A R State)
-                              `(rec: prog opT R)
-                              `(step: Semantics opT State),
-    forall (Hspec: prog_spec spec rec step),
+                              `(rec: prog R)
+                              `(rf: Refinement State)
+                              `(step: Semantics State),
+    forall (Hspec: prog_spec spec rec rf step),
       idempotent spec ->
-      prog_loopspec spec rec step.
+      prog_loopspec spec rec rf step.
 Proof.
-  unfold idempotent, prog_loopspec; intuition.
+  unfold idempotent, prog_loopspec; intros; safe_intuition.
   generalize dependent a.
-  induction H1; intros.
+  induction H2; intros.
   - match goal with
-    | [ Hexec: exec _ _ _ (Finished _ _) |- _ ] =>
+    | [ Hexec: exec _ _ (Finished _ _) |- _ ] =>
       eapply Hspec in Hexec; eauto
     end.
   - match goal with
-    | [ Hexec: exec _ _ _ (Crashed _) |- _ ] =>
+    | [ Hexec: exec _ _ (Crashed _) |- _ ] =>
       eapply Hspec in Hexec; eauto
     end.
+    simpl in *; safe_intuition.
     match goal with
     | [ Hpre: pre (spec _ _) |- _ ] =>
       eapply H in Hpre; repeat deex; eauto
     end.
+    specialize (IHexec_recover a'); intuition eauto.
 Qed.
 
 Theorem prog_rspec_from_crash : forall `(spec: RecSpecification A T R State)
-                                  `(p: prog opT T) `(rec: prog opT R)
-                                  (step: Semantics opT State)
+                                  `(p: prog T) `(rec: prog R)
+                                  (rf: Refinement State)
+                                  (step: Semantics State)
                                   `(pspec: Specification A1 T State)
                                   `(rspec: Specification A2 R State),
-    forall (Hpspec: prog_spec pspec p step)
-      (Hrspec: prog_loopspec rspec rec step),
+    forall (Hpspec: prog_spec pspec p rf step)
+      (Hrspec: prog_loopspec rspec rec rf step),
       (forall a state, rec_pre (spec a state) ->
               (* program's precondition holds *)
               exists a1, pre (pspec a1 state) /\
@@ -102,19 +122,21 @@ Theorem prog_rspec_from_crash : forall `(spec: RecSpecification A T R State)
                                  (* and recovery establishes recovery postcondition *)
                                  (forall rv state'', post (rspec a2 state') rv state'' ->
                                                 recover_post (spec a state) rv state''))) ->
-      prog_rspec spec p rec step.
+      prog_rspec spec p rec rf step.
 Proof.
   unfold prog_rspec, prog_loopspec; intuition.
-  inversion H1; subst.
+  inversion H2; subst.
   - eapply H in H0; eauto.
     deex.
-    eapply Hpspec in H2; eauto.
+    eapply Hpspec in H3; eauto.
+    simpl in *; intuition eauto.
   - eapply H in H0; eauto.
     deex.
-    eapply Hpspec in H2; eauto.
-    eapply H5 in H2.
+    eapply Hpspec in H3; eauto.
+    simpl in *; safe_intuition.
+    eapply H6 in H3.
     deex.
-    eauto.
+    eapply Hrspec in H4; intuition eauto.
 Qed.
 
 Definition rspec_impl
@@ -129,14 +151,15 @@ Definition rspec_impl
 
 Theorem prog_rspec_weaken : forall `(spec1: RecSpecification A T R State)
                               `(spec2: RecSpecification A' T R State)
-                              `(p: prog opT T) `(rec: prog opT R)
-                              (step: Semantics opT State),
-    prog_rspec spec1 p rec step ->
+                              `(p: prog T) `(rec: prog R)
+                              (rf: Refinement State)
+                              (step: Semantics State),
+    prog_rspec spec1 p rec rf step ->
     rspec_impl spec1 spec2 ->
-    prog_rspec spec2 p rec step.
+    prog_rspec spec2 p rec rf step.
 Proof.
   unfold prog_rspec at 2; intros.
   eapply H0 in H1; eauto; repeat deex.
-  eapply H in H2; eauto.
-  destruct r; eauto.
+  eapply H in H3; eauto.
+  destruct r; simpl in *; intuition eauto.
 Qed.

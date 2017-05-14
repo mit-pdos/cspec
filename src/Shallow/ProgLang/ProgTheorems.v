@@ -7,20 +7,20 @@ Require Import Prog.
 
 Local Hint Constructors exec.
 
-Theorem can_crash_at_begin : forall `(p: prog opT T) `(step: Semantics opT State) state,
-    exec step p state (Crashed state).
+Theorem can_crash_at_begin : forall `(p: prog T) w,
+    exec p w (Crashed w).
 Proof.
   induction p; intros; eauto.
 Qed.
 
-Theorem can_crash_at_end : forall `(p: prog opT T) `(step: Semantics opT State) state v state',
-    exec step p state (Finished v state') ->
-    exec step p state (Crashed state').
+Theorem can_crash_at_end : forall `(p: prog T) w v w',
+    exec p w (Finished v w') ->
+    exec p w (Crashed w').
 Proof.
   (* This is a slightly harder proof strategy (induction over the programs is
   more straightforward), but this proof doesn't require finite programs! *)
   intros.
-  remember (Finished v state').
+  remember (Finished v w').
   induction H;
     try match goal with
         | [ H: _ = Finished _ _ |- _ ] =>
@@ -37,14 +37,14 @@ we're proving that exec treats programs up to the monad laws as equivalences
 between programs).
  *)
 
-Definition exec_equiv `(step: Semantics opT State) T (p: prog opT T) p' :=
-  forall state r, exec step p state r <-> exec step p' state r.
+Definition exec_equiv T (p: prog T) p' :=
+  forall w r, exec p w r <-> exec p' w r.
 
-Lemma exec_ret : forall T (v:T) `(step: Semantics opT State) state r,
-    exec step (Ret v) state r ->
+Lemma exec_ret : forall T (v:T) w r,
+    exec (Ret v) w r ->
     match r with
-    | Finished v' state' => v = v' /\ state = state'
-    | Crashed state' => state = state'
+    | Finished v' w' => v = v' /\ w = w'
+    | Crashed w' => w = w'
     end.
 Proof.
   intros.
@@ -53,32 +53,31 @@ Qed.
 
 Ltac cleanup_exec :=
   match goal with
-  | [ H: exec _ (Ret _) _ ?r |- _ ] =>
+  | [ H: exec (Ret _) _ ?r |- _ ] =>
     first [ is_var r |
             apply exec_ret in H; safe_intuition; subst ]
   end.
 
-Theorem monad_left_id : forall T T' opT (p: T' -> prog opT T) `(step: Semantics opT State) v,
-    exec_equiv step (Bind (Ret v) p) (p v).
+Theorem monad_left_id : forall T T' (p: T' -> prog T) v,
+    exec_equiv (Bind (Ret v) p) (p v).
 Proof.
   unfold exec_equiv; split; intros.
   - inv_exec; try cleanup_exec; eauto.
   - eapply ExecBindFinished; eauto.
 Qed.
 
-Theorem monad_right_id : forall `(p: prog opT T) `(step: Semantics opT State),
-    exec_equiv step (Bind p (fun v => Ret v)) p.
+Theorem monad_right_id : forall `(p: prog T),
+    exec_equiv (Bind p (fun v => Ret v)) p.
 Proof.
   unfold exec_equiv; split; intros.
   - destruct r; inv_exec; try cleanup_exec; eauto.
   - destruct r; eauto.
 Qed.
 
-Theorem monad_assoc : forall `(p1: prog opT T)
-                        `(p2: T -> prog opT T')
-                        `(p3: T' -> prog opT T'')
-                        `(step: Semantics opT State),
-    exec_equiv step (Bind (Bind p1 p2) p3) (Bind p1 (fun v => Bind (p2 v) p3)).
+Theorem monad_assoc : forall `(p1: prog T)
+                        `(p2: T -> prog T')
+                        `(p3: T' -> prog T''),
+    exec_equiv (Bind (Bind p1 p2) p3) (Bind p1 (fun v => Bind (p2 v) p3)).
 Proof.
   unfold exec_equiv; split; intros.
   - destruct r; repeat (inv_exec; eauto).
@@ -86,31 +85,23 @@ Proof.
 Qed.
 
 (** invert a bind execution *)
-Lemma exec_bind : forall T T' `(p: prog opT T) (p': T -> prog opT T')
-                    `(step: Semantics opT State) state r,
-    exec step (Bind p p') state r ->
-    (exists v state', exec step p state (Finished v state') /\
-             exec step (p' v) state' r) \/
-    (exists state', exec step p state (Crashed state') /\
-           r = Crashed state').
+Lemma exec_bind : forall T T' `(p: prog T) (p': T -> prog T')
+                    w r,
+    exec (Bind p p') w r ->
+    (exists v w', exec p w (Finished v w') /\
+             exec (p' v) w' r) \/
+    (exists w', exec p w (Crashed w') /\
+           r = Crashed w').
 Proof.
   intros.
   inv_exec; eauto.
 Qed.
 
-Lemma exec_weaken : forall `(p: prog opT T) `(step: Semantics opT State) (step': Semantics opT State),
-    semantics_impl step step' ->
-    forall state r, exec step p state r ->
-           exec step' p state r.
-Proof.
-  induction 2; intros; eauto.
-Qed.
-
-Theorem rexec_ret : forall `(v:T) `(step: Semantics opT State) `(rec: prog opT R) state r,
-  rexec step (Ret v) rec state r ->
+Theorem rexec_ret : forall `(v:T) `(rec: prog R) w r,
+  rexec (Ret v) rec w r ->
   match r with
-  | RFinished v' state' => v' = v /\ state' = state
-  | Recovered v' state' => exec_recover step rec state v' state'
+  | RFinished v' w' => v' = v /\ w' = w
+  | Recovered v' w' => exec_recover rec w v' w'
   end.
 Proof.
   intros.
@@ -120,27 +111,25 @@ Qed.
 
 Local Hint Constructors rexec.
 
-Lemma rexec_finish_any_rec : forall `(p: prog opT T)
-                               `(rec: prog opT R)
-                               `(rec': prog opT R')
-                               `(step: Semantics opT State)
-                               state v state',
-    rexec step p rec state (RFinished v state') ->
-    rexec step p rec' state (RFinished v state').
+Lemma rexec_finish_any_rec : forall `(p: prog T)
+                               `(rec: prog R)
+                               `(rec': prog R')
+                               w v w',
+    rexec p rec w (RFinished v w') ->
+    rexec p rec' w (RFinished v w').
 Proof.
   intros.
   inversion H; subst; eauto.
 Qed.
 
-Lemma rexec_recover_bind_inv : forall `(p: prog opT T)
-                                 `(p': T -> prog opT T')
-                                 `(rec: prog opT R)
-                                 `(step: Semantics opT State)
-                                 state rv state'',
-    rexec step (Bind p p') rec state (Recovered rv state'') ->
-    rexec step p rec state (Recovered rv state'') \/
-    exists v state', rexec step p rec state (RFinished v state') /\
-            rexec step (p' v) rec state' (Recovered rv state'').
+Lemma rexec_recover_bind_inv : forall `(p: prog T)
+                                 `(p': T -> prog T')
+                                 `(rec: prog R)
+                                 w rv w'',
+    rexec (Bind p p') rec w (Recovered rv w'') ->
+    rexec p rec w (Recovered rv w'') \/
+    exists v w', rexec p rec w (RFinished v w') /\
+            rexec (p' v) rec w' (Recovered rv w'').
 Proof.
   intros.
   inversion H; subst.
@@ -153,7 +142,7 @@ Qed.
 Local Hint Constructors exec_recover.
 
 (** Invert looped recovery execution for a bind in the recovery procedure. The
-statement essentially breaks down the execution of recovering with [_ <- p; p']
+wment essentially breaks down the execution of recovering with [_ <- p; p']
 into three stages:
 
 - First, p runs until it finishes without crashing.
@@ -162,19 +151,18 @@ into three stages:
   from iteration to the next, initialized with the run of p in the first step.
 - Finally, the computer stops crashing and [p' rv] can run to completion.
  *)
-Lemma exec_recover_bind_inv : forall `(p: prog opT R)
-                                `(p': R -> prog opT R')
-                                `(step: Semantics opT State)
-                                state rv' state'',
-    exec_recover step (Bind p p') state rv' state'' ->
-    exists rv1 state1, exec_recover step p state rv1 state1 /\
-                  exists rv2 state2,
+Lemma exec_recover_bind_inv : forall `(p: prog R)
+                                `(p': R -> prog R')
+                                w rv' w'',
+    exec_recover (Bind p p') w rv' w'' ->
+    exists rv1 w1, exec_recover p w rv1 w1 /\
+                  exists rv2 w2,
                     clos_refl_trans_1n
                       _
-                      (fun '(rv, state) '(rv', state') =>
-                         rexec step (p' rv) p state (Recovered rv' state'))
-                      (rv1, state1) (rv2, state2) /\
-                    exec step (p' rv2) state2 (Finished rv' state'').
+                      (fun '(rv, w) '(rv', w') =>
+                         rexec (p' rv) p w (Recovered rv' w'))
+                      (rv1, w1) (rv2, w2) /\
+                    exec (p' rv2) w2 (Finished rv' w'').
 Proof.
   induction 1.
   - inv_exec; eauto 10 using rt1n_refl.
