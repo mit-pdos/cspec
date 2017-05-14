@@ -27,16 +27,8 @@ Inductive prog : forall T:Type, Type :=
 | Ret : forall T, T -> prog T
 | Bind : forall T T', prog T -> (T -> prog T') -> prog T'.
 
-(** A Semantics for a particular operation family and w type specifies
-  what each primitive returns and how it changes the w.
-
-  For some [step] of type [Semantics], [step op w v w'] means that operation
-  [op] when executed from w [w] returns [v] and leaves the w at [w'].
-  Note that the semantics might not specify any behavior for some input ws -
-  these are similar to non-termination, in that these ws are ignored by any
-  Hoare specification. *)
-Definition Semantics world :=
-  forall T, opT T -> world -> T -> world -> Prop.
+(** A Semantics is a transition relation for a particular program. *)
+Definition Semantics world T := world -> T -> world -> Prop.
 
 (** The outcome of an execution, including intermediate crash points. *)
 Inductive Result T :=
@@ -44,7 +36,7 @@ Inductive Result T :=
 | Crashed (w:world).
 Arguments Crashed {T} w.
 
-Axiom step:Semantics world.
+Axiom step:forall T, opT T -> Semantics world T.
 
 (** [exec] specifies the execution semantics of complete programs using [step]
   as the small-step semantics of the primitive operations.
@@ -132,18 +124,6 @@ Arguments RFinished {T R} v w.
 Arguments Recovered {T R} v w.
 
 Global Generalizable Variables T R opT State step.
-
-(* modify a semantics by adding a background step before every operation *)
-Definition background_step `(bg_step: State -> State -> Prop) `(step: Semantics State) :
-  Semantics State :=
-  fun T (op:opT T) state v state'' =>
-    exists state', bg_step state state' /\
-          step _ op state' v state''.
-
-(* definition of when one semantics implies a weaker one *)
-Definition semantics_impl State (step step': Semantics State) :=
-  forall T (op: opT T) state v state',
-    step _ op state v state' -> step' _ op state v state'.
 
 (** * Automation for inverting execution behavior. *)
 

@@ -62,6 +62,9 @@ Module TD.
       bg_step (Disks (Some d_0) (Some d_1) pf)
               (Disks (Some d_0) None proof).
 
+  (* TODO: split TwoDiskProg into a generic API and an (axiomatic)
+  implementation, same way Refinement/ version does. *)
+
   Inductive op_step : Semantics Op State :=
   | step_read : forall a i r state,
       match get_disk i state with
@@ -90,19 +93,6 @@ Module TD.
 
   Definition exec := Prog.exec step.
   Definition exec_recover := Prog.exec_recover step.
-
-  Ltac inv_step :=
-    match goal with
-    | [ H: step _ _ _ _ |- _ ] =>
-      inversion H; subst; clear H;
-      safe_intuition;
-      match goal with
-      | [ H: op_step _ _ _ _ |- _ ] =>
-        inversion H; subst; clear H;
-        repeat sigT_eq;
-        safe_intuition
-      end
-    end.
 
   Ltac inv_bg :=
     match goal with

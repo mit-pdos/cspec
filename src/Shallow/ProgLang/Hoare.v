@@ -29,8 +29,7 @@ Record Refinement State :=
     abstraction: world -> State }.
 
 Definition prog_spec `(spec: Specification A T State) `(p: prog T)
-           (rf: Refinement State)
-           (step: Semantics State) :=
+           (rf: Refinement State) :=
   forall a w,
     let state := abstraction rf w in
     pre (spec a state) ->
@@ -61,8 +60,7 @@ Definition DoublePre T State :=
 (** [prog_double] defines correctness in terms of a higher-order precondition.
 *)
 Definition prog_double `(pre: DoublePre T State) `(p: prog T)
-           (rf: Refinement State)
-           (step: Semantics State) :=
+           (rf: Refinement State) :=
   forall w postcond crashinv,
     let state := abstraction rf w in
     pre state postcond crashinv ->
@@ -81,8 +79,7 @@ Definition prog_double `(pre: DoublePre T State) `(p: prog T)
 (with separate precondition, postcondition, and crash invariants) into a Hoare
 double. *)
 Definition prog_ok `(spec: Specification A T State) `(p: prog T)
-           (rf: Refinement State)
-           (step: Semantics State) :=
+           (rf: Refinement State) :=
   forall T' (rx: T -> prog T'),
     prog_double
       (fun state postcond crashinv =>
@@ -92,9 +89,9 @@ Definition prog_ok `(spec: Specification A T State) `(p: prog T)
                          post (spec a state) r state' /\
                          postcond' = postcond /\
                          crashinv' = crashinv)
-                      (rx r) rf step) /\
+                      (rx r) rf) /\
               (forall state', crash (spec a state) state' ->
-                     crashinv state')) (Bind p rx) rf step.
+                     crashinv state')) (Bind p rx) rf.
 
 (** We prove a conversion theorem from the Hoare double-based correctness
 statement to the more natural quadruple interpretation. This theorem reveals a
@@ -105,8 +102,7 @@ by the continuation's proof. We cannot make that assumption here when
 establishing the crash invariant in the case that [p] crashes just before
 finishing, so we explicitly assume that the postcondition implies the crash
 invariant. *)
-Theorem prog_ok_to_spec : forall `(step: Semantics State)
-                            `(rf: Refinement State)
+Theorem prog_ok_to_spec : forall `(rf: Refinement State)
                             `(spec: Specification A T State) (p: prog T),
     (forall a w r w',
         let state := abstraction rf w in
@@ -115,7 +111,7 @@ Theorem prog_ok_to_spec : forall `(step: Semantics State)
         post (spec a state) r state' ->
         crash (spec a state) state' /\
         invariant rf w') ->
-    prog_ok spec p rf step -> prog_spec spec p rf step.
+    prog_ok spec p rf -> prog_spec spec p rf.
 Proof.
   unfold prog_ok, prog_double, prog_spec; intros.
   specialize (H0 _ Ret).
@@ -131,10 +127,9 @@ Proof.
   apply monad_right_id; auto.
 Qed.
 
-Theorem prog_spec_to_ok : forall `(step: Semantics State)
-                            `(rf: Refinement State)
+Theorem prog_spec_to_ok : forall `(rf: Refinement State)
                             `(spec: Specification A T State) (p: prog T),
-    prog_spec spec p rf step -> prog_ok spec p rf step.
+    prog_spec spec p rf -> prog_ok spec p rf.
 Proof.
   unfold prog_ok, prog_double, prog_spec; intros.
   deex.
@@ -152,10 +147,9 @@ Proof.
 Qed.
 
 Remark crash_invariants_must_handle_pre :
-  forall `(step: Semantics State)
-    `(rf: Refinement State)
+  forall `(rf: Refinement State)
     `(spec: Specification A T State) (p: prog T),
-    prog_spec spec p rf step ->
+    prog_spec spec p rf ->
     forall a w,
       let state := abstraction rf w in
       pre (spec a state) ->
@@ -169,13 +163,12 @@ Proof.
   apply can_crash_at_begin.
 Qed.
 
-Theorem double_weaken : forall `(step: Semantics State)
-                          `(rf: Refinement State)
+Theorem double_weaken : forall `(rf: Refinement State)
                           T (pre pre': DoublePre T State) (p: prog T),
-    prog_double pre' p rf step ->
+    prog_double pre' p rf ->
     (forall state postcond crashinv, pre state postcond crashinv ->
                             pre' state postcond crashinv) ->
-    prog_double pre p rf step.
+    prog_double pre p rf.
 Proof.
   unfold prog_double at 2; intros.
   eapply H; eauto.
@@ -191,14 +184,13 @@ Definition spec_impl
                (forall state', crash (spec1 a' state) state' ->
                       crash (spec2 a state) state').
 
-Theorem spec_weaken : forall `(step: Semantics State)
-                        `(rf: Refinement State)
+Theorem spec_weaken : forall `(rf: Refinement State)
                         `(spec1: Specification A' T State)
                         `(spec2: Specification A T State)
                         (p: prog T),
-    prog_spec spec1 p rf step ->
+    prog_spec spec1 p rf ->
     forall (Himpl: spec_impl spec1 spec2),
-      prog_spec spec2 p rf step.
+      prog_spec spec2 p rf.
 Proof.
   unfold prog_spec; intros.
   specialize (Himpl a (abstraction rf w)); intuition.
@@ -211,15 +203,14 @@ Proof.
   destruct r; intuition eauto.
 Qed.
 
-Definition ret_ok : forall T (v:T) `(step: Semantics State) `(rf: Refinement State),
+Definition ret_ok : forall T (v:T) `(rf: Refinement State),
     prog_ok
       (fun (_:unit) (state:State) =>
          {| pre := True;
             post := fun r state' => r = v /\ state' = state;
             crash := fun state' => False; |})
       (Ret v)
-      rf
-      step.
+      rf.
 Proof.
   unfold prog_ok, prog_double; intros.
   repeat deex; simpl in *.
@@ -232,12 +223,11 @@ Proof.
   eapply can_crash_at_begin.
 Qed.
 
-Theorem double_exec_equiv : forall `(step: Semantics State)
-                              `(rf: Refinement State)
+Theorem double_exec_equiv : forall `(rf: Refinement State)
                               `(pre: DoublePre T State) (p p': prog T),
     exec_equiv p p' ->
-    prog_double pre p' rf step ->
-    prog_double pre p rf step.
+    prog_double pre p' rf ->
+    prog_double pre p rf.
 Proof.
   unfold prog_double; intros.
   eapply H0 in H1; eauto.
@@ -246,20 +236,20 @@ Qed.
 
 Ltac monad_simpl :=
   repeat match goal with
-         | |- prog_double _ (Bind (Ret _) _) _ _ =>
+         | |- prog_double _ (Bind (Ret _) _) _ =>
            eapply double_exec_equiv; [ apply monad_left_id | ]
-         | |- prog_double _ (Bind (Bind _ _) _) _ _ =>
+         | |- prog_double _ (Bind (Bind _ _) _) _ =>
            eapply double_exec_equiv; [ apply monad_assoc | ]
          end.
 
 (** step_prog_with t handles the first program in a bind by applying tactic t *)
 Ltac step_prog_with t :=
   match goal with
-  | |- prog_double _ _ _ _ =>
+  | |- prog_double _ _ _ =>
     monad_simpl;
     eapply double_weaken; [ solve [ t ] | ]
   | |- forall _, _ => intros; step_prog_with t
-  | |- prog_ok _ _ _ _ => unfold prog_ok; step_prog_with t
+  | |- prog_ok _ _ _ => unfold prog_ok; step_prog_with t
   end.
 
 (** step_prog applies a registered prog_ok theorem (in the prog hint database)
@@ -269,7 +259,7 @@ Ltac step_prog := step_prog_with ltac:(eauto with prog).
 (* This notation builds a pattern; use it as [Hint Extern 1 {{ p; _}} => apply
 p_ok : prog] to associated p_ok as the specification for the program (pattern).
 Such patterns are used by [step_prog] via the prog hint database. *)
-Notation "{{ p ; '_' }}" := (prog_double _ (Bind p _) _ _)
+Notation "{{ p ; '_' }}" := (prog_double _ (Bind p _) _)
                               (only parsing, at level 0).
 
 (** * begin
@@ -282,12 +272,11 @@ haven't made this simplification. *)
 Definition begin := Ret tt.
 Hint Extern 1 {{ begin; _ }} => apply ret_ok : prog.
 
-Lemma begin_prog_ok : forall `(step: Semantics State)
-                        `(rf: Refinement State)
+Lemma begin_prog_ok : forall `(rf: Refinement State)
                         `(spec: Specification A T State)
                         `(p: prog T),
-    prog_ok spec (_ <- begin; p) rf step ->
-    prog_ok spec p rf step.
+    prog_ok spec (_ <- begin; p) rf ->
+    prog_ok spec p rf.
 Proof.
   unfold prog_ok, prog_double; intros.
   repeat deex.
@@ -311,13 +300,12 @@ Ltac intro_begin :=
 (* for programs that are pure the step automation doesn't work, since there is
 no bind in the program *)
 
-Theorem ret_prog_ok : forall `(step: Semantics State)
-                        `(rf: Refinement State)
+Theorem ret_prog_ok : forall `(rf: Refinement State)
                         `(spec: Specification A T State) (v:T),
     (forall a state, pre (spec a state) ->
             post (spec a state) v state /\
             crash (spec a state) state) ->
-    prog_ok spec (Ret v) rf step.
+    prog_ok spec (Ret v) rf.
 Proof.
   intros.
   unfold prog_ok, prog_double; intros.
