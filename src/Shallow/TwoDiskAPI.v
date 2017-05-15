@@ -2,6 +2,8 @@ Require Import Prog.
 Require Import Disk.
 Require Import Automation.
 
+Require Import Shallow.Interface.
+
 Inductive diskId := d0 | d1.
 
 Inductive DiskResult T :=
@@ -65,7 +67,7 @@ Module TD.
   (* TODO: split TwoDiskProg into a generic API and an (axiomatic)
   implementation, same way Refinement/ version does. *)
 
-  Inductive op_step : Semantics Op State :=
+  Inductive op_step : forall `(op: Op T), Semantics State T :=
   | step_read : forall a i r state,
       match get_disk i state with
       | Some d => match d a with
@@ -89,14 +91,19 @@ Module TD.
       end ->
       op_step (DiskSize i) state r state.
 
-  Definition step := background_step bg_step op_step.
+  Definition API := background_step bg_step (@op_step).
 
-  Definition exec := Prog.exec step.
-  Definition exec_recover := Prog.exec_recover step.
+  Ltac inv_step :=
+    match goal with
+    | [ H: op_step _ _ _ _ |- _ ] =>
+      inversion H; subst; clear H;
+      repeat sigT_eq;
+      safe_intuition
+    end.
 
   Ltac inv_bg :=
     match goal with
-    | [ H: TD.bg_step _ _ |- _ ] =>
+    | [ H: bg_step _ _ |- _ ] =>
       inversion H; subst; clear H
     end.
 

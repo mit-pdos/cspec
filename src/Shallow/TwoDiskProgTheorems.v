@@ -4,7 +4,9 @@ Require Import Disk.
 
 Require Import Shallow.ProgLang.Hoare.
 Require Import Shallow.ProgLang.Prog.
-Require Import TwoDiskProg.
+Require Import Shallow.TwoDiskAPI.
+
+Require Import Shallow.Interface.
 
 (** Hoare-style specifications for the TwoDisk primitives.
 
@@ -23,32 +25,43 @@ below.
  *)
 
 Ltac start_prim :=
-  intros; eapply prim_ok; intros;
-  repeat destruct_tuple;
-  simpl in *;
-  safe_intuition;
-  try solve [ intuition eauto ].
-
-Hint Resolve holds_in_some.
+  intros; eapply prog_ok_weaken; [
+    match goal with
+    | [ i: Interface _ |- _ ] =>
+      eapply (impl_ok i)
+    end | ];
+  unfold spec_impl; intros;
+  repeat match goal with
+         | [ |- exists (_:unit), _ ] => exists tt
+         | |- _ /\ _ =>
+           (* this splitting is just to separate the
+           precondition/postcondition/crash implications required by
+           spec_impl *)
+           split
+         end.
 
 Ltac cleanup :=
   repeat match goal with
+         | [ |- forall _, _ ] => intros
          | _ => progress simpl in *
          | _ => progress safe_intuition
          | _ => progress subst
+         | _ => destruct_tuple
          | _ => deex
          | _ => simpl_match
          | |- _ /\ _ => split; [ solve [ eauto || congruence ] | ]
          | |- _ /\ _ => split; [ | solve [ eauto || congruence ] ]
          | [ H: Working _ = Working _ |- _ ] => inversion H; subst; clear H
+         | [ |- exists (_:unit), _ ] => exists tt
          | _ => solve [ eauto ]
          | _ => congruence
          end.
 
+Hint Resolve holds_in_some.
 Hint Resolve holds_in_some_eq.
 Hint Resolve holds_in_none_eq.
 
-Theorem TDRead0_ok : forall a,
+Theorem TDRead0_ok : forall (i: Interface TD.API) a,
     prog_ok
       (fun '(d_0, F) state =>
          {|
@@ -67,10 +80,16 @@ Theorem TDRead0_ok : forall a,
              fun state' => TD.disk0 state' |= eq d_0 /\
                     TD.disk1 state' |= F;
          |})
-      (Prim (TD.Read d0 a))
-      TD.step.
+      (get_op i (TD.Read d0 a))
+      (refinement i).
 Proof.
-  start_prim.
+  start_prim; cleanup.
+  TD.inv_step.
+  TD.inv_bg; cleanup;
+    repeat (destruct matches in *; cleanup).
+  hyp_intuition; cleanup.
+  (* this part repeats the proof above about step - we need a version of prim_ok
+  that's for any direct get_op from the interface *)
   TD.inv_step.
   TD.inv_bg; cleanup;
     repeat (destruct matches in *; cleanup).

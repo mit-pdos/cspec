@@ -1,6 +1,8 @@
 Require Import Prog.
 Require Import Disk.
 
+Require Import Shallow.Interface.
+
 (* Defines programs over a single disk. *)
 
 Module D.

@@ -203,6 +203,23 @@ Proof.
   destruct r; intuition eauto.
 Qed.
 
+Theorem prog_ok_weaken : forall `(rf: Refinement State)
+                        `(spec1: Specification A' T State)
+                        `(spec2: Specification A T State)
+                        (p: prog T),
+    prog_ok spec1 p rf ->
+    forall (Himpl: spec_impl spec1 spec2),
+      prog_ok spec2 p rf.
+Proof.
+  unfold prog_ok; intros.
+  eapply double_weaken; eauto.
+  intros; repeat deex.
+  apply Himpl in H0; repeat deex.
+  descend; intuition eauto.
+  eapply double_weaken; eauto.
+  intros; intuition (subst; eauto).
+Qed.
+
 Definition ret_ok : forall T (v:T) `(rf: Refinement State),
     prog_ok
       (fun (_:unit) (state:State) =>
