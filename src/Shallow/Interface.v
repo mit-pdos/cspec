@@ -45,6 +45,7 @@ Definition get_op opT `{api: InterfaceAPI opT State}
            {T} (op: opT T) : prog T :=
   op_impl (interface_impl i) _ op.
 
-(* TODO: this coercion works but does not keep T implicit *)
+(* TODO: this coercion works but does not keep T implicit
+   see https://coq.inria.fr/bugs/show_bug.cgi?id=5527 *)
 Coercion get_op : Interface >-> Funclass.
 Add Printing Coercion get_op.
