@@ -108,9 +108,9 @@ Theorem prog_ok_to_spec : forall `(rf: Refinement State)
         let state := abstraction rf w in
         let state' := abstraction rf w' in
         pre (spec a state) ->
+        invariant rf w ->
         post (spec a state) r state' ->
-        crash (spec a state) state' /\
-        invariant rf w') ->
+        crash (spec a state) state') ->
     prog_ok spec p rf -> prog_spec spec p rf.
 Proof.
   unfold prog_ok, prog_double, prog_spec; intros.
@@ -123,7 +123,6 @@ Proof.
     apply exec_ret in H
   end.
   destruct r1; intuition (subst; eauto).
-  eapply H; eauto.
   apply monad_right_id; auto.
 Qed.
 

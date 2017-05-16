@@ -5,36 +5,39 @@ Require Import Automation.
 
 Require Import Shallow.ProgLang.Prog.
 Require Import Shallow.ProgLang.Hoare Shallow.ProgLang.HoareRecovery.
-Require Import Shallow.TwoDiskProg.
-Require Import Shallow.TwoDiskProg Shallow.TwoDiskProgTheorems.
-Require Import Shallow.SeqDiskProg.
+Require Import Shallow.TwoDiskAPI Shallow.TwoDiskProgTheorems.
+Require Import Shallow.SeqDiskAPI.
 
 Require Import MaybeHolds.
-Require Import Interpret.
+Require Import Shallow.Interface.
 
 Module RD.
 
-  Definition Read (a:addr) : TD.prog block :=
-    mv0 <- Prim (TD.Read d0 a);
+  Section ReplicatedDisk.
+
+  Variable (td:Interface TD.API).
+
+  Definition Read (a:addr) : prog block :=
+    mv0 <- Prim td (TD.Read d0 a);
       match mv0 with
       | Working v => Ret v
-      | Failed => mv2 <- Prim (TD.Read d1 a);
+      | Failed => mv2 <- Prim td (TD.Read d1 a);
                    match mv2 with
                    | Working v => Ret v
                    | Failed => Ret block0
                    end
       end.
 
-  Definition Write (a:addr) (b:block) : TD.prog unit :=
-    _ <- Prim (TD.Write d0 a b);
-      _ <- Prim (TD.Write d1 a b);
+  Definition Write (a:addr) (b:block) : prog unit :=
+    _ <- Prim td (TD.Write d0 a b);
+      _ <- Prim td (TD.Write d1 a b);
       Ret tt.
 
-  Definition DiskSize : TD.prog nat :=
-    msz <- Prim (TD.DiskSize d0);
+  Definition DiskSize : prog nat :=
+    msz <- Prim td (TD.DiskSize d0);
       match msz with
       | Working sz => Ret sz
-      | Failed => msz <- Prim (TD.DiskSize d1);
+      | Failed => msz <- Prim td (TD.DiskSize d1);
                    match msz with
                    | Working sz => Ret sz
                    | Failed => Ret 0
@@ -54,15 +57,15 @@ Module RD.
   invariant is now trivially satisfied *)
   | DiskFailed (i:diskId).
 
-  Definition fixup (a:addr) : TD.prog RecStatus :=
-    mv0 <- Prim (TD.Read d0 a);
+  Definition fixup (a:addr) : prog RecStatus :=
+    mv0 <- Prim td (TD.Read d0 a);
       match mv0 with
-      | Working v => mv2 <- Prim (TD.Read d1 a);
+      | Working v => mv2 <- Prim td (TD.Read d1 a);
                       match mv2 with
                       | Working v' => if v == v' then
                                        Ret Continue
                                      else
-                                       mu <- Prim (TD.Write d1 a v);
+                                       mu <- Prim td (TD.Write d1 a v);
                                        Ret (match mu with
                                             | Working _ => RepairDone
                                             | Failed => DiskFailed d1
@@ -73,7 +76,7 @@ Module RD.
       end.
 
   (* recursively performs recovery at [a-1], [a-2], down to 0 *)
-  Fixpoint recover_at (a:addr) : TD.prog RecStatus :=
+  Fixpoint recover_at (a:addr) : prog RecStatus :=
     match a with
     | 0 => Ret RepairDone
     | S n => s <- fixup n;
@@ -84,33 +87,39 @@ Module RD.
               end
     end.
 
-  Definition Recover : TD.prog unit :=
+  Definition Recover : prog unit :=
     sz <- DiskSize;
       _ <- recover_at sz;
       Ret tt.
 
-  Definition op_impl T (op:D.Op T) : TD.prog T :=
+  Definition op_impl T (op:D.Op T) : prog T :=
     match op with
     | D.Read a => Read a
     | D.Write a b => Write a b
     | D.DiskSize => DiskSize
     end.
 
-  Definition interpret := Interpret.interpret op_impl.
-
-  Definition abstraction (state:TD.State) : D.State :=
+  Definition rd_abstraction (state:TD.State) : D.State :=
     match state with
     | TD.Disks (Some d) _ _ => d
     | TD.Disks None (Some d) _ => d
     | _ => empty_disk (* impossible *)
     end.
 
-  Definition invariant (state:TD.State) :=
+  Definition rd_invariant (state:TD.State) :=
     match state with
     | TD.Disks (Some d_0) (Some d_1) _ =>
       d_0 = d_1
     | _ => True
     end.
+
+  (* TODO: replace this with refinement composition (need to generalize
+  refinement to allow two arbitrary states - current Refinement is a low-level
+  WorldRefinement) *)
+  Definition rd_refinement :=
+    {| invariant := fun w => invariant (refinement td) w /\
+                          rd_invariant (abstraction (refinement td) w);
+       abstraction := fun w => rd_abstraction (abstraction (refinement td) w) |}.
 
   Lemma exists_tuple2 : forall A B (P: A * B -> Prop),
       (exists a b, P (a, b)) ->
@@ -186,7 +195,7 @@ Module RD.
                  TD.disk1 state' |= eq d;
            |})
         (Read a)
-        TD.step.
+        (refinement td).
   Proof.
     intros; eapply prog_ok_to_spec; simplify.
     eauto.
@@ -225,7 +234,7 @@ Module RD.
                   TD.disk1 state' |= eq (diskUpd d a b));
            |})
         (Write a b)
-        TD.step.
+        (refinement td).
   Proof.
     intros; eapply prog_ok_to_spec; simplify.
     intuition eauto.
@@ -299,7 +308,7 @@ Module RD.
                  TD.disk1 state' |= eq d;
            |})
         (fixup a)
-        TD.step.
+        (refinement td).
   Proof.
     unfold fixup.
     step.
@@ -361,7 +370,7 @@ Module RD.
                   TD.disk1 state' |= eq d);
            |})
         (fixup a)
-        TD.step.
+        (refinement td).
   Proof.
     unfold fixup; intros.
     step.
@@ -415,7 +424,7 @@ Module RD.
                   TD.disk1 state' |= eq d);
            |})
         (fixup a)
-        TD.step.
+        (refinement td).
   Proof.
     unfold fixup; intros.
     step.
@@ -496,7 +505,7 @@ Module RD.
                  end;
            |})
         (fixup a)
-        TD.step.
+        (refinement td).
   Proof.
     intro_begin; simplify.
     destruct s; intuition eauto.
@@ -577,7 +586,7 @@ Module RD.
                  end;
            |})
         (recover_at a)
-        TD.step.
+        (refinement td).
   Proof.
     induction a; simpl; intros.
     - eapply ret_prog_ok; simplify; finish.
@@ -638,7 +647,7 @@ Module RD.
                end;
          |})
       (DiskSize)
-      TD.step.
+      (refinement td).
   Proof.
     unfold DiskSize.
 
@@ -694,7 +703,7 @@ Module RD.
                end;
          |})
       (Recover)
-      TD.step.
+      (refinement td).
   Proof.
     eapply idempotent_loopspec; simpl.
     - unfold Recover; intros.
@@ -740,7 +749,7 @@ Module RD.
                  TD.disk1 state' |= eq d;
            |})
         (Read a) Recover
-        TD.step.
+        (refinement td).
   Proof.
     intros.
     eapply prog_rspec_from_crash.
@@ -773,7 +782,7 @@ Module RD.
                   TD.disk1 state' |= eq (diskUpd d a b));
            |})
         (Write a b) Recover
-        TD.step.
+        (refinement td).
   Proof.
     intros.
     eapply prog_rspec_from_crash.
@@ -804,7 +813,7 @@ Module RD.
                TD.disk1 state' |= eq d;
          |})
       (DiskSize) Recover
-      TD.step.
+      (refinement td).
   Proof.
     eapply prog_rspec_from_crash.
     eapply prog_ok_to_spec; [ | apply DiskSize_ok ]; simplify.
@@ -850,24 +859,10 @@ Module RD.
   Hint Resolve read_step write_step disk_size_step.
   Hint Resolve tt.
 
-  Theorem prog_spec_exec : forall `(spec: Specification A T State) `(p: prog opT T)
-                             `(step: Semantics opT State),
-      prog_spec spec p step ->
-      forall state r, exec step p state r ->
-             forall a, pre (spec a state) ->
-                  match r with
-                  | Finished v state' => post (spec a state) v state'
-                  | Crashed state' => crash (spec a state) state'
-                  end.
-  Proof.
-    unfold prog_spec; intros.
-    eapply H; eauto.
-  Qed.
-
   Lemma invariant_to_disks_eq : forall state,
-      invariant state ->
-      TD.disk0 state |= eq (abstraction state) /\
-      TD.disk1 state |= eq (abstraction state).
+      rd_invariant state ->
+      TD.disk0 state |= eq (rd_abstraction state) /\
+      TD.disk1 state |= eq (rd_abstraction state).
   Proof.
     destruct state; simpl; intros.
     destruct matches in *; eauto.
@@ -876,7 +871,7 @@ Module RD.
   Lemma disks_eq_to_invariant : forall state d,
       TD.disk0 state |= eq d ->
       TD.disk1 state |= eq d ->
-      invariant state.
+      rd_invariant state.
   Proof.
     destruct state; simpl; intros.
     destruct matches in *; eauto.
@@ -885,47 +880,17 @@ Module RD.
   Lemma disks_eq_to_abstraction : forall state d,
       TD.disk0 state |= eq d ->
       TD.disk1 state |= eq d ->
-      abstraction state = d.
+      rd_abstraction state = d.
   Proof.
     destruct state; simpl; intros.
     destruct matches in *; eauto.
     exfalso; eauto.
   Qed.
 
-  Hint Extern 1 (TD.disk0 _ |= eq (abstraction _)) => apply invariant_to_disks_eq.
-  Hint Extern 1 (TD.disk1 _ |= eq (abstraction _)) => apply invariant_to_disks_eq.
+  Hint Extern 1 (TD.disk0 _ |= eq (rd_abstraction _)) => apply invariant_to_disks_eq.
+  Hint Extern 1 (TD.disk1 _ |= eq (rd_abstraction _)) => apply invariant_to_disks_eq.
   Hint Resolve disks_eq_to_invariant disks_eq_to_abstraction.
 
-  Theorem RD_ok : interpretation_rexec
-                    op_impl
-                    Recover
-                    TD.step D.step
-                    invariant
-                    abstraction.
-  Proof.
-    eapply interpret_rexec; intros; eauto.
-    - destruct op; simpl in *.
-      + eapply prog_rspec_weaken.
-        eapply Read_rok.
-        unfold rspec_impl; simplify.
-        exists (abstraction state); intuition eauto.
-      + eapply prog_rspec_weaken.
-        eapply Write_rok.
-        unfold rspec_impl; simplify.
-        exists (abstraction state); intuition eauto.
-      + eapply prog_rspec_weaken.
-        eapply DiskSize_rok.
-        unfold rspec_impl; simplify.
-        exists (abstraction state); intuition eauto.
-    - (* prove recovery correctly works when not doing anything (the invariant
-         is already true) *)
-      eapply prog_loopspec_weaken.
-      eapply Recover_ok.
-      unfold spec_impl; simplify.
-      exists (abstraction state), FullySynced; intuition eauto.
-
-      Grab Existential Variables.
-      all: auto.
-  Qed.
+  End ReplicatedDisk.
 
 End RD.
