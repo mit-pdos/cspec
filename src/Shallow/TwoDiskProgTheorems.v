@@ -71,7 +71,7 @@ Theorem TDRead0_ok : forall (i: Interface TD.API) a,
              fun state' => TD.disk0 state' |= eq d_0 /\
                     TD.disk1 state' |= F;
          |})
-      (get_op i (TD.Read d0 a))
+      (Prim i (TD.Read d0 a))
       (refinement i).
 Proof.
   start_prim; cleanup.
@@ -99,7 +99,7 @@ Theorem TDRead1_ok : forall (i: Interface TD.API) a,
              fun state' => TD.disk0 state' |= F /\
                     TD.disk1 state' |= eq d_1;
          |})
-      (get_op i (TD.Read d1 a))
+      (Prim i (TD.Read d1 a))
       (refinement i).
 Proof.
   start_prim; cleanup.
@@ -127,7 +127,7 @@ Theorem TDWrite0_ok : forall (i: Interface TD.API) a b,
                TD.disk0 state' |= eq d_0 /\
                TD.disk1 state' |= F;
          |})
-      (get_op i (TD.Write d0 a b))
+      (Prim i (TD.Write d0 a b))
       (refinement i).
 Proof.
   start_prim; cleanup.
@@ -155,7 +155,7 @@ Theorem TDWrite1_ok : forall (i: Interface TD.API) a b,
                TD.disk0 state' |= F /\
                TD.disk1 state' |= eq d_1;
          |})
-      (get_op i (TD.Write d1 a b))
+      (Prim i (TD.Write d1 a b))
       (refinement i).
 Proof.
   start_prim; cleanup.
@@ -184,7 +184,7 @@ Theorem TDDiskSize0_ok : forall (i: Interface TD.API),
                TD.disk0 state' |= eq d_0 /\
                TD.disk1 state' |= F;
          |})
-      (get_op i (TD.DiskSize d0))
+      (Prim i (TD.DiskSize d0))
       (refinement i).
 Proof.
   start_prim; cleanup.
@@ -213,7 +213,7 @@ Theorem TDDiskSize1_ok : forall (i: Interface TD.API),
                TD.disk0 state' |= F /\
                TD.disk1 state' |= eq d_1;
          |})
-      (get_op i (TD.DiskSize d1))
+      (Prim i (TD.DiskSize d1))
       (refinement i).
 Proof.
   start_prim; cleanup.
@@ -222,9 +222,9 @@ Proof.
     repeat (destruct matches in *; cleanup).
 Qed.
 
-Hint Extern 1 {{ get_op _ (TD.Read d0 _); _}} => apply TDRead0_ok : prog.
-Hint Extern 1 {{ get_op _ (TD.Read d1 _); _}} => apply TDRead1_ok : prog.
-Hint Extern 1 {{ get_op _ (TD.Write d0 _ _); _}} => apply TDWrite0_ok : prog.
-Hint Extern 1 {{ get_op _ (TD.Write d1 _ _); _}} => apply TDWrite1_ok : prog.
-Hint Extern 1 {{ get_op _ (TD.DiskSize d0); _}} => apply TDDiskSize0_ok : prog.
-Hint Extern 1 {{ get_op _ (TD.DiskSize d1); _}} => apply TDDiskSize1_ok : prog.
+Hint Extern 1 {{ Prim _ (TD.Read d0 _); _}} => apply TDRead0_ok : prog.
+Hint Extern 1 {{ Prim _ (TD.Read d1 _); _}} => apply TDRead1_ok : prog.
+Hint Extern 1 {{ Prim _ (TD.Write d0 _ _); _}} => apply TDWrite0_ok : prog.
+Hint Extern 1 {{ Prim _ (TD.Write d1 _ _); _}} => apply TDWrite1_ok : prog.
+Hint Extern 1 {{ Prim _ (TD.DiskSize d0); _}} => apply TDDiskSize0_ok : prog.
+Hint Extern 1 {{ Prim _ (TD.DiskSize d1); _}} => apply TDDiskSize1_ok : prog.

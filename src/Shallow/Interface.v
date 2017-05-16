@@ -39,15 +39,15 @@ Record Interface opT State (api: InterfaceAPI opT State) :=
                 (op_impl interface_impl _ op)
                 refinement; }.
 
-Definition get_op opT `{api: InterfaceAPI opT State}
+Definition Prim opT `{api: InterfaceAPI opT State}
            (i:Interface api)
            {T} (op: opT T) : prog T :=
   op_impl (interface_impl i) _ op.
 
 (* TODO: this coercion works but does not keep T implicit
    see https://coq.inria.fr/bugs/show_bug.cgi?id=5527 *)
-Coercion get_op : Interface >-> Funclass.
-Add Printing Coercion get_op.
+Coercion Prim : Interface >-> Funclass.
+Add Printing Coercion Prim.
 
 Theorem prim_ok : forall opT `(api: InterfaceAPI opT State)
                     `(i: Interface api)
@@ -58,7 +58,7 @@ Theorem prim_ok : forall opT `(api: InterfaceAPI opT State)
                     post (spec a state) v state') ->
     (forall a state, pre (spec a state) ->
             crash (spec a state) state) ->
-    prog_ok spec (get_op i op) (refinement i).
+    prog_ok spec (Prim i op) (refinement i).
 Proof.
   intros.
   eapply prog_ok_weaken; [ eapply (impl_ok i) | ].
