@@ -1,6 +1,6 @@
 module Main where
 
-import Control.Monad (unless, forM_)
+import Control.Monad (when, forM_)
 import Data.Semigroup ((<>))
 import Network.NBD (runServer, ServerOptions (..))
 import Options.Applicative
@@ -47,7 +47,7 @@ run Options
                { diskPaths=(fn0, fn1) } } = do
   exists0 <- doesFileExist fn0
   exists1 <- doesFileExist fn1
-  unless (exists0 && exists1) $
+  when (not exists0 && not exists1) $
     forM_ [fn0, fn1] $ \p ->
       withFile p WriteMode $ \h ->
         hSetFileSize h (fromIntegral $ size * 1024)

@@ -35,6 +35,7 @@ library
                      , conduit-combinators
                      , cereal
                      , cereal-conduit
+                     , directory
   default-language:    Haskell2010
 
 executable replicate-nbd

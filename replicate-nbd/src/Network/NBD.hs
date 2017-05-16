@@ -148,23 +148,23 @@ data SizeMismatchException =
 instance Exception SizeMismatchException
 
 runServer :: ServerOptions -> IO ()
-runServer ServerOptions {diskPaths=(fn0, fn1), logCommands=doLog} = do
-  withConfig fn0 fn1 $ \c -> do
-    putStrLn "recovering..."
-    RD.recover (interpreter c)
+runServer ServerOptions {diskPaths=(fn0, fn1), logCommands=doLog} =
+  let c = Config fn0 fn1 in do
+  putStrLn "recovering..."
+  RD.recover (interpreter c)
   putStrLn "serving on localhost:10809"
   let settings = serverSettings 10809 "127.0.0.1" in
     runTCPServer settings $ \ad -> do
-      withConfig fn0 fn1 $ \config ->
-        runConduit $ appSource ad .| do
-          liftIO $ putStrLn "received connection"
-          name <- negotiateNewstyle
-          liftIO $ when (name /= "") $
-            putStrLn $ "ignoring non-default export name " ++ show name
-          (sz0, sz1) <- liftIO $ diskSizes config
-          when (sz0 /= sz1) $ throwM $ SizeMismatchException sz0 sz1
-          sendExportInformation (fromIntegral sz1)
-          liftIO $ putStrLn "finished negotiation"
-          handleCommands doLog (interpreter config)
-          .| appSink ad
+      runConduit $ appSource ad .| do
+        liftIO $ putStrLn "received connection"
+        name <- negotiateNewstyle
+        liftIO $ when (name /= "") $
+          putStrLn $ "ignoring non-default export name " ++ show name
+        msz <- liftIO $ diskSizes c
+        case msz of
+          Left (sz0, sz1) -> throwM $ SizeMismatchException sz0 sz1
+          Right sz -> sendExportInformation (fromIntegral sz)
+        liftIO $ putStrLn "finished negotiation"
+        handleCommands doLog (interpreter c)
+        .| appSink ad
       putStrLn "client disconnect"
