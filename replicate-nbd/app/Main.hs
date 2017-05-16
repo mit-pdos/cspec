@@ -1,3 +1,5 @@
+{-# LANGUAGE ApplicativeDo #-}
+{-# LANGUAGE RecordWildCards #-}
 module Main where
 
 import Control.Monad (when, forM_)
@@ -12,24 +14,25 @@ data Options = Options
   , serverOpts :: ServerOptions }
 
 serverOptions :: Parser ServerOptions
-serverOptions = ServerOptions
-  <$> (( (,)
-         <$> argument str (metavar "FILE0")
-         <*> argument str (metavar "FILE1") )
-       <|> pure ("disk0.img", "disk1.img"))
-  <*> switch ( long "debug"
-             <> short 'd'
-             <> help "log each operation received" )
+serverOptions = do
+  diskPaths <- (,)
+               <$> argument str (metavar "FILE0")
+               <*> argument str (metavar "FILE1")
+  logCommands <- switch (long "debug"
+                        <> short 'd'
+                        <> help "log each operation received")
+  pure ServerOptions {..}
 
 options :: Parser Options
-options = Options
-  <$> option auto
+options = do
+  defaultSizeKB <- option auto
     ( long "size"
       <> help "size to initialize disk files to if they do not exist"
       <> showDefault
       <> value (100*1024)
       <> metavar "KB" )
-  <*> serverOptions
+  serverOpts <- serverOptions
+  pure Options {..}
 
 main :: IO ()
 main = execParser opts >>= run
