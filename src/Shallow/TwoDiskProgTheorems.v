@@ -80,7 +80,7 @@ Proof.
     repeat (destruct matches in *; cleanup).
 Qed.
 
-Theorem TDRead1_ok : forall a,
+Theorem TDRead1_ok : forall (i: Interface TD.API) a,
     prog_ok
       (fun '(F, d_1) state =>
          {|
@@ -99,16 +99,16 @@ Theorem TDRead1_ok : forall a,
              fun state' => TD.disk0 state' |= F /\
                     TD.disk1 state' |= eq d_1;
          |})
-      (Prim (TD.Read d1 a))
-      TD.step.
+      (get_op i (TD.Read d1 a))
+      (refinement i).
 Proof.
-  start_prim.
+  start_prim; cleanup.
   TD.inv_step.
   TD.inv_bg; cleanup;
     repeat (destruct matches in *; cleanup).
 Qed.
 
-Theorem TDWrite0_ok : forall a b,
+Theorem TDWrite0_ok : forall (i: Interface TD.API) a b,
     prog_ok
       (fun '(d_0, F) state =>
          {|
@@ -127,16 +127,16 @@ Theorem TDWrite0_ok : forall a b,
                TD.disk0 state' |= eq d_0 /\
                TD.disk1 state' |= F;
          |})
-      (Prim (TD.Write d0 a b))
-      TD.step.
+      (get_op i (TD.Write d0 a b))
+      (refinement i).
 Proof.
-  start_prim.
+  start_prim; cleanup.
   TD.inv_step; simpl.
   TD.inv_bg; cleanup;
     repeat (destruct matches in *; cleanup).
 Qed.
 
-Theorem TDWrite1_ok : forall a b,
+Theorem TDWrite1_ok : forall (i: Interface TD.API) a b,
     prog_ok
       (fun '(F, d_1) state =>
          {|
@@ -155,16 +155,16 @@ Theorem TDWrite1_ok : forall a b,
                TD.disk0 state' |= F /\
                TD.disk1 state' |= eq d_1;
          |})
-      (Prim (TD.Write d1 a b))
-      TD.step.
+      (get_op i (TD.Write d1 a b))
+      (refinement i).
 Proof.
-  start_prim.
+  start_prim; cleanup.
   TD.inv_step; simpl.
   TD.inv_bg; cleanup;
     repeat (destruct matches in *; cleanup).
 Qed.
 
-Theorem TDDiskSize0_ok :
+Theorem TDDiskSize0_ok : forall (i: Interface TD.API),
     prog_ok
       (fun '(d_0, F) state =>
          {|
@@ -184,16 +184,16 @@ Theorem TDDiskSize0_ok :
                TD.disk0 state' |= eq d_0 /\
                TD.disk1 state' |= F;
          |})
-      (Prim (TD.DiskSize d0))
-      TD.step.
+      (get_op i (TD.DiskSize d0))
+      (refinement i).
 Proof.
-  start_prim.
-  TD.inv_step; simpl.
+  start_prim; cleanup.
+  TD.inv_step.
   TD.inv_bg; cleanup;
     repeat (destruct matches in *; cleanup).
 Qed.
 
-Theorem TDDiskSize1_ok :
+Theorem TDDiskSize1_ok : forall (i: Interface TD.API),
     prog_ok
       (fun '(F, d_1) state =>
          {|
@@ -213,18 +213,18 @@ Theorem TDDiskSize1_ok :
                TD.disk0 state' |= F /\
                TD.disk1 state' |= eq d_1;
          |})
-      (Prim (TD.DiskSize d1))
-      TD.step.
+      (get_op i (TD.DiskSize d1))
+      (refinement i).
 Proof.
-  start_prim.
-  TD.inv_step; simpl.
+  start_prim; cleanup.
+  TD.inv_step.
   TD.inv_bg; cleanup;
     repeat (destruct matches in *; cleanup).
 Qed.
 
-Hint Extern 1 {{ Prim (TD.Read d0 _); _}} => apply TDRead0_ok : prog.
-Hint Extern 1 {{ Prim (TD.Read d1 _); _}} => apply TDRead1_ok : prog.
-Hint Extern 1 {{ Prim (TD.Write d0 _ _); _}} => apply TDWrite0_ok : prog.
-Hint Extern 1 {{ Prim (TD.Write d1 _ _); _}} => apply TDWrite1_ok : prog.
-Hint Extern 1 {{ Prim (TD.DiskSize d0); _}} => apply TDDiskSize0_ok : prog.
-Hint Extern 1 {{ Prim (TD.DiskSize d1); _}} => apply TDDiskSize1_ok : prog.
+Hint Extern 1 {{ get_op _ (TD.Read d0 _); _}} => apply TDRead0_ok : prog.
+Hint Extern 1 {{ get_op _ (TD.Read d1 _); _}} => apply TDRead1_ok : prog.
+Hint Extern 1 {{ get_op _ (TD.Write d0 _ _); _}} => apply TDWrite0_ok : prog.
+Hint Extern 1 {{ get_op _ (TD.Write d1 _ _); _}} => apply TDWrite1_ok : prog.
+Hint Extern 1 {{ get_op _ (TD.DiskSize d0); _}} => apply TDDiskSize0_ok : prog.
+Hint Extern 1 {{ get_op _ (TD.DiskSize d1); _}} => apply TDDiskSize1_ok : prog.
