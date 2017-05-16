@@ -26,8 +26,7 @@ Definition op_spec opT `(api: InterfaceAPI opT State) `(op: opT T) : Specificati
         fun v state' => op_sem api op state v state';
       crash :=
         fun state' =>
-          state' = state \/
-          exists v, op_sem api op state v state';
+          state' = state;
     |}.
 
 Record Interface opT State (api: InterfaceAPI opT State) :=
