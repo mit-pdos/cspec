@@ -25,20 +25,11 @@ below.
  *)
 
 Ltac start_prim :=
-  intros; eapply prog_ok_weaken; [
-    match goal with
-    | [ i: Interface _ |- _ ] =>
-      eapply (impl_ok i)
-    end | ];
-  unfold spec_impl; intros;
-  repeat match goal with
-         | [ |- exists (_:unit), _ ] => exists tt
-         | |- _ /\ _ =>
-           (* this splitting is just to separate the
-           precondition/postcondition/crash implications required by
-           spec_impl *)
-           split
-         end.
+  intros; eapply prim_ok; intros;
+  repeat destruct_tuple;
+  simpl in *;
+  safe_intuition;
+  try solve [ intuition eauto ].
 
 Ltac cleanup :=
   repeat match goal with
@@ -84,12 +75,6 @@ Theorem TDRead0_ok : forall (i: Interface TD.API) a,
       (refinement i).
 Proof.
   start_prim; cleanup.
-  TD.inv_step.
-  TD.inv_bg; cleanup;
-    repeat (destruct matches in *; cleanup).
-  hyp_intuition; cleanup.
-  (* this part repeats the proof above about step - we need a version of prim_ok
-  that's for any direct get_op from the interface *)
   TD.inv_step.
   TD.inv_bg; cleanup;
     repeat (destruct matches in *; cleanup).

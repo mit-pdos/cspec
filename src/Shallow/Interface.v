@@ -48,3 +48,23 @@ Definition get_op opT `{api: InterfaceAPI opT State}
    see https://coq.inria.fr/bugs/show_bug.cgi?id=5527 *)
 Coercion get_op : Interface >-> Funclass.
 Add Printing Coercion get_op.
+
+Theorem prim_ok : forall opT `(api: InterfaceAPI opT State)
+                    `(i: Interface api)
+                    `(op: opT T)
+                    `(spec: Specification A T State),
+    (forall a state, pre (spec a state) ->
+            forall v state', op_sem api op state v state' ->
+                    post (spec a state) v state') ->
+    (forall a state, pre (spec a state) ->
+            crash (spec a state) state) ->
+    prog_ok spec (get_op i op) (refinement i).
+Proof.
+  intros.
+  eapply prog_ok_weaken; [ eapply (impl_ok i) | ].
+  unfold spec_impl; intros.
+  exists tt; repeat match goal with
+               | [ |- _ /\ _ ] => split
+               end; simpl; eauto.
+  intuition (subst; eauto); eauto.
+Qed.
