@@ -228,19 +228,19 @@ Proof.
            end.
     match goal with
     | [ Hexec: rexec p _ _ (RFinished _ _) |- _ ] =>
-      eapply H in Hexec; simpl in *; safe_intuition; eauto
+      eapply H in Hexec; simpl in *; safe_intuition eauto
     end.
     specialize (H3 v0 w' postcond recpost); safe_intuition.
     eapply H3 in H12; eauto.
   - eapply rexec_recover_bind_inv in H2; hyp_intuition.
     + match goal with
       | [ Hexec: rexec p _ _ (Recovered _ _) |- _ ] =>
-        eapply H in Hexec; simpl in *; safe_intuition; eauto
+        eapply H in Hexec; simpl in *; safe_intuition eauto
       end.
     + repeat deex.
       match goal with
       | [ Hexec: rexec p _ _ (RFinished _ _) |- _ ] =>
-        eapply H in Hexec; simpl in *; safe_intuition; eauto
+        eapply H in Hexec; simpl in *; safe_intuition eauto
       end.
       specialize (H3 v0 w' postcond recpost); safe_intuition.
       eapply H3 in H5; eauto.
@@ -296,7 +296,7 @@ Proof.
     (* recovery after finishing p *)
     match goal with
     | [ Hexec: exec_recover _ _ _ _ |- _ ] =>
-      eapply H0 in Hexec; simpl in *; eauto; safe_intuition
+      eapply H0 in Hexec; simpl in *; safe_intuition eauto
     end.
     replace (abstraction rf w'').
     intuition eauto.
