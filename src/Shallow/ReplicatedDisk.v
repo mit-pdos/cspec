@@ -5,6 +5,7 @@ Require Import Automation.
 
 Require Import Shallow.ProgLang.Prog.
 Require Import Shallow.ProgLang.Hoare Shallow.ProgLang.HoareRecovery.
+Require Import Shallow.ProgLang.ProgTheorems.
 Require Import Shallow.TwoDiskAPI Shallow.TwoDiskProgTheorems.
 Require Import Shallow.SeqDiskAPI.
 
@@ -178,27 +179,29 @@ Module RD.
 
     Hint Resolve both_disks_not_missing : false.
 
+    Hint Resolve irec_noop.
+
     Theorem Read_ok : forall a,
-        prog_spec
+        prog_rspec
           (fun d state =>
              {|
-               pre := TD.disk0 state |= eq d /\
-                      TD.disk1 state |= eq d;
-               post :=
+               rec_pre := TD.disk0 state |= eq d /\
+                          TD.disk1 state |= eq d;
+               rec_post :=
                  fun r state' =>
                    d a |= eq r /\
                    TD.disk0 state' |= eq d /\
                    TD.disk1 state' |= eq d;
-               crash :=
-                 fun state' =>
+               recover_post :=
+                 fun _ state' =>
                    TD.disk0 state' |= eq d /\
                    TD.disk1 state' |= eq d;
              |})
           (Read a)
+          (irec td)
           (refinement td).
     Proof.
-      intros; eapply prog_ok_to_spec; simplify.
-      eauto.
+      intros; eapply prog_rok_to_rspec; simplify.
 
       unfold Read.
 

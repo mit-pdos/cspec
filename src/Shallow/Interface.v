@@ -39,7 +39,9 @@ Record Interface opT State (api: InterfaceAPI opT State) :=
         prog_rspec (op_spec api op)
                    (op_impl interface_impl _ op)
                    (recover_impl interface_impl)
-                   refinement; }.
+                   refinement;
+    rec_noop_ok:
+      rec_noop (recover_impl interface_impl) refinement }.
 
 Definition Prim opT `{api: InterfaceAPI opT State}
            (i:Interface api)
@@ -134,3 +136,10 @@ Qed.
 
 Definition irec opT `(api: InterfaceAPI opT State) `(i: Interface api) : prog unit :=
   recover_impl (interface_impl i).
+
+Lemma irec_noop : forall opT `(api: InterfaceAPI opT State) `(i: Interface api),
+    rec_noop (irec i) (refinement i).
+Proof.
+  intros.
+  eapply rec_noop_ok.
+Qed.

@@ -1,4 +1,5 @@
 Require Import Relations.Relation_Operators.
+Require Import RelationClasses.
 
 Require Import Automation.
 Require Import Prog.
@@ -39,6 +40,17 @@ between programs).
 
 Definition exec_equiv T (p: prog T) p' :=
   forall w r, exec p w r <-> exec p' w r.
+
+Instance exec_equiv_equiv T : Equivalence (exec_equiv (T:=T)).
+Proof.
+  constructor; hnf; unfold exec_equiv; intros;
+    repeat match goal with
+           | [ H: forall (w:world) (r: Result T), _,
+                 w: world,
+                 r: Result T |- _ ] =>
+             specialize (H w r)
+           end; intuition.
+Qed.
 
 Lemma exec_ret : forall T (v:T) w r,
     exec (Ret v) w r ->

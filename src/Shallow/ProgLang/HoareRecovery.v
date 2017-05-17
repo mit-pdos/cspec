@@ -304,3 +304,48 @@ Proof.
     apply monad_right_id.
     eauto.
 Qed.
+
+Theorem rdouble_exec_equiv : forall `(rf: Refinement State)
+                              `(pre: RecDoublePre T R State) (p p': prog T)
+                              (rec: prog R),
+    exec_equiv p p' ->
+    prog_rdouble pre p' rec rf ->
+    prog_rdouble pre p rec rf.
+Proof.
+  unfold prog_rdouble; intros.
+  eapply H0 in H1; eauto.
+  eapply rexec_equiv; eauto.
+  symmetry; auto.
+Qed.
+
+Ltac monad_simpl ::=
+  repeat match goal with
+         | |- prog_rdouble _ (Bind (Ret _) _) _ _ =>
+           eapply rdouble_exec_equiv; [ apply monad_left_id | ]
+         | |- prog_rdouble _ (Bind (Bind _ _) _) _ _ =>
+           eapply rdouble_exec_equiv; [ apply monad_assoc | ]
+         end.
+
+(** step_prog_with t handles the first program in a bind by applying tactic t *)
+Ltac step_prog_with t ::=
+  match goal with
+  | |- prog_rdouble _ _ _ _ =>
+    monad_simpl;
+    eapply rdouble_weaken; [ solve [ t ] | ]
+  | |- forall _, _ => intros; step_prog_with t
+  | |- prog_rok _ _ _ _ => unfold prog_rok; step_prog_with t
+  end.
+
+(** step_prog applies a registered prog_ok theorem (in the prog hint database)
+to the first program in a sequence of binds. *)
+Ltac step_prog ::= step_prog_with ltac:(eauto with prog).
+
+(* similar notation to Hoare.v's, this time for recovery Extern hints
+
+   TODO: make this notation nicer;
+   I don't like making the only distinction three braces instead of two, but
+   also don't know where to put a keyword to distinguish them that doesn't look
+   terrible.
+ *)
+Notation "{{{ p ; '_' }}}" := (prog_rdouble _ (Bind p _) _ _)
+                              (only parsing, at level 0).
