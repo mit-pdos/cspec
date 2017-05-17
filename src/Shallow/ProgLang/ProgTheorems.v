@@ -186,6 +186,25 @@ Proof.
     simpl; eauto.
 Qed.
 
+Lemma rexec_bind_cases : forall `(p: prog T) `(p': T -> prog T')
+                           `(rec: prog R)
+                           w r,
+    rexec (Bind p p') rec w r ->
+    (exists v w', rexec p rec w (RFinished v w') /\
+             rexec (p' v) rec w' r) \/
+    (exists v w'', r = Recovered v w'' /\
+              rexec p rec w (Recovered v w'')).
+Proof.
+  intros.
+  destruct r.
+  - inv_rexec.
+    inv_exec.
+    left; eauto 10.
+  - eapply rexec_recover_bind_inv in H; intuition.
+    inv_rexec.
+    right; eauto 10.
+Qed.
+
 Lemma impl_and1 : forall (P P' Q:Prop),
     (P' -> P) ->
     P' /\ Q ->

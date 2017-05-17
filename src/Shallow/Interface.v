@@ -4,6 +4,8 @@ Require Import ProgLang.Prog.
 Require Import ProgLang.Hoare.
 Require Import ProgLang.HoareRecovery.
 
+Require Import ProgLang.ProgTheorems.
+
 Record InterfaceAPI opT State :=
   { op_sem: forall T, opT T -> Semantics State T; }.
 
@@ -49,7 +51,7 @@ Definition Prim opT `{api: InterfaceAPI opT State}
 Coercion Prim : Interface >-> Funclass.
 Add Printing Coercion Prim.
 
-Theorem prim_ok : forall opT `(api: InterfaceAPI opT State)
+Theorem prim_spec : forall opT `(api: InterfaceAPI opT State)
                     `(i: Interface api)
                     `(op: opT T)
                     `(spec: RecSpecification A T unit State),
@@ -71,3 +73,42 @@ Proof.
   subst; eauto.
   repeat deex; eauto.
 Qed.
+
+Theorem prim_ok : forall opT `(api: InterfaceAPI opT State)
+                    `(i: Interface api)
+                    `(op: opT T)
+                    `(spec: RecSpecification A T unit State),
+    (forall a state, rec_pre (spec a state) ->
+            forall v state', op_sem api op state v state' ->
+                    rec_post (spec a state) v state') ->
+    (forall a state, rec_pre (spec a state) ->
+            recover_post (spec a state) tt state) ->
+    prog_rok spec (Prim i op) (recover_impl (interface_impl i)) (refinement i).
+Proof.
+  unfold prog_rok, prog_rdouble; intros.
+  repeat deex.
+
+  apply rexec_bind_cases in H3; hyp_intuition; repeat deex.
+  - eapply (impl_ok i) in H3; simpl in *; safe_intuition eauto.
+    eapply H4; eauto.
+  - pose proof H6.
+    eapply (impl_ok i) in H6; simpl in *; safe_intuition eauto; subst.
+    hyp_intuition.
+    + replace (abstraction (refinement i) w'').
+      intuition eauto.
+    + repeat deex.
+      eapply H in H6; eauto.
+      specialize (H4 v w'' postcond recpost); safe_intuition.
+      (* I don't know how to proceed from here: we need an [rexec (rx v)], which
+      should be a [rx v] crashing at the beginning and then the recovery
+      procedure running. The relevant state is the result of looping the
+      recovery procedure (due to the [rexec (Prim i op)] hypothesis, H3), but we
+      don't have any positive proofs that the recovery procedure _can_ execute
+      in a loop, only a spec governing what it does _when_ it loops.
+      Specifically, in addition to rec_noop we need a proof that the recovery
+      procedure can run in an invariant state and do nothing.
+
+      TODO: fix this in order to allow _ok proofs that ignore the case of
+      recovering after finishing.
+       *)
+Abort.
