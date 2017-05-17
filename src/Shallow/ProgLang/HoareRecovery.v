@@ -349,3 +349,22 @@ Ltac step_prog ::= step_prog_with ltac:(eauto with prog).
  *)
 Notation "{{{ p ; '_' }}}" := (prog_rdouble _ (Bind p _) _ _)
                               (only parsing, at level 0).
+
+(** * (much simpler) alternative to begin *)
+
+Theorem rdouble_cases : forall `(pre: RecDoublePre T R State)
+                          `(p: prog T) `(rec: prog R)
+                          `(rf: Refinement State),
+    (forall state postcond recpost,
+        pre state postcond recpost ->
+        exists pre', prog_rdouble pre' p rec rf /\
+                pre' state postcond recpost) ->
+    prog_rdouble pre p rec rf.
+Proof.
+  unfold prog_rdouble at 2; intros.
+  apply H in H0; repeat deex.
+  eapply H0; eauto.
+Qed.
+
+Ltac rdouble_case pf :=
+  eexists; split; [ solve [ apply pf ] | ].

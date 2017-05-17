@@ -464,10 +464,10 @@ Module RD.
     | OutOfSync (a:addr) (b:block).
 
     Theorem fixup_ok : forall a,
-        prog_ok
+        prog_rok
           (fun '(d, s) state =>
              {|
-               pre :=
+               rec_pre :=
                  a < size d /\
                  match s with
                  | FullySynced => TD.disk0 state |= eq d /\
@@ -476,7 +476,7 @@ Module RD.
                                     TD.disk0 state |= eq (diskUpd d a' b) /\
                                     TD.disk1 state |= eq d
                  end;
-               post :=
+               rec_post :=
                  fun r state' =>
                    match s with
                    | FullySynced => TD.disk0 state' |= eq d /\
@@ -506,12 +506,14 @@ Module RD.
                        end
                      end
                    end;
-               crash :=
-                 fun state' =>
+               recover_post :=
+                 fun _ state' =>
                    match s with
                    | FullySynced => TD.disk0 state' |= eq d /\
                                    TD.disk1 state' |= eq d
                    | OutOfSync a' b =>
+                     (TD.disk0 state' |= eq (diskUpd d a' b) /\
+                      TD.disk1 state' |= eq (diskUpd d a' b)) \/
                      (TD.disk0 state' |= eq (diskUpd d a' b) /\
                       TD.disk1 state' |= eq d) \/
                      (TD.disk0 state' |= eq d /\
@@ -519,22 +521,26 @@ Module RD.
                    end;
              |})
           (fixup a)
+          (irec td)
           (refinement td).
     Proof.
-      intro_begin; simplify.
+      unfold prog_rok; intros.
+      eapply rdouble_cases; simplify.
       destruct s; intuition eauto.
-      - step_prog_with ltac:(eapply fixup_equal_ok); simplify; finish.
+      - rdouble_case fixup_equal_ok; simplify; finish.
         descend; intuition eauto.
 
         step.
         destruct r; (intuition eauto); try congruence.
       - apply PeanoNat.Nat.lt_eq_cases in H3; intuition.
-        + step_prog_with ltac:(eapply fixup_wrong_addr_ok); simplify; finish.
+        + rdouble_case fixup_wrong_addr_ok;
+            simplify; finish.
           descend; intuition eauto.
 
           step.
           destruct r; intuition eauto.
-        + step_prog_with ltac:(eapply fixup_correct_addr_ok); simplify; finish.
+        + rdouble_case fixup_correct_addr_ok;
+            simplify; finish.
           descend; intuition eauto.
 
           step.
