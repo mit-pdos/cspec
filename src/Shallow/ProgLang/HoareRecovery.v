@@ -211,13 +211,6 @@ Proof.
   eapply H; eauto.
 Qed.
 
-Ltac inv_rexec :=
-  match goal with
-  | [ H: rexec _ _ _ _ |- _ ] =>
-    inversion H; subst; clear H;
-    repeat sigT_eq
-  end.
-
 Theorem prog_rspec_to_rok : forall `(spec: RecSpecification A T R State)
                               `(p: prog T) `(rec: prog R)
                               `(rf: Refinement State),
@@ -252,3 +245,26 @@ Proof.
       specialize (H3 v0 w' postcond recpost); safe_intuition.
       eapply H3 in H5; eauto.
 Qed.
+
+Theorem prog_rok_to_rspec : forall `(spec: RecSpecification A T R State)
+                              `(p: prog T) `(rec: prog R)
+                              `(rf: Refinement State),
+    prog_rok spec p rec rf ->
+    prog_rspec spec p rec rf.
+Proof.
+  unfold prog_rok, prog_rdouble, prog_rspec; intros.
+  specialize (H _ Ret).
+  specialize (H w).
+  eapply H; eauto.
+  exists a; intuition eauto; subst.
+  - inv_rexec; inv_ret; eauto.
+    (* recovery after finishing p *)
+    (* TODO: maybe the right condition here is that the recovery procedure has a
+    crash specification that says it goes from invariant to invariant in the
+    same abstraction? (it does nothing if the invariant is true - recovery is
+    only for non-invariant situations) *)
+    admit.
+  - eapply rexec_equiv.
+    apply monad_right_id.
+    eauto.
+Abort.

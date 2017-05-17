@@ -145,6 +145,12 @@ Ltac inv_exec :=
     inv_exec' H; repeat inv_ret
   end.
 
+Ltac inv_rexec :=
+  match goal with
+  | [ H: rexec _ _ _ _ |- _ ] =>
+    inv_exec' H
+  end.
+
 Ltac inv_prim :=
   match goal with
   | [ H: exec (Prim _) _ _ |- _ ] =>

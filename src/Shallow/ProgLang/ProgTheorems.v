@@ -97,6 +97,19 @@ Proof.
   inv_exec; eauto.
 Qed.
 
+Local Hint Constructors rexec.
+
+Theorem rexec_equiv : forall T (p p': prog T) `(rec: prog R) w r,
+    exec_equiv p p' ->
+    rexec p' rec w r ->
+    rexec p rec w r.
+Proof.
+  intros.
+  inv_rexec.
+  apply H in H1; eauto.
+  apply H in H1; eauto.
+Qed.
+
 Theorem rexec_ret : forall `(v:T) `(rec: prog R) w r,
   rexec (Ret v) rec w r ->
   match r with
@@ -108,8 +121,6 @@ Proof.
   inversion H; subst;
     inv_exec; eauto.
 Qed.
-
-Local Hint Constructors rexec.
 
 Lemma rexec_finish_any_rec : forall `(p: prog T)
                                `(rec: prog R)
