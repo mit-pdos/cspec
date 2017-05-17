@@ -246,25 +246,61 @@ Proof.
       eapply H3 in H5; eauto.
 Qed.
 
+(* TODO: the return value is actually unconstrained here, so this will really
+   only work for unit-producing recovery procedures.
+
+   We really don't have a story for return values from recovery yet, but I'm
+   hesitant to get rid of them everywhere in case we find a way to use them.
+ *)
+Definition rec_noop `(rec: prog R) `(rf: Refinement State) :=
+  prog_spec
+    (fun (_:unit) state =>
+       {| pre := True;
+          post := fun _ state' => state' = state;
+          crash := fun state' => state' = state; |}) rec rf.
+
+Theorem rec_noop_loop `(rec: prog R) `(rf: Refinement State) :
+  rec_noop rec rf ->
+  prog_loopspec
+    (fun (_:unit) state =>
+       {| pre := True;
+          post := fun _ state' => state' = state;
+          crash := fun state' => state' = state; |}) rec rf.
+Proof.
+  unfold rec_noop; intros.
+  apply idempotent_loopspec; auto.
+  unfold idempotent; simpl in *; intros.
+  subst; eauto.
+Qed.
+
+Hint Resolve tt.
+
 Theorem prog_rok_to_rspec : forall `(spec: RecSpecification A T R State)
                               `(p: prog T) `(rec: prog R)
                               `(rf: Refinement State),
     prog_rok spec p rec rf ->
+    rec_noop rec rf ->
+    (forall a state, rec_pre (spec a state) ->
+           forall v state',
+             rec_post (spec a state) v state' ->
+             forall rv, recover_post (spec a state) rv state') ->
     prog_rspec spec p rec rf.
 Proof.
   unfold prog_rok, prog_rdouble, prog_rspec; intros.
+  eapply rec_noop_loop in H0.
   specialize (H _ Ret).
   specialize (H w).
   eapply H; eauto.
   exists a; intuition eauto; subst.
   - inv_rexec; inv_ret; eauto.
     (* recovery after finishing p *)
-    (* TODO: maybe the right condition here is that the recovery procedure has a
-    crash specification that says it goes from invariant to invariant in the
-    same abstraction? (it does nothing if the invariant is true - recovery is
-    only for non-invariant situations) *)
-    admit.
+    match goal with
+    | [ Hexec: exec_recover _ _ _ _ |- _ ] =>
+      eapply H0 in Hexec; simpl in *; eauto; safe_intuition
+    end.
+    replace (abstraction rf w'').
+    intuition eauto.
   - eapply rexec_equiv.
     apply monad_right_id.
     eauto.
-Abort.
+Qed.
