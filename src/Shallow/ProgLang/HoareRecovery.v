@@ -368,3 +368,32 @@ Qed.
 
 Ltac rdouble_case pf :=
   eexists; split; [ solve [ apply pf ] | ].
+
+(* for recovery proofs about pure programs *)
+
+Theorem ret_prog_rok : forall `(rf: Refinement State)
+                         `(spec: RecSpecification A T R State)
+                         (v:T) (rec: prog R),
+    rec_noop rec rf ->
+    (forall a state, rec_pre (spec a state) ->
+            rec_post (spec a state) v state /\
+            forall r, recover_post (spec a state) r state) ->
+    prog_rok spec (Ret v) rec rf.
+Proof.
+  intros.
+  unfold prog_rok, prog_rdouble; intros.
+  repeat deex.
+  eapply H0 in H1; intuition eauto.
+  apply rexec_bind_cases in H3; hyp_intuition;
+    repeat deex.
+  - inv_rexec; inv_exec.
+    eapply H4; eauto.
+  - inv_rexec; inv_exec.
+    eapply rec_noop_loop in H.
+    match goal with
+    | [ Hexec: exec_recover rec _ _ _ |- _ ] =>
+      eapply H in Hexec; simpl in *; safe_intuition; eauto
+    end.
+    replace (abstraction rf w'').
+    eauto.
+Qed.

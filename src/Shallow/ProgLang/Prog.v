@@ -147,6 +147,8 @@ Ltac inv_exec :=
 
 Ltac inv_rexec :=
   match goal with
+  | [ H: rexec (Ret _) _ _ _ |- _ ] =>
+    inv_exec' H
   | [ H: rexec _ _ _ _ |- _ ] =>
     inv_exec' H
   end.

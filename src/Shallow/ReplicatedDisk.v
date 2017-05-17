@@ -547,17 +547,17 @@ Module RD.
           destruct r; intuition eauto.
     Qed.
 
-    Hint Extern 1 {{ fixup _; _ }} => apply fixup_ok : prog.
+    Hint Extern 1 {{{ fixup _; _ }}} => apply fixup_ok : prog.
 
     Hint Resolve Lt.lt_n_Sm_le.
 
     Hint Rewrite diskUpd_size : rd.
 
     Theorem recover_at_ok : forall a,
-        prog_ok
+        prog_rok
           (fun '(d, s) state =>
              {|
-               pre :=
+               rec_pre :=
                  a <= size d /\
                  match s with
                  | FullySynced => TD.disk0 state |= eq d /\
@@ -566,7 +566,7 @@ Module RD.
                                     TD.disk0 state |= eq (diskUpd d a' b) /\
                                     TD.disk1 state |= eq d
                  end;
-               post :=
+               rec_post :=
                  fun r state' =>
                    match s with
                    | FullySynced => TD.disk0 state' |= eq d /\
@@ -591,8 +591,8 @@ Module RD.
                        end
                      end
                    end;
-               crash :=
-                 fun state' =>
+               recover_post :=
+                 fun _ state' =>
                    match s with
                    | FullySynced => TD.disk0 state' |= eq d /\
                                    TD.disk1 state' |= eq d
@@ -606,10 +606,11 @@ Module RD.
                    end;
              |})
           (recover_at a)
+          (irec td)
           (refinement td).
     Proof.
       induction a; simpl; intros.
-      - eapply ret_prog_ok; simplify; finish.
+      - eapply ret_prog_rok; simplify; finish.
         destruct s; intuition eauto.
         congruence.
         inversion H1.
@@ -632,7 +633,7 @@ Module RD.
         destruct i; intuition eauto.
     Qed.
 
-    Hint Extern 1 {{ recover_at _; _ }} => apply recover_at_ok : prog.
+    Hint Extern 1 {{{ recover_at _; _ }}} => apply recover_at_ok : prog.
 
     Theorem DiskSize_ok :
       prog_ok
