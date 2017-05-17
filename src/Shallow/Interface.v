@@ -112,3 +112,25 @@ Proof.
       recovering after finishing.
        *)
 Abort.
+
+(* weaker version of prim_ok that requires the postcondition imply the recovery
+postcondition *)
+Theorem prim_ok : forall opT `(api: InterfaceAPI opT State)
+                    `(i: Interface api)
+                    `(op: opT T)
+                    `(spec: RecSpecification A T unit State),
+    (forall a state, rec_pre (spec a state) ->
+            forall v state', op_sem api op state v state' ->
+                    rec_post (spec a state) v state') ->
+    (forall a state, rec_pre (spec a state) ->
+            recover_post (spec a state) tt state) ->
+    (forall a state, rec_pre (spec a state) ->
+            forall v state', rec_post (spec a state) v state' ->
+                    recover_post (spec a state) tt state') ->
+    prog_rok spec (Prim i op) (recover_impl (interface_impl i)) (refinement i).
+Proof.
+  eauto using prog_rspec_to_rok, prim_spec.
+Qed.
+
+Definition irec opT `(api: InterfaceAPI opT State) `(i: Interface api) : prog unit :=
+  recover_impl (interface_impl i).
