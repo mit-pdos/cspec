@@ -131,7 +131,7 @@ Theorem TDWrite0_ok : forall (i: Interface TD.API) a b,
            recover_post :=
              fun _ state' =>
                (TD.disk0 state' |= eq d_0 \/
-                TD.disk0 state' |= eq (diskUpd d_0 a b)) /\
+                a < size d_0 /\ TD.disk0 state' |= eq (diskUpd d_0 a b)) /\
                 TD.disk1 state' |= F;
          |})
       (Prim i (TD.Write d0 a b))
@@ -143,6 +143,10 @@ Proof.
   TD.inv_bg; cleanup;
     repeat (destruct matches in *; cleanup).
   destruct matches in *; intuition eauto.
+
+  destruct (lt_dec a (size d_0));
+    autorewrite with upd in *;
+    eauto.
 Qed.
 
 Theorem TDWrite1_ok : forall (i: Interface TD.API) a b,
@@ -163,7 +167,7 @@ Theorem TDWrite1_ok : forall (i: Interface TD.API) a b,
              fun _ state' =>
                TD.disk0 state' |= F /\
                (TD.disk1 state' |= eq d_1 \/
-                TD.disk1 state' |= eq (diskUpd d_1 a b));
+                a < size d_1 /\ TD.disk1 state' |= eq (diskUpd d_1 a b));
          |})
       (Prim i (TD.Write d1 a b))
       (irec i)
@@ -174,6 +178,10 @@ Proof.
   TD.inv_bg; cleanup;
     repeat (destruct matches in *; cleanup).
   destruct matches in *; intuition eauto.
+
+  destruct (lt_dec a (size d_1));
+    autorewrite with upd in *;
+    eauto.
 Qed.
 
 Theorem TDDiskSize0_ok : forall (i: Interface TD.API),

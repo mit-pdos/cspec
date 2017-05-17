@@ -215,19 +215,19 @@ Module RD.
     Qed.
 
     Theorem Write_ok : forall a b,
-        prog_spec
+        prog_rspec
           (fun d state =>
              {|
-               pre :=
+               rec_pre :=
                  TD.disk0 state |= eq d /\
                  TD.disk1 state |= eq d;
-               post :=
+               rec_post :=
                  fun r state' =>
                    r = tt /\
                    TD.disk0 state' |= eq (diskUpd d a b) /\
                    TD.disk1 state' |= eq (diskUpd d a b);
-               crash :=
-                 fun state' =>
+               recover_post :=
+                 fun _ state' =>
                    (TD.disk0 state' |= eq d /\
                     TD.disk1 state' |= eq d) \/
                    (a < size d /\
@@ -237,15 +237,16 @@ Module RD.
                     TD.disk1 state' |= eq (diskUpd d a b));
              |})
           (Write a b)
+          (irec td)
           (refinement td).
     Proof.
-      intros; eapply prog_ok_to_spec; simplify.
+      intros; eapply prog_rok_to_rspec; simplify.
       intuition eauto.
 
       unfold Write.
 
       step.
-      descend; intuition eauto.
+      descend; intuition eauto 10.
       destruct r; step.
       descend; intuition eauto.
 
@@ -255,7 +256,7 @@ Module RD.
       eauto 10.
       autorewrite with upd in *; eauto.
 
-      descend; (intuition eauto); simplify.
+      descend; (intuition eauto); simplify; eauto 10.
       destruct r; step.
     Qed.
 
@@ -284,17 +285,17 @@ Module RD.
 
     (* we will show that fixup does nothing once the disks are the same *)
     Theorem fixup_equal_ok : forall a,
-        prog_ok
+        prog_rok
           (fun d state =>
              {|
-               pre :=
+               rec_pre :=
                  (* for simplicity we only consider in-bounds addresses, though
                     if a is out-of-bounds fixup just might uselessly write to
                     disk and not do anything *)
                  a < size d /\
                  TD.disk0 state |= eq d /\
                  TD.disk1 state |= eq d;
-               post :=
+               rec_post :=
                  fun r state' =>
                    match r with
                    | Continue =>
@@ -305,12 +306,13 @@ Module RD.
                      TD.disk0 state' |= eq d /\
                      TD.disk1 state' |= eq d
                    end;
-               crash :=
-                 fun state' =>
+               recover_post :=
+                 fun _ state' =>
                    TD.disk0 state' |= eq d /\
                    TD.disk1 state' |= eq d;
              |})
           (fixup a)
+          (irec td)
           (refinement td).
     Proof.
       unfold fixup.
@@ -340,14 +342,14 @@ Module RD.
     Hint Rewrite diskUpd_eq using (solve [ auto ]) : rd.
 
     Theorem fixup_correct_addr_ok : forall a,
-        prog_ok
+        prog_rok
           (fun '(d, b) state =>
              {|
-               pre :=
+               rec_pre :=
                  a < size d /\
                  TD.disk0 state |= eq (diskUpd d a b) /\
                  TD.disk1 state |= eq d;
-               post :=
+               rec_post :=
                  fun r state' =>
                    match r with
                    | Continue =>
@@ -365,14 +367,17 @@ Module RD.
                             TD.disk1 state' |= eq (diskUpd d a b)
                      end
                    end;
-               crash :=
-                 fun state' =>
+               recover_post :=
+                 fun _ state' =>
+                   (TD.disk0 state' |= eq (diskUpd d a b) /\
+                    TD.disk1 state' |= eq (diskUpd d a b)) \/
                    (TD.disk0 state' |= eq (diskUpd d a b) /\
                     TD.disk1 state' |= eq d) \/
                    (TD.disk0 state' |= eq d /\
                     TD.disk1 state' |= eq d);
              |})
           (fixup a)
+          (irec td)
           (refinement td).
     Proof.
       unfold fixup; intros.
@@ -391,17 +396,17 @@ Module RD.
     Qed.
 
     Theorem fixup_wrong_addr_ok : forall a,
-        prog_ok
+        prog_rok
           (fun '(d, b, a') state =>
              {|
-               pre :=
+               rec_pre :=
                  a < size d /\
                  (* recovery, working from end of disk, has not yet reached the
                     correct address *)
                  a' < a /\
                  TD.disk0 state |= eq (diskUpd d a' b) /\
                  TD.disk1 state |= eq d;
-               post :=
+               rec_post :=
                  fun r state' =>
                    match r with
                    | Continue =>
@@ -419,14 +424,15 @@ Module RD.
                             TD.disk1 state' |= eq (diskUpd d a' b)
                      end
                    end;
-               crash :=
-                 fun state' =>
+               recover_post :=
+                 fun _ state' =>
                    (TD.disk0 state' |= eq (diskUpd d a' b) /\
                     TD.disk1 state' |= eq d) \/
                    (TD.disk0 state' |= eq d /\
                     TD.disk1 state' |= eq d);
              |})
           (fixup a)
+          (irec td)
           (refinement td).
     Proof.
       unfold fixup; intros.
@@ -442,6 +448,11 @@ Module RD.
 
       step.
       destruct r; (intuition eauto); simplify; finish.
+      assert (a' <> a) by eauto using PeanoNat.Nat.lt_neq.
+      autorewrite with upd in *.
+      assert (v = v0) by eauto using disks_eq_inbounds.
+      contradiction.
+
       assert (a' <> a) by eauto using PeanoNat.Nat.lt_neq.
       autorewrite with upd in *.
       assert (v = v0) by eauto using disks_eq_inbounds.
