@@ -156,3 +156,99 @@ Proof.
   eapply H in H3; eauto.
   destruct r; simpl in *; intuition eauto.
 Qed.
+
+Definition RecDoublePre T R State :=
+  (* initial state *)
+  State ->
+  (* postcondition *)
+  (T -> State -> Prop) ->
+  (* recovery postcondition *)
+  (R -> State -> Prop) ->
+  Prop.
+
+Definition prog_rdouble `(pre: RecDoublePre T R State)
+           `(p: prog T) `(rec: prog R)
+           (rf: Refinement State) :=
+  forall w postcond recpost,
+    let state := abstraction rf w in
+    pre state postcond recpost ->
+    invariant rf w ->
+    forall r, rexec p rec w r ->
+         match r with
+         | RFinished v w' => let state' := abstraction rf w' in
+                            postcond v state' /\
+                            invariant rf w'
+         | Recovered v w' => let state' := abstraction rf w' in
+                            recpost v state' /\
+                            invariant rf w'
+         end.
+
+Definition prog_rok `(spec: RecSpecification A T R State)
+           `(p: prog T) `(rec: prog R)
+           `(rf: Refinement State) :=
+  forall T' (rx: T -> prog T'),
+    prog_rdouble
+      (fun state postcond recpost =>
+         exists a, rec_pre (spec a state) /\
+              (forall r, prog_rdouble
+                      (fun state' postcond' recpost' =>
+                         rec_post (spec a state) r state' /\
+                         postcond' = postcond /\
+                         recpost' = recpost)
+                      (rx r) rec rf) /\
+              (forall r state', recover_post (spec a state) r state' ->
+                       recpost r state')) (Bind p rx) rec rf.
+
+Theorem rdouble_weaken : forall `(p: prog T) `(rec: prog R)
+                          `(rf: Refinement State)
+                          (pre pre': RecDoublePre T R State),
+    prog_rdouble pre' p rec rf ->
+    (forall state postcond recpost, pre state postcond recpost ->
+                           pre' state postcond recpost) ->
+    prog_rdouble pre p rec rf.
+Proof.
+  unfold prog_rdouble at 2; intros.
+  eapply H; eauto.
+Qed.
+
+Ltac inv_rexec :=
+  match goal with
+  | [ H: rexec _ _ _ _ |- _ ] =>
+    inversion H; subst; clear H;
+    repeat sigT_eq
+  end.
+
+Theorem prog_rspec_to_rok : forall `(spec: RecSpecification A T R State)
+                              `(p: prog T) `(rec: prog R)
+                              `(rf: Refinement State),
+    prog_rspec spec p rec rf ->
+    prog_rok spec p rec rf.
+Proof.
+  unfold prog_rok, prog_rdouble; intros.
+  repeat deex.
+  destruct r.
+  - inv_rexec.
+    inv_exec.
+    repeat match goal with
+           | [ H: exec _ _ _ |- _ ] =>
+             eapply RExec with (rec:=rec) in H
+           end.
+    match goal with
+    | [ Hexec: rexec p _ _ (RFinished _ _) |- _ ] =>
+      eapply H in Hexec; simpl in *; safe_intuition; eauto
+    end.
+    specialize (H3 v0 w' postcond recpost); safe_intuition.
+    eapply H3 in H12; eauto.
+  - eapply rexec_recover_bind_inv in H2; hyp_intuition.
+    + match goal with
+      | [ Hexec: rexec p _ _ (Recovered _ _) |- _ ] =>
+        eapply H in Hexec; simpl in *; safe_intuition; eauto
+      end.
+    + repeat deex.
+      match goal with
+      | [ Hexec: rexec p _ _ (RFinished _ _) |- _ ] =>
+        eapply H in Hexec; simpl in *; safe_intuition; eauto
+      end.
+      specialize (H3 v0 w' postcond recpost); safe_intuition.
+      eapply H3 in H5; eauto.
+Qed.
