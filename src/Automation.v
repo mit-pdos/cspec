@@ -204,3 +204,12 @@ Create HintDb false.
 
 Ltac solve_false :=
   solve [ exfalso; eauto with false ].
+
+Ltac especialize H :=
+  match type of H with
+  | forall (x:?T), _ =>
+    let x := fresh x in
+    evar (x:T);
+    specialize (H x);
+    subst x
+  end.

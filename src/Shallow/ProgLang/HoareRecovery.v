@@ -392,8 +392,141 @@ Proof.
     eapply rec_noop_loop in H.
     match goal with
     | [ Hexec: exec_recover rec _ _ _ |- _ ] =>
-      eapply H in Hexec; simpl in *; safe_intuition; eauto
+      eapply H in Hexec; simpl in *; safe_intuition eauto
     end.
     replace (abstraction rf w'').
     eauto.
+Qed.
+
+(** * Proving a higher-level recovery procedure correct. *)
+
+Hint Constructors rexec.
+Hint Constructors exec.
+Hint Constructors exec_recover.
+
+Lemma clos_refl_trans_1n_unit_tuple : forall A (R: unit * A -> unit * A -> Prop) x y u u',
+    Relation_Operators.clos_refl_trans_1n R (u, x) (u', y) ->
+    Relation_Operators.clos_refl_trans_1n
+      (fun x y =>
+         R (tt, x) (tt, y)) x y.
+Proof.
+  intros.
+  destruct u, u'.
+  remember (tt, x).
+  remember (tt, y).
+  generalize dependent x.
+  generalize dependent y.
+  induction H; intuition subst.
+  - inversion Heqp0; subst.
+    inversion Heqp; subst.
+    constructor.
+  - destruct y.
+    destruct u.
+    especialize IHclos_refl_trans_1n; safe_intuition.
+    especialize IHclos_refl_trans_1n; safe_intuition.
+    econstructor; eauto.
+Qed.
+
+Definition rec_loopspec `(spec: RecSpecification A unit unit State)
+           `(rec: prog unit) `(rec': prog unit)
+           (rf: Refinement State) :=
+  forall a w,
+    let state := abstraction rf w in
+    rec_pre (spec a state) ->
+    invariant rf w ->
+    forall rv rv' w',
+      Relation_Operators.clos_refl_trans_1n
+        (fun '(_, w) '(rv', w') => rexec rec' rec w (Recovered rv' w'))
+        (rv, w) (rv', w') ->
+      forall rv'' w'',
+        exec rec' w' (Finished rv'' w'') ->
+        let state'' := abstraction rf w'' in
+        rec_post (spec a state) rv'' state'' /\
+        invariant rf w''.
+
+Definition rec_idempotent `(spec: RecSpecification A T unit State) :=
+  forall a state,
+    rec_pre (spec a state) ->
+    forall v state', recover_post (spec a state) v state' ->
+          (* idempotency: crash invariant implies precondition to re-run on
+               every crash *)
+          exists a', rec_pre (spec a' state') /\
+                (* postcondition transitivity: establishing the postcondition
+                   from a crash state is sufficient to establish it with respect
+                   to the original initial state (note all with the same ghost
+                   state) *)
+                forall rv state'', rec_post (spec a' state') rv state'' ->
+                              rec_post (spec a state) rv state''.
+
+Theorem rec_idempotent_loopspec : forall `(rec: prog unit) `(rec': prog unit)
+                                    `(spec: RecSpecification A unit unit State)
+                                    (rf: Refinement State),
+    forall (Hspec: prog_rspec spec rec' rec rf),
+      rec_idempotent spec ->
+      rec_loopspec spec rec rec' rf.
+Proof.
+  unfold rec_loopspec; intros.
+  apply clos_refl_trans_1n_unit_tuple in H2.
+  repeat match goal with
+         | [ u: unit |- _ ] => destruct u
+         end.
+
+  generalize dependent a.
+  induction H2; intros.
+  - eapply RExec in H3.
+    eapply Hspec in H3; eauto.
+  - eapply Hspec in H0; simpl in *; safe_intuition eauto.
+    eapply H in H0; eauto; repeat deex.
+    specialize (IHclos_refl_trans_1n a'); intuition eauto.
+Qed.
+
+Theorem compose_recovery : forall `(spec: RecSpecification A T unit State)
+                             `(rspec: RecSpecification A' unit unit State)
+                             `(spec': RecSpecification A T unit State)
+                             `(p: prog T) `(rec: prog unit) `(rec': prog unit)
+                             `(rf: Refinement State),
+    forall (Hspec: prog_rspec spec p rec rf)
+      (Hrspec: prog_rspec rspec rec' rec rf)
+      (Hidempotent: rec_idempotent rspec)
+      (Hspec_spec':
+         forall a state, rec_pre (spec' a state) ->
+                rec_pre (spec a state) /\
+                (forall v state', rec_post (spec a state) v state' ->
+                         rec_post (spec' a state) v state') /\
+                (forall v state', recover_post (spec a state) v state' ->
+                         exists a', rec_pre (rspec a' state') /\
+                               forall v' state'',
+                                 rec_post (rspec a' state') v' state'' ->
+                                 recover_post (spec' a state) v' state'')),
+      prog_rspec spec' p (_ <- rec; rec') rf.
+Proof.
+  intros.
+  unfold prog_rspec; intros.
+  eapply Hspec_spec' in H; safe_intuition.
+  destruct r.
+  - match goal with
+    | [ Hexec: rexec p _ _ _ |- _ ] =>
+      eapply rexec_finish_any_rec in Hexec;
+        eapply Hspec in Hexec
+    end; simpl in *; intuition eauto.
+  - inv_rexec.
+    match goal with
+    | [ Hexec: exec_recover _ _ _ _ |- _ ] =>
+      eapply exec_recover_bind_inv in Hexec
+    end; repeat deex.
+    assert (rexec p rec w (Recovered rv1 w1)) by eauto.
+    (* H9: exec p *)
+    (* H1: exec_recover rec *)
+    clear H9 H1.
+    match goal with
+    | [ Hexec: rexec p _ _ _ |- _ ] =>
+      eapply Hspec in Hexec
+    end; simpl in *; safe_intuition eauto.
+    (* H3: recover_post -> exists a' *)
+    (* H1: recover_post *)
+    eapply H3 in H1; repeat deex.
+    match goal with
+    | [ Hexec: exec rec' _ _ |- _ ] =>
+      eapply rec_idempotent_loopspec in Hexec
+    end; simpl in *; safe_intuition eauto.
 Qed.
