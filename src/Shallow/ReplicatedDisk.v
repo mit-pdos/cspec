@@ -636,10 +636,10 @@ Module RD.
     Hint Extern 1 {{{ recover_at _; _ }}} => apply recover_at_ok : prog.
 
     Theorem DiskSize_ok :
-      prog_ok
+      prog_rok
         (fun '(d, s) state =>
            {|
-             pre :=
+             rec_pre :=
                match s with
                | FullySynced => TD.disk0 state |= eq d /\
                                TD.disk1 state |= eq d
@@ -647,7 +647,7 @@ Module RD.
                                  TD.disk0 state |= eq (diskUpd d a b) /\
                                  TD.disk1 state |= eq d
                end;
-             post :=
+             rec_post :=
                fun r state' =>
                  r = size d /\
                  match s with
@@ -657,8 +657,8 @@ Module RD.
                                    TD.disk0 state' |= eq (diskUpd d a b) /\
                                    TD.disk1 state' |= eq d
                  end;
-             crash :=
-               fun state' =>
+             recover_post :=
+               fun _ state' =>
                  match s with
                  | FullySynced => TD.disk0 state' |= eq d /\
                                  TD.disk1 state' |= eq d
@@ -668,6 +668,7 @@ Module RD.
                  end;
            |})
         (DiskSize)
+        (irec td)
         (refinement td).
     Proof.
       unfold DiskSize.
@@ -684,7 +685,7 @@ Module RD.
         destruct r; step.
     Qed.
 
-    Hint Extern 1 {{ DiskSize; _ }} => apply DiskSize_ok : prog.
+    Hint Extern 1 {{{ DiskSize; _ }}} => apply DiskSize_ok : prog.
 
     Theorem Recover_ok :
       prog_loopspec
