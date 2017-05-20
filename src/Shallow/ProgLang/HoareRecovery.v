@@ -427,8 +427,8 @@ Proof.
     econstructor; eauto.
 Qed.
 
-Definition rec_loopspec `(spec: RecSpecification A unit unit State)
-           `(rec: prog unit) `(rec': prog unit)
+Definition prog_rec_loopspec `(spec: RecSpecification A unit unit State)
+           `(rec': prog unit) `(rec: prog unit)
            (rf: Refinement State) :=
   forall a w,
     let state := abstraction rf w in
@@ -463,9 +463,9 @@ Theorem rec_idempotent_loopspec : forall `(rec: prog unit) `(rec': prog unit)
                                     (rf: Refinement State),
     forall (Hspec: prog_rspec spec rec' rec rf),
       rec_idempotent spec ->
-      rec_loopspec spec rec rec' rf.
+      prog_rec_loopspec spec rec' rec rf.
 Proof.
-  unfold rec_loopspec; intros.
+  unfold prog_rec_loopspec; intros.
   apply clos_refl_trans_1n_unit_tuple in H2.
   repeat match goal with
          | [ u: unit |- _ ] => destruct u
@@ -486,8 +486,7 @@ Theorem compose_recovery : forall `(spec: RecSpecification A T unit State)
                              `(p: prog T) `(rec: prog unit) `(rec': prog unit)
                              `(rf: Refinement State),
     forall (Hspec: prog_rspec spec p rec rf)
-      (Hrspec: prog_rspec rspec rec' rec rf)
-      (Hidempotent: rec_idempotent rspec)
+      (Hrspec: prog_rec_loopspec rspec rec' rec rf)
       (Hspec_spec':
          forall a state, rec_pre (spec' a state) ->
                 rec_pre (spec a state) /\
@@ -527,6 +526,6 @@ Proof.
     eapply H3 in H1; repeat deex.
     match goal with
     | [ Hexec: exec rec' _ _ |- _ ] =>
-      eapply rec_idempotent_loopspec in Hexec
+      eapply Hrspec in Hexec
     end; simpl in *; safe_intuition eauto.
 Qed.
