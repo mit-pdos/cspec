@@ -688,10 +688,10 @@ Module RD.
     Hint Extern 1 {{{ DiskSize; _ }}} => apply DiskSize_ok : prog.
 
     Theorem Recover_ok :
-      prog_loopspec
+      prog_rec_loopspec
         (fun '(d, s) state =>
            {|
-             pre :=
+             rec_pre :=
                match s with
                | FullySynced => TD.disk0 state |= eq d /\
                                TD.disk1 state |= eq d
@@ -699,7 +699,7 @@ Module RD.
                                  TD.disk0 state |= eq (diskUpd d a b) /\
                                  TD.disk1 state |= eq d
                end;
-             post :=
+             rec_post :=
                fun _ state' =>
                  match s with
                  | FullySynced => TD.disk0 state' |= eq d /\
@@ -710,8 +710,8 @@ Module RD.
                    (TD.disk0 state' |= eq (diskUpd d a b) /\
                     TD.disk1 state' |= eq (diskUpd d a b))
                  end;
-             crash :=
-               fun state' =>
+             recover_post :=
+               fun _ state' =>
                  match s with
                  | FullySynced => TD.disk0 state' |= eq d /\
                                  TD.disk1 state' |= eq d
@@ -725,12 +725,12 @@ Module RD.
                  end;
            |})
         (Recover)
+        (irec td)
         (refinement td).
     Proof.
-      eapply idempotent_loopspec; simpl.
+      eapply rec_idempotent_loopspec; simpl.
       - unfold Recover; intros.
-        eapply prog_ok_to_spec; simplify.
-        + destruct s; intuition eauto.
+        eapply prog_rok_to_rspec; simplify.
         + step.
           descend; intuition eauto.
 
@@ -745,7 +745,8 @@ Module RD.
           destruct r; intuition eauto.
           destruct i; intuition eauto.
           destruct s; simplify; eauto.
-      - unfold idempotent; intuition; simplify.
+        + destruct s; intuition eauto.
+      - unfold rec_idempotent; intuition; simplify.
         rename a0 into d.
         destruct b; intuition eauto.
         exists d, FullySynced; intuition eauto.
@@ -770,11 +771,11 @@ Module RD.
                    TD.disk0 state' |= eq d /\
                    TD.disk1 state' |= eq d;
              |})
-          (Read a) Recover
+          (Read a) (_ <- irec td; Recover)
           (refinement td).
     Proof.
       intros.
-      eapply prog_rspec_from_crash.
+      eapply compose_recovery.
       eapply Read_ok.
       eapply Recover_ok.
       simplify.
@@ -803,11 +804,11 @@ Module RD.
                    (TD.disk0 state' |= eq (diskUpd d a b) /\
                     TD.disk1 state' |= eq (diskUpd d a b));
              |})
-          (Write a b) Recover
+          (Write a b) (_ <- irec td; Recover)
           (refinement td).
     Proof.
       intros.
-      eapply prog_rspec_from_crash.
+      eapply compose_recovery.
       eapply Write_ok.
       eapply Recover_ok.
       simplify.
@@ -834,12 +835,11 @@ Module RD.
                  TD.disk0 state' |= eq d /\
                  TD.disk1 state' |= eq d;
            |})
-        (DiskSize) Recover
+        (DiskSize) (_ <- irec td; Recover)
         (refinement td).
     Proof.
-      eapply prog_rspec_from_crash.
-      eapply prog_ok_to_spec; [ | apply DiskSize_ok ]; simplify.
-      destruct s; intuition eauto.
+      eapply compose_recovery.
+      eapply prog_rok_to_rspec; [ eapply DiskSize_ok | eauto | simplify ].
       eapply Recover_ok.
       simplify.
 
