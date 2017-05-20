@@ -531,3 +531,32 @@ Proof.
       eapply Hrspec in Hexec
     end; simpl in *; safe_intuition eauto.
 Qed.
+
+Theorem rspec_refinement_compose :
+  forall `(spec: RecSpecification A T R State2)
+    `(p: prog T) `(rec: prog R)
+    `(rf2: LRefinement State1 State2)
+    `(rf1: Refinement State1),
+    prog_rspec
+      (fun (a:A) state =>
+         let state2 := layer_abstraction rf2 state in
+         {| rec_pre := rec_pre (spec a state2) /\
+                       layer_invariant rf2 state;
+            rec_post :=
+              fun v state' =>
+                let state2' := layer_abstraction rf2 state' in
+                rec_post (spec a state2) v state2' /\
+                layer_invariant rf2 state';
+            recover_post :=
+              fun v state' =>
+                let state2' := layer_abstraction rf2 state' in
+                recover_post (spec a state2) v state2' /\
+                layer_invariant rf2 state'; |}) p rec rf1 ->
+    prog_rspec spec p rec (refinement_compose rf1 rf2).
+Proof.
+  intros.
+  unfold prog_rspec, refinement_compose;
+    simpl; intros; safe_intuition.
+  eapply H in H2; simpl in *; eauto.
+  destruct r; intuition eauto.
+Qed.

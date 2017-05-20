@@ -93,35 +93,6 @@ Module RD.
         _ <- recover_at sz;
         Ret tt.
 
-    Definition op_impl T (op:D.Op T) : prog T :=
-      match op with
-      | D.Read a => Read a
-      | D.Write a b => Write a b
-      | D.DiskSize => DiskSize
-      end.
-
-    Definition rd_abstraction (state:TD.State) : D.State :=
-      match state with
-      | TD.Disks (Some d) _ _ => d
-      | TD.Disks None (Some d) _ => d
-      | _ => empty_disk (* impossible *)
-      end.
-
-    Definition rd_invariant (state:TD.State) :=
-      match state with
-      | TD.Disks (Some d_0) (Some d_1) _ =>
-        d_0 = d_1
-      | _ => True
-      end.
-
-    (* TODO: replace this with refinement composition (need to generalize
-       refinement to allow two arbitrary states - current Refinement is a
-       low-level WorldRefinement) *)
-    Definition rd_refinement :=
-      {| invariant := fun w => invariant (refinement td) w /\
-                            rd_invariant (abstraction (refinement td) w);
-         abstraction := fun w => rd_abstraction (abstraction (refinement td) w) |}.
-
     Lemma exists_tuple2 : forall A B (P: A * B -> Prop),
         (exists a b, P (a, b)) ->
         (exists p, P p).
@@ -148,6 +119,7 @@ Module RD.
              | _ => progress safe_intuition
              | _ => progress subst
              | _ => progress autorewrite with rd in *
+             | [ u: unit |- _ ] => destruct u
              | [ crashinv: _ -> Prop |- _ ] =>
                match goal with
                | [ H: forall _, _ -> crashinv _ |-
@@ -879,6 +851,21 @@ Module RD.
     Qed.
 
     Hint Resolve read_step write_step disk_size_step.
+
+    Definition rd_abstraction (state:TD.State) : D.State :=
+      match state with
+      | TD.Disks (Some d) _ _ => d
+      | TD.Disks None (Some d) _ => d
+      | _ => empty_disk (* impossible *)
+      end.
+
+    Definition rd_invariant (state:TD.State) :=
+      match state with
+      | TD.Disks (Some d_0) (Some d_1) _ =>
+        d_0 = d_1
+      | _ => True
+      end.
+
     Hint Resolve tt.
 
     Lemma invariant_to_disks_eq : forall state,
@@ -912,6 +899,52 @@ Module RD.
     Hint Extern 1 (TD.disk0 _ |= eq (rd_abstraction _)) => apply invariant_to_disks_eq.
     Hint Extern 1 (TD.disk1 _ |= eq (rd_abstraction _)) => apply invariant_to_disks_eq.
     Hint Resolve disks_eq_to_invariant disks_eq_to_abstraction.
+
+    Definition d_op_impl T (op:D.Op T) : prog T :=
+      match op with
+      | D.Read a => Read a
+      | D.Write a b => Write a b
+      | D.DiskSize => DiskSize
+      end.
+
+    Definition rd_refinement :=
+      refinement_compose
+        (refinement td)
+        {| layer_invariant := rd_invariant;
+           layer_abstraction := rd_abstraction; |}.
+
+    Definition impl : Interface D.API.
+      unshelve econstructor.
+      - exact {| op_impl := d_op_impl;
+                 recover_impl := _ <- irec td; Recover; |}.
+      - exact rd_refinement.
+      - intros.
+        destruct op; unfold op_spec; simpl.
+        + apply rspec_refinement_compose; simpl.
+          eapply prog_rspec_weaken; [ apply Read_rok | ].
+          unfold rspec_impl; simplify.
+          exists (rd_abstraction state); (intuition eauto); simplify.
+        + apply rspec_refinement_compose; simpl.
+          eapply prog_rspec_weaken; [ apply Write_rok | ].
+          unfold rspec_impl; simplify.
+          exists (rd_abstraction state); (intuition eauto); simplify.
+        + apply rspec_refinement_compose; simpl.
+          eapply prog_rspec_weaken; [ apply DiskSize_rok | ].
+          unfold rspec_impl; simplify.
+          exists (rd_abstraction state); (intuition eauto); simplify.
+      - simpl.
+        unfold rec_noop.
+        (* oops, only rec_noop requires a crash proof about recovery; we can
+           probably just prove a recovery proof about recovery directly instead
+
+           TODO: fix rec_noop to be a prog_rec_loopspec so we can prove it by
+           weakening the existing complete recovery spec.
+         *)
+        admit.
+
+        Grab Existential Variables.
+        all: auto.
+    Abort.
 
   End ReplicatedDisk.
 

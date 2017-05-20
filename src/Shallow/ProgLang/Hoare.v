@@ -332,3 +332,21 @@ Proof.
   eapply H3; eauto.
   intuition eauto.
 Qed.
+
+(** * refinement composition *)
+
+(* A LRefinement (for "layer refinement") goes between State1 (implementation)
+and State2 (spec)
+
+ TODO: A Refinement is an LRefinement world, maybe we should just use one
+ definition and write a definition for world refinements. *)
+Record LRefinement State1 State2 :=
+  { layer_invariant : State1 -> Prop;
+    layer_abstraction : State1 -> State2; }.
+
+Definition refinement_compose
+           `(rf1: Refinement State1)
+           `(rf2: LRefinement State1 State2) :=
+  {| invariant := fun w => invariant rf1 w /\
+                        layer_invariant rf2 (abstraction rf1 w);
+     abstraction := fun w => layer_abstraction rf2 (abstraction rf1 w); |}.
