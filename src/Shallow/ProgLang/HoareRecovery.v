@@ -480,7 +480,7 @@ Proof.
     specialize (IHclos_refl_trans_1n a'); intuition eauto.
 Qed.
 
-Theorem compose_recovery : forall `(spec: RecSpecification A T unit State)
+Theorem compose_recovery : forall `(spec: RecSpecification A'' T unit State)
                              `(rspec: RecSpecification A' unit unit State)
                              `(spec': RecSpecification A T unit State)
                              `(p: prog T) `(rec: prog unit) `(rec': prog unit)
@@ -488,22 +488,24 @@ Theorem compose_recovery : forall `(spec: RecSpecification A T unit State)
     forall (Hspec: prog_rspec spec p rec rf)
       (Hrspec: prog_rec_loopspec rspec rec' rec rf)
       (Hspec_spec':
-         forall a state, rec_pre (spec' a state) ->
-                rec_pre (spec a state) /\
-                (forall v state', rec_post (spec a state) v state' ->
-                         rec_post (spec' a state) v state') /\
-                (forall v state', recover_post (spec a state) v state' ->
-                         exists a', rec_pre (rspec a' state') /\
-                               forall v' state'',
-                                 rec_post (rspec a' state') v' state'' ->
-                                 recover_post (spec' a state) v' state'')),
+         forall (a:A) state, rec_pre (spec' a state) ->
+                exists (a'':A''),
+                  rec_pre (spec a'' state) /\
+                  (forall v state', rec_post (spec a'' state) v state' ->
+                           rec_post (spec' a state) v state') /\
+                  (forall v state', recover_post (spec a'' state) v state' ->
+                           exists a', rec_pre (rspec a' state') /\
+                                 forall v' state'',
+                                   rec_post (rspec a' state') v' state'' ->
+                                   recover_post (spec' a state) v' state'')),
       prog_rspec spec' p (_ <- rec; rec') rf.
 Proof.
   intros.
   unfold prog_rspec; intros.
   eapply Hspec_spec' in H; safe_intuition.
   destruct r.
-  - match goal with
+  - repeat deex.
+    match goal with
     | [ Hexec: rexec p _ _ _ |- _ ] =>
       eapply rexec_finish_any_rec in Hexec;
         eapply Hspec in Hexec
@@ -514,16 +516,16 @@ Proof.
       eapply exec_recover_bind_inv in Hexec
     end; repeat deex.
     assert (rexec p rec w (Recovered rv1 w1)) by eauto.
-    (* H9: exec p *)
+    (* H7: exec p *)
     (* H1: exec_recover rec *)
-    clear H9 H1.
+    clear H7 H1.
     match goal with
     | [ Hexec: rexec p _ _ _ |- _ ] =>
       eapply Hspec in Hexec
     end; simpl in *; safe_intuition eauto.
-    (* H3: recover_post -> exists a' *)
+    (* H5: recover_post -> exists a' *)
     (* H1: recover_post *)
-    eapply H3 in H1; repeat deex.
+    eapply H5 in H1; repeat deex.
     match goal with
     | [ Hexec: exec rec' _ _ |- _ ] =>
       eapply Hrspec in Hexec
