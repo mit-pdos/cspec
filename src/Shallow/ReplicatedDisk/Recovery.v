@@ -1,10 +1,8 @@
-Require Import EquivDec.
-
 Require Import Automation.
 Require Import Disk.
 
 Require Import Shallow.Interface.
-Require Import Shallow.TwoDiskAPI Shallow.TwoDiskProgTheorems.
+Require Import Shallow.TwoDiskAPI.
 Require Import Shallow.ProgLang.Prog.
 Require Import Shallow.ProgLang.Hoare.
 

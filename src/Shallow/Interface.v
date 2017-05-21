@@ -1,7 +1,6 @@
 Require Import Automation.
 
 Require Import ProgLang.Prog.
-Require Import ProgLang.ProgTheorems.
 Require Import ProgLang.Hoare.
 
 (* Interfaces are groups of methods with a shared level of abstraction.
@@ -81,6 +80,8 @@ Definition Prim opT `{api: InterfaceAPI opT State}
    see https://coq.inria.fr/bugs/show_bug.cgi?id=5527 *)
 Coercion Prim : Interface >-> Funclass.
 Add Printing Coercion Prim.
+
+Generalizable Variable A.
 
 Theorem prim_spec : forall opT `(api: InterfaceAPI opT State)
                       `(i: Interface api)

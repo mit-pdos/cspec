@@ -3,7 +3,6 @@ Require Import MaybeHolds.
 Require Import Disk.
 
 Require Import Shallow.ProgLang.Hoare.
-Require Import Shallow.ProgLang.Prog.
 Require Import Shallow.TwoDiskAPI.
 
 Require Import Shallow.Interface.

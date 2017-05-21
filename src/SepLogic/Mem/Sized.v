@@ -1,4 +1,3 @@
-Require Arith.
 Require Import Omega.
 
 Require Import Automation.

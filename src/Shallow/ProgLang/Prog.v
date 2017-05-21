@@ -1,7 +1,4 @@
-Require Import EquivDec.
-
 Require Import Automation.
-Require Import Disk.
 
 (* Modeling of programs. *)
 
