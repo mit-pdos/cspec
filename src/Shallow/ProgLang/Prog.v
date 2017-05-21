@@ -114,14 +114,7 @@ Inductive rexec T R : prog T -> prog R -> world -> RResult T R -> Prop :=
 Notation "x <- p1 ; p2" := (Bind p1 (fun x => p2))
                             (at level 60, right associativity).
 
-(* TODO: some of these might be redundant now *)
-Arguments Prim {T} op.
 Arguments Ret {T} v.
-Arguments Bind {T T'} p p'.
-
-Arguments Crashed {T} w.
-Arguments RFinished {T R} v w.
-Arguments Recovered {T R} v w.
 
 Global Generalizable Variables T R opT State step.
 
