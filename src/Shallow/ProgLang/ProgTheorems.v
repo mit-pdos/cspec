@@ -122,18 +122,7 @@ Proof.
   apply H in H1; eauto.
 Qed.
 
-Theorem rexec_ret : forall `(v:T) `(rec: prog R) w r,
-  rexec (Ret v) rec w r ->
-  match r with
-  | RFinished v' w' => v' = v /\ w' = w
-  | Recovered v' w' => exec_recover rec w v' w'
-  end.
-Proof.
-  intros.
-  inversion H; subst;
-    inv_exec; eauto.
-Qed.
-
+(* When a program finishes, its recovery procedure is irrelevant. *)
 Lemma rexec_finish_any_rec : forall `(p: prog T)
                                `(rec: prog R)
                                `(rec': prog R')
@@ -196,55 +185,4 @@ Proof.
     descend; intuition eauto.
     eapply rt1n_trans; eauto.
     simpl; eauto.
-Qed.
-
-Lemma rexec_bind_cases : forall `(p: prog T) `(p': T -> prog T')
-                           `(rec: prog R)
-                           w r,
-    rexec (Bind p p') rec w r ->
-    (exists v w', rexec p rec w (RFinished v w') /\
-             rexec (p' v) rec w' r) \/
-    (exists v w'', r = Recovered v w'' /\
-              rexec p rec w (Recovered v w'')).
-Proof.
-  intros.
-  destruct r.
-  - inv_rexec.
-    inv_exec.
-    left; eauto 10.
-  - eapply rexec_recover_bind_inv in H; intuition.
-    inv_rexec.
-    right; eauto 10.
-Qed.
-
-Lemma impl_and1 : forall (P P' Q:Prop),
-    (P' -> P) ->
-    P' /\ Q ->
-    P /\ Q.
-Proof.
-  intuition.
-Qed.
-
-(* this theorem was a part of the interpret_rexec proof *)
-Theorem rexec_to_exec_crash_star_invariant :
-  forall `(p: prog T) `(rec: prog R) `(invariant: world -> Prop),
-    forall w w1 w2 v w',
-      invariant w1 ->
-      exec p w (Crashed w1) ->
-      clos_refl_trans_1n
-        (fun w w' => invariant w ->
-                  exec rec w (Crashed w') /\
-                  invariant w') w1 w2  ->
-      (invariant w2 -> exec rec w2 (Finished v w') /\
-                      invariant w') ->
-      rexec p rec w (Recovered v w') /\
-      invariant w'.
-Proof.
-  intros.
-  eapply impl_and1.
-  eapply RExecCrash; eauto.
-
-  clear dependent w.
-  induction H1; intros;
-    intuition eauto.
 Qed.
