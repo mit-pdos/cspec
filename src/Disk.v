@@ -6,8 +6,13 @@ Require Export SepLogic.Mem.
 Definition addr := nat.
 
 (* We introduce this definition to make the large constant opaque, for
-performance reasons. *)
-Definition blockbytes := 1024.
+performance reasons. The multiplication is to make the extracted code slightly
+more reasonable. *)
+Definition blockbytes := 2*8*8*8.
+
+Remark blockbytes_is_1024 : blockbytes = 1024.
+Proof. reflexivity. Qed.
+
 Opaque blockbytes.
 Definition block := bytes blockbytes.
 Definition block0 : block := bytes0 blockbytes.
