@@ -22,11 +22,24 @@ conditions and crash invariant specialized to a particular initial state. (This
 is why [pre] above is just a [Prop].) *)
 Definition Specification A T State := A -> State -> Quadruple T State.
 
+(** * refinement composition *)
+
+(* A LRefinement (for "layer refinement") goes between State1 (implementation)
+and State2 (spec) *)
+Record LRefinement State1 State2 :=
+  { invariant : State1 -> Prop;
+    abstraction : State1 -> State2; }.
+
 (* TODO: come up with a good, short name for terms of type Refinement (currently
 using [rf], which I'm not too happy with) *)
-Record Refinement State :=
-  { invariant: world -> Prop;
-    abstraction: world -> State }.
+Definition Refinement State := LRefinement world State.
+
+Definition refinement_compose
+           `(rf1: Refinement State1)
+           `(rf2: LRefinement State1 State2) :=
+  {| invariant := fun w => invariant rf1 w /\
+                        invariant rf2 (abstraction rf1 w);
+     abstraction := fun w => abstraction rf2 (abstraction rf1 w); |}.
 
 Definition prog_spec `(spec: Specification A T State) `(p: prog T)
            (rf: Refinement State) :=
@@ -332,21 +345,3 @@ Proof.
   eapply H3; eauto.
   intuition eauto.
 Qed.
-
-(** * refinement composition *)
-
-(* A LRefinement (for "layer refinement") goes between State1 (implementation)
-and State2 (spec)
-
- TODO: A Refinement is an LRefinement world, maybe we should just use one
- definition and write a definition for world refinements. *)
-Record LRefinement State1 State2 :=
-  { layer_invariant : State1 -> Prop;
-    layer_abstraction : State1 -> State2; }.
-
-Definition refinement_compose
-           `(rf1: Refinement State1)
-           `(rf2: LRefinement State1 State2) :=
-  {| invariant := fun w => invariant rf1 w /\
-                        layer_invariant rf2 (abstraction rf1 w);
-     abstraction := fun w => layer_abstraction rf2 (abstraction rf1 w); |}.

@@ -453,19 +453,19 @@ Theorem rspec_refinement_compose :
     `(rf1: Refinement State1),
     prog_rspec
       (fun (a:A) state =>
-         let state2 := layer_abstraction rf2 state in
+         let state2 := abstraction rf2 state in
          {| rec_pre := rec_pre (spec a state2) /\
-                       layer_invariant rf2 state;
+                       invariant rf2 state;
             rec_post :=
               fun v state' =>
-                let state2' := layer_abstraction rf2 state' in
+                let state2' := abstraction rf2 state' in
                 rec_post (spec a state2) v state2' /\
-                layer_invariant rf2 state';
+                invariant rf2 state';
             recover_post :=
               fun v state' =>
-                let state2' := layer_abstraction rf2 state' in
+                let state2' := abstraction rf2 state' in
                 recover_post (spec a state2) v state2' /\
-                layer_invariant rf2 state'; |}) p rec rf1 ->
+                invariant rf2 state'; |}) p rec rf1 ->
     prog_rspec spec p rec (refinement_compose rf1 rf2).
 Proof.
   intros.
@@ -548,13 +548,13 @@ Theorem rec_noop_compose : forall `(rec: prog unit) `(rec2: prog unit)
     rec_noop rec rf1 ->
     prog_rspec
       (fun (_:unit) state =>
-         {| rec_pre := layer_invariant rf2 state;
+         {| rec_pre := invariant rf2 state;
             rec_post :=
-              fun _ state' => layer_invariant rf2 state' /\
-                       layer_abstraction rf2 state' = layer_abstraction rf2 state;
+              fun _ state' => invariant rf2 state' /\
+                       abstraction rf2 state' = abstraction rf2 state;
             recover_post :=
-              fun _ state' => layer_invariant rf2 state' /\
-                       layer_abstraction rf2 state' = layer_abstraction rf2 state;
+              fun _ state' => invariant rf2 state' /\
+                       abstraction rf2 state' = abstraction rf2 state;
          |}) rec2 rec rf1 ->
     rec_noop (_ <- rec; rec2) (refinement_compose rf1 rf2).
 Proof.

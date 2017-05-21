@@ -923,8 +923,8 @@ Module RD.
     Definition rd_refinement :=
       refinement_compose
         (refinement td)
-        {| layer_invariant := rd_invariant;
-           layer_abstraction := rd_abstraction; |}.
+        {| invariant := rd_invariant;
+           abstraction := rd_abstraction; |}.
 
     Definition impl : InterfaceImpl D.Op :=
       {| op_impl := d_op_impl;
