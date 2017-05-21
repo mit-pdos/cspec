@@ -179,15 +179,11 @@ Ltac step_prog_with t :=
 to the first program in a sequence of binds. *)
 Ltac step_prog := step_prog_with ltac:(eauto with prog).
 
-(* similar notation to Hoare.v's, this time for recovery Extern hints
-
-   TODO: make this notation nicer;
-   I don't like making the only distinction three braces instead of two, but
-   also don't know where to put a keyword to distinguish them that doesn't look
-   terrible.
- *)
-Notation "{{{ p ; '_' }}}" := (prog_rdouble _ (Bind p _) _ _)
-                                (only parsing, at level 0).
+(* This notation builds a pattern; use it as [Hint Extern 1 {{ p; _}} => apply
+p_ok : prog] to associated p_ok as the specification for the program (pattern).
+Such patterns are used by [step_prog] via the prog hint database. *)
+Notation "{{ p ; '_' }}" := (prog_rdouble _ (Bind p _) _ _)
+                              (only parsing, at level 0).
 
 (** * (much simpler) alternative to begin *)
 

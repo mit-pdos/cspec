@@ -246,9 +246,9 @@ Proof.
   destruct matches in *; intuition eauto.
 Qed.
 
-Hint Extern 1 {{{ Prim _ (TD.Read d0 _); _ }}} => apply TDRead0_ok : prog.
-Hint Extern 1 {{{ Prim _ (TD.Read d1 _); _ }}} => apply TDRead1_ok : prog.
-Hint Extern 1 {{{ Prim _ (TD.Write d0 _ _); _ }}} => apply TDWrite0_ok : prog.
-Hint Extern 1 {{{ Prim _ (TD.Write d1 _ _); _ }}} => apply TDWrite1_ok : prog.
-Hint Extern 1 {{{ Prim _ (TD.DiskSize d0); _ }}} => apply TDDiskSize0_ok : prog.
-Hint Extern 1 {{{ Prim _ (TD.DiskSize d1); _ }}} => apply TDDiskSize1_ok : prog.
+Hint Extern 1 {{ Prim _ (TD.Read d0 _); _ }} => apply TDRead0_ok : prog.
+Hint Extern 1 {{ Prim _ (TD.Read d1 _); _ }} => apply TDRead1_ok : prog.
+Hint Extern 1 {{ Prim _ (TD.Write d0 _ _); _ }} => apply TDWrite0_ok : prog.
+Hint Extern 1 {{ Prim _ (TD.Write d1 _ _); _ }} => apply TDWrite1_ok : prog.
+Hint Extern 1 {{ Prim _ (TD.DiskSize d0); _ }} => apply TDDiskSize0_ok : prog.
+Hint Extern 1 {{ Prim _ (TD.DiskSize d1); _ }} => apply TDDiskSize1_ok : prog.

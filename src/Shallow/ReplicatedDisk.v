@@ -519,7 +519,7 @@ Module RD.
           destruct r; intuition eauto.
     Qed.
 
-    Hint Extern 1 {{{ fixup _; _ }}} => apply fixup_ok : prog.
+    Hint Extern 1 {{ fixup _; _ }} => apply fixup_ok : prog.
 
     Hint Resolve Lt.lt_n_Sm_le.
 
@@ -605,7 +605,7 @@ Module RD.
         destruct i; intuition eauto.
     Qed.
 
-    Hint Extern 1 {{{ recover_at _; _ }}} => apply recover_at_ok : prog.
+    Hint Extern 1 {{ recover_at _; _ }} => apply recover_at_ok : prog.
 
     Theorem DiskSize_ok :
       prog_rok
@@ -657,7 +657,7 @@ Module RD.
         destruct r; step.
     Qed.
 
-    Hint Extern 1 {{{ DiskSize; _ }}} => apply DiskSize_ok : prog.
+    Hint Extern 1 {{ DiskSize; _ }} => apply DiskSize_ok : prog.
 
     Definition Recover_spec :=
       (fun '(d, s) state =>
