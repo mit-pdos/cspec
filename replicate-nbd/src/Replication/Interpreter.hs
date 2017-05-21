@@ -3,7 +3,6 @@ module Replication.Interpreter where
 
 import           Control.Monad.Reader (ReaderT, reader, liftIO)
 import qualified Data.ByteString as BS
-import Datatypes (Coq_unit)
 import           Disk
 import           Replication.TwoDiskEnvironment
 import           System.Directory (doesFileExist)
@@ -59,12 +58,12 @@ tdRead d a = do
       pread h blocksize (addrToOffset a)
 
 tdWrite :: Coq_diskId -> Coq_addr -> BS.ByteString
-        -> ReaderT Config IO (DiskResult Coq_unit)
+        -> ReaderT Config IO (DiskResult ())
 tdWrite d a b = do
   path <- reader $ getDisk d
   liftIO . ifExists path $
       withBinaryFile path ReadWriteMode $ \h ->
-        coqTt <$> pwrite h b (addrToOffset a)
+        pwrite h b (addrToOffset a)
 
 tdDiskSize :: Coq_diskId
            -> ReaderT Config IO (DiskResult Integer)

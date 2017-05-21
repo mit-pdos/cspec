@@ -1,6 +1,7 @@
 Cd "replicate-nbd/src/".
 
 Require Import ExtrHaskellNatInteger.
+Require Import ExtrHaskellBasic.
 Require Import ExtrBytes.
 Require Import Shallow.ProgLang.ExtrProg.
 Require Import Shallow.ExtrTwoDiskImpl.

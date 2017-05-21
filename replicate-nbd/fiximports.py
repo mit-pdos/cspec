@@ -8,7 +8,6 @@ import os, sys
 
 module_imports = {
     "Bytes": """
-import qualified Specif
 import qualified Data.ByteString as BS
     """,
     "Interface": """

@@ -19,7 +19,7 @@ rdRead :: BlockOffset -> ReaderT Config IO BS.ByteString
 rdRead off = _RD__prim _TD__td $ D__Read (fromIntegral off)
 
 rdWrite :: BlockOffset -> BS.ByteString -> ReaderT Config IO ()
-rdWrite off dat = unit <$> _RD__prim _TD__td (D__Write (fromIntegral off) dat)
+rdWrite off dat = _RD__prim _TD__td $ D__Write (fromIntegral off) dat
 
 readBytes :: ByteOffset -> Int -> ReaderT Config IO BS.ByteString
 readBytes off len =
@@ -42,4 +42,4 @@ writeBytes off dat =
           loop (blockOff+1) (BS.drop blocksize s)
 
 recover :: ReaderT Config IO ()
-recover = unit <$> _RD__recover _TD__td
+recover = _RD__recover _TD__td
