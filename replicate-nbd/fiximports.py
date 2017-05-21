@@ -6,10 +6,22 @@
 import re
 import os, sys
 
-imports = """
+module_imports = {
+    "Bytes": """
 import qualified Specif
 import qualified Data.ByteString as BS
-"""
+    """,
+    "Interface": """
+import Replication.TwoDiskEnvironment
+    """,
+    "ReplicatedDisk": """
+import Replication.TwoDiskEnvironment
+    """,
+    "TwoDiskImpl": """
+import Replication.Interpreter
+import Replication.TwoDiskEnvironment
+    """
+}
 
 fs_filename = sys.argv[1]
 filename = sys.argv[2]
@@ -24,10 +36,11 @@ for n, line in enumerate(open(filename), 1):
     m = MODULE_RE.match(line)
     if m:
         module_name = m.group("module")
-    if (line.strip() == "import qualified Prelude" and
-        module_name == "Bytes"):
-        out.write(imports)
-        out.write("{-# LINE %d \"%s\" #-}\n" % (n, filename))
+    if line.strip() == "import qualified Prelude":
+        imports = module_imports.get(module_name)
+        if imports:
+            out.write(imports)
+            out.write("{-# LINE %d \"%s\" #-}\n" % (n, filename))
     line = line.replace('__FILE__', '"%s"' % sys.argv[2])
     line = line.replace('__LINE__', '%d' % n)
     out.write(line)
