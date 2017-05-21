@@ -20,7 +20,16 @@ import Replication.TwoDiskEnvironment
     "TwoDiskImpl": """
 import Replication.Interpreter
 import Replication.TwoDiskEnvironment
-    """
+    """,
+    "DiskSize": """
+import Replication.TwoDiskEnvironment
+    """,
+    "ReadWrite": """
+import Replication.TwoDiskEnvironment
+    """,
+    "Recovery": """
+import Replication.TwoDiskEnvironment
+    """,
 }
 
 fs_filename = sys.argv[1]

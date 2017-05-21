@@ -10,6 +10,6 @@ Extraction Language Haskell.
 Require Import ReplicatedDisk.
 Require Import Shallow.TwoDiskImpl.
 
-Separate Extraction RD.Read RD.Write RD.Recover TD.td.
+Separate Extraction TD.td RD.prim RD.recover.
 
 Cd "../../".

@@ -6,6 +6,7 @@ import           Control.Monad.Reader (ReaderT)
 import qualified Data.ByteString as BS
 import           ReplicatedDisk
 import           Replication.TwoDiskEnvironment
+import           SeqDiskAPI
 import           TwoDiskImpl (_TD__td)
 import           Utils.Conversion
 
@@ -15,10 +16,10 @@ type BlockOffset = Int
 type ByteOffset = Int
 
 rdRead :: BlockOffset -> ReaderT Config IO BS.ByteString
-rdRead off = _RD__coq_Read _TD__td (fromIntegral off)
+rdRead off = _RD__prim _TD__td $ D__Read (fromIntegral off)
 
 rdWrite :: BlockOffset -> BS.ByteString -> ReaderT Config IO ()
-rdWrite off dat = unit <$> _RD__coq_Write _TD__td (fromIntegral off) dat
+rdWrite off dat = unit <$> _RD__prim _TD__td (D__Write (fromIntegral off) dat)
 
 readBytes :: ByteOffset -> Int -> ReaderT Config IO BS.ByteString
 readBytes off len =
@@ -41,4 +42,4 @@ writeBytes off dat =
           loop (blockOff+1) (BS.drop blocksize s)
 
 recover :: ReaderT Config IO ()
-recover = unit <$> _RD__coq_Recover _TD__td
+recover = unit <$> _RD__recover _TD__td

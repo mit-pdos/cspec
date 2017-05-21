@@ -132,3 +132,5 @@ Proof.
   intros.
   eapply ret_rec_ok.
 Qed.
+
+Hint Resolve irec_ret_ok.

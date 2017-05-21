@@ -26,10 +26,14 @@ library
                      , Datatypes
                      , Def
                      , Disk
+                     , DiskSize
                      , EquivDec
                      , Hoare
                      , Interface
                      , Prog
+                     , ReadWrite
+                     , Recovery
+                     , SeqDiskAPI
                      , Specif
                      , TwoDiskAPI
                      , TwoDiskImpl
