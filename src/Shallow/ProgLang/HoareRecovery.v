@@ -259,7 +259,7 @@ Proof.
   symmetry; auto.
 Qed.
 
-Ltac monad_simpl ::=
+Ltac monad_simpl :=
   repeat match goal with
          | |- prog_rdouble _ (Bind (Ret _) _) _ _ =>
            eapply rdouble_exec_equiv; [ apply monad_left_id | ]
@@ -268,7 +268,7 @@ Ltac monad_simpl ::=
          end.
 
 (** step_prog_with t handles the first program in a bind by applying tactic t *)
-Ltac step_prog_with t ::=
+Ltac step_prog_with t :=
   match goal with
   | |- prog_rdouble _ _ _ _ =>
     monad_simpl;
@@ -279,7 +279,7 @@ Ltac step_prog_with t ::=
 
 (** step_prog applies a registered prog_ok theorem (in the prog hint database)
 to the first program in a sequence of binds. *)
-Ltac step_prog ::= step_prog_with ltac:(eauto with prog).
+Ltac step_prog := step_prog_with ltac:(eauto with prog).
 
 (* similar notation to Hoare.v's, this time for recovery Extern hints
 
