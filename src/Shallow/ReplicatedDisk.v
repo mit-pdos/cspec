@@ -151,7 +151,7 @@ Module RD.
 
     Hint Resolve both_disks_not_missing : false.
 
-    Hint Resolve irec_noop.
+    Hint Resolve irec_ret_ok.
 
     Theorem Read_ok : forall a,
         prog_rspec
