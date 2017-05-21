@@ -1,7 +1,6 @@
 Require Export Disk.
 Require Import Implements.
 Require Import ProofIrrelevance.
-Require Import FunctionalExtensionality.
 
 Module DSpec.
   Record State :=

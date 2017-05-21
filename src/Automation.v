@@ -1,4 +1,3 @@
-Require Eqdep.
 Require Import EquivDec.
 
 (** * Simplify matches when possible. *)

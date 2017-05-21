@@ -1,7 +1,6 @@
 Require Import Automation.
 
 Require Import ProgLang.Prog.
-Require Import ProgLang.ProgTheorems.
 Require Import ProgLang.Hoare.
 
 (* Interfaces are groups of methods with a shared level of abstraction.

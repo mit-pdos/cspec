@@ -1,5 +1,3 @@
-Require Import FunctionalExtensionality.
-
 Require Import Disk.
 Require Import Automation.
 

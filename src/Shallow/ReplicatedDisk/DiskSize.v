@@ -1,5 +1,3 @@
-Require Import EquivDec.
-
 Require Import Automation.
 Require Import Disk.
 
