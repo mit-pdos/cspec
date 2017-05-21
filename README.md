@@ -105,30 +105,33 @@ subdirectories.
   [0, size).
 * `Shallow/`
 
-  FSCQ-like programming languages at each layer. We have a generic `prog` and
-  semantics, so that each layer specifies some operations and how they execute
-  but gets the rest of the semantics for free.
+  We define an axiomatic `prog` inductive for programs. These programs have
+  entirely opaque behavior, manipulating states of an axiom type `world`.
+  Everything is built up in terms of _refinement_. The bottom-most level of the
+  refinement goes from the two disk API to the `world` states, which we define
+  in Haskell and assume has the appropriate refinement specification.
 
-  - `ProgLang/Prog.v`: programs over generic operations, parametrized by the operations'
-    semantics.
-  - `ProgLang/ProgTheorems.v`: some sample theorems about the execution semantics,
-    including the monad laws
-  - `ProgLang/Hoare.v`: Hoare quadruples and doubles, with desugaring
-    from quadruples to doubles and some equivalence proofs between the different
-    spec definitions.
-  - `Interpret.v`: implementing one language (the "spec language") in terms of
-    another (the "implementation language") by providing implementations for
-    each spec operation and proving semantics preservation in a refinement-based
-    approach. Produces a theorem about spec programs translated to
-    implementation programs, including a hidden recovery procedure that is
-    specific to the language implementation.
-  - `TwoDiskProg.v`: instantiation of `prog` for programs that manipulate two
-    disks, where one might fail at any time.
-  - `SeqDiskProg.v`: programs over a single disk without failures.
-  - `ReplicatedDisk.v`: implements the `SeqDiskProg` interface using
-    `TwoDiskProg`, using replication to handle failure of a single disk
-    seamlessly. Includes a recovery procedure to patch up any inconsistency
-    created due to a crash in the middle of writing to the two disks.
+  - `ProgLang/Prog.v`: axiomatically defined programs. `prog` provides `Bind`
+    and `Ret` combinators to build up programs, but other operations available
+    are opaque.
+  - `ProgLang/ProgTheorems.v`: some basic theorems about the execution
+    semantics, including the monad laws
+  - `ProgLang/Hoare.v`: Hoare quadruples and doubles, with desugaring from
+    quadruples to doubles and some equivalence proofs between the different spec
+    definitions.
+  - `Interface.v`: Layer of operations, with their implementations and
+    refinement proofs.
+  - `TwoDiskAPI.v`: Layer API for programs that manipulate two disks, where one
+    might fail at any time.
+  - `TwoDiskImpl.v`: construction of an interface for two disk programs, using
+    axioms for the operations and correctness proofs. This layer is implemented
+    in Haskell by supplying regular Haskell functions at extraction time.
+  - `SeqDiskAPI.v`: programs over a single disk without failures.
+  - `ReplicatedDisk.v`: implements the `SeqDiskAPI` interface using an
+    implementation of `TwoDiskAPI`, using replication to handle failure of a
+    single disk seamlessly. Includes a recovery procedure to patch up any
+    inconsistency created due to a crash in the middle of writing to the two
+    disks.
 
 * `Refinement/`
   * `Implements/` defines an IO monad and the notion of an implementation
