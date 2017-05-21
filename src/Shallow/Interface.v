@@ -2,7 +2,6 @@ Require Import Automation.
 
 Require Import ProgLang.Prog.
 Require Import ProgLang.Hoare.
-Require Import ProgLang.HoareRecovery.
 
 Require Import ProgLang.ProgTheorems.
 

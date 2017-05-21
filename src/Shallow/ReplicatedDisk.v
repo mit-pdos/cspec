@@ -4,7 +4,7 @@ Require Import Disk.
 Require Import Automation.
 
 Require Import Shallow.ProgLang.Prog.
-Require Import Shallow.ProgLang.Hoare Shallow.ProgLang.HoareRecovery.
+Require Import Shallow.ProgLang.Hoare.
 Require Import Shallow.ProgLang.ProgTheorems.
 Require Import Shallow.TwoDiskAPI Shallow.TwoDiskProgTheorems.
 Require Import Shallow.SeqDiskAPI.

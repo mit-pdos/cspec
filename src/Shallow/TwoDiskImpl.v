@@ -3,9 +3,7 @@ Require Import Disk.
 Require Import Shallow.TwoDiskAPI.
 Require Import Shallow.Interface.
 Require Import Shallow.ProgLang.Prog.
-Require Import
-        Shallow.ProgLang.Hoare
-        Shallow.ProgLang.HoareRecovery.
+Require Import Shallow.ProgLang.Hoare.
 
 Module TD.
   Axiom read : diskId -> addr -> prog (DiskResult block).
