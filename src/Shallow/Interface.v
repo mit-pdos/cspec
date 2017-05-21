@@ -40,6 +40,9 @@ Record Interface opT State (api: InterfaceAPI opT State) :=
                    (op_impl interface_impl _ op)
                    (recover_impl interface_impl)
                    refinement;
+    (* TODO: rec_noop is a poor name, at least for the layer proof; it's really
+       a [Ret_rok] proof, showing [Ret] is correctly recovered (that is, by not
+       doing anything). *)
     rec_noop_ok:
       rec_noop (recover_impl interface_impl) refinement }.
 

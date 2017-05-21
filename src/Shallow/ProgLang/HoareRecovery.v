@@ -246,65 +246,6 @@ Proof.
       eapply H3 in H5; eauto.
 Qed.
 
-(* TODO: the return value is actually unconstrained here, so this will really
-   only work for unit-producing recovery procedures.
-
-   We really don't have a story for return values from recovery yet, but I'm
-   hesitant to get rid of them everywhere in case we find a way to use them.
- *)
-Definition rec_noop `(rec: prog R) `(rf: Refinement State) :=
-  prog_spec
-    (fun (_:unit) state =>
-       {| pre := True;
-          post := fun _ state' => state' = state;
-          crash := fun state' => state' = state; |}) rec rf.
-
-Theorem rec_noop_loop `(rec: prog R) `(rf: Refinement State) :
-  rec_noop rec rf ->
-  prog_loopspec
-    (fun (_:unit) state =>
-       {| pre := True;
-          post := fun _ state' => state' = state;
-          crash := fun state' => state' = state; |}) rec rf.
-Proof.
-  unfold rec_noop; intros.
-  apply idempotent_loopspec; auto.
-  unfold idempotent; simpl in *; intros.
-  subst; eauto.
-Qed.
-
-Hint Resolve tt.
-
-Theorem prog_rok_to_rspec : forall `(spec: RecSpecification A T R State)
-                              `(p: prog T) `(rec: prog R)
-                              `(rf: Refinement State),
-    prog_rok spec p rec rf ->
-    rec_noop rec rf ->
-    (forall a state, rec_pre (spec a state) ->
-           forall v state',
-             rec_post (spec a state) v state' ->
-             forall rv, recover_post (spec a state) rv state') ->
-    prog_rspec spec p rec rf.
-Proof.
-  unfold prog_rok, prog_rdouble, prog_rspec; intros.
-  eapply rec_noop_loop in H0.
-  specialize (H _ Ret).
-  specialize (H w).
-  eapply H; eauto.
-  exists a; intuition eauto; subst.
-  - inv_rexec; inv_ret; eauto.
-    (* recovery after finishing p *)
-    match goal with
-    | [ Hexec: exec_recover _ _ _ _ |- _ ] =>
-      eapply H0 in Hexec; simpl in *; safe_intuition eauto
-    end.
-    replace (abstraction rf w'').
-    intuition eauto.
-  - eapply rexec_equiv.
-    apply monad_right_id.
-    eauto.
-Qed.
-
 Theorem rdouble_exec_equiv : forall `(rf: Refinement State)
                               `(pre: RecDoublePre T R State) (p p': prog T)
                               (rec: prog R),
@@ -369,34 +310,7 @@ Qed.
 Ltac rdouble_case pf :=
   eexists; split; [ solve [ apply pf ] | ].
 
-(* for recovery proofs about pure programs *)
 
-Theorem ret_prog_rok : forall `(rf: Refinement State)
-                         `(spec: RecSpecification A T R State)
-                         (v:T) (rec: prog R),
-    rec_noop rec rf ->
-    (forall a state, rec_pre (spec a state) ->
-            rec_post (spec a state) v state /\
-            forall r, recover_post (spec a state) r state) ->
-    prog_rok spec (Ret v) rec rf.
-Proof.
-  intros.
-  unfold prog_rok, prog_rdouble; intros.
-  repeat deex.
-  eapply H0 in H1; intuition eauto.
-  apply rexec_bind_cases in H3; hyp_intuition;
-    repeat deex.
-  - inv_rexec; inv_exec.
-    eapply H4; eauto.
-  - inv_rexec; inv_exec.
-    eapply rec_noop_loop in H.
-    match goal with
-    | [ Hexec: exec_recover rec _ _ _ |- _ ] =>
-      eapply H in Hexec; simpl in *; safe_intuition eauto
-    end.
-    replace (abstraction rf w'').
-    eauto.
-Qed.
 
 (** * Proving a higher-level recovery procedure correct. *)
 
@@ -559,4 +473,98 @@ Proof.
     simpl; intros; safe_intuition.
   eapply H in H2; simpl in *; eauto.
   destruct r; intuition eauto.
+Qed.
+
+(* TODO: the return value is actually unconstrained here, so this will really
+   only work for unit-producing recovery procedures.
+
+   We really don't have a story for return values from recovery yet, but I'm
+   hesitant to get rid of them everywhere in case we find a way to use them.
+ *)
+Definition rec_noop `(rec: prog R) `(rf: Refinement State) :=
+  forall T (v:T),
+    prog_rspec
+      (fun (_:unit) state =>
+         {| rec_pre := True;
+            rec_post := fun r state' => r = v /\
+                                 state' = state;
+            recover_post := fun _ state' => state' = state; |}) (Ret v) rec rf.
+
+Hint Resolve tt.
+
+Theorem prog_rok_to_rspec : forall `(spec: RecSpecification A T R State)
+                              `(p: prog T) `(rec: prog R)
+                              `(rf: Refinement State),
+    prog_rok spec p rec rf ->
+    rec_noop rec rf ->
+    (forall a state, rec_pre (spec a state) ->
+           forall v state',
+             rec_post (spec a state) v state' ->
+             forall rv, recover_post (spec a state) rv state') ->
+    prog_rspec spec p rec rf.
+Proof.
+  unfold prog_rok, prog_rdouble, prog_rspec; intros.
+  specialize (H _ Ret).
+  specialize (H w).
+  eapply H; eauto.
+  exists a; intuition eauto; subst.
+  - eapply H0 in H8; simpl in *; eauto.
+    destruct r1; safe_intuition; subst; eauto.
+    replace (abstraction rf w1).
+    intuition eauto.
+    replace (abstraction rf w1).
+    intuition eauto.
+  - eapply rexec_equiv.
+    apply monad_right_id.
+    eauto.
+Qed.
+
+(* for recovery proofs about pure programs *)
+
+Theorem ret_prog_rok : forall `(rf: Refinement State)
+                         `(spec: RecSpecification A T R State)
+                         (v:T) (rec: prog R),
+    rec_noop rec rf ->
+    (forall a state, rec_pre (spec a state) ->
+            rec_post (spec a state) v state /\
+            forall r, recover_post (spec a state) r state) ->
+    prog_rok spec (Ret v) rec rf.
+Proof.
+  intros.
+  eapply prog_rspec_to_rok.
+  unfold prog_rspec; intros.
+  eapply H in H3; simpl in *; eauto.
+  eapply H0 in H1.
+  destruct r; safe_intuition; subst.
+  replace (abstraction rf w0).
+  intuition eauto.
+  replace (abstraction rf w0).
+  intuition eauto.
+Qed.
+
+Theorem rec_noop_compose : forall `(rec: prog unit) `(rec2: prog unit)
+                             `(rf1: Refinement State1)
+                             `(rf2: LRefinement State1 State2),
+    rec_noop rec rf1 ->
+    prog_rspec
+      (fun (_:unit) state =>
+         {| rec_pre := layer_invariant rf2 state;
+            rec_post :=
+              fun _ state' => layer_invariant rf2 state' /\
+                       layer_abstraction rf2 state' = layer_abstraction rf2 state;
+            recover_post :=
+              fun _ state' => layer_invariant rf2 state' /\
+                       layer_abstraction rf2 state' = layer_abstraction rf2 state;
+         |}) rec2 rec rf1 ->
+    rec_noop (_ <- rec; rec2) (refinement_compose rf1 rf2).
+Proof.
+  unfold rec_noop; intros.
+  eapply rspec_refinement_compose; simpl.
+  eapply compose_recovery; eauto.
+  eapply rec_idempotent_loopspec; eauto.
+  unfold rec_idempotent; simpl; intuition eauto.
+  descend; intuition (eauto; congruence).
+  simpl; intuition.
+  descend; intuition (subst; eauto).
+  descend; intuition (subst; eauto).
 Qed.

@@ -659,8 +659,7 @@ Module RD.
 
     Hint Extern 1 {{{ DiskSize; _ }}} => apply DiskSize_ok : prog.
 
-    Theorem Recover_ok :
-      prog_rec_loopspec
+    Definition Recover_spec :=
         (fun '(d, s) state =>
            {|
              rec_pre :=
@@ -672,7 +671,7 @@ Module RD.
                                  TD.disk1 state |= eq d
                end;
              rec_post :=
-               fun _ state' =>
+               fun (_:unit) state' =>
                  match s with
                  | FullySynced => TD.disk0 state' |= eq d /\
                                  TD.disk1 state' |= eq d
@@ -683,7 +682,7 @@ Module RD.
                     TD.disk1 state' |= eq (diskUpd d a b))
                  end;
              recover_post :=
-               fun _ state' =>
+               fun (_:unit) state' =>
                  match s with
                  | FullySynced => TD.disk0 state' |= eq d /\
                                  TD.disk1 state' |= eq d
@@ -695,29 +694,43 @@ Module RD.
                    (TD.disk0 state' |= eq (diskUpd d a b) /\
                     TD.disk1 state' |= eq (diskUpd d a b))
                  end;
-           |})
+           |}).
+
+    Theorem Recover_rok :
+      prog_rspec
+        Recover_spec
+        (Recover)
+        (irec td)
+        (refinement td).
+    Proof.
+      unfold Recover, Recover_spec; intros.
+      eapply prog_rok_to_rspec; simplify.
+      - step.
+        descend; intuition eauto.
+
+        step.
+        destruct s; intuition.
+        exists d, FullySynced; intuition eauto.
+        step.
+
+        exists d, (OutOfSync a b); intuition eauto.
+        step.
+
+        destruct r; intuition eauto.
+        destruct i; intuition eauto.
+        destruct s; simplify; eauto.
+      - destruct s; intuition eauto.
+    Qed.
+
+    Theorem Recover_ok :
+      prog_rec_loopspec
+        Recover_spec
         (Recover)
         (irec td)
         (refinement td).
     Proof.
       eapply rec_idempotent_loopspec; simpl.
-      - unfold Recover; intros.
-        eapply prog_rok_to_rspec; simplify.
-        + step.
-          descend; intuition eauto.
-
-          step.
-          destruct s; intuition.
-          exists d, FullySynced; intuition eauto.
-          step.
-
-          exists d, (OutOfSync a b); intuition eauto.
-          step.
-
-          destruct r; intuition eauto.
-          destruct i; intuition eauto.
-          destruct s; simplify; eauto.
-        + destruct s; intuition eauto.
+      - eapply Recover_rok.
       - unfold rec_idempotent; intuition; simplify.
         rename a0 into d.
         destruct b; intuition eauto.
@@ -913,10 +926,13 @@ Module RD.
         {| layer_invariant := rd_invariant;
            layer_abstraction := rd_abstraction; |}.
 
-    Definition impl : Interface D.API.
+    Definition impl : InterfaceImpl D.Op :=
+      {| op_impl := d_op_impl;
+         recover_impl := _ <- irec td; Recover; |}.
+
+    Definition rd : Interface D.API.
       unshelve econstructor.
-      - exact {| op_impl := d_op_impl;
-                 recover_impl := _ <- irec td; Recover; |}.
+      - exact impl.
       - exact rd_refinement.
       - intros.
         destruct op; unfold op_spec; simpl.
@@ -932,19 +948,14 @@ Module RD.
           eapply prog_rspec_weaken; [ apply DiskSize_rok | ].
           unfold rspec_impl; simplify.
           exists (rd_abstraction state); (intuition eauto); simplify.
-      - simpl.
-        unfold rec_noop.
-        (* oops, only rec_noop requires a crash proof about recovery; we can
-           probably just prove a recovery proof about recovery directly instead
-
-           TODO: fix rec_noop to be a prog_rec_loopspec so we can prove it by
-           weakening the existing complete recovery spec.
-         *)
-        admit.
+      - eapply rec_noop_compose; eauto; simpl.
+        eapply prog_rspec_weaken; [ eapply Recover_rok | ].
+        unfold rspec_impl; simplify.
+        exists (rd_abstraction state), FullySynced; intuition eauto.
 
         Grab Existential Variables.
         all: auto.
-    Abort.
+    Defined.
 
   End ReplicatedDisk.
 
