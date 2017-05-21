@@ -58,9 +58,9 @@ Theorem TDRead0_ok : forall (i: Interface TD.API) a,
     prog_rok
       (fun '(d_0, F) state =>
          {|
-           rec_pre := TD.disk0 state |= eq d_0 /\
-                      TD.disk1 state |= F;
-           rec_post :=
+           pre := TD.disk0 state |= eq d_0 /\
+                  TD.disk1 state |= F;
+           post :=
              fun r state' =>
                match r with
                | Working v => TD.disk0 state' |= eq d_0 /\
@@ -69,7 +69,7 @@ Theorem TDRead0_ok : forall (i: Interface TD.API) a,
                | Failed => TD.disk0 state' |= missing /\
                           TD.disk1 state' |= F
                end;
-           recover_post :=
+           recover :=
              fun _ state' => TD.disk0 state' |= eq d_0 /\
                       TD.disk1 state' |= F;
          |})
@@ -88,9 +88,9 @@ Theorem TDRead1_ok : forall (i: Interface TD.API) a,
     prog_rok
       (fun '(F, d_1) state =>
          {|
-           rec_pre := TD.disk0 state |= F /\
-                      TD.disk1 state |= eq d_1;
-           rec_post :=
+           pre := TD.disk0 state |= F /\
+                  TD.disk1 state |= eq d_1;
+           post :=
              fun r state' =>
                match r with
                | Working v => TD.disk0 state' |= F /\
@@ -99,7 +99,7 @@ Theorem TDRead1_ok : forall (i: Interface TD.API) a,
                | Failed => TD.disk0 state' |= F /\
                            TD.disk1 state' |= missing
                end;
-           recover_post :=
+           recover :=
              fun _ state' => TD.disk0 state' |= F /\
                              TD.disk1 state' |= eq d_1;
          |})
@@ -118,9 +118,9 @@ Theorem TDWrite0_ok : forall (i: Interface TD.API) a b,
     prog_rok
       (fun '(d_0, F) state =>
          {|
-           rec_pre := TD.disk0 state |= eq d_0 /\
-                      TD.disk1 state |= F;
-           rec_post :=
+           pre := TD.disk0 state |= eq d_0 /\
+                  TD.disk1 state |= F;
+           post :=
              fun r state' =>
                match r with
                | Working _ => TD.disk0 state' |= eq (diskUpd d_0 a b) /\
@@ -128,7 +128,7 @@ Theorem TDWrite0_ok : forall (i: Interface TD.API) a b,
                | Failed => TD.disk0 state' |= missing /\
                            TD.disk1 state' |= F
                end;
-           recover_post :=
+           recover :=
              fun _ state' =>
                (TD.disk0 state' |= eq d_0 \/
                 a < size d_0 /\ TD.disk0 state' |= eq (diskUpd d_0 a b)) /\
@@ -153,9 +153,9 @@ Theorem TDWrite1_ok : forall (i: Interface TD.API) a b,
     prog_rok
       (fun '(F, d_1) state =>
          {|
-           rec_pre := TD.disk0 state |= F /\
-                      TD.disk1 state |= eq d_1;
-           rec_post :=
+           pre := TD.disk0 state |= F /\
+                  TD.disk1 state |= eq d_1;
+           post :=
              fun r state' =>
                match r with
                | Working _ => TD.disk0 state' |= F /\
@@ -163,7 +163,7 @@ Theorem TDWrite1_ok : forall (i: Interface TD.API) a b,
                | Failed => TD.disk0 state' |= F /\
                            TD.disk1 state' |= missing
                end;
-           recover_post :=
+           recover :=
              fun _ state' =>
                TD.disk0 state' |= F /\
                (TD.disk1 state' |= eq d_1 \/
@@ -188,9 +188,9 @@ Theorem TDDiskSize0_ok : forall (i: Interface TD.API),
     prog_rok
       (fun '(d_0, F) state =>
          {|
-           rec_pre := TD.disk0 state |= eq d_0 /\
-                      TD.disk1 state |= F;
-           rec_post :=
+           pre := TD.disk0 state |= eq d_0 /\
+                  TD.disk1 state |= F;
+           post :=
              fun r state' =>
                match r with
                | Working n => n = size d_0 /\
@@ -199,7 +199,7 @@ Theorem TDDiskSize0_ok : forall (i: Interface TD.API),
                | Failed => TD.disk0 state' |= missing /\
                           TD.disk1 state' |= F
                end;
-           recover_post :=
+           recover :=
              fun _ state' =>
                TD.disk0 state' |= eq d_0 /\
                TD.disk1 state' |= F;
@@ -219,9 +219,9 @@ Theorem TDDiskSize1_ok : forall (i: Interface TD.API),
     prog_rok
       (fun '(F, d_1) state =>
          {|
-           rec_pre := TD.disk0 state |= F /\
-                      TD.disk1 state |= eq d_1;
-           rec_post :=
+           pre := TD.disk0 state |= F /\
+                  TD.disk1 state |= eq d_1;
+           post :=
              fun r state' =>
                match r with
                | Working n => n = size d_1 /\
@@ -230,7 +230,7 @@ Theorem TDDiskSize1_ok : forall (i: Interface TD.API),
                | Failed => TD.disk0 state' |= F /\
                           TD.disk1 state' |= missing
                end;
-           recover_post :=
+           recover :=
              fun _ state' =>
                TD.disk0 state' |= F /\
                TD.disk1 state' |= eq d_1;
@@ -246,9 +246,9 @@ Proof.
   destruct matches in *; intuition eauto.
 Qed.
 
-Hint Extern 1 {{{ Prim _ (TD.Read d0 _); _ }}} => apply TDRead0_ok : prog.
-Hint Extern 1 {{{ Prim _ (TD.Read d1 _); _ }}} => apply TDRead1_ok : prog.
-Hint Extern 1 {{{ Prim _ (TD.Write d0 _ _); _ }}} => apply TDWrite0_ok : prog.
-Hint Extern 1 {{{ Prim _ (TD.Write d1 _ _); _ }}} => apply TDWrite1_ok : prog.
-Hint Extern 1 {{{ Prim _ (TD.DiskSize d0); _ }}} => apply TDDiskSize0_ok : prog.
-Hint Extern 1 {{{ Prim _ (TD.DiskSize d1); _ }}} => apply TDDiskSize1_ok : prog.
+Hint Extern 1 {{ Prim _ (TD.Read d0 _); _ }} => apply TDRead0_ok : prog.
+Hint Extern 1 {{ Prim _ (TD.Read d1 _); _ }} => apply TDRead1_ok : prog.
+Hint Extern 1 {{ Prim _ (TD.Write d0 _ _); _ }} => apply TDWrite0_ok : prog.
+Hint Extern 1 {{ Prim _ (TD.Write d1 _ _); _ }} => apply TDWrite1_ok : prog.
+Hint Extern 1 {{ Prim _ (TD.DiskSize d0); _ }} => apply TDDiskSize0_ok : prog.
+Hint Extern 1 {{ Prim _ (TD.DiskSize d1); _ }} => apply TDDiskSize1_ok : prog.

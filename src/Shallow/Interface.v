@@ -15,13 +15,13 @@ Definition background_step {opT State} (bg_step: State -> State -> Prop)
                  exists state', bg_step state state' /\
                        step op state' v state''; |}.
 
-Definition op_spec opT `(api: InterfaceAPI opT State) `(op: opT T) : RecSpecification unit T unit State :=
+Definition op_spec opT `(api: InterfaceAPI opT State) `(op: opT T) : Specification unit T unit State :=
   fun (_:unit) state =>
     {|
-      rec_pre := True;
-      rec_post :=
+      pre := True;
+      post :=
         fun v state' => op_sem api op state v state';
-      recover_post :=
+      recover :=
         fun r state' =>
           r = tt /\
           (state' = state \/
@@ -57,17 +57,17 @@ Coercion Prim : Interface >-> Funclass.
 Add Printing Coercion Prim.
 
 Theorem prim_spec : forall opT `(api: InterfaceAPI opT State)
-                    `(i: Interface api)
-                    `(op: opT T)
-                    `(spec: RecSpecification A T unit State),
-    (forall a state, rec_pre (spec a state) ->
+                      `(i: Interface api)
+                      `(op: opT T)
+                      `(spec: Specification A T unit State),
+    (forall a state, pre (spec a state) ->
             forall v state', op_sem api op state v state' ->
-                    rec_post (spec a state) v state') ->
-    (forall a state, rec_pre (spec a state) ->
-            recover_post (spec a state) tt state) ->
-    (forall a state, rec_pre (spec a state) ->
-            forall v state', rec_post (spec a state) v state' ->
-                    recover_post (spec a state) tt state') ->
+                    post (spec a state) v state') ->
+    (forall a state, pre (spec a state) ->
+            recover (spec a state) tt state) ->
+    (forall a state, pre (spec a state) ->
+            forall v state', post (spec a state) v state' ->
+                    recover (spec a state) tt state') ->
     prog_rspec spec (Prim i op) (recover_impl (interface_impl i)) (refinement i).
 Proof.
   intros.
@@ -82,12 +82,12 @@ Qed.
 Theorem prim_ok : forall opT `(api: InterfaceAPI opT State)
                     `(i: Interface api)
                     `(op: opT T)
-                    `(spec: RecSpecification A T unit State),
-    (forall a state, rec_pre (spec a state) ->
+                    `(spec: Specification A T unit State),
+    (forall a state, pre (spec a state) ->
             forall v state', op_sem api op state v state' ->
-                    rec_post (spec a state) v state') ->
-    (forall a state, rec_pre (spec a state) ->
-            recover_post (spec a state) tt state) ->
+                    post (spec a state) v state') ->
+    (forall a state, pre (spec a state) ->
+            recover (spec a state) tt state) ->
     prog_rok spec (Prim i op) (recover_impl (interface_impl i)) (refinement i).
 Proof.
   unfold prog_rok, prog_rdouble; intros.
@@ -104,7 +104,7 @@ Proof.
     + repeat deex.
       eapply H in H6; eauto.
       specialize (H4 v w'' postcond recpost); safe_intuition.
-      (* I don't know how to proceed from here: we need an [rexec (rx v)], which
+(* I don't know how to proceed from here: we need an [rexec (rx v)], which
       should be a [rx v] crashing at the beginning and then the recovery
       procedure running. The relevant state is the result of looping the
       recovery procedure (due to the [rexec (Prim i op)] hypothesis, H3), but we
@@ -115,7 +115,7 @@ Proof.
 
       TODO: fix this in order to allow _ok proofs that ignore the case of
       recovering after finishing.
-       *)
+ *)
 Abort.
 
 (* weaker version of prim_ok that requires the postcondition imply the recovery
@@ -123,15 +123,15 @@ postcondition *)
 Theorem prim_ok : forall opT `(api: InterfaceAPI opT State)
                     `(i: Interface api)
                     `(op: opT T)
-                    `(spec: RecSpecification A T unit State),
-    (forall a state, rec_pre (spec a state) ->
+                    `(spec: Specification A T unit State),
+    (forall a state, pre (spec a state) ->
             forall v state', op_sem api op state v state' ->
-                    rec_post (spec a state) v state') ->
-    (forall a state, rec_pre (spec a state) ->
-            recover_post (spec a state) tt state) ->
-    (forall a state, rec_pre (spec a state) ->
-            forall v state', rec_post (spec a state) v state' ->
-                    recover_post (spec a state) tt state') ->
+                    post (spec a state) v state') ->
+    (forall a state, pre (spec a state) ->
+            recover (spec a state) tt state) ->
+    (forall a state, pre (spec a state) ->
+            forall v state', post (spec a state) v state' ->
+                    recover (spec a state) tt state') ->
     prog_rok spec (Prim i op) (recover_impl (interface_impl i)) (refinement i).
 Proof.
   eauto using prog_rspec_to_rok, prim_spec.
