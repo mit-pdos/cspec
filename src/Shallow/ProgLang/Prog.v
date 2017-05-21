@@ -3,14 +3,9 @@ Require Import EquivDec.
 Require Import Automation.
 Require Import Disk.
 
-(* Modeling of programs with generic operations. *)
+(* Modeling of programs. *)
 
 Global Set Implicit Arguments.
-
-(** The type of operations (more precisely, the family of operation). An [opT
-  T] is a primitive operation that produces a T-typed result. Of course, there
-  need not be an [opT T] for every T. *)
-Parameter opT: Type -> Type.
 
 (** The type of w that programs manipulate. Will vary depending on the
   operations involved,and the same operations could in principle operate on
@@ -19,15 +14,26 @@ Parameter world:Type.
 
 Implicit Type (w:world).
 
-(** Our minimal, generic programming language. Operations are provided as
-    primitives using [Prim], and programs can be combined with [Bind] and
-    include arbitrary intermediate values using [Ret]. *)
+(* As a technical detail, we let programs include arbitrary operations of types
+[opT T] (which will produce a T-typed result). *)
+Parameter opT: Type -> Type.
+
+(** Our minimal, generic programming language. This definition does not provide
+useful functionality (it will be assumed later when we introduce primitives).
+Programs can be combined with [Bind] and [Ret].
+
+ Why do we even have BaseOp? The intention here is that programs should have
+ opaque behavior, so we make sure that one of the constructors of [prog] allows
+ arbitrary additional behavior. Otherwise, we would know that [Bind] and [Ret]
+ are only enough for pure programs that do not have side effects.
+ *)
 Inductive prog : forall T:Type, Type :=
-| Prim : forall T, opT T -> prog T
+| BaseOp : forall T, opT T -> prog T
 | Ret : forall T, T -> prog T
 | Bind : forall T T', prog T -> (T -> prog T') -> prog T'.
 
-(** A Semantics is a transition relation for a particular program. *)
+(** A Semantics is a transition relation for a particular program, relating an
+initial state to a return value and final state. *)
 Definition Semantics world T := world -> T -> world -> Prop.
 
 (** The outcome of an execution, including intermediate crash points. *)
@@ -36,6 +42,7 @@ Inductive Result T :=
 | Crashed (w:world).
 Arguments Crashed {T} w.
 
+(* Programs may have arbitrary behavior for each primitive. *)
 Axiom step:forall T, opT T -> Semantics world T.
 
 (** [exec] specifies the execution semantics of complete programs using [step]
@@ -46,12 +53,12 @@ Axiom step:forall T, opT T -> Semantics world T.
 Inductive exec : forall T, prog T -> world -> Result T -> Prop :=
 | ExecOp : forall T (op: opT T) w v w',
     step op w v w' ->
-    exec (Prim op) w (Finished v w')
+    exec (BaseOp op) w (Finished v w')
 | ExecOpCrashBegin : forall T (op: opT T) w,
-    exec (Prim op) w (Crashed w)
+    exec (BaseOp op) w (Crashed w)
 | ExecOpCrashEnd : forall T (op: opT T) w v w',
     step op w v w' ->
-    exec (Prim op) w (Crashed w')
+    exec (BaseOp op) w (Crashed w')
 | ExecRet : forall T (v:T) w,
     exec (Ret v) w (Finished v w)
 | ExecRetCrash : forall T (v:T) w,
@@ -116,7 +123,7 @@ Notation "x <- p1 ; p2" := (Bind p1 (fun x => p2))
 
 Arguments Ret {T} v.
 
-Global Generalizable Variables T R opT State step.
+Global Generalizable Variables T R State step.
 
 (** * Automation for inverting execution behavior. *)
 
@@ -145,28 +152,3 @@ Ltac inv_rexec :=
   | [ H: rexec _ _ _ _ |- _ ] =>
     inv_exec' H
   end.
-
-Ltac inv_prim :=
-  match goal with
-  | [ H: exec (Prim _) _ _ |- _ ] =>
-    inv_exec' H
-  end.
-
-(* [inversion_prim_exec] performs much the same function as inversion on an exec
-relation for a [Prim op] with one key diffence: it re-uses the proof of the
-[Finished v w'] case in the [Crashed w'] case. This allows the crash invariant
-proof to re-use the postcondition in the case that the primitive fully executed
-just before crashing. *)
-Theorem inversion_prim_exec : forall `(op: opT T) w r,
-    exec (Prim op) w r ->
-    forall (P: _ -> Prop),
-      (forall v w', step op w v w' ->
-               P (Finished v w')) ->
-      (forall v w', step op w v w' ->
-               P (Finished v w') ->
-               P (Crashed w')) ->
-      (P (Crashed w)) ->
-      P r.
-Proof.
-  intros; inv_exec; eauto.
-Qed.
