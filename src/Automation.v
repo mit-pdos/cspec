@@ -157,16 +157,20 @@ Ltac subst_var :=
 
 (** * Variants of intuition that do not split the goal. *)
 
-Ltac safe_intuition :=
+Ltac safe_intuition_then t :=
   repeat match goal with
          | [ H: _ /\ _ |- _ ] =>
            destruct H
          | [ H: ?P -> _ |- _ ] =>
            lazymatch type of P with
-           | Prop => specialize (H ltac:(auto))
+           | Prop => specialize (H ltac:(t))
            | _ => fail
            end
+         | _ => progress t
          end.
+
+Tactic Notation "safe_intuition" := safe_intuition_then ltac:(auto).
+Tactic Notation "safe_intuition" tactic(t) := safe_intuition_then t.
 
 Ltac hyp_intuition :=
   repeat match goal with
@@ -200,3 +204,12 @@ Create HintDb false.
 
 Ltac solve_false :=
   solve [ exfalso; eauto with false ].
+
+Ltac especialize H :=
+  match type of H with
+  | forall (x:?T), _ =>
+    let x := fresh x in
+    evar (x:T);
+    specialize (H x);
+    subst x
+  end.

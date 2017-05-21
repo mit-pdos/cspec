@@ -5,6 +5,7 @@ module Network.NBD where
 import           Conduit
 import           Control.Exception.Base (Exception)
 import           Control.Monad (when)
+import           Control.Monad.Reader (runReaderT)
 import           Data.Bits
 import qualified Data.ByteString as BS
 import           Data.Conduit.Cereal
@@ -13,6 +14,7 @@ import           Data.Serialize
 import           Network.NBD.Data
 import qualified Replication.DiskOps as RD
 import           Replication.Interpreter
+import           Replication.TwoDiskEnvironment
 
 -- IANA reserved port 10809
 --
@@ -113,8 +115,11 @@ sendReply h err = sourcePut $ do
   putWord32be (errCode err)
   putWord64be h
 
-handleCommands :: (MonadThrow m, MonadIO m) => Bool -> Interpreter -> ByteConduit m ()
-handleCommands doLog run = handle
+withConfig :: Config -> ReaderT Config IO a -> IO a
+withConfig c m = runReaderT m c
+
+handleCommands :: (MonadThrow m, MonadIO m) => Bool -> Config -> ByteConduit m ()
+handleCommands doLog c = handle
   where
     debug = liftIO . when doLog . putStrLn
     handle = do
@@ -123,13 +128,13 @@ handleCommands doLog run = handle
         -- TODO: insert bounds checks
         Read h off len -> do
           debug $ "read at " ++ show off ++ " len " ++ show len
-          bs <- liftIO $ RD.readBytes run off len
+          bs <- liftIO . withConfig c $ RD.readBytes off len
           sendReply h NoError
           sourcePut $ putByteString bs
           handle
         Write h off dat -> do
           debug $ "write at " ++ show off ++ " len " ++ show (BS.length dat)
-          liftIO $ RD.writeBytes run off dat
+          liftIO . withConfig c $ RD.writeBytes off dat
           sendReply h NoError
           handle
         Disconnect -> do
@@ -151,7 +156,7 @@ runServer :: ServerOptions -> IO ()
 runServer ServerOptions {diskPaths=(fn0, fn1), logCommands=doLog} =
   let c = Config fn0 fn1 in do
   putStrLn "recovering..."
-  RD.recover (interpreter c)
+  withConfig c RD.recover
   putStrLn "serving on localhost:10809"
   let settings = serverSettings 10809 "127.0.0.1" in
     runTCPServer settings $ \ad -> do
@@ -165,6 +170,6 @@ runServer ServerOptions {diskPaths=(fn0, fn1), logCommands=doLog} =
           Left (sz0, sz1) -> throwM $ SizeMismatchException sz0 sz1
           Right sz -> sendExportInformation (fromIntegral sz)
         liftIO $ putStrLn "finished negotiation"
-        handleCommands doLog (interpreter c)
+        handleCommands doLog c
         .| appSink ad
       putStrLn "client disconnect"

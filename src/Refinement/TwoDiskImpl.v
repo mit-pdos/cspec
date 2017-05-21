@@ -1,5 +1,5 @@
 Require Import Implements.
-Require Import TwoDiskAPI.
+Require Import Refinement.TwoDiskAPI.
 
 (* TD is an implementation of the operations described in TDSpec.
 

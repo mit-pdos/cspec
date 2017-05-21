@@ -18,16 +18,21 @@ library
   exposed-modules:     ReplicatedDisk
                      , Network.NBD
   other-modules:       Utils.Conversion
-                     , Replication.Interpreter
                      , Replication.DiskOps
+                     , Replication.Interpreter
+                     , Replication.TwoDiskEnvironment
                      , Network.NBD.Data
                      , Bytes
                      , Datatypes
+                     , Def
                      , Disk
                      , EquivDec
+                     , Hoare
+                     , Interface
                      , Prog
                      , Specif
-                     , TwoDiskProg
+                     , TwoDiskAPI
+                     , TwoDiskImpl
   build-depends:       base >= 4.7 && < 5
                      , ghc-prim
                      , bytestring
@@ -36,6 +41,7 @@ library
                      , cereal
                      , cereal-conduit
                      , directory
+                     , mtl
   default-language:    Haskell2010
 
 executable replicate-nbd

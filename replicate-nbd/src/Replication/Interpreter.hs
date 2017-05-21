@@ -1,19 +1,15 @@
 {-# LANGUAGE Rank2Types #-}
 module Replication.Interpreter where
 
+import           Control.Monad.Reader (ReaderT, reader, liftIO)
 import qualified Data.ByteString as BS
-import           Prog
+import Datatypes (Coq_unit)
+import           Disk
+import           Replication.TwoDiskEnvironment
 import           System.Directory (doesFileExist)
 import           System.IO
-import           TwoDiskProg
-import           Unsafe.Coerce
+import           TwoDiskAPI
 import           Utils.Conversion
-
-type Interpreter = forall t. TD__Coq_prog t -> IO t
-
-data Config =
-  Config { disk0Path :: FilePath
-         , disk1Path :: FilePath }
 
 -- this operation is unfortunate: we use it to check the invariant that the
 -- disks are the same size for safety, but it would be nice to get it from Coq
@@ -44,39 +40,37 @@ pwrite h dat off = do
   hSeek h AbsoluteSeek off
   BS.hPut h dat
 
-interpreter :: Config -> Interpreter
-interpreter c = interp
-  where
-    getDisk :: Coq_diskId -> FilePath
-    getDisk Coq_d0 = disk0Path c
-    getDisk Coq_d1 = disk1Path c
+getDisk :: Coq_diskId -> Config -> FilePath
+getDisk Coq_d0 = disk0Path
+getDisk Coq_d1 = disk1Path
 
-    ifExists :: FilePath -> IO a -> IO (DiskResult a)
-    ifExists path a = do
-      exists <- doesFileExist path
-      if exists then Working `fmap` a
-        else return Failed
+ifExists :: FilePath -> IO a -> IO (DiskResult a)
+ifExists path a = do
+  exists <- doesFileExist path
+  if exists then Working <$> a
+    else return Failed
 
-    interp :: Interpreter
-    interp (Prim op) = case op of
-      -- TODO: catch exceptions and return Failed
-      TD__Read d a ->
-        let path = getDisk d in
-        unsafeCoerce <$> ifExists path $
-          withBinaryFile path ReadMode $ \h ->
-            pread h blocksize (addrToOffset a)
-      TD__Write d a b ->
-        let path = getDisk d in
-        unsafeCoerce <$> ifExists path $
-            withBinaryFile path ReadWriteMode $ \h ->
-              pwrite h b (addrToOffset a)
-      TD__DiskSize d ->
-        let path = getDisk d in
-        unsafeCoerce <$> ifExists path $
-          withBinaryFile path ReadMode $ \h -> do
-            sz <- hFileSize h
-            return (sz `div` blocksize::Integer)
-    interp (Ret t) = return t
-    interp (Bind p1 p2) = do
-      r <- interp p1
-      interp (p2 r)
+tdRead :: Coq_diskId -> Coq_addr
+       -> ReaderT Config IO (DiskResult BS.ByteString)
+tdRead d a = do
+  path <- reader $ getDisk d
+  liftIO . ifExists path $
+    withBinaryFile path ReadMode $ \h ->
+      pread h blocksize (addrToOffset a)
+
+tdWrite :: Coq_diskId -> Coq_addr -> BS.ByteString
+        -> ReaderT Config IO (DiskResult Coq_unit)
+tdWrite d a b = do
+  path <- reader $ getDisk d
+  liftIO . ifExists path $
+      withBinaryFile path ReadWriteMode $ \h ->
+        coqTt <$> pwrite h b (addrToOffset a)
+
+tdDiskSize :: Coq_diskId
+           -> ReaderT Config IO (DiskResult Integer)
+tdDiskSize d = do
+  path <- reader $ getDisk d
+  liftIO . ifExists path $
+    withBinaryFile path ReadMode $ \h -> do
+      sz <- hFileSize h
+      return (sz `div` blocksize::Integer)

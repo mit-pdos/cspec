@@ -14,3 +14,6 @@ addrToOffset a = a * blockbytes
 
 unit :: Coq_unit -> ()
 unit _ = ()
+
+coqTt :: () -> Coq_unit
+coqTt _ = Coq_tt

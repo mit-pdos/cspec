@@ -4,5 +4,6 @@
 ((coq-mode
   (company-coq-dir-local-symbols
    ("State" . ?Σ) ("state" . ?σ) ("state'" . (?σ (Br . Bl) ?'))
+   ("world" . ?Ω)
    ("|=" . ?⊨) ("|->" . ?↦)
    )))

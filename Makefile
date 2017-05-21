@@ -13,6 +13,9 @@ ExtractReplicatedDisk.vo: coq replicate-nbd/fiximports.py
 	@echo "COQC ExtractReplicatedDisk.v"
 	@coqc -R src Pocs -noglob ExtractReplicatedDisk.v
 	./scripts/add-preprocess.sh replicate-nbd/src/Bytes.hs
+	./scripts/add-preprocess.sh replicate-nbd/src/Interface.hs
+	./scripts/add-preprocess.sh replicate-nbd/src/ReplicatedDisk.hs
+	./scripts/add-preprocess.sh replicate-nbd/src/TwoDiskImpl.hs
 
 extract: ExtractReplicatedDisk.vo
 

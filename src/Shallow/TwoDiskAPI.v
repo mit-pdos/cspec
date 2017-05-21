@@ -2,6 +2,8 @@ Require Import Prog.
 Require Import Disk.
 Require Import Automation.
 
+Require Import Shallow.Interface.
+
 Inductive diskId := d0 | d1.
 
 Inductive DiskResult T :=
@@ -17,8 +19,6 @@ Module TD.
   | Write (i:diskId) (a:addr) (b:block) : Op (DiskResult unit)
   (* get disk size in blocks *)
   | DiskSize (i:diskId) : Op (DiskResult nat).
-
-  Definition prog := Prog.prog Op.
 
   (** The state the program manipulates as it executes. *)
   Record State :=
@@ -64,7 +64,10 @@ Module TD.
       bg_step (Disks (Some d_0) (Some d_1) pf)
               (Disks (Some d_0) None proof).
 
-  Inductive op_step : Semantics Op State :=
+  (* TODO: split TwoDiskProg into a generic API and an (axiomatic)
+  implementation, same way Refinement/ version does. *)
+
+  Inductive op_step : forall `(op: Op T), Semantics State T :=
   | step_read : forall a i r state,
       match get_disk i state with
       | Some d => match d a with
@@ -88,27 +91,19 @@ Module TD.
       end ->
       op_step (DiskSize i) state r state.
 
-  Definition step := background_step bg_step op_step.
-
-  Definition exec := Prog.exec step.
-  Definition exec_recover := Prog.exec_recover step.
+  Definition API := background_step bg_step (@op_step).
 
   Ltac inv_step :=
     match goal with
-    | [ H: step _ _ _ _ |- _ ] =>
+    | [ H: op_step _ _ _ _ |- _ ] =>
       inversion H; subst; clear H;
-      safe_intuition;
-      match goal with
-      | [ H: op_step _ _ _ _ |- _ ] =>
-        inversion H; subst; clear H;
-        repeat sigT_eq;
-        safe_intuition
-      end
+      repeat sigT_eq;
+      safe_intuition
     end.
 
   Ltac inv_bg :=
     match goal with
-    | [ H: TD.bg_step _ _ |- _ ] =>
+    | [ H: bg_step _ _ |- _ ] =>
       inversion H; subst; clear H
     end.
 
