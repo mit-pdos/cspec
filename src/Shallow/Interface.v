@@ -82,6 +82,8 @@ Definition Prim opT `{api: InterfaceAPI opT State}
 Coercion Prim : Interface >-> Funclass.
 Add Printing Coercion Prim.
 
+Generalizable Variable A.
+
 Theorem prim_spec : forall opT `(api: InterfaceAPI opT State)
                       `(i: Interface api)
                       `(op: opT T)

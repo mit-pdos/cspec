@@ -32,6 +32,8 @@ Record Quadruple T R State :=
 
 Definition Specification A T R State := A -> State -> Quadruple T R State.
 
+Generalizable Variable A.
+
 Definition prog_rspec `(spec: Specification A T R State) `(p: prog T)
            `(rec: prog R)
            `(rf: Refinement State) :=
