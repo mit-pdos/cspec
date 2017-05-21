@@ -190,21 +190,21 @@ Definition prog_rok `(spec: RecSpecification A T R State)
     prog_rdouble
       (fun state postcond recpost =>
          exists a, rec_pre (spec a state) /\
-              (forall r, prog_rdouble
-                      (fun state' postcond' recpost' =>
-                         rec_post (spec a state) r state' /\
-                         postcond' = postcond /\
-                         recpost' = recpost)
-                      (rx r) rec rf) /\
-              (forall r state', recover_post (spec a state) r state' ->
-                       recpost r state')) (Bind p rx) rec rf.
+                   (forall r, prog_rdouble
+                                (fun state' postcond' recpost' =>
+                                   rec_post (spec a state) r state' /\
+                                   postcond' = postcond /\
+                                   recpost' = recpost)
+                                (rx r) rec rf) /\
+                   (forall r state', recover_post (spec a state) r state' ->
+                                     recpost r state')) (Bind p rx) rec rf.
 
 Theorem rdouble_weaken : forall `(p: prog T) `(rec: prog R)
-                          `(rf: Refinement State)
-                          (pre pre': RecDoublePre T R State),
+                                `(rf: Refinement State)
+                                (pre pre': RecDoublePre T R State),
     prog_rdouble pre' p rec rf ->
     (forall state postcond recpost, pre state postcond recpost ->
-                           pre' state postcond recpost) ->
+                                    pre' state postcond recpost) ->
     prog_rdouble pre p rec rf.
 Proof.
   unfold prog_rdouble at 2; intros.
@@ -212,8 +212,8 @@ Proof.
 Qed.
 
 Theorem prog_rspec_to_rok : forall `(spec: RecSpecification A T R State)
-                              `(p: prog T) `(rec: prog R)
-                              `(rf: Refinement State),
+                                   `(p: prog T) `(rec: prog R)
+                                   `(rf: Refinement State),
     prog_rspec spec p rec rf ->
     prog_rok spec p rec rf.
 Proof.
@@ -247,8 +247,8 @@ Proof.
 Qed.
 
 Theorem rdouble_exec_equiv : forall `(rf: Refinement State)
-                              `(pre: RecDoublePre T R State) (p p': prog T)
-                              (rec: prog R),
+                                    `(pre: RecDoublePre T R State) (p p': prog T)
+                                    (rec: prog R),
     exec_equiv p p' ->
     prog_rdouble pre p' rec rf ->
     prog_rdouble pre p rec rf.
@@ -289,17 +289,17 @@ Ltac step_prog ::= step_prog_with ltac:(eauto with prog).
    terrible.
  *)
 Notation "{{{ p ; '_' }}}" := (prog_rdouble _ (Bind p _) _ _)
-                              (only parsing, at level 0).
+                                (only parsing, at level 0).
 
 (** * (much simpler) alternative to begin *)
 
 Theorem rdouble_cases : forall `(pre: RecDoublePre T R State)
-                          `(p: prog T) `(rec: prog R)
-                          `(rf: Refinement State),
+                               `(p: prog T) `(rec: prog R)
+                               `(rf: Refinement State),
     (forall state postcond recpost,
         pre state postcond recpost ->
         exists pre', prog_rdouble pre' p rec rf /\
-                pre' state postcond recpost) ->
+                     pre' state postcond recpost) ->
     prog_rdouble pre p rec rf.
 Proof.
   unfold prog_rdouble at 2; intros.
@@ -362,19 +362,19 @@ Definition rec_idempotent `(spec: RecSpecification A T unit State) :=
   forall a state,
     rec_pre (spec a state) ->
     forall v state', recover_post (spec a state) v state' ->
-          (* idempotency: crash invariant implies precondition to re-run on
+                     (* idempotency: crash invariant implies precondition to re-run on
                every crash *)
-          exists a', rec_pre (spec a' state') /\
-                (* postcondition transitivity: establishing the postcondition
+                     exists a', rec_pre (spec a' state') /\
+                                (* postcondition transitivity: establishing the postcondition
                    from a crash state is sufficient to establish it with respect
                    to the original initial state (note all with the same ghost
                    state) *)
-                forall rv state'', rec_post (spec a' state') rv state'' ->
-                              rec_post (spec a state) rv state''.
+                                forall rv state'', rec_post (spec a' state') rv state'' ->
+                                                   rec_post (spec a state) rv state''.
 
 Theorem rec_idempotent_loopspec : forall `(rec: prog unit) `(rec': prog unit)
-                                    `(spec: RecSpecification A unit unit State)
-                                    (rf: Refinement State),
+                                         `(spec: RecSpecification A unit unit State)
+                                         (rf: Refinement State),
     forall (Hspec: prog_rspec spec rec' rec rf),
       rec_idempotent spec ->
       prog_rec_loopspec spec rec' rec rf.
@@ -395,23 +395,23 @@ Proof.
 Qed.
 
 Theorem compose_recovery : forall `(spec: RecSpecification A'' T unit State)
-                             `(rspec: RecSpecification A' unit unit State)
-                             `(spec': RecSpecification A T unit State)
-                             `(p: prog T) `(rec: prog unit) `(rec': prog unit)
-                             `(rf: Refinement State),
+                                  `(rspec: RecSpecification A' unit unit State)
+                                  `(spec': RecSpecification A T unit State)
+                                  `(p: prog T) `(rec: prog unit) `(rec': prog unit)
+                                  `(rf: Refinement State),
     forall (Hspec: prog_rspec spec p rec rf)
-      (Hrspec: prog_rec_loopspec rspec rec' rec rf)
-      (Hspec_spec':
-         forall (a:A) state, rec_pre (spec' a state) ->
-                exists (a'':A''),
-                  rec_pre (spec a'' state) /\
-                  (forall v state', rec_post (spec a'' state) v state' ->
-                           rec_post (spec' a state) v state') /\
-                  (forall v state', recover_post (spec a'' state) v state' ->
-                           exists a', rec_pre (rspec a' state') /\
-                                 forall v' state'',
-                                   rec_post (rspec a' state') v' state'' ->
-                                   recover_post (spec' a state) v' state'')),
+           (Hrspec: prog_rec_loopspec rspec rec' rec rf)
+           (Hspec_spec':
+              forall (a:A) state, rec_pre (spec' a state) ->
+                                  exists (a'':A''),
+                                    rec_pre (spec a'' state) /\
+                                    (forall v state', rec_post (spec a'' state) v state' ->
+                                                      rec_post (spec' a state) v state') /\
+                                    (forall v state', recover_post (spec a'' state) v state' ->
+                                                      exists a', rec_pre (rspec a' state') /\
+                                                                 forall v' state'',
+                                                                   rec_post (rspec a' state') v' state'' ->
+                                                                   recover_post (spec' a state) v' state'')),
       prog_rspec spec' p (_ <- rec; rec') rf.
 Proof.
   intros.
@@ -498,9 +498,9 @@ Theorem prog_rok_to_rspec : forall `(spec: RecSpecification A T R State)
     prog_rok spec p rec rf ->
     rec_noop rec rf ->
     (forall a state, rec_pre (spec a state) ->
-           forall v state',
-             rec_post (spec a state) v state' ->
-             forall rv, recover_post (spec a state) rv state') ->
+            forall v state',
+              rec_post (spec a state) v state' ->
+              forall rv, recover_post (spec a state) rv state') ->
     prog_rspec spec p rec rf.
 Proof.
   unfold prog_rok, prog_rdouble, prog_rspec; intros.

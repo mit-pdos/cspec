@@ -123,7 +123,7 @@ Module RD.
              | [ crashinv: _ -> Prop |- _ ] =>
                match goal with
                | [ H: forall _, _ -> crashinv _ |-
-                           crashinv _ ] =>
+                                crashinv _ ] =>
                  eapply H
                end
              end.
@@ -334,9 +334,9 @@ Module RD.
                    | DiskFailed i =>
                      match i with
                      | d0 => TD.disk0 state' |= eq d /\
-                            TD.disk1 state' |= eq d
+                             TD.disk1 state' |= eq d
                      | d1 => TD.disk0 state' |= eq (diskUpd d a b) /\
-                            TD.disk1 state' |= eq (diskUpd d a b)
+                             TD.disk1 state' |= eq (diskUpd d a b)
                      end
                    end;
                recover_post :=
@@ -391,9 +391,9 @@ Module RD.
                    | DiskFailed i =>
                      match i with
                      | d0 => TD.disk0 state' |= eq d /\
-                            TD.disk1 state' |= eq d
+                             TD.disk1 state' |= eq d
                      | d1 => TD.disk0 state' |= eq (diskUpd d a' b) /\
-                            TD.disk1 state' |= eq (diskUpd d a' b)
+                             TD.disk1 state' |= eq (diskUpd d a' b)
                      end
                    end;
                recover_post :=
@@ -443,18 +443,18 @@ Module RD.
                  a < size d /\
                  match s with
                  | FullySynced => TD.disk0 state |= eq d /\
-                                 TD.disk1 state |= eq d
+                                  TD.disk1 state |= eq d
                  | OutOfSync a' b => a' <= a /\
-                                    TD.disk0 state |= eq (diskUpd d a' b) /\
-                                    TD.disk1 state |= eq d
+                                     TD.disk0 state |= eq (diskUpd d a' b) /\
+                                     TD.disk1 state |= eq d
                  end;
                rec_post :=
                  fun r state' =>
                    match s with
                    | FullySynced => TD.disk0 state' |= eq d /\
-                                   TD.disk1 state' |= eq d /\
-                                   (* not actually useful *)
-                                   r <> RepairDone
+                                    TD.disk1 state' |= eq d /\
+                                    (* not actually useful *)
+                                    r <> RepairDone
                    | OutOfSync a' b =>
                      match r with
                      | Continue =>
@@ -472,9 +472,9 @@ Module RD.
                      | DiskFailed i =>
                        match i with
                        | d0 => TD.disk0 state' |= eq d /\
-                              TD.disk1 state' |= eq d
+                               TD.disk1 state' |= eq d
                        | d1 => TD.disk0 state' |= eq (diskUpd d a' b) /\
-                              TD.disk1 state' |= eq (diskUpd d a' b)
+                               TD.disk1 state' |= eq (diskUpd d a' b)
                        end
                      end
                    end;
@@ -482,7 +482,7 @@ Module RD.
                  fun _ state' =>
                    match s with
                    | FullySynced => TD.disk0 state' |= eq d /\
-                                   TD.disk1 state' |= eq d
+                                    TD.disk1 state' |= eq d
                    | OutOfSync a' b =>
                      (TD.disk0 state' |= eq (diskUpd d a' b) /\
                       TD.disk1 state' |= eq (diskUpd d a' b)) \/
@@ -533,17 +533,17 @@ Module RD.
                  a <= size d /\
                  match s with
                  | FullySynced => TD.disk0 state |= eq d /\
-                                 TD.disk1 state |= eq d
+                                  TD.disk1 state |= eq d
                  | OutOfSync a' b => a' < a /\
-                                    TD.disk0 state |= eq (diskUpd d a' b) /\
-                                    TD.disk1 state |= eq d
+                                     TD.disk0 state |= eq (diskUpd d a' b) /\
+                                     TD.disk1 state |= eq d
                  end;
                rec_post :=
                  fun r state' =>
                    match s with
                    | FullySynced => TD.disk0 state' |= eq d /\
-                                   TD.disk1 state' |= eq d /\
-                                   r <> Continue
+                                    TD.disk1 state' |= eq d /\
+                                    r <> Continue
                    | OutOfSync a' b =>
                      match r with
                      | Continue => False
@@ -555,11 +555,11 @@ Module RD.
                      | DiskFailed i =>
                        match i with
                        | d0 => (TD.disk0 state' |= eq d /\
-                               TD.disk1 state' |= eq d) \/
-                              (TD.disk0 state' |= eq (diskUpd d a' b) /\
-                               TD.disk1 state' |= eq (diskUpd d a' b))
+                                TD.disk1 state' |= eq d) \/
+                               (TD.disk0 state' |= eq (diskUpd d a' b) /\
+                                TD.disk1 state' |= eq (diskUpd d a' b))
                        | d1 => TD.disk0 state' |= eq (diskUpd d a' b) /\
-                              TD.disk1 state' |= eq (diskUpd d a' b)
+                               TD.disk1 state' |= eq (diskUpd d a' b)
                        end
                      end
                    end;
@@ -567,7 +567,7 @@ Module RD.
                  fun _ state' =>
                    match s with
                    | FullySynced => TD.disk0 state' |= eq d /\
-                                   TD.disk1 state' |= eq d
+                                    TD.disk1 state' |= eq d
                    | OutOfSync a' b =>
                      (TD.disk0 state' |= eq d /\
                       TD.disk1 state' |= eq d) \/
@@ -614,29 +614,29 @@ Module RD.
              rec_pre :=
                match s with
                | FullySynced => TD.disk0 state |= eq d /\
-                               TD.disk1 state |= eq d
+                                TD.disk1 state |= eq d
                | OutOfSync a b => a < size d /\
-                                 TD.disk0 state |= eq (diskUpd d a b) /\
-                                 TD.disk1 state |= eq d
+                                  TD.disk0 state |= eq (diskUpd d a b) /\
+                                  TD.disk1 state |= eq d
                end;
              rec_post :=
                fun r state' =>
                  r = size d /\
                  match s with
                  | FullySynced => TD.disk0 state' |= eq d /\
-                                 TD.disk1 state' |= eq d
+                                  TD.disk1 state' |= eq d
                  | OutOfSync a b => a < size d /\
-                                   TD.disk0 state' |= eq (diskUpd d a b) /\
-                                   TD.disk1 state' |= eq d
+                                    TD.disk0 state' |= eq (diskUpd d a b) /\
+                                    TD.disk1 state' |= eq d
                  end;
              recover_post :=
                fun _ state' =>
                  match s with
                  | FullySynced => TD.disk0 state' |= eq d /\
-                                 TD.disk1 state' |= eq d
+                                  TD.disk1 state' |= eq d
                  | OutOfSync a b => a < size d /\
-                                   TD.disk0 state' |= eq (diskUpd d a b) /\
-                                   TD.disk1 state' |= eq d
+                                    TD.disk0 state' |= eq (diskUpd d a b) /\
+                                    TD.disk1 state' |= eq d
                  end;
            |})
         (DiskSize)
@@ -660,41 +660,41 @@ Module RD.
     Hint Extern 1 {{{ DiskSize; _ }}} => apply DiskSize_ok : prog.
 
     Definition Recover_spec :=
-        (fun '(d, s) state =>
-           {|
-             rec_pre :=
+      (fun '(d, s) state =>
+         {|
+           rec_pre :=
+             match s with
+             | FullySynced => TD.disk0 state |= eq d /\
+                              TD.disk1 state |= eq d
+             | OutOfSync a b => a < size d /\
+                                TD.disk0 state |= eq (diskUpd d a b) /\
+                                TD.disk1 state |= eq d
+             end;
+           rec_post :=
+             fun (_:unit) state' =>
                match s with
-               | FullySynced => TD.disk0 state |= eq d /\
-                               TD.disk1 state |= eq d
-               | OutOfSync a b => a < size d /\
-                                 TD.disk0 state |= eq (diskUpd d a b) /\
-                                 TD.disk1 state |= eq d
+               | FullySynced => TD.disk0 state' |= eq d /\
+                                TD.disk1 state' |= eq d
+               | OutOfSync a b =>
+                 (TD.disk0 state' |= eq d /\
+                  TD.disk1 state' |= eq d) \/
+                 (TD.disk0 state' |= eq (diskUpd d a b) /\
+                  TD.disk1 state' |= eq (diskUpd d a b))
                end;
-             rec_post :=
-               fun (_:unit) state' =>
-                 match s with
-                 | FullySynced => TD.disk0 state' |= eq d /\
-                                 TD.disk1 state' |= eq d
-                 | OutOfSync a b =>
-                   (TD.disk0 state' |= eq d /\
-                    TD.disk1 state' |= eq d) \/
-                   (TD.disk0 state' |= eq (diskUpd d a b) /\
-                    TD.disk1 state' |= eq (diskUpd d a b))
-                 end;
-             recover_post :=
-               fun (_:unit) state' =>
-                 match s with
-                 | FullySynced => TD.disk0 state' |= eq d /\
-                                 TD.disk1 state' |= eq d
-                 | OutOfSync a b =>
-                   (TD.disk0 state' |= eq d /\
-                    TD.disk1 state' |= eq d) \/
-                   (TD.disk0 state' |= eq (diskUpd d a b) /\
-                    TD.disk1 state' |= eq d) \/
-                   (TD.disk0 state' |= eq (diskUpd d a b) /\
-                    TD.disk1 state' |= eq (diskUpd d a b))
-                 end;
-           |}).
+           recover_post :=
+             fun (_:unit) state' =>
+               match s with
+               | FullySynced => TD.disk0 state' |= eq d /\
+                                TD.disk1 state' |= eq d
+               | OutOfSync a b =>
+                 (TD.disk0 state' |= eq d /\
+                  TD.disk1 state' |= eq d) \/
+                 (TD.disk0 state' |= eq (diskUpd d a b) /\
+                  TD.disk1 state' |= eq d) \/
+                 (TD.disk0 state' |= eq (diskUpd d a b) /\
+                  TD.disk1 state' |= eq (diskUpd d a b))
+               end;
+         |}).
 
     Theorem Recover_rok :
       prog_rspec
