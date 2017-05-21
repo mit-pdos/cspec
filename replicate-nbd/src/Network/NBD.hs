@@ -58,6 +58,9 @@ getOption = do
       ExportName -> Left <$> getBytes len
       _ -> getBytes len >> return (Right opt)
 
+-- negotiate a set of options with the client
+-- options are currently all ignored, so that this process simply returns the
+-- export name requested by the client
 negotiateNewstyle :: MonadThrow m => ByteConduit m ExportName
 negotiateNewstyle = do
   yield newstylePrelude
@@ -80,7 +83,7 @@ negotiateNewstyle = do
           -- we actually ignore all options
           handleOptions
 
-
+-- start transmission after negotiation by informing the client about the export
 sendExportInformation :: Monad m => ByteCount -> ByteConduit m ()
 sendExportInformation len = sourcePut $ do
     putWord64be $ fromIntegral len
@@ -90,6 +93,7 @@ sendExportInformation len = sourcePut $ do
     zeroes = BS.replicate 124 0
     flags = nbd_FLAG_HAS_FLAGS
 
+-- parse a command from the client during the transmission phase
 getCommand :: (MonadThrow m, MonadIO m) => ByteConduit m Command
 getCommand = do
   magic <- sinkGet getWord32be
@@ -109,6 +113,8 @@ getCommand = do
     2 -> return Disconnect
     _ -> return $ UnknownCommand typ handle offset len
 
+-- send an error code reply to the client (data is sent separately afterward,
+-- for reads)
 sendReply :: Monad m => Handle -> ErrorCode -> ByteConduit m ()
 sendReply h err = sourcePut $ do
   putWord32be nbd_REPLY_MAGIC
@@ -159,17 +165,24 @@ runServer ServerOptions {diskPaths=(fn0, fn1), logCommands=doLog} =
   withConfig c RD.recover
   putStrLn "serving on localhost:10809"
   let settings = serverSettings 10809 "127.0.0.1" in
-    runTCPServer settings $ \ad -> do
-      runConduit $ appSource ad .| do
-        liftIO $ putStrLn "received connection"
-        name <- negotiateNewstyle
-        liftIO $ when (name /= "") $
-          putStrLn $ "ignoring non-default export name " ++ show name
-        msz <- liftIO $ diskSizes c
-        case msz of
-          Left (sz0, sz1) -> throwM $ SizeMismatchException sz0 sz1
-          Right sz -> sendExportInformation (fromIntegral sz)
-        liftIO $ putStrLn "finished negotiation"
-        handleCommands doLog c
-        .| appSink ad
-      putStrLn "client disconnect"
+    runTCPServer settings $ \ad ->
+    -- these are all the steps of a single client connection
+      let nbdConnection = do
+            liftIO $ putStrLn "received connection"
+          -- negotiate
+            name <- negotiateNewstyle
+            liftIO $ when (name /= "") $
+              putStrLn $ "ignoring non-default export name " ++ show name
+            msz <- liftIO $ diskSizes c
+            case msz of
+              Left (sz0, sz1) -> throwM $ SizeMismatchException sz0 sz1
+              Right sz ->
+                -- start transmission phase
+                sendExportInformation (fromIntegral sz)
+            liftIO $ putStrLn "finished negotiation"
+          -- handle commands in a loop, which terminates upon receiving the
+          -- Disconnect command
+            handleCommands doLog c
+            liftIO $ putStrLn "client disconnect" in
+      -- assemble a conduit using the TCP server as input and output
+      runConduit $ appSource ad .| nbdConnection .| appSink ad
