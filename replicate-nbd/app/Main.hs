@@ -15,9 +15,10 @@ data Options = Options
 
 serverOptions :: Parser ServerOptions
 serverOptions = do
-  diskPaths <- (,)
-               <$> argument str (metavar "FILE0")
-               <*> argument str (metavar "FILE1")
+  diskPaths <- ((,)
+                <$> argument str (metavar "FILE0")
+                <*> argument str (metavar "FILE1"))
+               <|> pure ("disk0.img", "disk1.img")
   logCommands <- switch (long "debug"
                         <> short 'd'
                         <> help "log each operation received")
