@@ -369,12 +369,6 @@ Proof.
   destruct r; intuition eauto.
 Qed.
 
-(* TODO: the return value is actually unconstrained here, so this will really
-   only work for unit-producing recovery procedures.
-
-   We really don't have a story for return values from recovery yet, but I'm
-   hesitant to get rid of them everywhere in case we find a way to use them.
- *)
 Definition rec_noop `(rec: prog R) `(rf: Refinement State) :=
   forall T (v:T),
     prog_rspec
