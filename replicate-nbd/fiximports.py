@@ -17,7 +17,7 @@ import Replication.TwoDiskEnvironment
 import Replication.TwoDiskEnvironment
     """,
     "TwoDiskImpl": """
-import Replication.Interpreter
+import qualified Replication.TwoDiskOps as TD
 import Replication.TwoDiskEnvironment
     """,
     "DiskSize": """

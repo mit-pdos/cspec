@@ -1,5 +1,5 @@
 {-# LANGUAGE Rank2Types #-}
-module Replication.Interpreter where
+module Replication.TwoDiskOps where
 
 import           Control.Monad.Reader (ReaderT, reader, liftIO)
 import qualified Data.ByteString as BS
@@ -49,25 +49,25 @@ ifExists path a = do
   if exists then Working <$> a
     else return Failed
 
-tdRead :: Coq_diskId -> Coq_addr
+read :: Coq_diskId -> Coq_addr
        -> ReaderT Config IO (DiskResult BS.ByteString)
-tdRead d a = do
+read d a = do
   path <- reader $ getDisk d
   liftIO . ifExists path $
     withBinaryFile path ReadMode $ \h ->
       pread h blocksize (addrToOffset a)
 
-tdWrite :: Coq_diskId -> Coq_addr -> BS.ByteString
+write :: Coq_diskId -> Coq_addr -> BS.ByteString
         -> ReaderT Config IO (DiskResult ())
-tdWrite d a b = do
+write d a b = do
   path <- reader $ getDisk d
   liftIO . ifExists path $
       withBinaryFile path ReadWriteMode $ \h ->
         pwrite h b (addrToOffset a)
 
-tdDiskSize :: Coq_diskId
+diskSize :: Coq_diskId
            -> ReaderT Config IO (DiskResult Integer)
-tdDiskSize d = do
+diskSize d = do
   path <- reader $ getDisk d
   liftIO . ifExists path $
     withBinaryFile path ReadMode $ \h -> do

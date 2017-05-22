@@ -18,8 +18,8 @@ library
   exposed-modules:     ReplicatedDisk
                      , Network.NBD
   other-modules:       Utils.Conversion
-                     , Replication.DiskOps
-                     , Replication.Interpreter
+                     , Replication.ReplicatedDiskImpl
+                     , Replication.TwoDiskOps
                      , Replication.TwoDiskEnvironment
                      , Network.NBD.Data
                      , Bytes

@@ -1,5 +1,5 @@
 {-# LANGUAGE Rank2Types #-}
-module Replication.DiskOps where
+module Replication.ReplicatedDiskImpl where
 
 import           Control.Monad (unless)
 import           Control.Monad.Reader (ReaderT)

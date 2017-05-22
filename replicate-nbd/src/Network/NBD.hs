@@ -12,8 +12,8 @@ import           Data.Conduit.Cereal
 import           Data.Conduit.Network
 import           Data.Serialize
 import           Network.NBD.Data
-import qualified Replication.DiskOps as RD
-import           Replication.Interpreter
+import qualified Replication.ReplicatedDiskImpl as RD
+import           Replication.TwoDiskOps
 import           Replication.TwoDiskEnvironment
 
 -- IANA reserved port 10809
