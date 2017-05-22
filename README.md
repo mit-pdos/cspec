@@ -16,74 +16,9 @@ retrieved using `git` means you need to `git add` before a file will be built.
 is still a bit hacky - I'd like to fix it by determining some useful features
 for Coq to have, implementing those, and getting them merged upstream.
 
-## Running the replicated disk as an nbd server
+## Running the Haskell nbd server
 
-The only tools you need are `stack` for building the server and `nbd-client` for
-connecting to it. If you're not familiar
-with [Stack](https://docs.haskellstack.org/en/stable/GUIDE/), it's a build tool
-for Haskell aiming for reproducible, local builds. Using Stack, compiling will
-fetch, build, and use stable versions of all dependencies (including GHC
-itself), independent of the rest of your Haskell setup.
-
-```
-make
-cd replicate-nbd
-stack setup # one-time download of compiler
-stack build
-```
-
-Once you've compiled, run the server:
-
-```
-stack exec -- replicate-nbd [--debug]
-```
-
-The underlying disks will be `disk0.img` and `disk1.img` in the current
-directory, which are initialized to two empty 100MB files if they don't exist.
-Run with `--help` to see how to customize these.
-
-First, load the `nbd` kernel module (TODO: is this Arch-specific? what happens
-on Ubuntu?). On Arch, you can do this on boot by creating a file
-`/etc/modules-load.d/nbd.conf` with just 'nbd' (see
-https://wiki.archlinux.org/index.php/kernel_modules).
-
-```
-sudo modprobe nbd
-```
-
-Connect to it from a client:
-
-```
-sudo nbd-client localhost /dev/nbd0
-```
-
-Note that you can use `nbd` over the network (this is what it's intended for). I
-use this to run the server from my Mac but mount it in a Linux virtual machine,
-by accessing the host machine over a VirtualBox NAT. I believe this just entails
-using 10.0.2.2 as the hostname for `nbd-client` rather than `localhost` (this is
-with the default networking configuration, where under "Network" the adapter has
-"Attached to:" set to "NAT").
-
-Use it a bit (you can do this without sudo by adding yourself to the disk
-group: `sudo usermod -a -G disk $USER`) (TODO: possibly Arch-specific):
-
-```
-mkfs.ext4 -E root_owner /dev/nbd0
-sudo mkdir /mnt/nbd
-sudo mount /dev/nbd0 /mnt/nbd
-mkdir /mnt/nbd/dir
-ls /mnt/nbd
-sudo umount /mnt/nbd
-```
-
-Disconnect the block device:
-
-```
-sudo nbd-client -d /dev/nbd0
-```
-
-The server won't exit since it continually accepts new connections, but you can
-send an interrupt signal with `Ctrl-C`.
+See the [replicate-nbd README](replicate-nbd/README.md).
 
 # Reading guide
 
