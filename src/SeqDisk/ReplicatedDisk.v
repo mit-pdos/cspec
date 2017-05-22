@@ -114,9 +114,7 @@ Module RD.
         (DiskSize td) (_ <- irec td; Recover td)
         (refinement td).
     Proof.
-      eapply compose_recovery; eauto.
-      eapply prog_ok_to_spec; [ eapply DiskSize_ok | eauto | simplify ].
-      simplify.
+      eapply compose_recovery; simplify.
 
       rename a into d.
       exists d, d; (intuition eauto); simplify.

@@ -49,9 +49,7 @@ See the [replicate-nbd README](replicate-nbd/README.md).
     are opaque.
   - [ProgLang/ProgTheorems.v](src/Refinement/ProgLang/ProgTheorems.v): some basic theorems about the execution
     semantics, including the monad laws
-  - [ProgLang/Hoare.v](src/Refinement/ProgLang/Hoare.v): Hoare quadruples and doubles, with desugaring from
-    quadruples to doubles and some equivalence proofs between the different spec
-    definitions.
+  - [ProgLang/Hoare.v](src/Refinement/ProgLang/Hoare.v): Hoare quadruples and theorems to chain specifications (including chaining recovery procedures).
   - [Interface.v](src/Refinement/Interface.v): Layer of operations, with their implementations and
     refinement proofs.
 * [TwoDisk/](src/TwoDisk/) Programs that manipulate two disks, one of which may fail at any time.

@@ -106,23 +106,6 @@ Proof.
   repeat deex; eauto.
 Qed.
 
-Theorem prim_ok : forall opT `(api: InterfaceAPI opT State)
-                    `(i: Interface api)
-                    `(op: opT T)
-                    `(spec: Specification A T unit State),
-    (forall a state, pre (spec a state) ->
-            forall v state', op_sem api op state v state' ->
-                    post (spec a state) v state') ->
-    (forall a state, pre (spec a state) ->
-            recover (spec a state) tt state) ->
-    (forall a state, pre (spec a state) ->
-            forall v state', post (spec a state) v state' ->
-                    recover (spec a state) tt state') ->
-    prog_ok spec (Prim i op) (recover_impl (interface_impl i)) (refinement i).
-Proof.
-  eauto using prog_spec_to_ok, prim_spec.
-Qed.
-
 (* Helper to get the recovery procedure from an [Interface]. *)
 Definition irec opT `(api: InterfaceAPI opT State) `(i: Interface api) : prog unit :=
   recover_impl (interface_impl i).

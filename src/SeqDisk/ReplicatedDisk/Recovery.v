@@ -89,7 +89,7 @@ Section ReplicatedDiskRecovery.
 
     (* we will show that fixup does nothing once the disks are the same *)
     Theorem fixup_equal_ok : forall a,
-        prog_ok
+        prog_spec
           (fun d state =>
              {|
                pre :=
@@ -146,7 +146,7 @@ Section ReplicatedDiskRecovery.
     Hint Rewrite diskUpd_eq using (solve [ auto ]) : rd.
 
     Theorem fixup_correct_addr_ok : forall a,
-        prog_ok
+        prog_spec
           (fun '(d, b) state =>
              {|
                pre :=
@@ -200,7 +200,7 @@ Section ReplicatedDiskRecovery.
     Qed.
 
     Theorem fixup_wrong_addr_ok : forall a,
-        prog_ok
+        prog_spec
           (fun '(d, b, a') state =>
              {|
                pre :=
@@ -252,12 +252,18 @@ Section ReplicatedDiskRecovery.
 
       step.
       destruct r; (intuition eauto); simplify; finish.
-      assert (a' <> a) by eauto using PeanoNat.Nat.lt_neq.
+      (* TODO: factor out this redundant proof *)
+      assert (a'0 <> a) by eauto using PeanoNat.Nat.lt_neq.
       autorewrite with upd in *.
       assert (v = v0) by eauto using disks_eq_inbounds.
       contradiction.
 
-      assert (a' <> a) by eauto using PeanoNat.Nat.lt_neq.
+      assert (a'0 <> a) by eauto using PeanoNat.Nat.lt_neq.
+      autorewrite with upd in *.
+      assert (v = v0) by eauto using disks_eq_inbounds.
+      contradiction.
+
+      assert (a'0 <> a) by eauto using PeanoNat.Nat.lt_neq.
       autorewrite with upd in *.
       assert (v = v0) by eauto using disks_eq_inbounds.
       contradiction.
@@ -271,7 +277,7 @@ Section ReplicatedDiskRecovery.
     | OutOfSync (a:addr) (b:block).
 
     Theorem fixup_ok : forall a,
-        prog_ok
+        prog_spec
           (fun '(d, s) state =>
              {|
                pre :=
@@ -331,37 +337,30 @@ Section ReplicatedDiskRecovery.
           (irec td)
           (refinement td).
     Proof.
-      unfold prog_ok; intros.
-      eapply rdouble_cases; simplify.
+      spec_cases; simplify.
       destruct s; intuition eauto.
-      - rdouble_case fixup_equal_ok; simplify; finish.
-        descend; intuition eauto.
-
-        step.
-        destruct r; (intuition eauto); try congruence.
-      - apply PeanoNat.Nat.lt_eq_cases in H3; intuition.
-        + rdouble_case fixup_wrong_addr_ok;
-            simplify; finish.
+      - spec_case fixup_equal_ok; simplify; finish.
+        descend; (intuition eauto); destruct matches in *;
+          intuition eauto.
+      - apply PeanoNat.Nat.lt_eq_cases in H1; intuition.
+        + spec_case fixup_wrong_addr_ok; simplify; finish.
           descend; intuition eauto.
 
-          step.
-          destruct r; intuition eauto.
-        + rdouble_case fixup_correct_addr_ok;
-            simplify; finish.
+          destruct v; intuition eauto.
+        + spec_case fixup_correct_addr_ok; simplify; finish.
           descend; intuition eauto.
 
-          step.
-          destruct r; intuition eauto.
+          destruct v; intuition eauto.
     Qed.
 
-    Hint Extern 1 {{ fixup _; _ }} => apply fixup_ok : prog.
+    Hint Resolve fixup_ok.
 
     Hint Resolve Lt.lt_n_Sm_le.
 
     Hint Rewrite diskUpd_size : rd.
 
     Theorem recover_at_ok : forall a,
-        prog_ok
+        prog_spec
           (fun '(d, s) state =>
              {|
                pre :=
@@ -417,7 +416,7 @@ Section ReplicatedDiskRecovery.
           (refinement td).
     Proof.
       induction a; simpl; intros.
-      - eapply ret_prog_ok; simplify; finish.
+      - step.
         destruct s; intuition eauto.
         congruence.
         inversion H1.
@@ -434,13 +433,12 @@ Section ReplicatedDiskRecovery.
         exists d, (OutOfSync a0 b); intuition eauto.
         exists (diskUpd d a0 b), FullySynced; intuition eauto.
         simplify; finish.
-        step.
-        destruct r; intuition eauto.
+        destruct v; intuition eauto.
         destruct i; intuition eauto.
         destruct i; intuition eauto.
     Qed.
 
-    Hint Extern 1 {{ recover_at _; _ }} => apply recover_at_ok : prog.
+    Hint Resolve recover_at_ok.
 
     Definition Recover_spec :=
       (fun '(d, s) state =>
@@ -487,23 +485,22 @@ Section ReplicatedDiskRecovery.
         (refinement td).
     Proof.
       unfold Recover, Recover_spec; intros.
-      eapply prog_ok_to_spec; simplify.
-      - step.
-        destruct s; simplify.
-        + exists d, d; intuition eauto.
-          step.
-          exists d, FullySynced; intuition eauto.
+      step.
+      destruct s; simplify.
+      + exists d, d; intuition eauto.
+        step.
+        exists d, FullySynced; intuition eauto.
 
-          step.
-        + exists (diskUpd d a b), d; (intuition eauto); simplify.
-          step.
+        step.
+      + exists (diskUpd d a b), d; (intuition eauto); simplify.
+        step.
 
-          exists d, (OutOfSync a b); intuition eauto.
-          step.
+        exists d, (OutOfSync a b); intuition eauto.
+        step.
 
-          destruct r; intuition eauto.
-          destruct i; intuition eauto.
-      - destruct s; intuition eauto.
+        destruct r; intuition eauto.
+        destruct i; intuition eauto.
+        destruct i; intuition eauto.
     Qed.
 
     Theorem Recover_ok :

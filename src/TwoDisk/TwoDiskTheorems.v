@@ -24,7 +24,7 @@ below.
  *)
 
 Ltac start_prim :=
-  intros; eapply prim_ok; intros;
+  intros; eapply prim_spec; intros;
   repeat destruct_tuple;
   simpl in *;
   safe_intuition;
@@ -53,7 +53,7 @@ Hint Resolve holds_in_none_eq.
 Hint Resolve pred_missing.
 
 Theorem TDRead0_ok : forall (i: Interface TD.API) a,
-    prog_ok
+    prog_spec
       (fun '(d_0, F) state =>
          {|
            pre := TD.disk0 state |= eq d_0 /\
@@ -83,7 +83,7 @@ Proof.
 Qed.
 
 Theorem TDRead1_ok : forall (i: Interface TD.API) a,
-    prog_ok
+    prog_spec
       (fun '(F, d_1) state =>
          {|
            pre := TD.disk0 state |= F /\
@@ -113,7 +113,7 @@ Proof.
 Qed.
 
 Theorem TDWrite0_ok : forall (i: Interface TD.API) a b,
-    prog_ok
+    prog_spec
       (fun '(d_0, F) state =>
          {|
            pre := TD.disk0 state |= eq d_0 /\
@@ -148,7 +148,7 @@ Proof.
 Qed.
 
 Theorem TDWrite1_ok : forall (i: Interface TD.API) a b,
-    prog_ok
+    prog_spec
       (fun '(F, d_1) state =>
          {|
            pre := TD.disk0 state |= F /\
@@ -183,7 +183,7 @@ Proof.
 Qed.
 
 Theorem TDDiskSize0_ok : forall (i: Interface TD.API),
-    prog_ok
+    prog_spec
       (fun '(d_0, F) state =>
          {|
            pre := TD.disk0 state |= eq d_0 /\
@@ -214,7 +214,7 @@ Proof.
 Qed.
 
 Theorem TDDiskSize1_ok : forall (i: Interface TD.API),
-    prog_ok
+    prog_spec
       (fun '(F, d_1) state =>
          {|
            pre := TD.disk0 state |= F /\
@@ -244,9 +244,10 @@ Proof.
   destruct matches in *; intuition eauto.
 Qed.
 
-Hint Extern 1 {{ Prim _ (TD.Read d0 _); _ }} => apply TDRead0_ok : prog.
-Hint Extern 1 {{ Prim _ (TD.Read d1 _); _ }} => apply TDRead1_ok : prog.
-Hint Extern 1 {{ Prim _ (TD.Write d0 _ _); _ }} => apply TDWrite0_ok : prog.
-Hint Extern 1 {{ Prim _ (TD.Write d1 _ _); _ }} => apply TDWrite1_ok : prog.
-Hint Extern 1 {{ Prim _ (TD.DiskSize d0); _ }} => apply TDDiskSize0_ok : prog.
-Hint Extern 1 {{ Prim _ (TD.DiskSize d1); _ }} => apply TDDiskSize1_ok : prog.
+Hint Resolve
+     TDRead0_ok
+     TDRead1_ok
+     TDWrite0_ok
+     TDWrite1_ok
+     TDDiskSize0_ok
+     TDDiskSize1_ok.

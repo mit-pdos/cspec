@@ -54,8 +54,6 @@ Section ReplicatedDiskReadWrite.
         (irec td)
         (refinement td).
   Proof.
-    intros; eapply prog_ok_to_spec; simplify.
-
     unfold Read.
 
     step.
@@ -93,9 +91,6 @@ Section ReplicatedDiskReadWrite.
         (irec td)
         (refinement td).
   Proof.
-    intros; eapply prog_ok_to_spec; simplify.
-    intuition eauto.
-
     unfold Write.
 
     step.
@@ -105,7 +100,7 @@ Section ReplicatedDiskReadWrite.
 
     step.
     destruct r; (intuition eauto); simplify.
-    destruct (lt_dec a (size a0)).
+    destruct (lt_dec a (size a')).
     eauto 10.
     autorewrite with upd in *; eauto.
 

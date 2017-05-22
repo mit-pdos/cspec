@@ -29,8 +29,11 @@ Section ReplicatedDisk.
 
     Hint Resolve both_disks_not_missing : false.
 
+    Hint Resolve TDDiskSize0_ok.
+    Hint Resolve TDDiskSize1_ok.
+
     Theorem DiskSize_ok :
-      prog_ok
+      prog_spec
         (fun '(d_0, d_1) state =>
            {|
              pre :=
@@ -65,4 +68,4 @@ Section ReplicatedDisk.
 
 End ReplicatedDisk.
 
-Hint Extern 1 {{ DiskSize _; _ }} => apply DiskSize_ok : prog.
+Hint Resolve DiskSize_ok.
