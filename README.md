@@ -29,7 +29,7 @@ See the [replicate-nbd README](replicate-nbd/README.md).
 * [SepLogic](src/SepLogic/): (the start of) a separation logic library, somewhat modelled
   after FSCQ's separation logic but mostly influenced by FRAP. There is little
   automation so far as it has not yet been necessary.
-  * [Mem/](src/SepLogic/Mem/)`: as in FSCQ, a `mem A V` is a `A -> option V`, where addresses are
+  * [Mem/](src/SepLogic/Mem/): as in FSCQ, a `mem A V` is a `A -> option V`, where addresses are
     required to have deciable equality in order to update memories.
   * [Pred/](src/SepLogic/Pred/): predicates over memories, including separation logic connectives
     and primitives (`star`, `ptsto`, etc.)
