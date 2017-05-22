@@ -94,7 +94,7 @@ subdirectories.
 * [Bytes.v](src/Bytes.v): (currently axiomatic) definition of byte strings of known lengths.
 * [ExtrBytes.v](src/ExtrBytes.v): extraction of axiomatic `bytes` definitions to Haskell
   `Data.ByteString`.
-* [SepLogic](src/SepLogic/)`: (the start of) a separation logic library, somewhat modelled
+* [SepLogic](src/SepLogic/): (the start of) a separation logic library, somewhat modelled
   after FSCQ's separation logic but mostly influenced by FRAP. There is little
   automation so far as it has not yet been necessary.
   * [Mem/](src/SepLogic/Mem/)`: as in FSCQ, a `mem A V` is a `A -> option V`, where addresses are
