@@ -22,6 +22,7 @@ library
                      , Replication.TwoDiskOps
                      , Replication.TwoDiskEnvironment
                      , Network.NBD.Data
+                     , ArrayAPI
                      , Bytes
                      , Datatypes
                      , Def

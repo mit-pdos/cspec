@@ -16,7 +16,7 @@ Section ArrayDisk.
     | 0 => Ret (bytes0 0)
     | S n => b <- Prim d (D.Read off);
               rest <- read (off+1) n;
-              Ret (bconcat b rest)
+              Ret (bappend b rest)
     end.
 
   Fixpoint write (off:nat) n (bs:bytes (n*blockbytes)) {struct n} : prog unit.
@@ -26,5 +26,11 @@ Section ArrayDisk.
       apply (Bind (Prim d (D.Write off b))); intros _.
       apply (write (off+1) _ rest).
   Defined.
+
+  Definition diskSize : prog nat :=
+    Prim d D.DiskSize.
+
+  Definition recover : prog unit :=
+    irec d.
 
 End ArrayDisk.
