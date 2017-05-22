@@ -5,7 +5,7 @@ Labs for 6.826 (POCS)
 
 ```
 make [-jN]
-make -f Makefile.coq src/Refinement/ReplicatedDisk.vo
+make -f Makefile.coq src/SeqDisk/ReplicatedDisk.vo
 ```
 
 The Makefile generates a `_CoqProject` listing out the files in the project
