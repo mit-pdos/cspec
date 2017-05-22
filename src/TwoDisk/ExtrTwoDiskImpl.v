@@ -1,4 +1,4 @@
-Require Import Refinement.TwoDiskImpl.
+Require Import TwoDisk.TwoDiskImpl.
 
 Extraction Language Haskell.
 

@@ -2,12 +2,13 @@ Require Import Automation.
 Require Import Disk.
 
 Require Import Refinement.Interface.
-Require Import Refinement.TwoDiskAPI Refinement.TwoDiskProgTheorems.
+Require Import TwoDisk.TwoDiskAPI TwoDisk.TwoDiskTheorems.
 Require Import Refinement.ProgLang.Prog.
 Require Import Refinement.ProgLang.Hoare.
 
-Require Import Refinement.ReplicatedDisk.Step.
-Require Import Refinement.ReplicatedDisk.TwoDiskFacts.
+Require Import
+        SeqDisk.ReplicatedDisk.Step
+        SeqDisk.ReplicatedDisk.TwoDiskFacts.
 
 Require Import MaybeHolds.
 

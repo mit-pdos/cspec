@@ -3,7 +3,7 @@ Require Import MaybeHolds.
 Require Import Disk.
 
 Require Import Refinement.ProgLang.Hoare.
-Require Import Refinement.TwoDiskAPI.
+Require Import TwoDisk.TwoDiskAPI.
 
 Require Import Refinement.Interface.
 

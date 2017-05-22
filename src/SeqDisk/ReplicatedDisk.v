@@ -3,13 +3,13 @@ Require Import Automation.
 
 Require Import Refinement.ProgLang.Prog.
 Require Import Refinement.ProgLang.Hoare.
-Require Import Refinement.TwoDiskAPI.
-Require Import Refinement.SeqDiskAPI.
+Require Import TwoDisk.TwoDiskAPI.
+Require Import SeqDisk.SeqDiskAPI.
 
-Require Import Refinement.ReplicatedDisk.Step.
-Require Import Refinement.ReplicatedDisk.DiskSize.
-Require Import Refinement.ReplicatedDisk.Recovery.
-Require Import Refinement.ReplicatedDisk.ReadWrite.
+Require Import SeqDisk.ReplicatedDisk.Step.
+Require Import SeqDisk.ReplicatedDisk.DiskSize.
+Require Import SeqDisk.ReplicatedDisk.Recovery.
+Require Import SeqDisk.ReplicatedDisk.ReadWrite.
 
 Require Import MaybeHolds.
 Require Import Refinement.Interface.

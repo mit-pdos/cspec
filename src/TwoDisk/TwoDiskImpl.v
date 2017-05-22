@@ -1,6 +1,6 @@
 Require Import Disk.
 
-Require Import Refinement.TwoDiskAPI.
+Require Import TwoDisk.TwoDiskAPI.
 Require Import Refinement.Interface.
 Require Import Refinement.ProgLang.Prog.
 Require Import Refinement.ProgLang.Hoare.

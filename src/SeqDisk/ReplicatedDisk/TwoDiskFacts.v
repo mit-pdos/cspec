@@ -1,4 +1,4 @@
-Require Import Refinement.TwoDiskAPI.
+Require Import TwoDisk.TwoDiskAPI.
 Require Import MaybeHolds.
 
 Lemma both_disks_not_missing : forall state,
