@@ -15,31 +15,33 @@ import           Utils.Conversion
 type BlockOffset = Int
 type ByteOffset = Int
 
+-- |wrapper for replicated disk Read
 rdRead :: BlockOffset -> ReaderT Config IO BS.ByteString
 rdRead off = _RD__prim _TD__td $ D__Read (fromIntegral off)
 
+-- |wrapper for replicated disk Write
 rdWrite :: BlockOffset -> BS.ByteString -> ReaderT Config IO ()
 rdWrite off dat = _RD__prim _TD__td $ D__Write (fromIntegral off) dat
 
+-- |read multiple blocks by calling rdRead and concatenating the results
 readBytes :: ByteOffset -> Int -> ReaderT Config IO BS.ByteString
 readBytes off len =
   if not (off `mod` blocksize == 0 && len `mod` blocksize == 0) then
     error $ "misaligned read at " ++ show off ++ " length " ++ show len
-  else loop (off `div` blocksize) (len `div` blocksize)
-  where loop _ 0 = return BS.empty
-        loop blockOff l = do
-          b <- rdRead blockOff
-          s' <- loop (blockOff+1) (l-1)
-          return (BS.append b s')
+  else BS.concat <$> mapM rdRead [0..len `div` blocksize-1]
 
+-- |write a chunk of data by calling rdWrite for each block
+-- (assumes the string is an integer number of blocks long)
 writeBytes :: ByteOffset -> BS.ByteString -> ReaderT Config IO ()
 writeBytes off dat =
   if not (off `mod` blocksize == 0 && BS.length dat `mod` blocksize == 0) then
     error $ "misaligned write at " ++ show off ++ " length " ++ show (BS.length dat)
   else loop (off `div` blocksize) dat
-  where loop blockOff s = unless (BS.length s == 0) $ do
-          rdWrite blockOff (BS.take blocksize s)
-          loop (blockOff+1) (BS.drop blocksize s)
+  where loop blockOff s = unless (BS.length s == 0) $
+          let (b, rest) = BS.splitAt blocksize s in do
+            rdWrite blockOff b
+            loop (blockOff+1) rest
 
+-- |wrapper for replicated disk recovery procedure
 recover :: ReaderT Config IO ()
 recover = _RD__recover _TD__td
