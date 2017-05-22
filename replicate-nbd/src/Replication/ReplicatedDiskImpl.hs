@@ -1,11 +1,10 @@
 {-# LANGUAGE Rank2Types #-}
 module Replication.ReplicatedDiskImpl where
 
-import           Control.Monad (unless)
+import           ArrayAPI
 import qualified Data.ByteString as BS
 import           ReplicatedDisk
 import           Replication.TwoDiskEnvironment (TwoDiskProg)
-import           SeqDiskAPI
 import           TwoDiskImpl (_TD__td)
 import           Utils.Conversion
 
@@ -14,33 +13,25 @@ import           Utils.Conversion
 type BlockOffset = Int
 type ByteOffset = Int
 
--- |wrapper for replicated disk Read
-rdRead :: BlockOffset -> TwoDiskProg BS.ByteString
-rdRead off = _RD__prim _TD__td $ D__Read (fromIntegral off)
-
--- |wrapper for replicated disk Write
-rdWrite :: BlockOffset -> BS.ByteString -> TwoDiskProg ()
-rdWrite off dat = _RD__prim _TD__td $ D__Write (fromIntegral off) dat
-
--- |read multiple blocks by calling rdRead and concatenating the results
+-- |wrapper for Array read that checks for invalid parameters and converts types
 readBytes :: ByteOffset -> Int -> TwoDiskProg BS.ByteString
 readBytes off len =
   if not (off `mod` blocksize == 0 && len `mod` blocksize == 0) then
     error $ "misaligned read at " ++ show off ++ " length " ++ show len
-  else BS.concat <$> mapM rdRead [0..len `div` blocksize-1]
+  else ArrayAPI.read (_RD__rd _TD__td)
+       (fromIntegral off `div` blocksize)
+       (fromIntegral len `div` blocksize)
 
--- |write a chunk of data by calling rdWrite for each block
--- (assumes the string is an integer number of blocks long)
+-- |wrapper for Array write that checks for invalid parameters and converts types
 writeBytes :: ByteOffset -> BS.ByteString -> TwoDiskProg ()
 writeBytes off dat =
   if not (off `mod` blocksize == 0 && BS.length dat `mod` blocksize == 0) then
     error $ "misaligned write at " ++ show off ++ " length " ++ show (BS.length dat)
-  else loop (off `div` blocksize) dat
-  where loop blockOff s = unless (BS.length s == 0) $
-          let (b, rest) = BS.splitAt blocksize s in do
-            rdWrite blockOff b
-            loop (blockOff+1) rest
+  else ArrayAPI.write (_RD__rd _TD__td)
+       (fromIntegral off `div` blocksize)
+       (fromIntegral $ BS.length dat `div` blocksize)
+       dat
 
 -- |wrapper for replicated disk recovery procedure
 recover :: TwoDiskProg ()
-recover = _RD__recover _TD__td
+recover = ArrayAPI.recover (_RD__rd _TD__td)

@@ -29,6 +29,9 @@ import Replication.TwoDiskEnvironment
     "Recovery": """
 import Replication.TwoDiskEnvironment
     """,
+    "ArrayAPI": """
+import Replication.TwoDiskEnvironment
+    """,
 }
 
 fs_filename = sys.argv[1]
