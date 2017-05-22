@@ -54,14 +54,9 @@ See the [replicate-nbd README](replicate-nbd/README.md).
     definitions.
   - [Interface.v](src/Refinement/Interface.v): Layer of operations, with their implementations and
     refinement proofs.
-  - [TwoDiskAPI.v](src/Refinement/TwoDiskAPI.v): Layer API for programs that manipulate two disks, where one
-    might fail at any time.
-  - [TwoDiskImpl.v](src/Refinement/TwoDiskImpl.v): construction of an interface for two disk programs, using
-    axioms for the operations and correctness proofs. This layer is implemented
-    in Haskell by supplying regular Haskell functions at extraction time.
-  - [SeqDiskAPI.v](src/Refinement/SeqDiskAPI.v): programs over a single disk without failures.
-  - [ReplicatedDisk.v](src/Refinement/ReplicatedDisk.v): implements the `SeqDiskAPI` interface using an
-    implementation of `TwoDiskAPI`, using replication to handle failure of a
-    single disk seamlessly. Includes a recovery procedure to patch up any
-    inconsistency created due to a crash in the middle of writing to the two
-    disks.
+* [TwoDisk/](src/TwoDisk/) Programs that manipulate two disks, one of which may fail at any time.
+  - [TwoDiskAPI.v](src/TwoDisk/TwoDiskAPI.v): Layer API, giving the operations and their semantics.
+  - [TwoDiskImpl.v](src/TwoDisk/TwoDiskImpl.v): construction of an interface for two disk programs, using axioms for the operations and correctness proofs. This layer is implemented in Haskell by supplying regular Haskell functions at extraction time.
+* [SeqDisk/](src/SeqDisk/): Programs that manipulate a single, synchronous disk, without failures.
+  - [SeqDiskAPI.v](src/SeqDisk/SeqDiskAPI.v): Layer API.
+  - [ReplicatedDisk.v](src/SeqDisk/ReplicatedDisk.v): implements the `SeqDiskAPI` interface using an implementation of `TwoDiskAPI`, using replication to handle failure of a single disk seamlessly. Includes a recovery procedure to patch up any inconsistency created due to a crash in the middle of writing to the two disks.
