@@ -25,46 +25,26 @@ Section ReplicatedDisk.
                    end
       end.
 
-    Inductive DiskStatus :=
-    | FullySynced
-    | OutOfSync (a:addr) (b:block).
-
     Hint Resolve both_disks_not_missing : false.
 
-    Hint Rewrite diskUpd_size : rd.
-
-    (* TODO: why does this not have a simpler spec? *)
     Theorem DiskSize_ok :
       prog_rok
-        (fun '(d, s) state =>
+        (fun '(d_0, d_1) state =>
            {|
              pre :=
-               match s with
-               | FullySynced => TD.disk0 state |= eq d /\
-                               TD.disk1 state |= eq d
-               | OutOfSync a b => a < size d /\
-                                 TD.disk0 state |= eq (diskUpd d a b) /\
-                                 TD.disk1 state |= eq d
-               end;
+               TD.disk0 state |= eq d_0 /\
+               TD.disk1 state |= eq d_1 /\
+               size d_0 = size d_1;
              post :=
                fun r state' =>
-                 r = size d /\
-                 match s with
-                 | FullySynced => TD.disk0 state' |= eq d /\
-                                 TD.disk1 state' |= eq d
-                 | OutOfSync a b => a < size d /\
-                                   TD.disk0 state' |= eq (diskUpd d a b) /\
-                                   TD.disk1 state' |= eq d
-                 end;
+                 r = size d_0 /\
+                 r = size d_1 /\
+                 TD.disk0 state' |= eq d_0 /\
+                 TD.disk1 state' |= eq d_1;
              recover :=
                fun _ state' =>
-                 match s with
-                 | FullySynced => TD.disk0 state' |= eq d /\
-                                 TD.disk1 state' |= eq d
-                 | OutOfSync a b => a < size d /\
-                                   TD.disk0 state' |= eq (diskUpd d a b) /\
-                                   TD.disk1 state' |= eq d
-                 end;
+                 TD.disk0 state' |= eq d_0 /\
+                 TD.disk1 state' |= eq d_1;
            |})
         (DiskSize)
         (irec td)
@@ -73,15 +53,12 @@ Section ReplicatedDisk.
       unfold DiskSize.
 
       step.
-      destruct s; descend; intuition eauto.
-      - destruct r; step.
-        descend; intuition eauto.
+      descend; intuition eauto.
 
-        destruct r; step.
-      - destruct r; step.
-        descend; intuition eauto.
+      destruct r; step.
+      descend; intuition eauto.
 
-        destruct r; step.
+      destruct r; step.
     Qed.
 
 End ReplicatedDisk.

@@ -109,8 +109,7 @@ Module RD.
       simplify.
 
       rename a into d.
-      exists d, FullySynced; intuition eauto.
-      simplify.
+      exists d, d; (intuition eauto); simplify.
       exists d, FullySynced; intuition eauto.
     Qed.
 

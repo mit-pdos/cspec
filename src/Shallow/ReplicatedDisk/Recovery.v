@@ -262,6 +262,13 @@ Section ReplicatedDiskRecovery.
       contradiction.
     Qed.
 
+    (* To make these specifications precise while also covering both the already
+    synced and diverged disks cases, we keep track of which input state we're
+    in from the input and use it to give an exact postcondition. *)
+    Inductive DiskStatus :=
+    | FullySynced
+    | OutOfSync (a:addr) (b:block).
+
     Theorem fixup_ok : forall a,
         prog_rok
           (fun '(d, s) state =>
@@ -481,19 +488,20 @@ Section ReplicatedDiskRecovery.
       unfold Recover, Recover_spec; intros.
       eapply prog_rok_to_rspec; simplify.
       - step.
-        descend; intuition eauto.
+        destruct s; simplify.
+        + exists d, d; intuition eauto.
+          step.
+          exists d, FullySynced; intuition eauto.
 
-        step.
-        destruct s; intuition.
-        exists d, FullySynced; intuition eauto.
-        step.
+          step.
+        + exists (diskUpd d a b), d; (intuition eauto); simplify.
+          step.
 
-        exists d, (OutOfSync a b); intuition eauto.
-        step.
+          exists d, (OutOfSync a b); intuition eauto.
+          step.
 
-        destruct r; intuition eauto.
-        destruct i; intuition eauto.
-        destruct s; simplify; eauto.
+          destruct r; intuition eauto.
+          destruct i; intuition eauto.
       - destruct s; intuition eauto.
     Qed.
 
