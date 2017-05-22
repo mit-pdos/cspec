@@ -14,11 +14,21 @@ Require Import Shallow.ReplicatedDisk.ReadWrite.
 Require Import MaybeHolds.
 Require Import Shallow.Interface.
 
+(* The replicated disk implementation of the SeqDiskAPI (D.API) using two disks,
+despite failures at the two disk level. *)
+
 Module RD.
 
   Section ReplicatedDisk.
 
+    (* The replicated disk implementation works for any implementation of two
+    disks - [Interface] already captures the implementation and all the
+    correctness proofs needed here. *)
     Variable (td:Interface TD.API).
+
+    (* As the final step in giving the correctness of the replicated disk
+    operations, we prove recovery specs that include the replicated disk Recover
+    function. *)
 
     Theorem Read_rok : forall a,
         prog_rspec
@@ -113,6 +123,12 @@ Module RD.
       exists d, FullySynced; intuition eauto.
     Qed.
 
+    (* Now we gather up the implementation and all the correctness proofs,
+    expressing them in terms of the high-level API in D.API. *)
+
+    (* First, we prove some lemmas that re-express the D.API semantics in more
+    convenient terms (in some cases, just for the sake of the automation). *)
+
     Lemma read_step : forall a (state state':D.State) b,
         state a |= eq b ->
         state' = state ->
@@ -144,6 +160,9 @@ Module RD.
 
     Hint Resolve read_step write_step disk_size_step.
 
+    (* The proof will require a refinement; we build one up based on the two
+    disk state. *)
+
     Definition rd_abstraction (state:TD.State) : D.State :=
       match state with
       | TD.Disks (Some d) _ _ => d
@@ -158,11 +177,19 @@ Module RD.
       | _ => True
       end.
 
-    Hint Resolve tt.
+    (* We re-express the abstraction and invariant's behavior in terms of the
+       maybe holds (m |= F) statements in all of our specifications. *)
 
-    Lemma invariant_to_disks_eq : forall state,
+    Lemma invariant_to_disks_eq0 : forall state,
         rd_invariant state ->
-        TD.disk0 state |= eq (rd_abstraction state) /\
+        TD.disk0 state |= eq (rd_abstraction state).
+    Proof.
+      destruct state; simpl; intros.
+      destruct matches in *; eauto.
+    Qed.
+
+    Lemma invariant_to_disks_eq1 : forall state,
+        rd_invariant state ->
         TD.disk1 state |= eq (rd_abstraction state).
     Proof.
       destruct state; simpl; intros.
@@ -185,12 +212,16 @@ Module RD.
     Proof.
       destruct state; simpl; intros.
       destruct matches in *; eauto.
-      exfalso; eauto.
+      solve_false.
     Qed.
 
-    Hint Extern 1 (TD.disk0 _ |= eq (rd_abstraction _)) => apply invariant_to_disks_eq.
-    Hint Extern 1 (TD.disk1 _ |= eq (rd_abstraction _)) => apply invariant_to_disks_eq.
+    Hint Resolve invariant_to_disks_eq0 invariant_to_disks_eq1.
     Hint Resolve disks_eq_to_invariant disks_eq_to_abstraction.
+
+    (* Finally, we put together the pieces of the [Interface]. Here we also
+    convert from our specificatiosn above to the exact form that an Interface
+    uses; the proofs are automatic after defining the lemmas above about D.step
+    and the layer refinement. *)
 
     Definition d_op_impl T (op:D.Op T) : prog T :=
       match op with
@@ -235,6 +266,9 @@ Module RD.
         Grab Existential Variables.
         all: auto.
     Defined.
+
+    (* For the convenience of the extracted Haskell code we define short
+    functions to access the final implementation. *)
 
     Definition prim T (op: D.Op T) : prog T :=
       Prim rd op.
