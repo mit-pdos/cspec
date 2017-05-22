@@ -144,7 +144,7 @@ subdirectories.
       the appropriate `io_step` for these operations; `TwoDiskImpl` does so.
 
       For extraction `IO` is particularly clean: it just extracts to the Haskell
-      `IO` monad! The assumed `Ret` and `Bind` because `return` and `(>>=)`, while
+      `IO` monad! The assumed `Ret` and `Bind` operations extract to `return` and `(>>=)`, while
       the semantics and `world` state type are not needed for extraction. Then any
       axiomatized operations are provided as ordinary Haskell programs.
     - [IOcrash.v](src/Refinement/Implements/IOcrash.v): extends `IOstep` to also define `io_crash`, which is like step
