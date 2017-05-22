@@ -101,6 +101,7 @@ subdirectories.
     required to have deciable equality in order to update memories.
   * [Pred/](src/SepLogic/Pred/): predicates over memories, including separation logic connectives
     and primitives (`star`, `ptsto`, etc.)
+* [MaybeHolds](src/MaybeHolds.v): some simple infrastructure for conveniently stating properties of an `option` value. The core definition is `m |= F` (notation for `maybe_holds F m`, but you can read it as "m satisfies F"), which states that if `m` holds a value `x`, then `F(x)` is true.
 * [Disk.v](src/Disk.v): defines `disk`, a memory with fixed size that always maps addresses
   [0, size).
 * [Shallow/](src/Shallow/)
