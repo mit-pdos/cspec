@@ -1,4 +1,4 @@
-Require Import Shallow.TwoDiskAPI.
+Require Import Refinement.TwoDiskAPI.
 Require Import MaybeHolds.
 
 Lemma both_disks_not_missing : forall state,

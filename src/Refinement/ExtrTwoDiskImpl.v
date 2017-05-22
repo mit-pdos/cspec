@@ -1,4 +1,4 @@
-Require Import Shallow.TwoDiskImpl.
+Require Import Refinement.TwoDiskImpl.
 
 Extraction Language Haskell.
 

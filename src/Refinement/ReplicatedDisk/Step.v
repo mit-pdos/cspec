@@ -1,6 +1,6 @@
 Require Import Automation.
 
-Require Import Shallow.ProgLang.Hoare.
+Require Import Refinement.ProgLang.Hoare.
 
 Lemma exists_tuple2 : forall A B (P: A * B -> Prop),
     (exists a b, P (a, b)) ->

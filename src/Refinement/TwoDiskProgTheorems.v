@@ -2,10 +2,10 @@ Require Import Automation.
 Require Import MaybeHolds.
 Require Import Disk.
 
-Require Import Shallow.ProgLang.Hoare.
-Require Import Shallow.TwoDiskAPI.
+Require Import Refinement.ProgLang.Hoare.
+Require Import Refinement.TwoDiskAPI.
 
-Require Import Shallow.Interface.
+Require Import Refinement.Interface.
 
 (** Hoare-style specifications for the TwoDisk primitives.
 

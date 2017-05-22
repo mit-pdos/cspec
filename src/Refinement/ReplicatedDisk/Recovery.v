@@ -1,13 +1,13 @@
 Require Import Automation.
 Require Import Disk.
 
-Require Import Shallow.Interface.
-Require Import Shallow.TwoDiskAPI.
-Require Import Shallow.ProgLang.Prog.
-Require Import Shallow.ProgLang.Hoare.
+Require Import Refinement.Interface.
+Require Import Refinement.TwoDiskAPI.
+Require Import Refinement.ProgLang.Prog.
+Require Import Refinement.ProgLang.Hoare.
 
-Require Import Shallow.ReplicatedDisk.Step.
-Require Import Shallow.ReplicatedDisk.DiskSize.
+Require Import Refinement.ReplicatedDisk.Step.
+Require Import Refinement.ReplicatedDisk.DiskSize.
 
 Require Import MaybeHolds.
 

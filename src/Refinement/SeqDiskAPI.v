@@ -1,38 +1,28 @@
-Require Export Disk.
-Require Import Implements.
-Require Import ProofIrrelevance.
+Require Import Prog.
+Require Import Disk.
 
-Module DSpec.
-  Record State :=
-    Disk { sdisk : disk }.
+Require Import Refinement.Interface.
 
-  Lemma state_eq : forall (state state':State),
-      size (sdisk state) = size (sdisk state') ->
-      (forall a, sdisk state a = sdisk state' a) ->
-      state = state'.
-  Proof.
-    intros.
-    destruct state, state'; simpl in *; f_equal.
-    destruct sdisk0, sdisk1.
-    simpl in *; subst.
-    assert (diskMem = diskMem0).
-    extensionality a; auto.
-    subst.
-    assert (diskMem_domain = diskMem_domain0).
-    apply proof_irrelevance.
-    subst.
-    auto.
-  Qed.
+(* Defines programs over a single disk. *)
 
-  Definition Read a : Semantics block :=
-    StepRel (fun state r state' =>
-               match sdisk state a with
-               | Some v0 => r = v0
-               | None => True
-               end /\ state' = state).
+Module D.
 
-  Definition Write a b : Semantics unit :=
-    StepRel (fun state r state' =>
-               state' = Disk (diskUpd (sdisk state) a b) /\ r = tt).
+  Inductive Op : Type -> Type :=
+  | Read (a:addr) : Op block
+  | Write (a:addr) (b:block) : Op unit
+  | DiskSize : Op nat.
 
-End DSpec.
+  Definition State := disk.
+
+  Inductive step : forall `(op: Op T), Semantics State T :=
+  | step_read : forall a r (state: State),
+      (forall b, state a = Some b -> r = b) ->
+      step (Read a) state r state
+  | step_write : forall a b (state: State),
+      step (Write a b) state tt (diskUpd state a b)
+  | step_disk_size : forall (state: State),
+      step (DiskSize) state (size state) state.
+
+  Definition API := {| op_sem := @step |}.
+
+End D.

@@ -1,31 +1,41 @@
-Require Import Implements.
+Require Import Disk.
+
 Require Import Refinement.TwoDiskAPI.
+Require Import Refinement.Interface.
+Require Import Refinement.ProgLang.Prog.
+Require Import Refinement.ProgLang.Hoare.
 
-(* TD is an implementation of the operations described in TDSpec.
-
- We don't actually implement this layer, instead assuming some operations exist
- that will be filled in later in the extracted code. *)
 Module TD.
+  Axiom read : diskId -> addr -> prog (DiskResult block).
+  Axiom write : diskId -> addr -> block -> prog (DiskResult unit).
+  Axiom diskSize : diskId -> prog (DiskResult nat).
 
-  Axiom Read : diskId -> addr -> IO block.
-  Axiom Write : diskId -> addr -> block -> IO unit.
+  Definition td_op_impl T (op: TD.Op T) : prog T :=
+    match op with
+    | TD.Read d a => read d a
+    | TD.Write d a b => write d a b
+    | TD.DiskSize d => diskSize d
+    end.
 
-  Axiom abstraction : world -> TDSpec.State.
-  (* any world state, and thus any TD state that the abstraction function might
-  produce, is ok, so we use a trivial invariant below *)
+  Definition impl : InterfaceImpl TD.Op :=
+    {| op_impl := td_op_impl;
+       recover_impl := Ret tt; |}.
 
-  Axiom Read_ok : forall i a,
-      implements
-        (TDSpec.Read i a)
-        (Read i a)
-        abstraction
-        (fun _ => True).
+  Axiom refinement : Refinement TD.State.
 
-  Axiom Write_ok : forall i a b,
-      implements
-        (TDSpec.Write i a b)
-        (Write i a b)
-        abstraction
-        (fun _ => True).
+  Axiom impl_ok :  forall (T : Type) (op : TD.Op T),
+      prog_rspec (op_spec TD.API op) (op_impl impl T op)
+                 (recover_impl impl) refinement.
+
+  Definition td : Interface TD.API.
+    unshelve econstructor.
+    - exact impl.
+    - exact refinement.
+    - apply impl_ok.
+    - unfold rec_noop; simpl; intros.
+      unfold prog_rspec; simpl; intros.
+      inv_rexec; inv_exec; eauto.
+      induction H3; inv_exec; eauto.
+  Defined.
 
 End TD.

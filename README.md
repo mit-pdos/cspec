@@ -5,7 +5,7 @@ Labs for 6.826 (POCS)
 
 ```
 make [-jN]
-make -f Makefile.coq src/Shallow/ReplicatedDisk.vo
+make -f Makefile.coq src/Refinement/ReplicatedDisk.vo
 ```
 
 The Makefile generates a `_CoqProject` listing out the files in the project
@@ -22,9 +22,6 @@ See the [replicate-nbd README](replicate-nbd/README.md).
 
 # Reading guide
 
-There are two distinct experiments, in the `Shallow` and `Refinement`
-subdirectories.
-
 * [Automation.v](src/Automation.v): a bunch of nice Ltac
 * [Bytes.v](src/Bytes.v): (currently axiomatic) definition of byte strings of known lengths.
 * [ExtrBytes.v](src/ExtrBytes.v): extraction of axiomatic `bytes` definitions to Haskell
@@ -39,7 +36,7 @@ subdirectories.
 * [MaybeHolds](src/MaybeHolds.v): some simple infrastructure for conveniently stating properties of an `option` value. The core definition is `m |= F` (notation for `maybe_holds F m`, but you can read it as "m satisfies F"), which states that if `m` holds a value `x`, then `F(x)` is true.
 * [Disk.v](src/Disk.v): defines `disk`, a memory with fixed size that always maps addresses
   [0, size).
-* [Shallow/](src/Shallow/)
+* [Refinement/](src/Refinement/)
 
   We define an axiomatic `prog` inductive for programs. These programs have
   entirely opaque behavior, manipulating states of an axiom type `world`.
@@ -47,65 +44,24 @@ subdirectories.
   refinement goes from the two disk API to the `world` states, which we define
   in Haskell and assume has the appropriate refinement specification.
 
-  - [ProgLang/Prog.v](src/Shallow/ProgLang/Prog.v): axiomatically defined programs. `prog` provides `Bind`
+  - [ProgLang/Prog.v](src/Refinement/ProgLang/Prog.v): axiomatically defined programs. `prog` provides `Bind`
     and `Ret` combinators to build up programs, but other operations available
     are opaque.
-  - [ProgLang/ProgTheorems.v](src/Shallow/ProgLang/ProgTheorems.v): some basic theorems about the execution
+  - [ProgLang/ProgTheorems.v](src/Refinement/ProgLang/ProgTheorems.v): some basic theorems about the execution
     semantics, including the monad laws
-  - [ProgLang/Hoare.v](src/Shallow/ProgLang/Hoare.v): Hoare quadruples and doubles, with desugaring from
+  - [ProgLang/Hoare.v](src/Refinement/ProgLang/Hoare.v): Hoare quadruples and doubles, with desugaring from
     quadruples to doubles and some equivalence proofs between the different spec
     definitions.
-  - [Interface.v](src/Shallow/Interface.v): Layer of operations, with their implementations and
+  - [Interface.v](src/Refinement/Interface.v): Layer of operations, with their implementations and
     refinement proofs.
-  - [TwoDiskAPI.v](src/Shallow/TwoDiskAPI.v): Layer API for programs that manipulate two disks, where one
+  - [TwoDiskAPI.v](src/Refinement/TwoDiskAPI.v): Layer API for programs that manipulate two disks, where one
     might fail at any time.
-  - [TwoDiskImpl.v](src/Shallow/TwoDiskImpl.v): construction of an interface for two disk programs, using
+  - [TwoDiskImpl.v](src/Refinement/TwoDiskImpl.v): construction of an interface for two disk programs, using
     axioms for the operations and correctness proofs. This layer is implemented
     in Haskell by supplying regular Haskell functions at extraction time.
-  - [SeqDiskAPI.v](src/Shallow/SeqDiskAPI.v): programs over a single disk without failures.
-  - [ReplicatedDisk.v](src/Shallow/ReplicatedDisk.v): implements the `SeqDiskAPI` interface using an
+  - [SeqDiskAPI.v](src/Refinement/SeqDiskAPI.v): programs over a single disk without failures.
+  - [ReplicatedDisk.v](src/Refinement/ReplicatedDisk.v): implements the `SeqDiskAPI` interface using an
     implementation of `TwoDiskAPI`, using replication to handle failure of a
     single disk seamlessly. Includes a recovery procedure to patch up any
     inconsistency created due to a crash in the middle of writing to the two
     disks.
-
-* [Refinement/](src/Refinement/)
-  * `Implements/` defines an IO monad and the notion of an implementation
-    refining the opaque behavior of this monad. This is our definition of what a spec is and when a program meets its specification.
-    - [IOstep.v](src/Refinement/Implements/IOstep.v): assumes some operations in an `IO` monad, ncluding `Ret` and
-      `Bind` operations, as well as its semantics. These programs have an opaque
-      semantics: they manipulate state of type `world` according to some (unknown)
-      relation `io_step`. We can add axioms for operations in `IO` and assume
-      the appropriate `io_step` for these operations; `TwoDiskImpl` does so.
-
-      For extraction `IO` is particularly clean: it just extracts to the Haskell
-      `IO` monad! The assumed `Ret` and `Bind` operations extract to `return` and `(>>=)`, while
-      the semantics and `world` state type are not needed for extraction. Then any
-      axiomatized operations are provided as ordinary Haskell programs.
-    - [IOcrash.v](src/Refinement/Implements/IOcrash.v): extends `IOstep` to also define `io_crash`, which is like step
-      but has rules for crashing before a program starts, in the middle of a bind,
-      and during either side of a bind.
-    - [IO.v](src/Refinement/Implements/IO.v): re-exports `IOstep` and `IOcrash` to give a complete semantics to
-      the `IO` monad.
-    - [Implements.v](src/Refinement/Implements/Implements.v): defines an `implements` relation between two relations based
-      on refinement, linked via an abstraction function. A proof of an
-      `implements` relation is a correctness specification.
-  - [TwoDiskAPI.v](src/Refinement/TwoDiskAPI.v): provides definitions for what operations on two disks should
-    do; not quite an API since the signatures for `Read` and `Write` are not
-    really given, but are instead implicit in the signatures for `Read` and
-    `Write`'s semantics.
-
-    We start using modules here for namespacing (there will be many things
-    called `Read` and `Write`), but do not use module types or functors.
-  - [TwoDiskImpl.v](src/Refinement/TwoDiskImpl.v): here are the actual operations for operating on two disks.
-    Since this is the lowest level we don't actually provide implementations but
-    just a set of axioms. Here we also provide `Read_ok` and `Write_ok` proofs
-    that link the specs (in `TwoDiskAPI`) to the IO monad; these are also
-    assumed, and give `TD.Read` and `TD.Write` meaning via refinement.
-  - [SeqDiskAPI.v](src/Refinement/SeqDiskAPI.v): in analogy to `TwoDiskAPI.v`, provides the API (specs) for a
-    single, sequential disk's operations.
-  - [SeqDiskImpl.v](src/Refinement/SeqDiskImpl.v): implements the sequential disk operations using the
-    two-disk operations. The implementation is kind of pointless without crashes
-    (and really just uses the first disk), but the refinement proof already has
-    some interesting issues. For example, it maintains an invariant that both
-    disks have the same domain.

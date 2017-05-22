@@ -1,18 +1,18 @@
 Require Import Disk.
 Require Import Automation.
 
-Require Import Shallow.ProgLang.Prog.
-Require Import Shallow.ProgLang.Hoare.
-Require Import Shallow.TwoDiskAPI.
-Require Import Shallow.SeqDiskAPI.
+Require Import Refinement.ProgLang.Prog.
+Require Import Refinement.ProgLang.Hoare.
+Require Import Refinement.TwoDiskAPI.
+Require Import Refinement.SeqDiskAPI.
 
-Require Import Shallow.ReplicatedDisk.Step.
-Require Import Shallow.ReplicatedDisk.DiskSize.
-Require Import Shallow.ReplicatedDisk.Recovery.
-Require Import Shallow.ReplicatedDisk.ReadWrite.
+Require Import Refinement.ReplicatedDisk.Step.
+Require Import Refinement.ReplicatedDisk.DiskSize.
+Require Import Refinement.ReplicatedDisk.Recovery.
+Require Import Refinement.ReplicatedDisk.ReadWrite.
 
 Require Import MaybeHolds.
-Require Import Shallow.Interface.
+Require Import Refinement.Interface.
 
 (* The replicated disk implementation of the SeqDiskAPI (D.API) using two disks,
 despite failures at the two disk level. *)
