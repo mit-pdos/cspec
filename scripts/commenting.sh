@@ -6,8 +6,14 @@ set -e
 
 tmp=$(mktemp -t "cloc.sql")
 
-cloc --quiet --vcs=git -sql="$tmp"
-sqlite3 -cmd ".read \"$tmp\"" -cmd '.headers on' -cmd '.width 38' -column <<EOF
+args="$@"
+
+if [ "$#" -eq 0 ]; then
+	args="--vcs=git"
+fi
+
+cloc --quiet --sql="$tmp" $args
+sqlite3 -cmd ".read \"$tmp\"" -cmd '.headers on' -cmd '.width 50' -column <<EOF
 select File, nCode+nComment as "code lines",
 	round(cast(nComment as float)/(nCode+nComment), 2) as "% comments"
 	from t
