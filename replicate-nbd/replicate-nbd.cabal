@@ -1,14 +1,14 @@
 name:                replicate-nbd
 version:             0.1.0.0
--- synopsis:
--- description:
-homepage:            https://github.com/githubuser/replicate-nbd#readme
+synopsis:            Replicated NBD server
+description:         Network block device server that replicates requests over two disks, supporting whole disk failures. The core implementation is extracted from Coq.
+homepage:            https://github.com/mit-pdos/6.826-labs
 license:             BSD3
 license-file:        LICENSE
-author:              Author name here
-maintainer:          example@example.com
-copyright:           2017 Author name here
-category:            Web
+author:              Tej Chajed
+maintainer:          tchajed@mit.edu
+copyright:           2017 Tej Chajed
+category:            Network
 build-type:          Simple
 extra-source-files:  README.md
 cabal-version:       >=1.10
@@ -69,4 +69,4 @@ test-suite replicate-nbd-test
 
 source-repository head
   type:     git
-  location: https://github.com/githubuser/replicate-nbd
+  location: https://github.com/mit-pdos/6.826-labs
