@@ -37,7 +37,8 @@ Module TD.
     - apply impl_ok.
     - unfold rec_noop; simpl; intros.
       unfold prog_spec; simpl; intros.
-      inv_rexec; inv_exec; eauto.
+      inv_rexec; inv_ret; eauto.
+      induction H3; inv_exec; eauto.
       induction H3; inv_exec; eauto.
     - apply init_ok.
   Defined.

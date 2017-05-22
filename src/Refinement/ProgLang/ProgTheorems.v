@@ -11,7 +11,7 @@ Local Hint Constructors exec.
 Theorem can_crash_at_begin : forall `(p: prog T) w,
     exec p w (Crashed w).
 Proof.
-  induction p; intros; eauto.
+  eauto.
 Qed.
 
 Theorem can_crash_at_end : forall `(p: prog T) w v w',
@@ -109,6 +109,23 @@ Proof.
   inv_exec; eauto.
 Qed.
 
+Lemma exec_ret_crash : forall T (v:T) w r,
+    exec (Ret v) w r ->
+    match r with
+    | Finished v' w' => v' = v /\ w' = w
+    | Crashed w' => w' = w
+    end.
+Proof.
+  intros.
+  inv_exec; eauto.
+Qed.
+
+Ltac inv_ret :=
+  match goal with
+  | [ H: exec (Ret _) _ _ |- _ ] =>
+    apply exec_ret_crash in H; safe_intuition
+  end.
+
 Local Hint Constructors rexec.
 
 Theorem rexec_equiv : forall T (p p': prog T) `(rec: prog R) w r,
@@ -146,6 +163,7 @@ Proof.
   intros.
   inversion H; subst.
   inv_exec.
+  - left; eauto.
   - right.
     descend; intuition eauto.
   - left; eauto.

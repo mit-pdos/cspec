@@ -24,7 +24,7 @@ Programs can be combined with [Bind] and [Ret].
  arbitrary additional behavior. Otherwise, we would know that [Bind] and [Ret]
  are only enough for pure programs that do not have side effects.
  *)
-Inductive prog : forall T:Type, Type :=
+CoInductive prog : forall T:Type, Type :=
 | BaseOp : forall T, opT T -> prog T
 | Ret : forall T, T -> prog T
 | Bind : forall T T', prog T -> (T -> prog T') -> prog T'.
@@ -51,11 +51,11 @@ Inductive exec : forall T, prog T -> world -> Result T -> Prop :=
 | ExecOp : forall T (op: opT T) w v w',
     step op w v w' ->
     exec (BaseOp op) w (Finished v w')
-| ExecOpCrashBegin : forall T (op: opT T) w,
-    exec (BaseOp op) w (Crashed w)
 | ExecOpCrashEnd : forall T (op: opT T) w v w',
     step op w v w' ->
     exec (BaseOp op) w (Crashed w')
+| ExecCrashBegin : forall T (p: prog T) w,
+    exec p w (Crashed w)
 | ExecRet : forall T (v:T) w,
     exec (Ret v) w (Finished v w)
 | ExecRetCrash : forall T (v:T) w,
