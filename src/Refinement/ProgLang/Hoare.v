@@ -34,7 +34,7 @@ Definition Specification A T R State := A -> State -> Quadruple T R State.
 
 Generalizable Variable A.
 
-Definition prog_rspec `(spec: Specification A T R State) `(p: prog T)
+Definition prog_spec `(spec: Specification A T R State) `(p: prog T)
            `(rec: prog R)
            `(rf: Refinement State) :=
   forall a w,
@@ -51,7 +51,7 @@ Definition prog_rspec `(spec: Specification A T R State) `(p: prog T)
                             invariant rf w'
          end.
 
-Definition rspec_impl
+Definition spec_impl
            `(spec1: Specification A' T R State)
            `(spec2: Specification A T R State) :=
   forall a state, pre (spec2 a state) ->
@@ -61,15 +61,15 @@ Definition rspec_impl
                (forall rv state', recover (spec1 a' state) rv state' ->
                          recover (spec2 a state) rv state').
 
-Theorem prog_rspec_weaken : forall `(spec1: Specification A T R State)
+Theorem prog_spec_weaken : forall `(spec1: Specification A T R State)
                               `(spec2: Specification A' T R State)
                               `(p: prog T) `(rec: prog R)
                               (rf: Refinement State),
-    prog_rspec spec1 p rec rf ->
-    rspec_impl spec1 spec2 ->
-    prog_rspec spec2 p rec rf.
+    prog_spec spec1 p rec rf ->
+    spec_impl spec1 spec2 ->
+    prog_spec spec2 p rec rf.
 Proof.
-  unfold prog_rspec at 2; intros.
+  unfold prog_spec at 2; intros.
   eapply H0 in H1; eauto; repeat deex.
   eapply H in H3; eauto.
   destruct r; simpl in *; intuition eauto.
@@ -101,7 +101,7 @@ Definition prog_rdouble `(pre: RecDoublePre T R State)
                             invariant rf w'
          end.
 
-Definition prog_rok `(spec: Specification A T R State)
+Definition prog_ok `(spec: Specification A T R State)
            `(p: prog T) `(rec: prog R)
            `(rf: Refinement State) :=
   forall T' (rx: T -> prog T'),
@@ -129,13 +129,13 @@ Proof.
   eapply H; eauto.
 Qed.
 
-Theorem prog_rspec_to_rok : forall `(spec: Specification A T R State)
+Theorem prog_spec_to_ok : forall `(spec: Specification A T R State)
                               `(p: prog T) `(rec: prog R)
                               `(rf: Refinement State),
-    prog_rspec spec p rec rf ->
-    prog_rok spec p rec rf.
+    prog_spec spec p rec rf ->
+    prog_ok spec p rec rf.
 Proof.
-  unfold prog_rok, prog_rdouble; intros.
+  unfold prog_ok, prog_rdouble; intros.
   repeat deex.
   destruct r.
   - inv_rexec.
@@ -192,7 +192,7 @@ Ltac step_prog_with t :=
     monad_simpl;
     eapply rdouble_weaken; [ solve [ t ] | ]
   | |- forall _, _ => intros; step_prog_with t
-  | |- prog_rok _ _ _ _ => unfold prog_rok; step_prog_with t
+  | |- prog_ok _ _ _ _ => unfold prog_ok; step_prog_with t
   end.
 
 (** step_prog applies a registered prog_ok theorem (in the prog hint database)
@@ -289,7 +289,7 @@ Definition idempotent `(spec: Specification A T unit State) :=
 Theorem idempotent_loopspec : forall `(rec: prog unit) `(rec': prog unit)
                                      `(spec: Specification A unit unit State)
                                      (rf: Refinement State),
-    forall (Hspec: prog_rspec spec rec' rec rf),
+    forall (Hspec: prog_spec spec rec' rec rf),
       idempotent spec ->
       prog_loopspec spec rec' rec rf.
 Proof.
@@ -309,27 +309,27 @@ Proof.
 Qed.
 
 Theorem compose_recovery : forall `(spec: Specification A'' T unit State)
-                                  `(rspec: Specification A' unit unit State)
-                                  `(spec': Specification A T unit State)
-                                  `(p: prog T) `(rec: prog unit) `(rec': prog unit)
-                                  `(rf: Refinement State),
-    forall (Hspec: prog_rspec spec p rec rf)
-           (Hrspec: prog_loopspec rspec rec' rec rf)
-           (Hspec_spec':
-              forall (a:A) state, pre (spec' a state) ->
-                                  exists (a'':A''),
-                                    pre (spec a'' state) /\
-                                    (forall v state', post (spec a'' state) v state' ->
-                                                      post (spec' a state) v state') /\
-                                    (forall v state', recover (spec a'' state) v state' ->
-                                                      exists a', pre (rspec a' state') /\
-                                                                 forall v' state'',
-                                                                   post (rspec a' state') v' state'' ->
-                                                                   recover (spec' a state) v' state'')),
-      prog_rspec spec' p (_ <- rec; rec') rf.
+                             `(rspec: Specification A' unit unit State)
+                             `(spec': Specification A T unit State)
+                             `(p: prog T) `(rec: prog unit) `(rec': prog unit)
+                             `(rf: Refinement State),
+    forall (Hspec: prog_spec spec p rec rf)
+      (Hrspec: prog_loopspec rspec rec' rec rf)
+      (Hspec_spec':
+         forall (a:A) state, pre (spec' a state) ->
+                    exists (a'':A''),
+                      pre (spec a'' state) /\
+                      (forall v state', post (spec a'' state) v state' ->
+                               post (spec' a state) v state') /\
+                      (forall v state', recover (spec a'' state) v state' ->
+                               exists a', pre (rspec a' state') /\
+                                     forall v' state'',
+                                       post (rspec a' state') v' state'' ->
+                                       recover (spec' a state) v' state'')),
+      prog_spec spec' p (_ <- rec; rec') rf.
 Proof.
   intros.
-  unfold prog_rspec; intros.
+  unfold prog_spec; intros.
   eapply Hspec_spec' in H; safe_intuition.
   destruct r.
   - repeat deex.
@@ -360,12 +360,12 @@ Proof.
     end; simpl in *; safe_intuition eauto.
 Qed.
 
-Theorem rspec_refinement_compose :
+Theorem spec_refinement_compose :
   forall `(spec: Specification A T R State2)
          `(p: prog T) `(rec: prog R)
          `(rf2: LRefinement State1 State2)
          `(rf1: Refinement State1),
-    prog_rspec
+    prog_spec
       (fun (a:A) state =>
          let state2 := abstraction rf2 state in
          {| pre := pre (spec a state2) /\
@@ -380,10 +380,10 @@ Theorem rspec_refinement_compose :
                 let state2' := abstraction rf2 state' in
                 recover (spec a state2) v state2' /\
                 invariant rf2 state'; |}) p rec rf1 ->
-    prog_rspec spec p rec (refinement_compose rf1 rf2).
+    prog_spec spec p rec (refinement_compose rf1 rf2).
 Proof.
   intros.
-  unfold prog_rspec, refinement_compose;
+  unfold prog_spec, refinement_compose;
     simpl; intros; safe_intuition.
   eapply H in H2; simpl in *; eauto.
   destruct r; intuition eauto.
@@ -391,7 +391,7 @@ Qed.
 
 Definition rec_noop `(rec: prog R) `(rf: Refinement State) :=
   forall T (v:T),
-    prog_rspec
+    prog_spec
       (fun (_:unit) state =>
          {| pre := True;
             post := fun r state' => r = v /\
@@ -400,18 +400,18 @@ Definition rec_noop `(rec: prog R) `(rf: Refinement State) :=
 
 Hint Resolve tt.
 
-Theorem prog_rok_to_rspec : forall `(spec: Specification A T R State)
+Theorem prog_ok_to_spec : forall `(spec: Specification A T R State)
                               `(p: prog T) `(rec: prog R)
                               `(rf: Refinement State),
-    prog_rok spec p rec rf ->
+    prog_ok spec p rec rf ->
     rec_noop rec rf ->
     (forall a state, pre (spec a state) ->
             forall v state',
               post (spec a state) v state' ->
               forall rv, recover (spec a state) rv state') ->
-    prog_rspec spec p rec rf.
+    prog_spec spec p rec rf.
 Proof.
-  unfold prog_rok, prog_rdouble, prog_rspec; intros.
+  unfold prog_ok, prog_rdouble, prog_spec; intros.
   specialize (H _ Ret).
   specialize (H w).
   eapply H; eauto.
@@ -429,18 +429,18 @@ Qed.
 
 (* for recovery proofs about pure programs *)
 
-Theorem ret_prog_rok : forall `(rf: Refinement State)
+Theorem ret_prog_ok : forall `(rf: Refinement State)
                          `(spec: Specification A T R State)
                          (v:T) (rec: prog R),
     rec_noop rec rf ->
     (forall a state, pre (spec a state) ->
             post (spec a state) v state /\
             forall r, recover (spec a state) r state) ->
-    prog_rok spec (Ret v) rec rf.
+    prog_ok spec (Ret v) rec rf.
 Proof.
   intros.
-  eapply prog_rspec_to_rok.
-  unfold prog_rspec; intros.
+  eapply prog_spec_to_ok.
+  unfold prog_spec; intros.
   eapply H in H3; simpl in *; eauto.
   eapply H0 in H1.
   destruct r; safe_intuition; subst.
@@ -454,7 +454,7 @@ Theorem rec_noop_compose : forall `(rec: prog unit) `(rec2: prog unit)
                              `(rf1: Refinement State1)
                              `(rf2: LRefinement State1 State2),
     rec_noop rec rf1 ->
-    prog_rspec
+    prog_spec
       (fun (_:unit) state =>
          {| pre := invariant rf2 state;
             post :=
@@ -467,7 +467,7 @@ Theorem rec_noop_compose : forall `(rec: prog unit) `(rec2: prog unit)
     rec_noop (_ <- rec; rec2) (refinement_compose rf1 rf2).
 Proof.
   unfold rec_noop; intros.
-  eapply rspec_refinement_compose; simpl.
+  eapply spec_refinement_compose; simpl.
   eapply compose_recovery; eauto.
   eapply idempotent_loopspec; eauto.
   unfold idempotent; simpl; intuition eauto.

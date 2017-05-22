@@ -32,7 +32,7 @@ Module RD.
 
     Ltac start := intros;
                   match goal with
-                  | |- prog_rspec _ _ (_ <- _; _) _ =>
+                  | |- prog_spec _ _ (_ <- _; _) _ =>
                     eapply compose_recovery; eauto; simplify
                   end.
 
@@ -41,7 +41,7 @@ Module RD.
     Hint Resolve Read_ok Write_ok DiskSize_ok Recover_ok.
 
     Theorem Read_rok : forall a,
-        prog_rspec
+        prog_spec
           (fun d state =>
              {|
                pre := TD.disk0 state |= eq d /\
@@ -66,7 +66,7 @@ Module RD.
     Qed.
 
     Theorem Write_rok : forall a b,
-        prog_rspec
+        prog_spec
           (fun d state =>
              {|
                pre :=
@@ -96,7 +96,7 @@ Module RD.
     Qed.
 
     Theorem DiskSize_rok :
-      prog_rspec
+      prog_spec
         (fun d state =>
            {|
              pre := TD.disk0 state |= eq d /\
@@ -115,7 +115,7 @@ Module RD.
         (refinement td).
     Proof.
       eapply compose_recovery; eauto.
-      eapply prog_rok_to_rspec; [ eapply DiskSize_ok | eauto | simplify ].
+      eapply prog_ok_to_spec; [ eapply DiskSize_ok | eauto | simplify ].
       simplify.
 
       rename a into d.
@@ -252,15 +252,15 @@ Module RD.
       - exact rd_refinement.
       - intros.
         destruct op; unfold op_spec;
-          apply rspec_refinement_compose;
-          eapply prog_rspec_weaken; eauto;
-            unfold rspec_impl; simplify.
+          apply spec_refinement_compose;
+          eapply prog_spec_weaken; eauto;
+            unfold spec_impl; simplify.
         + exists (rd_abstraction state); (intuition eauto); simplify.
         + exists (rd_abstraction state); (intuition eauto); simplify.
         + exists (rd_abstraction state); (intuition eauto); simplify.
       - eapply rec_noop_compose; eauto; simpl.
-        eapply prog_rspec_weaken; eauto;
-          unfold rspec_impl; simplify.
+        eapply prog_spec_weaken; eauto;
+          unfold spec_impl; simplify.
         exists (rd_abstraction state), FullySynced; intuition eauto.
 
         Grab Existential Variables.

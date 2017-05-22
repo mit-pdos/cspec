@@ -35,7 +35,7 @@ Section ReplicatedDiskReadWrite.
   Hint Resolve pred_missing.
   Hint Resolve both_disks_not_missing : false.
   Theorem Read_ok : forall a,
-      prog_rspec
+      prog_spec
         (fun d state =>
            {|
              pre := TD.disk0 state |= eq d /\
@@ -54,7 +54,7 @@ Section ReplicatedDiskReadWrite.
         (irec td)
         (refinement td).
   Proof.
-    intros; eapply prog_rok_to_rspec; simplify.
+    intros; eapply prog_ok_to_spec; simplify.
 
     unfold Read.
 
@@ -68,7 +68,7 @@ Section ReplicatedDiskReadWrite.
   Qed.
 
   Theorem Write_ok : forall a b,
-      prog_rspec
+      prog_spec
         (fun d state =>
            {|
              pre :=
@@ -93,7 +93,7 @@ Section ReplicatedDiskReadWrite.
         (irec td)
         (refinement td).
   Proof.
-    intros; eapply prog_rok_to_rspec; simplify.
+    intros; eapply prog_ok_to_spec; simplify.
     intuition eauto.
 
     unfold Write.

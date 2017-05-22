@@ -30,7 +30,7 @@ Section ReplicatedDisk.
     Hint Resolve both_disks_not_missing : false.
 
     Theorem DiskSize_ok :
-      prog_rok
+      prog_ok
         (fun '(d_0, d_1) state =>
            {|
              pre :=

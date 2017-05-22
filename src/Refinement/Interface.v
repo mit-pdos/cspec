@@ -62,10 +62,10 @@ Record Interface opT State (api: InterfaceAPI opT State) :=
   { interface_impl: InterfaceImpl opT;
     refinement: Refinement State;
     impl_ok : forall `(op: opT T),
-        prog_rspec (op_spec api op)
-                   (op_impl interface_impl _ op)
-                   (recover_impl interface_impl)
-                   refinement;
+        prog_spec (op_spec api op)
+                  (op_impl interface_impl _ op)
+                  (recover_impl interface_impl)
+                  refinement;
     ret_rec_ok:
       rec_noop (recover_impl interface_impl) refinement }.
 
@@ -95,12 +95,12 @@ Theorem prim_spec : forall opT `(api: InterfaceAPI opT State)
     (forall a state, pre (spec a state) ->
             forall v state', post (spec a state) v state' ->
                     recover (spec a state) tt state') ->
-    prog_rspec spec (Prim i op) (recover_impl (interface_impl i)) (refinement i).
+    prog_spec spec (Prim i op) (recover_impl (interface_impl i)) (refinement i).
 Proof.
   intros.
-  eapply prog_rspec_weaken.
+  eapply prog_spec_weaken.
   eapply (impl_ok i).
-  unfold rspec_impl; intros.
+  unfold spec_impl; intros.
   exists tt; simpl; intuition.
   subst; eauto.
   repeat deex; eauto.
@@ -118,9 +118,9 @@ Theorem prim_ok : forall opT `(api: InterfaceAPI opT State)
     (forall a state, pre (spec a state) ->
             forall v state', post (spec a state) v state' ->
                     recover (spec a state) tt state') ->
-    prog_rok spec (Prim i op) (recover_impl (interface_impl i)) (refinement i).
+    prog_ok spec (Prim i op) (recover_impl (interface_impl i)) (refinement i).
 Proof.
-  eauto using prog_rspec_to_rok, prim_spec.
+  eauto using prog_spec_to_ok, prim_spec.
 Qed.
 
 (* Helper to get the recovery procedure from an [Interface]. *)

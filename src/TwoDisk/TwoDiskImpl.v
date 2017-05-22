@@ -24,8 +24,8 @@ Module TD.
   Axiom refinement : Refinement TD.State.
 
   Axiom impl_ok :  forall (T : Type) (op : TD.Op T),
-      prog_rspec (op_spec TD.API op) (op_impl impl T op)
-                 (recover_impl impl) refinement.
+      prog_spec (op_spec TD.API op) (op_impl impl T op)
+                (recover_impl impl) refinement.
 
   Definition td : Interface TD.API.
     unshelve econstructor.
@@ -33,7 +33,7 @@ Module TD.
     - exact refinement.
     - apply impl_ok.
     - unfold rec_noop; simpl; intros.
-      unfold prog_rspec; simpl; intros.
+      unfold prog_spec; simpl; intros.
       inv_rexec; inv_exec; eauto.
       induction H3; inv_exec; eauto.
   Defined.

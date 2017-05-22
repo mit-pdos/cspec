@@ -89,7 +89,7 @@ Section ReplicatedDiskRecovery.
 
     (* we will show that fixup does nothing once the disks are the same *)
     Theorem fixup_equal_ok : forall a,
-        prog_rok
+        prog_ok
           (fun d state =>
              {|
                pre :=
@@ -146,7 +146,7 @@ Section ReplicatedDiskRecovery.
     Hint Rewrite diskUpd_eq using (solve [ auto ]) : rd.
 
     Theorem fixup_correct_addr_ok : forall a,
-        prog_rok
+        prog_ok
           (fun '(d, b) state =>
              {|
                pre :=
@@ -200,7 +200,7 @@ Section ReplicatedDiskRecovery.
     Qed.
 
     Theorem fixup_wrong_addr_ok : forall a,
-        prog_rok
+        prog_ok
           (fun '(d, b, a') state =>
              {|
                pre :=
@@ -271,7 +271,7 @@ Section ReplicatedDiskRecovery.
     | OutOfSync (a:addr) (b:block).
 
     Theorem fixup_ok : forall a,
-        prog_rok
+        prog_ok
           (fun '(d, s) state =>
              {|
                pre :=
@@ -331,7 +331,7 @@ Section ReplicatedDiskRecovery.
           (irec td)
           (refinement td).
     Proof.
-      unfold prog_rok; intros.
+      unfold prog_ok; intros.
       eapply rdouble_cases; simplify.
       destruct s; intuition eauto.
       - rdouble_case fixup_equal_ok; simplify; finish.
@@ -361,7 +361,7 @@ Section ReplicatedDiskRecovery.
     Hint Rewrite diskUpd_size : rd.
 
     Theorem recover_at_ok : forall a,
-        prog_rok
+        prog_ok
           (fun '(d, s) state =>
              {|
                pre :=
@@ -417,7 +417,7 @@ Section ReplicatedDiskRecovery.
           (refinement td).
     Proof.
       induction a; simpl; intros.
-      - eapply ret_prog_rok; simplify; finish.
+      - eapply ret_prog_ok; simplify; finish.
         destruct s; intuition eauto.
         congruence.
         inversion H1.
@@ -480,14 +480,14 @@ Section ReplicatedDiskRecovery.
          |}).
 
     Theorem Recover_rok :
-      prog_rspec
+      prog_spec
         Recover_spec
         (Recover)
         (irec td)
         (refinement td).
     Proof.
       unfold Recover, Recover_spec; intros.
-      eapply prog_rok_to_rspec; simplify.
+      eapply prog_ok_to_spec; simplify.
       - step.
         destruct s; simplify.
         + exists d, d; intuition eauto.
