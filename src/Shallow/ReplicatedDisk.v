@@ -30,6 +30,16 @@ Module RD.
     operations, we prove recovery specs that include the replicated disk Recover
     function. *)
 
+    Ltac start := intros;
+                  match goal with
+                  | |- prog_rspec _ _ (_ <- _; _) _ =>
+                    eapply compose_recovery; eauto; simplify
+                  end.
+
+    (* it's sufficient to use regular hints to plug these specifications into
+    the basic automation here *)
+    Hint Resolve Read_ok Write_ok DiskSize_ok Recover_ok.
+
     Theorem Read_rok : forall a,
         prog_rspec
           (fun d state =>
@@ -49,14 +59,9 @@ Module RD.
           (Read td a) (_ <- irec td; Recover td)
           (refinement td).
     Proof.
-      intros.
-      eapply compose_recovery.
-      eapply Read_ok.
-      eapply Recover_ok.
-      simplify.
+      start.
       rename a0 into d.
-      descend; intuition eauto.
-      simplify.
+      descend; (intuition eauto); simplify.
       exists d, FullySynced; intuition eauto.
     Qed.
 
@@ -82,16 +87,12 @@ Module RD.
           (Write td a b) (_ <- irec td; Recover td)
           (refinement td).
     Proof.
-      intros.
-      eapply compose_recovery.
-      eapply Write_ok.
-      eapply Recover_ok.
-      simplify.
+      start.
       rename a0 into d.
       descend; (intuition eauto); simplify.
-      exists d, FullySynced; intuition eauto.
-      exists d, (OutOfSync a b); intuition eauto.
-      exists (diskUpd d a b), FullySynced; intuition eauto.
+      - exists d, FullySynced; intuition eauto.
+      - exists d, (OutOfSync a b); intuition eauto.
+      - exists (diskUpd d a b), FullySynced; intuition eauto.
     Qed.
 
     Theorem DiskSize_rok :
@@ -113,9 +114,8 @@ Module RD.
         (DiskSize td) (_ <- irec td; Recover td)
         (refinement td).
     Proof.
-      eapply compose_recovery.
+      eapply compose_recovery; eauto.
       eapply prog_rok_to_rspec; [ eapply DiskSize_ok | eauto | simplify ].
-      eapply Recover_ok.
       simplify.
 
       rename a into d.
@@ -180,20 +180,26 @@ Module RD.
     (* We re-express the abstraction and invariant's behavior in terms of the
        maybe holds (m |= F) statements in all of our specifications. *)
 
+    Ltac crush :=
+      intros; repeat match goal with
+                     | [ state: TD.State |- _ ] =>
+                       destruct state; simpl in *
+                     | _ => destruct matches in *
+                     | _ => eauto
+                     end.
+
     Lemma invariant_to_disks_eq0 : forall state,
         rd_invariant state ->
         TD.disk0 state |= eq (rd_abstraction state).
     Proof.
-      destruct state; simpl; intros.
-      destruct matches in *; eauto.
+      crush.
     Qed.
 
     Lemma invariant_to_disks_eq1 : forall state,
         rd_invariant state ->
         TD.disk1 state |= eq (rd_abstraction state).
     Proof.
-      destruct state; simpl; intros.
-      destruct matches in *; eauto.
+      crush.
     Qed.
 
     Lemma disks_eq_to_invariant : forall state d,
@@ -201,8 +207,7 @@ Module RD.
         TD.disk1 state |= eq d ->
         rd_invariant state.
     Proof.
-      destruct state; simpl; intros.
-      destruct matches in *; eauto.
+      crush.
     Qed.
 
     Lemma disks_eq_to_abstraction : forall state d,
@@ -210,8 +215,7 @@ Module RD.
         TD.disk1 state |= eq d ->
         rd_abstraction state = d.
     Proof.
-      destruct state; simpl; intros.
-      destruct matches in *; eauto.
+      crush.
       solve_false.
     Qed.
 
@@ -240,27 +244,23 @@ Module RD.
       {| op_impl := d_op_impl;
          recover_impl := _ <- irec td; Recover td; |}.
 
+    Hint Resolve Read_rok Write_rok DiskSize_rok Recover_rok.
+
     Definition rd : Interface D.API.
       unshelve econstructor.
       - exact impl.
       - exact rd_refinement.
       - intros.
-        destruct op; unfold op_spec; simpl.
-        + apply rspec_refinement_compose; simpl.
-          eapply prog_rspec_weaken; [ apply Read_rok | ].
-          unfold rspec_impl; simplify.
-          exists (rd_abstraction state); (intuition eauto); simplify.
-        + apply rspec_refinement_compose; simpl.
-          eapply prog_rspec_weaken; [ apply Write_rok | ].
-          unfold rspec_impl; simplify.
-          exists (rd_abstraction state); (intuition eauto); simplify.
-        + apply rspec_refinement_compose; simpl.
-          eapply prog_rspec_weaken; [ apply DiskSize_rok | ].
-          unfold rspec_impl; simplify.
-          exists (rd_abstraction state); (intuition eauto); simplify.
+        destruct op; unfold op_spec;
+          apply rspec_refinement_compose;
+          eapply prog_rspec_weaken; eauto;
+            unfold rspec_impl; simplify.
+        + exists (rd_abstraction state); (intuition eauto); simplify.
+        + exists (rd_abstraction state); (intuition eauto); simplify.
+        + exists (rd_abstraction state); (intuition eauto); simplify.
       - eapply rec_noop_compose; eauto; simpl.
-        eapply prog_rspec_weaken; [ eapply Recover_rok | ].
-        unfold rspec_impl; simplify.
+        eapply prog_rspec_weaken; eauto;
+          unfold rspec_impl; simplify.
         exists (rd_abstraction state), FullySynced; intuition eauto.
 
         Grab Existential Variables.
