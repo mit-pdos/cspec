@@ -7,6 +7,7 @@ Require Import TwoDisk.TwoDiskAPI.
 Require Import SeqDisk.SeqDiskAPI.
 
 Require Import SeqDisk.ReplicatedDisk.Step.
+Require Import SeqDisk.ReplicatedDisk.Init.
 Require Import SeqDisk.ReplicatedDisk.DiskSize.
 Require Import SeqDisk.ReplicatedDisk.Recovery.
 Require Import SeqDisk.ReplicatedDisk.ReadWrite.
@@ -240,7 +241,8 @@ Module RD.
 
     Definition impl : InterfaceImpl D.Op :=
       {| op_impl := d_op_impl;
-         recover_impl := _ <- irec td; Recover td; |}.
+         recover_impl := _ <- irec td; Recover td;
+      init_impl := then_init (iInit td) (Init td) |}.
 
     Hint Resolve Read_rok Write_rok DiskSize_rok Recover_rok.
 
@@ -260,10 +262,11 @@ Module RD.
         eapply prog_spec_weaken; eauto;
           unfold spec_impl; simplify.
         exists (rd_abstraction state), FullySynced; intuition eauto.
+      - admit. (* initialization proof *)
 
         Grab Existential Variables.
         all: auto.
-    Defined.
+    Admitted.
 
     (* For the convenience of the extracted Haskell code we define short
     functions to access the final implementation. *)

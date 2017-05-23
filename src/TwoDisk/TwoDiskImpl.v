@@ -19,13 +19,16 @@ Module TD.
 
   Definition impl : InterfaceImpl TD.Op :=
     {| op_impl := td_op_impl;
-       recover_impl := Ret tt; |}.
+       recover_impl := Ret tt;
+       init_impl := Ret Initialized; |}.
 
   Axiom refinement : Refinement TD.State.
 
   Axiom impl_ok :  forall (T : Type) (op : TD.Op T),
       prog_spec (op_spec TD.API op) (op_impl impl T op)
                 (recover_impl impl) refinement.
+
+  Axiom init_ok : init_invariant (init_impl impl) (recover_impl impl) refinement.
 
   Definition td : Interface TD.API.
     unshelve econstructor.
@@ -36,6 +39,7 @@ Module TD.
       unfold prog_spec; simpl; intros.
       inv_rexec; inv_exec; eauto.
       induction H3; inv_exec; eauto.
+    - apply init_ok.
   Defined.
 
 End TD.

@@ -16,6 +16,10 @@ Record LRefinement State1 State2 :=
 using [rf], which I'm not too happy with) *)
 Definition Refinement State := LRefinement world State.
 
+Definition IdRefinement State : LRefinement State State :=
+  {| invariant := fun _ => True;
+     abstraction := fun state => state; |}.
+
 Definition refinement_compose
            `(rf1: Refinement State1)
            `(rf2: LRefinement State1 State2) :=
