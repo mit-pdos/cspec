@@ -12,14 +12,7 @@ coq: Makefile.coq
 ExtractReplicatedDisk.vo: coq replicate-nbd/fiximports.py
 	@echo "COQC ExtractReplicatedDisk.v"
 	@coqc -R src Pocs -noglob ExtractReplicatedDisk.v
-	./scripts/add-preprocess.sh replicate-nbd/src/Bytes.hs
-	./scripts/add-preprocess.sh replicate-nbd/src/Interface.hs
-	./scripts/add-preprocess.sh replicate-nbd/src/ReplicatedDisk.hs
-	./scripts/add-preprocess.sh replicate-nbd/src/ArrayAPI.hs
-	./scripts/add-preprocess.sh replicate-nbd/src/DiskSize.hs
-	./scripts/add-preprocess.sh replicate-nbd/src/ReadWrite.hs
-	./scripts/add-preprocess.sh replicate-nbd/src/Recovery.hs
-	./scripts/add-preprocess.sh replicate-nbd/src/TwoDiskImpl.hs
+	./scripts/add-preprocess.sh replicate-nbd/src/*.hs
 
 extract: ExtractReplicatedDisk.vo
 
