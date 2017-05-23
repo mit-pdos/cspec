@@ -70,6 +70,16 @@ Proof.
   autorewrite with upd; auto.
 Qed.
 
+Lemma disk_oob_eq : forall d a,
+    ~a < size d ->
+    d a = None.
+Proof.
+  intros.
+  unfold diskUpd.
+  pose proof (diskMem_domain d a).
+  destruct (lt_dec a (size d)); try contradiction; auto.
+Qed.
+
 Lemma diskUpd_oob_eq : forall d a b,
     ~a < size d ->
     diskUpd d a b a = None.
@@ -119,6 +129,7 @@ Proof.
 Qed.
 
 Hint Rewrite diskUpd_eq using (solve [ auto ]) : upd.
+Hint Rewrite disk_oob_eq using (solve [ auto ]) : upd.
 Hint Rewrite diskUpd_oob_eq using (solve [ auto ]) : upd.
 Hint Rewrite diskUpd_size : upd.
 Hint Rewrite diskUpd_neq using (solve [ auto ]) : upd.
