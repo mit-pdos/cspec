@@ -291,6 +291,9 @@ Module RD.
     Definition recover : prog unit :=
       irec rd.
 
+    Definition init : prog InitResult :=
+      iInit rd.
+
   End ReplicatedDisk.
 
 End RD.

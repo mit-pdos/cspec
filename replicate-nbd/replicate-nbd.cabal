@@ -30,6 +30,7 @@ library
                      , DiskSize
                      , EquivDec
                      , Hoare
+                     , Init
                      , Interface
                      , Prog
                      , ReadWrite
