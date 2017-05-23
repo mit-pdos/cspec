@@ -16,6 +16,9 @@ ExtractReplicatedDisk.vo: coq replicate-nbd/fiximports.py
 
 extract: ExtractReplicatedDisk.vo
 
+hs: extract
+	cd replicate-nbd; stack build
+
 Makefile.coq: Makefile $(CODE) _CoqProject
 	coq_makefile -f _CoqProject > Makefile.coq
 
