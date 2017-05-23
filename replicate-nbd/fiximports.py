@@ -6,31 +6,16 @@
 import re
 import os, sys
 
+common_imports = """
+import Replication.TwoDiskEnvironment
+"""
+
 module_imports = {
     "Bytes": """
 import qualified Data.ByteString as BS
     """,
-    "Interface": """
-import Replication.TwoDiskEnvironment
-    """,
-    "ReplicatedDisk": """
-import Replication.TwoDiskEnvironment
-    """,
     "TwoDiskImpl": """
 import qualified Replication.TwoDiskOps as TD
-import Replication.TwoDiskEnvironment
-    """,
-    "DiskSize": """
-import Replication.TwoDiskEnvironment
-    """,
-    "ReadWrite": """
-import Replication.TwoDiskEnvironment
-    """,
-    "Recovery": """
-import Replication.TwoDiskEnvironment
-    """,
-    "ArrayAPI": """
-import Replication.TwoDiskEnvironment
     """,
 }
 
@@ -48,10 +33,12 @@ for n, line in enumerate(open(filename), 1):
     if m:
         module_name = m.group("module")
     if line.strip() == "import qualified Prelude":
-        imports = module_imports.get(module_name)
-        if imports:
-            out.write(imports)
-            out.write("{-# LINE %d \"%s\" #-}\n" % (n, filename))
+        imports = common_imports
+        mod_imports = module_imports.get(module_name)
+        if mod_imports:
+            imports += "\n" + mod_imports
+        out.write(imports)
+        out.write("{-# LINE %d \"%s\" #-}\n" % (n, filename))
     line = line.replace('__FILE__', '"%s"' % sys.argv[2])
     line = line.replace('__LINE__', '%d' % n)
     out.write(line)
