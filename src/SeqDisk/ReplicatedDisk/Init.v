@@ -1,3 +1,5 @@
+Require Import Omega.
+
 Require Import Automation.
 Require Import Disk.
 
@@ -49,10 +51,8 @@ Section Init.
       n = m \/
       S n <= m /\ n <> m.
   Proof.
-    inversion 1; eauto.
-    right; intuition eauto using le_n_S.
-    subst.
-    eapply PeanoNat.Nat.nle_succ_diag_l; eauto.
+    intros.
+    omega.
   Qed.
 
   Definition equal_after a (d_0 d_1: disk) :=
@@ -118,6 +118,8 @@ Section Init.
         exact block0.
   Qed.
 
+  Hint Resolve init_at_ok.
+
   Lemma equal_after_0_to_eq : forall d_0 d_1,
       equal_after 0 d_0 d_1 ->
       d_0 = d_1.
@@ -125,7 +127,68 @@ Section Init.
     unfold equal_after; intuition.
     eapply diskMem_ext_eq.
     extensionality a'.
-    eauto using le_0_n.
+    eapply H1; omega.
+  Qed.
+
+  Lemma equal_after_size : forall d_0 d_1,
+      size d_0 = size d_1 ->
+      equal_after (size d_0) d_0 d_1.
+  Proof.
+    unfold equal_after; intuition.
+    assert (~a' < size d_0) by omega.
+    assert (~a' < size d_1) by congruence.
+    autorewrite with upd; eauto.
+  Qed.
+
+  Hint Resolve equal_after_size.
+  Hint Resolve equal_after_0_to_eq.
+
+  Hint Resolve both_disks_not_missing : false.
+
+  Theorem Init_ok :
+      prog_spec
+        (fun '(d_0, d_1) state =>
+           {| pre :=
+                TD.disk0 state |= eq d_0 /\
+                TD.disk1 state |= eq d_1;
+              post :=
+                fun r state' =>
+                  match r with
+                  | Initialized =>
+                    exists d_0' d_1',
+                    TD.disk0 state' |= eq d_0' /\
+                    TD.disk1 state' |= eq d_1' /\
+                    d_0' = d_1'
+                  | InitFailed => (size d_0 <> size d_1)%type
+                  end;
+              recover :=
+                fun _ state' => True;
+           |})
+        (Init)
+        (irec td)
+        (refinement td).
+  Proof.
+    unfold Init; step.
+    descend; intuition eauto.
+
+    destruct r; step.
+    descend; intuition eauto.
+
+    destruct r; try step.
+    is_eq (size d_0) v; step.
+    descend; intuition eauto.
+    step.
+    descend; intuition eauto.
+    descend; intuition eauto.
+    step.
+    descend; intuition eauto.
+    descend; intuition eauto.
+    destruct r; step.
+    descend; intuition eauto.
+    step.
+    descend; intuition eauto.
   Qed.
 
 End Init.
+
+Hint Resolve Init_ok.
