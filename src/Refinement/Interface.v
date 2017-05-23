@@ -2,6 +2,7 @@ Require Import Automation.
 
 Require Import ProgLang.Prog.
 Require Import ProgLang.Hoare.
+Require Import ProgLang.ProgTheorems.
 
 (* Interfaces are groups of methods with a shared level of abstraction.
 
@@ -154,8 +155,51 @@ Definition then_init (init1 init2: prog InitResult) : prog InitResult :=
   r <- init1;
     match r with
     | Initialized => init2
-    | Failed => init1
+    | Failed => Ret Failed
     end.
 
-(* TODO: prove principle for deriving init_invariant for composed refinement and
-then_init *)
+Theorem init_invariant_any_rec : forall (init: prog InitResult)
+                                   (rec rec': prog unit)
+                                   `(rf: Refinement State),
+    init_invariant init rec rf ->
+    init_invariant init rec' rf.
+Proof.
+  unfold init_invariant, prog_spec; simpl; intros.
+  destruct matches; subst.
+  eapply rexec_finish_any_rec in H2.
+  eapply H in H2; eauto.
+Qed.
+
+Theorem then_init_compose : forall (init1 init2: prog InitResult)
+                              (rec rec': prog unit)
+                              `(rf1: Refinement State1)
+                              `(rf2: LRefinement State1 State2),
+    init_invariant init1 rec rf1 ->
+    prog_spec
+      (fun (_:unit) state =>
+         {| pre := True;
+            post :=
+              fun r state' => match r with
+                       | Initialized => invariant rf2 state'
+                       | InitFailed => True
+                       end;
+            recover :=
+              fun _ state' => True; |}) init2 rec rf1 ->
+    init_invariant (then_init init1 init2) rec' (refinement_compose rf1 rf2).
+Proof.
+  intros.
+  eapply init_invariant_any_rec with rec.
+  unfold init_invariant, then_init in *; intros.
+  step_prog; intuition; simpl in *.
+  descend; intuition eauto.
+  destruct r.
+  - clear H.
+    unfold prog_spec in *; (intuition eauto); simpl in *.
+    eapply H in H0; eauto.
+    destruct matches in *; safe_intuition eauto.
+  - unfold prog_spec; simpl; intros.
+    destruct matches.
+    subst.
+    inv_rexec; inv_exec.
+    congruence.
+Qed.
