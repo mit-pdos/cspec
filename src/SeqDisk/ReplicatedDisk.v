@@ -7,6 +7,7 @@ Require Import TwoDisk.TwoDiskAPI.
 Require Import SeqDisk.SeqDiskAPI.
 
 Require Import SeqDisk.ReplicatedDisk.Step.
+Require Import SeqDisk.ReplicatedDisk.Init.
 Require Import SeqDisk.ReplicatedDisk.DiskSize.
 Require Import SeqDisk.ReplicatedDisk.Recovery.
 Require Import SeqDisk.ReplicatedDisk.ReadWrite.
@@ -240,9 +241,20 @@ Module RD.
 
     Definition impl : InterfaceImpl D.Op :=
       {| op_impl := d_op_impl;
-         recover_impl := _ <- irec td; Recover td; |}.
+         recover_impl := _ <- irec td; Recover td;
+      init_impl := then_init (iInit td) (Init td) |}.
 
     Hint Resolve Read_rok Write_rok DiskSize_rok Recover_rok.
+
+    Theorem state_some_disks : forall state,
+        exists d_0 d_1,
+          TD.disk0 state |= eq d_0 /\
+          TD.disk1 state |= eq d_1.
+    Proof.
+      destruct state.
+      destruct disk0, disk1; simpl; eauto.
+      exfalso; eauto.
+    Qed.
 
     Definition rd : Interface D.API.
       unshelve econstructor.
@@ -260,19 +272,15 @@ Module RD.
         eapply prog_spec_weaken; eauto;
           unfold spec_impl; simplify.
         exists (rd_abstraction state), FullySynced; intuition eauto.
+      - eapply then_init_compose; eauto.
+        eapply prog_spec_weaken; unfold spec_impl; simplify.
+        pose proof (state_some_disks state); simplify.
+        descend; intuition eauto.
+        destruct v; simplify; finish.
 
         Grab Existential Variables.
         all: auto.
     Defined.
-
-    (* For the convenience of the extracted Haskell code we define short
-    functions to access the final implementation. *)
-
-    Definition prim T (op: D.Op T) : prog T :=
-      Prim rd op.
-
-    Definition recover : prog unit :=
-      irec rd.
 
   End ReplicatedDisk.
 

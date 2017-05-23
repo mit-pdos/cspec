@@ -4,55 +4,77 @@ module Main where
 
 import Control.Monad (when, forM_)
 import Data.Semigroup ((<>))
-import Network.NBD (runServer, ServerOptions (..))
+import Network.NBD (runServer, initServer, ServerOptions (..))
 import Options.Applicative
 import System.Directory
 import System.IO
 
-data Options = Options
+data InitOptions = InitOptions
   { defaultSizeKB :: Int
-  , serverOpts :: ServerOptions }
+  , initDiskPaths :: (FilePath, FilePath) }
 
-serverOptions :: Parser ServerOptions
-serverOptions = do
-  diskPaths <- ((,)
+data Options = Start ServerOptions
+             | Init InitOptions
+
+parseDiskPaths :: Parser (FilePath, FilePath)
+parseDiskPaths = ((,)
                 <$> argument str (metavar "FILE0")
                 <*> argument str (metavar "FILE1"))
                <|> pure ("disk0.img", "disk1.img")
+
+serverOptions :: Parser ServerOptions
+serverOptions = do
+  diskPaths <- parseDiskPaths
   logCommands <- switch (long "debug"
                         <> short 'd'
                         <> help "log each operation received")
   pure ServerOptions {..}
 
-options :: Parser Options
-options = do
+initOptions :: Parser InitOptions
+initOptions = do
   defaultSizeKB <- option auto
     ( long "size"
       <> help "size to initialize disk files to if they do not exist"
       <> showDefault
       <> value (100*1024)
       <> metavar "KB" )
-  serverOpts <- serverOptions
-  pure Options {..}
+  initDiskPaths <- parseDiskPaths
+  pure InitOptions {..}
+
+diskDefaultMessage :: String
+diskDefaultMessage = "disks default to disk0.img and disk1.img if not provided"
+
+options :: Parser Options
+options = hsubparser
+          ( command "start" (info (Start <$> serverOptions)
+                             (progDesc "start server"
+                             <> footer diskDefaultMessage))
+            <> command "init" (info (Init <$> initOptions)
+                               (progDesc "initialize replicated disks"
+                               <> footer diskDefaultMessage))
+          )
 
 main :: IO ()
 main = execParser opts >>= run
   where
     opts = info (options <**> helper)
       (fullDesc
-       <> progDesc "start an nbd server that replicates over two disks"
+       <> progDesc "an nbd server that replicates over two disks"
        <> header "replicate-nbd - replicating network block device"
-       <> footer "disks default to disk0.img and disk1.img if not provided")
+       )
 
 run :: Options -> IO ()
-run Options
+run (Start opts) = runServer opts
+run (Init opts) = runInit opts
+
+runInit :: InitOptions -> IO ()
+runInit InitOptions
   { defaultSizeKB=size,
-    serverOpts=opts@ServerOptions
-               { diskPaths=(fn0, fn1) } } = do
+    initDiskPaths=diskPaths@(fn0, fn1) } = do
   exists0 <- doesFileExist fn0
   exists1 <- doesFileExist fn1
   when (not exists0 && not exists1) $
     forM_ [fn0, fn1] $ \p ->
       withFile p WriteMode $ \h ->
         hSetFileSize h (fromIntegral $ size * 1024)
-  runServer opts
+  initServer diskPaths

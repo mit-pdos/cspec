@@ -3,6 +3,7 @@ module Replication.ReplicatedDiskImpl where
 
 import           ArrayAPI
 import qualified Data.ByteString as BS
+import           Interface (InitResult)
 import           ReplicatedDisk
 import           Replication.TwoDiskEnvironment (TwoDiskProg)
 import           TwoDiskImpl (_TD__td)
@@ -35,3 +36,7 @@ writeBytes off dat =
 -- |wrapper for replicated disk recovery procedure
 recover :: TwoDiskProg ()
 recover = ArrayAPI.recover (_RD__rd _TD__td)
+
+-- |wrapper for replicated disk initialization
+init :: TwoDiskProg InitResult
+init = ArrayAPI.init (_RD__rd _TD__td)

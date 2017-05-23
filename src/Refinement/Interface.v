@@ -2,6 +2,7 @@ Require Import Automation.
 
 Require Import ProgLang.Prog.
 Require Import ProgLang.Hoare.
+Require Import ProgLang.ProgTheorems.
 
 (* Interfaces are groups of methods with a shared level of abstraction.
 
@@ -46,18 +47,40 @@ Definition op_spec opT `(api: InterfaceAPI opT State) `(op: opT T) : Specificati
            exists v, op_sem api op state v state');
     |}.
 
+Inductive InitResult := Initialized | InitFailed.
+
 (* An InterfaceImpl supplies concrete programs for each method defined by [opT],
-as well as a single global recovery procedure. *)
+as well as a single global recovery procedure.
+
+ TODO: add documentation throughout for initialization
+ *)
 Record InterfaceImpl opT :=
   { op_impl: forall T, opT T -> prog T;
-    recover_impl: prog unit; }.
+    recover_impl: prog unit;
+    init_impl: prog InitResult; }.
+
+Definition init_invariant
+           (init: prog InitResult) (rec: prog unit)
+           `(rf: Refinement State) :=
+  prog_spec
+    (fun (_:unit) w =>
+       {| pre := True;
+          post :=
+            fun r w' => match r with
+                     | Initialized => invariant rf w'
+                     | InitFailed => True
+                     end;
+          recover :=
+            fun _ w' => True;
+       |}) init rec (IdRefinement world).
 
 (* Finally, an Interface ties everything together: the parameter [api] specifies all details of how the implementation behaves, while the fields give an implementation and a refinement proof.
 
 Of note is that in addition to every method being correct ([impl_ok]), the
 recovery procedure should preserve the behavior of [Ret], namely that nothing
 happens (in terms of abstract states) if the system crashes in a quiescent state
-and recovers. This is guaranteed by the [ret_rec_ok] proof. *)
+and recovers. This is guaranteed by the [ret_rec_ok] proof.
+ *)
 Record Interface opT State (api: InterfaceAPI opT State) :=
   { interface_impl: InterfaceImpl opT;
     refinement: Refinement State;
@@ -67,7 +90,11 @@ Record Interface opT State (api: InterfaceAPI opT State) :=
                   (recover_impl interface_impl)
                   refinement;
     ret_rec_ok:
-      rec_noop (recover_impl interface_impl) refinement }.
+      rec_noop (recover_impl interface_impl) refinement;
+    init_ok:
+      init_invariant
+        (init_impl interface_impl) (recover_impl interface_impl)
+        refinement; }.
 
 (* Helper function to get the implementation of a primitive operation from an
 [Interface]. *)
@@ -118,3 +145,70 @@ Proof.
 Qed.
 
 Hint Resolve irec_ret_ok.
+
+(* Helpers for initialization *)
+
+Definition iInit opT `(api: InterfaceAPI opT State) `(i: Interface api) : prog InitResult :=
+  init_impl (interface_impl i).
+
+Definition then_init (init1 init2: prog InitResult) : prog InitResult :=
+  r <- init1;
+    match r with
+    | Initialized => init2
+    | Failed => Ret Failed
+    end.
+
+Theorem init_invariant_any_rec : forall (init: prog InitResult)
+                                   (rec rec': prog unit)
+                                   `(rf: Refinement State),
+    init_invariant init rec rf ->
+    init_invariant init rec' rf.
+Proof.
+  unfold init_invariant, prog_spec; simpl; intros.
+  destruct matches; subst.
+  eapply rexec_finish_any_rec in H2.
+  eapply H in H2; eauto.
+Qed.
+
+Theorem iInit_init_ok : forall opT `(api: InterfaceAPI opT State) `(i: Interface api),
+    init_invariant (iInit i) (irec i) (refinement i).
+Proof.
+  intros.
+  eapply init_ok.
+Qed.
+
+Hint Resolve iInit_init_ok.
+
+Theorem then_init_compose : forall (init1 init2: prog InitResult)
+                              (rec rec': prog unit)
+                              `(rf1: Refinement State1)
+                              `(rf2: LRefinement State1 State2),
+    init_invariant init1 rec rf1 ->
+    prog_spec
+      (fun (_:unit) state =>
+         {| pre := True;
+            post :=
+              fun r state' => match r with
+                       | Initialized => invariant rf2 state'
+                       | InitFailed => True
+                       end;
+            recover :=
+              fun _ state' => True; |}) init2 rec rf1 ->
+    init_invariant (then_init init1 init2) rec' (refinement_compose rf1 rf2).
+Proof.
+  intros.
+  eapply init_invariant_any_rec with rec.
+  unfold init_invariant, then_init in *; intros.
+  step_prog; intuition; simpl in *.
+  descend; intuition eauto.
+  destruct r.
+  - clear H.
+    unfold prog_spec in *; (intuition eauto); simpl in *.
+    eapply H in H0; eauto.
+    destruct matches in *; safe_intuition eauto.
+  - unfold prog_spec; simpl; intros.
+    destruct matches.
+    subst.
+    inv_rexec; inv_exec.
+    congruence.
+Qed.

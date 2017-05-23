@@ -10,10 +10,12 @@ import qualified Data.ByteString as BS
 import           Data.Conduit.Cereal
 import           Data.Conduit.Network
 import           Data.Serialize
+import           Interface (InitResult(..))
 import           Network.NBD.Data
 import qualified Replication.ReplicatedDiskImpl as RD
-import           Replication.TwoDiskOps
 import           Replication.TwoDiskEnvironment
+import           Replication.TwoDiskOps
+import           System.Exit (die)
 
 -- IANA reserved port 10809
 --
@@ -182,3 +184,11 @@ runServer ServerOptions {diskPaths=(fn0, fn1), logCommands=doLog} =
             liftIO $ putStrLn "client disconnect" in
       -- assemble a conduit using the TCP server as input and output
       runConduit $ appSource ad .| nbdConnection .| appSink ad
+
+initServer :: (FilePath, FilePath) -> IO ()
+initServer (fn0, fn1) =
+  let c = Config fn0 fn1 in do
+  r <- runTD c RD.init
+  case r of
+    Initialized -> return ()
+    InitFailed -> die "initialization failed! are disks of different sizes?"
