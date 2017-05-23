@@ -97,22 +97,13 @@ Section Init.
     induction a; simpl; intros.
     - step.
     - step.
-      descend; intuition eauto.
 
       step.
-      destruct r.
-      + descend; intuition eauto.
-        step.
-        destruct r.
-        descend; intuition eauto.
-
-        simplify.
-        descend; intuition eauto.
-      + descend; intuition eauto.
-        step.
-        destruct r; simplify.
-        descend; intuition eauto; simplify.
-        descend; (intuition eauto); simplify.
+      destruct r; finish.
+      + step.
+        destruct r; finish.
+      + step.
+        destruct r; finish.
 
         Grab Existential Variables.
         exact block0.
@@ -169,24 +160,13 @@ Section Init.
         (refinement td).
   Proof.
     unfold Init; step.
-    descend; intuition eauto.
-
     destruct r; step.
-    descend; intuition eauto.
-
     destruct r; try step.
     is_eq (size d_0) v; step.
-    descend; intuition eauto.
     step.
-    descend; intuition eauto.
-    descend; intuition eauto.
     step.
-    descend; intuition eauto.
-    descend; intuition eauto.
     destruct r; step.
-    descend; intuition eauto.
     step.
-    descend; intuition eauto.
   Qed.
 
 End Init.
