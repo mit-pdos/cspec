@@ -28,10 +28,16 @@ stack setup # one-time download of compiler
 stack build
 ```
 
-Once you've compiled, run the server:
+Once you've compiled, initialize the disks:
 
 ```
-stack exec -- replicate-nbd [--debug]
+stack exec -- replicate-nbd init
+```
+
+And then run the server:
+
+```
+stack exec -- replicate-nbd start [--debug]
 ```
 
 The underlying disks will be `disk0.img` and `disk1.img` in the current
