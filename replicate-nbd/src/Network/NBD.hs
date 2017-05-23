@@ -3,6 +3,8 @@
 module Network.NBD where
 
 import           Conduit
+import           Control.Concurrent (forkIO)
+import           Control.Concurrent.MVar (newEmptyMVar, putMVar, takeMVar)
 import           Control.Exception.Base (Exception)
 import           Control.Monad (when)
 import           Data.Bits
@@ -11,11 +13,13 @@ import           Data.Conduit.Cereal
 import           Data.Conduit.Network
 import           Data.Serialize
 import           Interface (InitResult(..))
+import qualified NbdData as Nbd
 import           Network.NBD.Data
-import qualified Replication.ReplicatedDiskImpl as RD
 import           Replication.TwoDiskEnvironment
 import           Replication.TwoDiskOps
+import qualified Server
 import           System.Exit (die)
+import           Utils.Conversion
 
 -- IANA reserved port 10809
 --
@@ -122,32 +126,42 @@ sendReply h err = sourcePut $ do
   putWord32be (errCode err)
   putWord64be h
 
+-- TODO: get rid of Command, replace with Nbd.Request
+commandToRequest :: Command -> Nbd.Request
+commandToRequest c = case c of
+  Read h off len -> Nbd.Read h (fromIntegral off `div` blocksize) (fromIntegral len `div` blocksize)
+  Write h off dat -> Nbd.Write h (fromIntegral off `div` blocksize) (fromIntegral (BS.length dat `div` blocksize)) dat
+  Disconnect -> Nbd.Disconnect
+  UnknownCommand _ h _ _ -> Nbd.UnknownOp h
+
+-- TODO: get rid of ErrorCode in Haskell, replace with Nbd.ErrorCode
+nbdErrCodeToErrCode :: Nbd.ErrorCode -> ErrorCode
+nbdErrCodeToErrCode e = case e of
+  Nbd.ESuccess -> NoError
+  Nbd.EInvalid -> EInval
+
+sendResponse :: MonadIO m => Nbd.Response -> ByteConduit m ()
+sendResponse (Nbd.Build_Response h e _ dat) = do
+  sendReply h (nbdErrCodeToErrCode e)
+  sourcePut $ putByteString dat
+
 handleCommands :: (MonadThrow m, MonadIO m) => Bool -> Env -> ByteConduit m ()
 handleCommands doLog e = handle
   where
+    debug :: (MonadThrow m, MonadIO m) => String -> ByteConduit m ()
     debug = liftIO . when doLog . putStrLn
     handle = do
       cmd <- getCommand
       case cmd of
-        -- TODO: insert bounds checks
-        Read h off len -> do
-          debug $ "read at " ++ show off ++ " len " ++ show len
-          bs <- liftIO . runTD e $ RD.readBytes off len
-          sendReply h NoError
-          sourcePut $ putByteString bs
-          handle
-        Write h off dat -> do
-          debug $ "write at " ++ show off ++ " len " ++ show (BS.length dat)
-          liftIO . runTD e $ RD.writeBytes off dat
-          sendReply h NoError
-          handle
-        Disconnect -> do
-          debug "disconnect command"
-          return ()
-        UnknownCommand _ h _ _ -> do
-          debug $ "unknown command " ++ show cmd
-          sendReply h EInval
-          handle
+        Read _ off len -> debug $ "read at " ++ show off ++ " of length " ++ show len
+        Write _ off dat -> debug $ "write at " ++ show off ++ " of length " ++ show (BS.length dat)
+        Disconnect -> debug "disconnect command"
+        UnknownCommand i _ _ _ -> debug $ "unknown command with id " ++ show i
+      r <- liftIO $ do
+        putMVar (requests e) (commandToRequest cmd)
+        takeMVar (responses e)
+      sendResponse r
+      handle
 
 data SizeMismatchException =
   SizeMismatchException { size0 :: Integer
@@ -157,11 +171,12 @@ data SizeMismatchException =
 instance Exception SizeMismatchException
 
 runServer :: ServerOptions -> IO ()
-runServer ServerOptions {diskPaths=(fn0, fn1), logCommands=doLog} =
-  let e = Env fn0 fn1 in do
-  putStrLn "recovering..."
-  runTD e RD.recover
+runServer ServerOptions
+  { diskPaths=(fn0, fn1),
+    logCommands=doLog} = do
+  e <- Env fn0 fn1 <$> newEmptyMVar <*> newEmptyMVar
   putStrLn "serving on localhost:10809"
+  _ <- liftIO . forkIO $ runTD e Server.serverLoop
   let settings = serverSettings 10809 "127.0.0.1" in
     runTCPServer settings $ \ad ->
     -- these are all the steps of a single client connection
@@ -178,17 +193,17 @@ runServer ServerOptions {diskPaths=(fn0, fn1), logCommands=doLog} =
                 -- start transmission phase
                 sendExportInformation (fromIntegral sz)
             liftIO $ putStrLn "finished negotiation"
+            handleCommands doLog e
           -- handle commands in a loop, which terminates upon receiving the
           -- Disconnect command
-            handleCommands doLog e
             liftIO $ putStrLn "client disconnect" in
       -- assemble a conduit using the TCP server as input and output
       runConduit $ appSource ad .| nbdConnection .| appSink ad
 
 initServer :: (FilePath, FilePath) -> IO ()
-initServer (fn0, fn1) =
-  let c = Env fn0 fn1 in do
-  r <- runTD c RD.init
+initServer (fn0, fn1) = do
+  e <- Env fn0 fn1 <$> newEmptyMVar <*> newEmptyMVar
+  r <- runTD e Server.init
   case r of
     Initialized -> return ()
     InitFailed -> die "initialization failed! are disks of different sizes?"

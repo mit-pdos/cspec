@@ -13,7 +13,7 @@ Section ArrayDisk.
 
   Fixpoint read (off:nat) n : prog (bytes (n*blockbytes)) :=
     match n with
-    | 0 => Ret (bytes0 0)
+    | 0 => Ret bnull
     | S n => b <- Prim d (D.Read off);
               rest <- read (off+1) n;
               Ret (bappend b rest)
