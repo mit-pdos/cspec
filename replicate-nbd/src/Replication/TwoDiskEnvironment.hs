@@ -1,7 +1,7 @@
 module Replication.TwoDiskEnvironment
   (
     TwoDiskProg
-  , Config(..)
+  , Env(..)
   , runTD
   , (>>=)
   , return
@@ -9,11 +9,11 @@ module Replication.TwoDiskEnvironment
 
 import Control.Monad.Reader (ReaderT, runReaderT)
 
-data Config =
-  Config { disk0Path :: FilePath
-         , disk1Path :: FilePath }
+data Env =
+  Env { disk0Path :: FilePath
+      , disk1Path :: FilePath }
 
-type TwoDiskProg = ReaderT Config IO
+type TwoDiskProg = ReaderT Env IO
 
-runTD :: Config -> TwoDiskProg a -> IO a
-runTD c m = runReaderT m c
+runTD :: Env -> TwoDiskProg a -> IO a
+runTD e m = runReaderT m e

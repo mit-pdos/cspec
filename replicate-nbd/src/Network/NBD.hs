@@ -122,8 +122,8 @@ sendReply h err = sourcePut $ do
   putWord32be (errCode err)
   putWord64be h
 
-handleCommands :: (MonadThrow m, MonadIO m) => Bool -> Config -> ByteConduit m ()
-handleCommands doLog c = handle
+handleCommands :: (MonadThrow m, MonadIO m) => Bool -> Env -> ByteConduit m ()
+handleCommands doLog e = handle
   where
     debug = liftIO . when doLog . putStrLn
     handle = do
@@ -132,13 +132,13 @@ handleCommands doLog c = handle
         -- TODO: insert bounds checks
         Read h off len -> do
           debug $ "read at " ++ show off ++ " len " ++ show len
-          bs <- liftIO . runTD c $ RD.readBytes off len
+          bs <- liftIO . runTD e $ RD.readBytes off len
           sendReply h NoError
           sourcePut $ putByteString bs
           handle
         Write h off dat -> do
           debug $ "write at " ++ show off ++ " len " ++ show (BS.length dat)
-          liftIO . runTD c $ RD.writeBytes off dat
+          liftIO . runTD e $ RD.writeBytes off dat
           sendReply h NoError
           handle
         Disconnect -> do
@@ -158,9 +158,9 @@ instance Exception SizeMismatchException
 
 runServer :: ServerOptions -> IO ()
 runServer ServerOptions {diskPaths=(fn0, fn1), logCommands=doLog} =
-  let c = Config fn0 fn1 in do
+  let e = Env fn0 fn1 in do
   putStrLn "recovering..."
-  runTD c RD.recover
+  runTD e RD.recover
   putStrLn "serving on localhost:10809"
   let settings = serverSettings 10809 "127.0.0.1" in
     runTCPServer settings $ \ad ->
@@ -171,7 +171,7 @@ runServer ServerOptions {diskPaths=(fn0, fn1), logCommands=doLog} =
             name <- negotiateNewstyle
             liftIO $ when (name /= "") $
               putStrLn $ "ignoring non-default export name " ++ show name
-            msz <- liftIO $ diskSizes c
+            msz <- liftIO . runTD e $ diskSizes
             case msz of
               Left (sz0, sz1) -> throwM $ SizeMismatchException sz0 sz1
               Right sz ->
@@ -180,14 +180,14 @@ runServer ServerOptions {diskPaths=(fn0, fn1), logCommands=doLog} =
             liftIO $ putStrLn "finished negotiation"
           -- handle commands in a loop, which terminates upon receiving the
           -- Disconnect command
-            handleCommands doLog c
+            handleCommands doLog e
             liftIO $ putStrLn "client disconnect" in
       -- assemble a conduit using the TCP server as input and output
       runConduit $ appSource ad .| nbdConnection .| appSink ad
 
 initServer :: (FilePath, FilePath) -> IO ()
 initServer (fn0, fn1) =
-  let c = Config fn0 fn1 in do
+  let c = Env fn0 fn1 in do
   r <- runTD c RD.init
   case r of
     Initialized -> return ()
