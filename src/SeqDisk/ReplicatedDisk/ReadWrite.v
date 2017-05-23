@@ -57,11 +57,8 @@ Section ReplicatedDiskReadWrite.
     unfold Read.
 
     step.
-    descend; intuition eauto.
 
     destruct r; step.
-    descend; (intuition eauto); simplify.
-
     destruct r; step.
   Qed.
 
@@ -94,7 +91,6 @@ Section ReplicatedDiskReadWrite.
     unfold Write.
 
     step.
-    descend; intuition eauto 10.
     destruct r; step.
     descend; intuition eauto.
 
@@ -104,7 +100,6 @@ Section ReplicatedDiskReadWrite.
     eauto 10.
     autorewrite with upd in *; eauto.
 
-    descend; (intuition eauto); simplify; eauto 10.
     destruct r; step.
   Qed.
 

@@ -121,10 +121,8 @@ Section ReplicatedDiskRecovery.
     Proof.
       unfold fixup.
       step.
-      descend; intuition eauto.
 
       destruct r; step.
-      descend; intuition eauto.
 
       destruct r; try step.
       is_eq v v0; try step.
@@ -186,14 +184,11 @@ Section ReplicatedDiskRecovery.
     Proof.
       unfold fixup; intros.
       step.
-      descend; intuition eauto.
 
       destruct r; try step.
-      descend; intuition eauto.
 
       destruct r; try step.
       is_eq b v; try step.
-      descend; intuition eauto.
 
       step.
       destruct r; (intuition eauto); simplify; finish.
@@ -241,10 +236,8 @@ Section ReplicatedDiskRecovery.
     Proof.
       unfold fixup; intros.
       step.
-      descend; intuition eauto.
 
       destruct r; try step.
-      descend; intuition eauto.
 
       destruct r; try step.
       is_eq v v0; try step.

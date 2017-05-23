@@ -42,6 +42,14 @@ Ltac finish :=
          | _ => solve_false
          | _ => congruence
          | _ => solve [ intuition eauto ]
+         | _ =>
+           (* if we can solve all the side conditions automatically, then it's
+           safe to run descend *)
+           descend; intuition eauto;
+               lazymatch goal with
+               | |- prog_spec _ _ _ _ => idtac
+               | _ => fail
+               end
          end.
 
 Ltac step :=

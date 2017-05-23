@@ -58,11 +58,8 @@ Section ReplicatedDisk.
       unfold DiskSize.
 
       step.
-      descend; intuition eauto.
 
       destruct r; step.
-      descend; intuition eauto.
-
       destruct r; step.
     Qed.
 
