@@ -1,8 +1,8 @@
-.PHONY: coq extract clean
+.PHONY: coq default extract hs clean
 
 CODE := $(shell git ls-files "*.v")
 
-all: _CoqProject coq extract
+default: _CoqProject coq extract
 
 coq: Makefile.coq
 	$(MAKE) -f Makefile.coq
