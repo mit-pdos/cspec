@@ -246,6 +246,16 @@ Module RD.
 
     Hint Resolve Read_rok Write_rok DiskSize_rok Recover_rok.
 
+    Theorem state_some_disks : forall state,
+        exists d_0 d_1,
+          TD.disk0 state |= eq d_0 /\
+          TD.disk1 state |= eq d_1.
+    Proof.
+      destruct state.
+      destruct disk0, disk1; simpl; eauto.
+      exfalso; eauto.
+    Qed.
+
     Definition rd : Interface D.API.
       unshelve econstructor.
       - exact impl.
@@ -262,11 +272,15 @@ Module RD.
         eapply prog_spec_weaken; eauto;
           unfold spec_impl; simplify.
         exists (rd_abstraction state), FullySynced; intuition eauto.
-      - admit. (* initialization proof *)
+      - eapply then_init_compose; eauto.
+        eapply prog_spec_weaken; unfold spec_impl; simplify.
+        pose proof (state_some_disks state); simplify.
+        descend; intuition eauto.
+        destruct v; simplify; finish.
 
         Grab Existential Variables.
         all: auto.
-    Admitted.
+    Qed.
 
     (* For the convenience of the extracted Haskell code we define short
     functions to access the final implementation. *)

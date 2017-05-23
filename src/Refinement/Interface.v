@@ -170,6 +170,15 @@ Proof.
   eapply H in H2; eauto.
 Qed.
 
+Theorem iInit_init_ok : forall opT `(api: InterfaceAPI opT State) `(i: Interface api),
+    init_invariant (iInit i) (irec i) (refinement i).
+Proof.
+  intros.
+  eapply init_ok.
+Qed.
+
+Hint Resolve iInit_init_ok.
+
 Theorem then_init_compose : forall (init1 init2: prog InitResult)
                               (rec rec': prog unit)
                               `(rf1: Refinement State1)
