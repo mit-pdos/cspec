@@ -280,19 +280,7 @@ Module RD.
 
         Grab Existential Variables.
         all: auto.
-    Qed.
-
-    (* For the convenience of the extracted Haskell code we define short
-    functions to access the final implementation. *)
-
-    Definition prim T (op: D.Op T) : prog T :=
-      Prim rd op.
-
-    Definition recover : prog unit :=
-      irec rd.
-
-    Definition init : prog InitResult :=
-      iInit rd.
+    Defined.
 
   End ReplicatedDisk.
 

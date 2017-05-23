@@ -27,10 +27,16 @@ Section ArrayDisk.
       apply (write (off+1) _ rest).
   Defined.
 
+  (* For the convenience of the extracted Haskell code we define short functions
+     to access the final implementation. *)
+
   Definition diskSize : prog nat :=
     Prim d D.DiskSize.
 
   Definition recover : prog unit :=
     irec d.
+
+  Definition init : prog InitResult :=
+    iInit d.
 
 End ArrayDisk.
