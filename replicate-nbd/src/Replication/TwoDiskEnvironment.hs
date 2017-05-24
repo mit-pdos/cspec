@@ -13,7 +13,6 @@ module Replication.TwoDiskEnvironment
   ) where
 
 import Control.Concurrent.MVar (MVar, newEmptyMVar)
-import Control.Exception
 import Control.Monad.Reader (ReaderT, runReaderT)
 import NbdData
 import System.Directory (doesFileExist)
@@ -50,13 +49,14 @@ newEnv fn0 fn1 = pure Env
   <*> openFile fn0
   <*> openFile fn1
   <*> newEmptyMVar <*> newEmptyMVar
-  where openFile path =
-          handleJust
-          (\e -> if isDoesNotExistErrorType (ioeGetErrorType e)
-                 then Just (path, Nothing)
-                 else Nothing) return $ do
+  where openFile :: FilePath -> IO CachedHandle
+        openFile path =
+          catchIOError (do
               fd <- openFd path ReadWrite Nothing defaultFileFlags
-              return (path, Just fd)
+              return (path, Just fd))
+          (\e -> if isDoesNotExistError e
+                 then return (path, Nothing)
+                 else ioError e)
 
 
 runTD :: Env -> TwoDiskProg a -> IO a
