@@ -4,7 +4,7 @@ module Network.NBD where
 
 import           Conduit
 import           Control.Concurrent (forkIO)
-import           Control.Concurrent.MVar (newEmptyMVar, putMVar, takeMVar)
+import           Control.Concurrent.MVar (newMVar, newEmptyMVar, putMVar, takeMVar)
 import           Control.Exception.Base (Exception)
 import           Control.Monad (when)
 import           Data.Bits
@@ -145,14 +145,11 @@ handleCommands doLog e = handle
         Write _ off len _ -> debug $ "write at " ++ show (off*blocksize) ++ " of length " ++ show (len*blocksize)
         Disconnect -> debug "disconnect command"
         UnknownOp _ -> debug "unknown command"
-      case cmd of
-        Disconnect -> liftIO $ putMVar (requests e) cmd
-        _ -> do
-          r <- liftIO $ do
-            putMVar (requests e) cmd
-            takeMVar (responses e)
-          sendResponse r
-          handle
+      r <- liftIO $ do
+        putMVar (requests e) cmd
+        takeMVar (responses e)
+      sendResponse r
+      handle
 
 data SizeMismatchException =
   SizeMismatchException { size0 :: Integer
@@ -161,11 +158,32 @@ data SizeMismatchException =
 
 instance Exception SizeMismatchException
 
-serveSingleClient :: ServerSettings -> (AppData -> IO ()) -> IO ()
-serveSingleClient settings app = do
-  mv <- newEmptyMVar
-  _ <- forkTCPServer settings (\ad -> app ad >> putMVar mv ())
-  takeMVar mv
+forkNbdServer :: Env -> Bool -> IO ()
+forkNbdServer e doLog =
+  forkSingleClient $ \ad ->
+  -- assemble a conduit using the TCP server as input and output
+  runConduit $ appSource ad .| nbdConnection .| appSink ad
+  where
+    settings = serverSettings 10809 "127.0.0.1"
+    forkSingleClient app = do
+      -- process a single client; new connections will block on this MVar
+      mv <- newMVar ()
+      _ <- forkTCPServer settings (\ad -> takeMVar mv >> app ad)
+      return ()
+    nbdConnection = do
+      -- negotiate
+      name <- negotiateNewstyle
+      liftIO $ when (name /= "") $
+        putStrLn $ "ignoring non-default export name " ++ show name
+      msz <- liftIO . runTD e $ diskSizes
+      case msz of
+        Left (sz0, sz1) -> throwM $ SizeMismatchException sz0 sz1
+        Right sz ->
+          -- start transmission phase
+          sendExportInformation (fromIntegral sz)
+      liftIO $ putStrLn "negotiated with client"
+      -- infinite loop parsing commands and putting them on the queue
+      handleCommands doLog e
 
 runServer :: ServerOptions -> IO ()
 runServer ServerOptions
@@ -173,27 +191,10 @@ runServer ServerOptions
     logCommands=doLog} = do
   e <- Env fn0 fn1 <$> newEmptyMVar <*> newEmptyMVar
   putStrLn "serving on localhost:10809"
-  _ <- liftIO . forkIO $ runTD e Server.serverLoop
-  let settings = serverSettings 10809 "127.0.0.1" in
-    serveSingleClient settings $ \ad ->
-    -- these are all the steps of a single client connection
-      let nbdConnection = do
-            -- negotiate
-            name <- negotiateNewstyle
-            liftIO $ when (name /= "") $
-              putStrLn $ "ignoring non-default export name " ++ show name
-            msz <- liftIO . runTD e $ diskSizes
-            case msz of
-              Left (sz0, sz1) -> throwM $ SizeMismatchException sz0 sz1
-              Right sz ->
-                -- start transmission phase
-                sendExportInformation (fromIntegral sz)
-            liftIO $ putStrLn "negotiated with client"
-            -- add commands to the processing queue until a disconnect
-            handleCommands doLog e
-            liftIO $ putStrLn "client disconnect" in
-      -- assemble a conduit using the TCP server as input and output
-      runConduit $ appSource ad .| nbdConnection .| appSink ad
+  mv <- newEmptyMVar
+  _ <- liftIO . forkIO $ runTD e Server.serverLoop >> putMVar mv ()
+  forkNbdServer e doLog
+  takeMVar mv
 
 initServer :: (FilePath, FilePath) -> IO ()
 initServer (fn0, fn1) = do
