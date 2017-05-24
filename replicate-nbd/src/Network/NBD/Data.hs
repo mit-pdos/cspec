@@ -6,6 +6,7 @@ import           Data.Bits
 import qualified Data.ByteString as BS
 import           Data.Typeable (Typeable)
 import           GHC.Word
+import           NbdData
 
 {-# ANN module ("HLint: ignore Use camelCase"::String) #-}
 
@@ -57,7 +58,7 @@ nbd_C_OPT_MAGIC = 0x49484156454F5054 -- same as nbd_NEW_MAGIC
 nbd_FLAG_HAS_FLAGS :: Bits a => a
 nbd_FLAG_HAS_FLAGS = bit 0
 
-type Handle = Word64
+-- Handle is a Word64, defined by extraction
 type ByteCount = Int
 type FileOffset = Int
 
@@ -80,12 +81,8 @@ nbd_REQUEST_MAGIC = 0x25609513
 nbd_REPLY_MAGIC :: Word32
 nbd_REPLY_MAGIC = 0x67446698
 
-data ErrorCode = NoError
-               | EInval
-               | ENospc
-
 errCode :: ErrorCode -> Word32
 errCode err = case err of
-  NoError -> 0
-  EInval -> 22
+  ESuccess -> 0
+  EInvalid -> 22
   ENospc -> 28

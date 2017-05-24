@@ -120,7 +120,7 @@ getCommand = do
 
 -- send an error code reply to the client (data is sent separately afterward,
 -- for reads)
-sendReply :: Monad m => Handle -> ErrorCode -> ByteConduit m ()
+sendReply :: Monad m => Nbd.Handle -> Nbd.ErrorCode -> ByteConduit m ()
 sendReply h err = sourcePut $ do
   putWord32be nbd_REPLY_MAGIC
   putWord32be (errCode err)
@@ -134,15 +134,9 @@ commandToRequest c = case c of
   Disconnect -> Nbd.Disconnect
   UnknownCommand _ h _ _ -> Nbd.UnknownOp h
 
--- TODO: get rid of ErrorCode in Haskell, replace with Nbd.ErrorCode
-nbdErrCodeToErrCode :: Nbd.ErrorCode -> ErrorCode
-nbdErrCodeToErrCode e = case e of
-  Nbd.ESuccess -> NoError
-  Nbd.EInvalid -> EInval
-
 sendResponse :: MonadIO m => Nbd.Response -> ByteConduit m ()
 sendResponse (Nbd.Build_Response h e _ dat) = do
-  sendReply h (nbdErrCodeToErrCode e)
+  sendReply h e
   sourcePut $ putByteString dat
 
 handleCommands :: (MonadThrow m, MonadIO m) => Bool -> Env -> ByteConduit m ()

@@ -11,7 +11,8 @@ Inductive Request :=
 
 Inductive ErrorCode :=
 | ESuccess
-| EInvalid.
+| EInvalid
+| ENospc.
 
 Record Response :=
   { rhandle: Handle;
