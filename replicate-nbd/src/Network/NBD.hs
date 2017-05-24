@@ -188,7 +188,7 @@ runServer :: ServerOptions -> IO ()
 runServer ServerOptions
   { diskPaths=(fn0, fn1),
     logCommands=doLog} = do
-  e <- Env fn0 fn1 <$> newEmptyMVar <*> newEmptyMVar
+  e <- newEnv fn0 fn1
   putStrLn "serving on localhost:10809"
   mv <- newEmptyMVar
   _ <- liftIO . forkIO $ runTD e Server.serverLoop >> putMVar mv ()
@@ -197,7 +197,7 @@ runServer ServerOptions
 
 initServer :: (FilePath, FilePath) -> IO ()
 initServer (fn0, fn1) = do
-  e <- Env fn0 fn1 <$> newEmptyMVar <*> newEmptyMVar
+  e <- newEnv fn0 fn1
   r <- runTD e Server.init
   case r of
     Initialized -> return ()

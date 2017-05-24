@@ -51,6 +51,8 @@ library
                      , cereal-conduit
                      , directory
                      , mtl
+                     , unix
+                     , unix-bytestring
   default-language:    Haskell2010
 
 executable replicate-nbd
