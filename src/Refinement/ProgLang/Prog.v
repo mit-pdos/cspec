@@ -127,10 +127,21 @@ Global Generalizable Variables T R State step.
 Local Ltac inv_exec' H :=
   inversion H; subst; clear H; repeat sigT_eq.
 
+Lemma exec_ret : forall T (v:T) w r,
+    exec (Ret v) w r ->
+    match r with
+    | Finished v' w' => v = v' /\ w = w'
+    | Crashed w' => w = w'
+    end.
+Proof.
+  intros.
+  inv_exec' H; intuition.
+Qed.
+
 Ltac inv_ret :=
   match goal with
   | [ H: exec (Ret _) _ _ |- _ ] =>
-    inv_exec' H
+    apply exec_ret in H; safe_intuition; subst
   end.
 
 Ltac inv_exec :=
