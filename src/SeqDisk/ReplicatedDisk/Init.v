@@ -26,24 +26,29 @@ Section Init.
               init_at a
     end.
 
-  Definition Init : prog InitResult :=
+  Definition DiskSizes : prog (nat * nat + nat) :=
     sz1 <- Prim td (TD.DiskSize d0);
       match sz1 with
       | Working sz1 => sz2 <- Prim td (TD.DiskSize d1);
                         match sz2 with
                         | Working sz2 => if sz1 == sz2 then
-                                          _ <- init_at sz1;
-                                            Ret Initialized
-                                        else Ret InitFailed
-                        | Failed => _ <- init_at sz1;
-                                     Ret Initialized
+                                          Ret (inr sz1)
+                                        else Ret (inl (sz1, sz2))
+                        | Failed => Ret (inr sz1)
                         end
       | Failed => sz2 <- Prim td (TD.DiskSize d1);
                    match sz2 with
-                   | Working sz2 => _ <- init_at sz2;
-                                     Ret Initialized
-                   | Failed => Ret InitFailed (* impossible *)
+                   | Working sz2 => Ret (inr sz2)
+                   | Failed => Ret (inl (0, 0)) (* impossible *)
                    end
+      end.
+
+  Definition Init : prog InitResult :=
+    sizes <- DiskSizes;
+      match sizes with
+      | inr sz => _ <- init_at sz;
+                   Ret Initialized
+      | inl _ => Ret InitFailed
       end.
 
   Lemma le_eq_or_S_le : forall n m,
@@ -111,6 +116,38 @@ Section Init.
 
   Hint Resolve init_at_ok.
 
+  Hint Resolve both_disks_not_missing : false.
+
+  Theorem DiskSizes_ok :
+      prog_spec
+        (fun '(d_0, d_1) state =>
+           {| pre :=
+                TD.disk0 state |= eq d_0 /\
+                TD.disk1 state |= eq d_1;
+              post :=
+                fun r state' =>
+                  exists d_0' d_1',
+                    TD.disk0 state' |= eq d_0' /\
+                    TD.disk1 state' |= eq d_1' /\
+                    match r with
+                  | inr sz => size d_0' = sz /\
+                             size d_1' = sz
+                  | inl _ => size d_0 <> size d_1
+                  end;
+              recover :=
+                fun _ state' => True;
+           |})
+        (DiskSizes)
+        (irec td)
+        (refinement td).
+  Proof.
+    unfold DiskSizes; step.
+    destruct r; step.
+    destruct r; try step.
+    is_eq (size d_0) v; step.
+    destruct r; step.
+  Qed.
+
   Lemma equal_after_0_to_eq : forall d_0 d_1,
       equal_after 0 d_0 d_1 ->
       d_0 = d_1.
@@ -134,7 +171,7 @@ Section Init.
   Hint Resolve equal_after_size.
   Hint Resolve equal_after_0_to_eq.
 
-  Hint Resolve both_disks_not_missing : false.
+  Hint Resolve DiskSizes_ok.
 
   Theorem Init_ok :
       prog_spec
@@ -160,12 +197,8 @@ Section Init.
         (refinement td).
   Proof.
     unfold Init; step.
-    destruct r; step.
-    destruct r; try step.
-    is_eq (size d_0) v; step.
     step.
     step.
-    destruct r; step.
     step.
   Qed.
 

@@ -11,6 +11,6 @@ Extraction Language Haskell.
 Require Import NBD.Server.
 Require Import NBD.ExtrServer.
 
-Separate Extraction serverLoop init.
+Separate Extraction diskSizes serverLoop init.
 
 Cd "../../".

@@ -10,26 +10,6 @@ import           System.IO
 import           TwoDiskAPI
 import           Utils.Conversion
 
--- this operation is unfortunate: we use it to check the invariant that the
--- disks are the same size for safety, but it would be nice to get it from Coq
--- somehow
-diskSizes :: TwoDiskProg (Either (Integer, Integer) Integer)
-diskSizes = do
-  msz0 <- maybeSize =<< reader disk0Path
-  msz1 <- maybeSize =<< reader disk1Path
-  return $ case (msz0, msz1) of
-    (Just sz0, Just sz1) -> if sz0 == sz1 then Right sz0 else Left (sz0, sz1)
-    (Just sz, Nothing) -> Right sz
-    (Nothing, Just sz) -> Right sz
-    (Nothing, Nothing) -> Right 0
-  where
-    maybeSize :: FilePath -> TwoDiskProg (Maybe Integer)
-    maybeSize path = liftIO $ do
-      exists <- doesFileExist path
-      if not exists then return Nothing
-        else withBinaryFile path ReadMode $ \h ->
-          Just <$> hFileSize h
-
 pread :: Handle -> Int -> FileOffset -> IO BS.ByteString
 pread h len off = do
   hSeek h AbsoluteSeek off

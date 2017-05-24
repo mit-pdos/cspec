@@ -3,6 +3,7 @@ Require Import Bytes.
 Require Import Refinement.ProgLang.Prog.
 Require Import SeqDisk.ArrayAPI.
 Require Import SeqDisk.ReplicatedDisk.
+Require Import SeqDisk.ReplicatedDisk.Init.
 Require Import TwoDisk.TwoDiskImpl.
 
 Require Import NBD.NbdData.
@@ -38,6 +39,9 @@ CoFixpoint handle : prog unit :=
         handle
     | Disconnect => Ret tt
     end.
+
+Definition diskSizes : prog (nat * nat + nat) :=
+  DiskSizes TD.td.
 
 Definition serverLoop : prog unit :=
   _ <- ArrayAPI.recover d;
