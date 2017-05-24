@@ -145,11 +145,14 @@ handleCommands doLog e = handle
         Write _ off len _ -> debug $ "write at " ++ show (off*blocksize) ++ " of length " ++ show (len*blocksize)
         Disconnect -> debug "disconnect command"
         UnknownOp _ -> debug "unknown command"
-      r <- liftIO $ do
-        putMVar (requests e) cmd
-        takeMVar (responses e)
-      sendResponse r
-      handle
+      case cmd of
+        Disconnect -> liftIO $ putMVar (requests e) cmd
+        _ -> do
+          r <- liftIO $ do
+            putMVar (requests e) cmd
+            takeMVar (responses e)
+          sendResponse r
+          handle
 
 data SizeMismatchException =
   SizeMismatchException { size0 :: Integer
@@ -157,6 +160,12 @@ data SizeMismatchException =
   deriving (Eq, Show)
 
 instance Exception SizeMismatchException
+
+serveSingleClient :: ServerSettings -> (AppData -> IO ()) -> IO ()
+serveSingleClient settings app = do
+  mv <- newEmptyMVar
+  _ <- forkTCPServer settings (\ad -> app ad >> putMVar mv ())
+  takeMVar mv
 
 runServer :: ServerOptions -> IO ()
 runServer ServerOptions
@@ -166,11 +175,10 @@ runServer ServerOptions
   putStrLn "serving on localhost:10809"
   _ <- liftIO . forkIO $ runTD e Server.serverLoop
   let settings = serverSettings 10809 "127.0.0.1" in
-    runTCPServer settings $ \ad ->
+    serveSingleClient settings $ \ad ->
     -- these are all the steps of a single client connection
       let nbdConnection = do
-            liftIO $ putStrLn "received connection"
-          -- negotiate
+            -- negotiate
             name <- negotiateNewstyle
             liftIO $ when (name /= "") $
               putStrLn $ "ignoring non-default export name " ++ show name
@@ -180,10 +188,9 @@ runServer ServerOptions
               Right sz ->
                 -- start transmission phase
                 sendExportInformation (fromIntegral sz)
-            liftIO $ putStrLn "finished negotiation"
+            liftIO $ putStrLn "negotiated with client"
+            -- add commands to the processing queue until a disconnect
             handleCommands doLog e
-          -- handle commands in a loop, which terminates upon receiving the
-          -- Disconnect command
             liftIO $ putStrLn "client disconnect" in
       -- assemble a conduit using the TCP server as input and output
       runConduit $ appSource ad .| nbdConnection .| appSink ad
