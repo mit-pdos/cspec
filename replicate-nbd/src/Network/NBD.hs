@@ -3,6 +3,8 @@
 module Network.NBD where
 
 import           Conduit
+import           Control.Concurrent (forkIO)
+import           Control.Concurrent.MVar (newMVar, newEmptyMVar, putMVar, takeMVar)
 import           Control.Exception.Base (Exception)
 import           Control.Monad (when)
 import           Data.Bits
@@ -11,11 +13,13 @@ import           Data.Conduit.Cereal
 import           Data.Conduit.Network
 import           Data.Serialize
 import           Interface (InitResult(..))
+import NbdData
 import           Network.NBD.Data
-import qualified Replication.ReplicatedDiskImpl as RD
 import           Replication.TwoDiskEnvironment
 import           Replication.TwoDiskOps
+import qualified Server
 import           System.Exit (die)
+import           Utils.Conversion
 
 -- IANA reserved port 10809
 --
@@ -95,7 +99,7 @@ sendExportInformation len = sourcePut $ do
     flags = nbd_FLAG_HAS_FLAGS
 
 -- parse a command from the client during the transmission phase
-getCommand :: (MonadThrow m, MonadIO m) => ByteConduit m Command
+getCommand :: (MonadThrow m, MonadIO m) => ByteConduit m Request
 getCommand = do
   magic <- sinkGet getWord32be
   when (magic /= nbd_REQUEST_MAGIC) $
@@ -107,12 +111,14 @@ getCommand = do
     (fromIntegral <$> getWord64be) <*> -- offset
     (fromIntegral <$> getWord32be) -- length
   case typ of
-    0 -> return $ Read handle offset len
+    0 -> return $ Read handle (offset `div` blocksize) (len `div` blocksize)
     1 -> do
-      dat <- sinkGet $ getBytes len
-      return $ Write handle offset dat
+      dat <- sinkGet $ getBytes (fromIntegral len)
+      return $ Write handle
+        (offset `div` blocksize)
+        (len `div` blocksize) dat
     2 -> return Disconnect
-    _ -> return $ UnknownCommand typ handle offset len
+    _ -> return $ UnknownOp handle
 
 -- send an error code reply to the client (data is sent separately afterward,
 -- for reads)
@@ -122,32 +128,28 @@ sendReply h err = sourcePut $ do
   putWord32be (errCode err)
   putWord64be h
 
+sendResponse :: MonadIO m => Response -> ByteConduit m ()
+sendResponse (Build_Response h e _ dat) = do
+  sendReply h e
+  sourcePut $ putByteString dat
+
 handleCommands :: (MonadThrow m, MonadIO m) => Bool -> Env -> ByteConduit m ()
 handleCommands doLog e = handle
   where
+    debug :: (MonadThrow m, MonadIO m) => String -> ByteConduit m ()
     debug = liftIO . when doLog . putStrLn
     handle = do
       cmd <- getCommand
       case cmd of
-        -- TODO: insert bounds checks
-        Read h off len -> do
-          debug $ "read at " ++ show off ++ " len " ++ show len
-          bs <- liftIO . runTD e $ RD.readBytes off len
-          sendReply h NoError
-          sourcePut $ putByteString bs
-          handle
-        Write h off dat -> do
-          debug $ "write at " ++ show off ++ " len " ++ show (BS.length dat)
-          liftIO . runTD e $ RD.writeBytes off dat
-          sendReply h NoError
-          handle
-        Disconnect -> do
-          debug "disconnect command"
-          return ()
-        UnknownCommand _ h _ _ -> do
-          debug $ "unknown command " ++ show cmd
-          sendReply h EInval
-          handle
+        Read _ off len -> debug $ "read at " ++ show (off*blocksize) ++ " of length " ++ show (len*blocksize)
+        Write _ off len _ -> debug $ "write at " ++ show (off*blocksize) ++ " of length " ++ show (len*blocksize)
+        Disconnect -> debug "disconnect command"
+        UnknownOp _ -> debug "unknown command"
+      r <- liftIO $ do
+        putMVar (requests e) cmd
+        takeMVar (responses e)
+      sendResponse r
+      handle
 
 data SizeMismatchException =
   SizeMismatchException { size0 :: Integer
@@ -156,39 +158,48 @@ data SizeMismatchException =
 
 instance Exception SizeMismatchException
 
+forkNbdServer :: Env -> Bool -> IO ()
+forkNbdServer e doLog =
+  forkSingleClient $ \ad ->
+  -- assemble a conduit using the TCP server as input and output
+  runConduit $ appSource ad .| nbdConnection .| appSink ad
+  where
+    settings = serverSettings 10809 "127.0.0.1"
+    forkSingleClient app = do
+      -- process a single client; new connections will block on this MVar
+      mv <- newMVar ()
+      _ <- forkTCPServer settings (\ad -> takeMVar mv >> app ad)
+      return ()
+    nbdConnection = do
+      -- negotiate
+      name <- negotiateNewstyle
+      liftIO $ when (name /= "") $
+        putStrLn $ "ignoring non-default export name " ++ show name
+      msz <- liftIO . runTD e $ diskSizes
+      case msz of
+        Left (sz0, sz1) -> throwM $ SizeMismatchException sz0 sz1
+        Right sz ->
+          -- start transmission phase
+          sendExportInformation (fromIntegral sz)
+      liftIO $ putStrLn "negotiated with client"
+      -- infinite loop parsing commands and putting them on the queue
+      handleCommands doLog e
+
 runServer :: ServerOptions -> IO ()
-runServer ServerOptions {diskPaths=(fn0, fn1), logCommands=doLog} =
-  let e = Env fn0 fn1 in do
-  putStrLn "recovering..."
-  runTD e RD.recover
+runServer ServerOptions
+  { diskPaths=(fn0, fn1),
+    logCommands=doLog} = do
+  e <- Env fn0 fn1 <$> newEmptyMVar <*> newEmptyMVar
   putStrLn "serving on localhost:10809"
-  let settings = serverSettings 10809 "127.0.0.1" in
-    runTCPServer settings $ \ad ->
-    -- these are all the steps of a single client connection
-      let nbdConnection = do
-            liftIO $ putStrLn "received connection"
-          -- negotiate
-            name <- negotiateNewstyle
-            liftIO $ when (name /= "") $
-              putStrLn $ "ignoring non-default export name " ++ show name
-            msz <- liftIO . runTD e $ diskSizes
-            case msz of
-              Left (sz0, sz1) -> throwM $ SizeMismatchException sz0 sz1
-              Right sz ->
-                -- start transmission phase
-                sendExportInformation (fromIntegral sz)
-            liftIO $ putStrLn "finished negotiation"
-          -- handle commands in a loop, which terminates upon receiving the
-          -- Disconnect command
-            handleCommands doLog e
-            liftIO $ putStrLn "client disconnect" in
-      -- assemble a conduit using the TCP server as input and output
-      runConduit $ appSource ad .| nbdConnection .| appSink ad
+  mv <- newEmptyMVar
+  _ <- liftIO . forkIO $ runTD e Server.serverLoop >> putMVar mv ()
+  forkNbdServer e doLog
+  takeMVar mv
 
 initServer :: (FilePath, FilePath) -> IO ()
-initServer (fn0, fn1) =
-  let c = Env fn0 fn1 in do
-  r <- runTD c RD.init
+initServer (fn0, fn1) = do
+  e <- Env fn0 fn1 <$> newEmptyMVar <*> newEmptyMVar
+  r <- runTD e Server.init
   case r of
     Initialized -> return ()
     InitFailed -> die "initialization failed! are disks of different sizes?"

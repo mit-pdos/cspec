@@ -8,10 +8,9 @@ Require Import TwoDisk.ExtrTwoDiskImpl.
 
 Extraction Language Haskell.
 
-Require Import SeqDisk.ReplicatedDisk.
-Require Import SeqDisk.ArrayAPI.
-Require Import TwoDisk.TwoDiskImpl.
+Require Import NBD.Server.
+Require Import NBD.ExtrServer.
 
-Separate Extraction TD.td RD.rd ArrayAPI.
+Separate Extraction serverLoop init.
 
 Cd "../../".
