@@ -13,7 +13,7 @@ import           Data.Conduit.Cereal
 import           Data.Conduit.Network
 import           Data.Serialize
 import           Interface (InitResult(..))
-import qualified NbdData as Nbd
+import NbdData
 import           Network.NBD.Data
 import           Replication.TwoDiskEnvironment
 import           Replication.TwoDiskOps
@@ -99,7 +99,7 @@ sendExportInformation len = sourcePut $ do
     flags = nbd_FLAG_HAS_FLAGS
 
 -- parse a command from the client during the transmission phase
-getCommand :: (MonadThrow m, MonadIO m) => ByteConduit m Command
+getCommand :: (MonadThrow m, MonadIO m) => ByteConduit m Request
 getCommand = do
   magic <- sinkGet getWord32be
   when (magic /= nbd_REQUEST_MAGIC) $
@@ -111,31 +111,25 @@ getCommand = do
     (fromIntegral <$> getWord64be) <*> -- offset
     (fromIntegral <$> getWord32be) -- length
   case typ of
-    0 -> return $ Read handle offset len
+    0 -> return $ Read handle (offset `div` blocksize) (len `div` blocksize)
     1 -> do
-      dat <- sinkGet $ getBytes len
-      return $ Write handle offset dat
+      dat <- sinkGet $ getBytes (fromIntegral len)
+      return $ Write handle
+        (offset `div` blocksize)
+        (len `div` blocksize) dat
     2 -> return Disconnect
-    _ -> return $ UnknownCommand typ handle offset len
+    _ -> return $ UnknownOp handle
 
 -- send an error code reply to the client (data is sent separately afterward,
 -- for reads)
-sendReply :: Monad m => Nbd.Handle -> Nbd.ErrorCode -> ByteConduit m ()
+sendReply :: Monad m => Handle -> ErrorCode -> ByteConduit m ()
 sendReply h err = sourcePut $ do
   putWord32be nbd_REPLY_MAGIC
   putWord32be (errCode err)
   putWord64be h
 
--- TODO: get rid of Command, replace with Nbd.Request
-commandToRequest :: Command -> Nbd.Request
-commandToRequest c = case c of
-  Read h off len -> Nbd.Read h (fromIntegral off `div` blocksize) (fromIntegral len `div` blocksize)
-  Write h off dat -> Nbd.Write h (fromIntegral off `div` blocksize) (fromIntegral (BS.length dat `div` blocksize)) dat
-  Disconnect -> Nbd.Disconnect
-  UnknownCommand _ h _ _ -> Nbd.UnknownOp h
-
-sendResponse :: MonadIO m => Nbd.Response -> ByteConduit m ()
-sendResponse (Nbd.Build_Response h e _ dat) = do
+sendResponse :: MonadIO m => Response -> ByteConduit m ()
+sendResponse (Build_Response h e _ dat) = do
   sendReply h e
   sourcePut $ putByteString dat
 
@@ -147,12 +141,12 @@ handleCommands doLog e = handle
     handle = do
       cmd <- getCommand
       case cmd of
-        Read _ off len -> debug $ "read at " ++ show off ++ " of length " ++ show len
-        Write _ off dat -> debug $ "write at " ++ show off ++ " of length " ++ show (BS.length dat)
+        Read _ off len -> debug $ "read at " ++ show (off*blocksize) ++ " of length " ++ show (len*blocksize)
+        Write _ off len _ -> debug $ "write at " ++ show (off*blocksize) ++ " of length " ++ show (len*blocksize)
         Disconnect -> debug "disconnect command"
-        UnknownCommand i _ _ _ -> debug $ "unknown command with id " ++ show i
+        UnknownOp _ -> debug "unknown command"
       r <- liftIO $ do
-        putMVar (requests e) (commandToRequest cmd)
+        putMVar (requests e) cmd
         takeMVar (responses e)
       sendResponse r
       handle
