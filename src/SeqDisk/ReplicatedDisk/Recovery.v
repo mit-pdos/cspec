@@ -194,6 +194,10 @@ Section ReplicatedDiskRecovery.
       destruct r; (intuition eauto); simplify; finish.
     Qed.
 
+    Hint Resolve PeanoNat.Nat.lt_neq.
+    Hint Rewrite diskUpd_neq : rd.
+    Hint Resolve disks_eq_inbounds.
+
     Theorem fixup_wrong_addr_ok : forall a,
         prog_spec
           (fun '(d, b, a') state =>
@@ -218,9 +222,9 @@ Section ReplicatedDiskRecovery.
                    | DiskFailed i =>
                      match i with
                      | d0 => TD.disk0 state' |= eq d /\
-                             TD.disk1 state' |= eq d
+                            TD.disk1 state' |= eq d
                      | d1 => TD.disk0 state' |= eq (diskUpd d a' b) /\
-                             TD.disk1 state' |= eq (diskUpd d a' b)
+                            TD.disk1 state' |= eq (diskUpd d a' b)
                      end
                    end;
                recover :=
@@ -241,25 +245,6 @@ Section ReplicatedDiskRecovery.
 
       destruct r; try step.
       is_eq v v0; try step.
-      descend; intuition eauto.
-
-      step.
-      destruct r; (intuition eauto); simplify; finish.
-      (* TODO: factor out this redundant proof *)
-      assert (a'0 <> a) by eauto using PeanoNat.Nat.lt_neq.
-      autorewrite with upd in *.
-      assert (v = v0) by eauto using disks_eq_inbounds.
-      contradiction.
-
-      assert (a'0 <> a) by eauto using PeanoNat.Nat.lt_neq.
-      autorewrite with upd in *.
-      assert (v = v0) by eauto using disks_eq_inbounds.
-      contradiction.
-
-      assert (a'0 <> a) by eauto using PeanoNat.Nat.lt_neq.
-      autorewrite with upd in *.
-      assert (v = v0) by eauto using disks_eq_inbounds.
-      contradiction.
     Qed.
 
     (* To make these specifications precise while also covering both the already
