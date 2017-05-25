@@ -64,9 +64,6 @@ Module TD.
       bg_step (Disks (Some d_0) (Some d_1) pf)
               (Disks (Some d_0) None proof).
 
-  (* TODO: split TwoDiskProg into a generic API and an (axiomatic)
-  implementation, same way Refinement/ version does. *)
-
   Inductive op_step : forall `(op: Op T), Semantics State T :=
   | step_read : forall a i r state,
       match get_disk i state with
