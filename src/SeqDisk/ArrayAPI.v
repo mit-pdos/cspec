@@ -7,6 +7,8 @@ Require Import Refinement.Interface.
 
 Opaque blockbytes.
 
+(* TODO: re-use this code for asynchronous single-disk API *)
+
 Section ArrayDisk.
 
   Variable (d:Interface D.API).

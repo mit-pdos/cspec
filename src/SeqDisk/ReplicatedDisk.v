@@ -41,6 +41,8 @@ Module RD.
     the basic automation here *)
     Hint Resolve Read_ok Write_ok DiskSize_ok Recover_ok.
 
+    Implicit Type (state:TD.State).
+
     Theorem Read_rok : forall a,
         prog_spec
           (fun d state =>

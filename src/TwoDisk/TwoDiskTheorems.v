@@ -62,6 +62,9 @@ Hint Resolve holds_in_some_eq.
 Hint Resolve holds_in_none_eq.
 Hint Resolve pred_missing.
 
+(* help out type inference *)
+Implicit Type (state:TD.State).
+
 Theorem TDRead0_ok : forall (i: Interface TD.API) a,
     prog_spec
       (fun '(d_0, F) state =>

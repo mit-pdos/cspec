@@ -34,6 +34,9 @@ Section ReplicatedDiskReadWrite.
 
   Hint Resolve pred_missing.
   Hint Resolve both_disks_not_missing : false.
+
+  Implicit Type (state:TD.State).
+
   Theorem Read_ok : forall a,
       prog_spec
         (fun d state =>
