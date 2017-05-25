@@ -13,6 +13,7 @@ Module TD.
     match op with
     | TD.Read d a => read d a
     | TD.Write d a b => write d a b
+    | TD.Sync d => sync d
     | TD.DiskSize d => diskSize d
     end.
 

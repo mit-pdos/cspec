@@ -9,6 +9,7 @@ import                   Replication.TwoDiskEnvironment
 import                   System.IO (SeekMode(..))
 import "unix-bytestring" System.Posix.IO.ByteString
 import                   System.Posix.Types (Fd)
+import                   System.Posix.Unistd (fileSynchronise)
 import                   TwoDiskDefs
 import                   Utils.Conversion
 
@@ -30,6 +31,10 @@ read d a = ifExists d $ \fd ->
 write :: Coq_diskId -> Coq_addr -> BS.ByteString -> TwoDiskProg (DiskResult ())
 write d a b = ifExists d $ \fd ->
   void $ fdPwrite fd b (fromIntegral $ addrToOffset a)
+
+sync :: Coq_diskId -> TwoDiskProg (DiskResult ())
+sync d = ifExists d $ \fd ->
+  void $ fileSynchronise fd
 
 -- |implementation of two disk DiskSize operation - note that this size is
 -- reported to Coq in blocks

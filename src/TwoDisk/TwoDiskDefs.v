@@ -13,6 +13,7 @@ Module TD.
   Inductive Op : Type -> Type :=
   | Read (i:diskId) (a:addr) : Op (DiskResult block)
   | Write (i:diskId) (a:addr) (b:block) : Op (DiskResult unit)
+  | Sync (i:diskId) : Op (DiskResult unit)
   (* get disk size in blocks *)
   | DiskSize (i:diskId) : Op (DiskResult nat).
 

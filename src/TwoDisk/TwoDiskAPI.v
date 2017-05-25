@@ -31,6 +31,12 @@ Module TD.
       | None => r = Failed /\ state' = state
       end ->
       op_step (Write i a b) state r state'
+  | step_sync : forall i state r state',
+      match get_disk i state with
+      | Some d => state' = state /\ r = Working tt
+      | None => r = Failed /\ state' = state
+      end ->
+      op_step (Sync i) state r state'
   | step_size : forall i state r,
       match get_disk i state with
       | Some d => r = Working (size d)
