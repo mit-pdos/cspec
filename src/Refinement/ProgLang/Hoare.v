@@ -278,10 +278,11 @@ Theorem compose_recovery : forall `(spec: Specification A'' T unit State)
 Proof.
   intros.
   unfold prog_spec; intros.
-  eapply Hspec_spec' in H; safe_intuition.
+  eapply Hspec_spec' in H; safe_intuition;
+    repeat deex.
+  clear Hspec_spec'.
   destruct r.
-  - repeat deex.
-    match goal with
+  - match goal with
     | [ Hexec: rexec p _ _ _ |- _ ] =>
       eapply rexec_finish_any_rec in Hexec;
         eapply Hspec in Hexec
@@ -291,17 +292,17 @@ Proof.
     | [ Hexec: exec_recover _ _ _ _ |- _ ] =>
       eapply exec_recover_bind_inv in Hexec
     end; repeat deex.
-    assert (rexec p rec w (Recovered rv1 w1)) by eauto.
-    (* H7: exec p *)
-    (* H1: exec_recover rec *)
-    clear H7 H1.
+    match goal with
+    | [ Hexec: exec_recover rec _ _ _ |- _ ] =>
+      eapply RExecCrash in Hexec; eauto
+    end; repeat deex.
     match goal with
     | [ Hexec: rexec p _ _ _ |- _ ] =>
       eapply Hspec in Hexec
     end; simpl in *; safe_intuition eauto.
-    (* H5: recover -> exists a' *)
+    (* H3: recover -> exists a' *)
     (* H1: recover *)
-    eapply H5 in H1; repeat deex.
+    eapply H3 in H1; repeat deex.
     match goal with
     | [ Hexec: exec rec' _ _ |- _ ] =>
       eapply Hrspec in Hexec
