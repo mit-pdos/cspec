@@ -12,6 +12,9 @@ Definition blockset := nonempty block.
 Definition latest (bs:blockset) : block := head bs.
 Definition buffer (b: block) (bs:blockset) : blockset := prepend b bs.
 
+(* TODO: we may want to use only (current value, on-platter value) for the
+representation, and use disksets or diskset-like things only for predicates *)
+
 Definition disk := diskOf blockset.
 
 Inductive covers : blockset -> blockset -> Prop :=
