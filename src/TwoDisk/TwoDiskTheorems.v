@@ -22,6 +22,9 @@ restrictive. While we have tried to avoid doing so, we do not prove completeness
 below.
  *)
 
+(* help out type inference *)
+Implicit Type (state:TD.State).
+
 Theorem maybe_holds_stable : forall state state' F0 F1,
     TD.disk0 state |= F0 ->
     TD.disk1 state |= F1 ->
@@ -61,9 +64,6 @@ Ltac prim :=
 Hint Resolve holds_in_some_eq.
 Hint Resolve holds_in_none_eq.
 Hint Resolve pred_missing.
-
-(* help out type inference *)
-Implicit Type (state:TD.State).
 
 Theorem TDRead0_ok : forall (i: Interface TD.API) a,
     prog_spec
@@ -235,10 +235,33 @@ Proof.
   prim.
 Qed.
 
+Theorem TDSync_ok : forall (i: Interface TD.API) d_ident,
+    prog_spec
+      (fun '(F0, F1) state =>
+         {|
+           pre := TD.disk0 state |= F0 /\
+                  TD.disk1 state |= F1;
+           post :=
+             fun r state' =>
+               TD.disk0 state' |= F0 /\
+               TD.disk1 state' |= F1;
+           recover :=
+             fun _ state' =>
+               TD.disk0 state' |= F0 /\
+               TD.disk1 state' |= F1;
+         |})
+      (Prim i (TD.Sync d_ident))
+      (irec i)
+      (refinement i).
+Proof.
+  destruct d_ident; prim.
+Qed.
+
 Hint Resolve
      TDRead0_ok
      TDRead1_ok
      TDWrite0_ok
      TDWrite1_ok
      TDDiskSize0_ok
-     TDDiskSize1_ok.
+     TDDiskSize1_ok
+     TDSync_ok.

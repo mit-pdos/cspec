@@ -38,8 +38,10 @@ library
                      , ReadWrite
                      , Recovery
                      , SeqDiskAPI
+                     , SeqDiskDefs
                      , Server
                      , Specif
+                     , Sync
                      , TwoDiskAPI
                      , TwoDiskDefs
                      , TwoDiskImpl

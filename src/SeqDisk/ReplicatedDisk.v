@@ -9,6 +9,7 @@ Require Import SeqDisk.SeqDiskAPI.
 Require Import SeqDisk.ReplicatedDisk.Step.
 Require Import SeqDisk.ReplicatedDisk.Init.
 Require Import SeqDisk.ReplicatedDisk.DiskSize.
+Require Import SeqDisk.ReplicatedDisk.Sync.
 Require Import SeqDisk.ReplicatedDisk.Recovery.
 Require Import SeqDisk.ReplicatedDisk.ReadWrite.
 
@@ -98,6 +99,32 @@ Module RD.
       - exists (diskUpd d a b), FullySynced; intuition eauto.
     Qed.
 
+    Theorem Sync_rok :
+      prog_spec
+        (fun d state =>
+           {|
+             pre := TD.disk0 state |= eq d /\
+                    TD.disk1 state |= eq d;
+             post :=
+               fun r state' =>
+                 r = tt /\
+                 TD.disk0 state' |= eq d /\
+                 TD.disk1 state' |= eq d;
+             recover :=
+               fun _ state' =>
+                 TD.disk0 state' |= eq d /\
+                 TD.disk1 state' |= eq d;
+           |})
+        (Sync td) (_ <- irec td; Recover td)
+        (refinement td).
+    Proof.
+      eapply compose_recovery; simplify.
+
+      rename a into d.
+      exists d, d; (intuition eauto); simplify.
+      exists d, FullySynced; intuition eauto.
+    Qed.
+
     Theorem DiskSize_rok :
       prog_spec
         (fun d state =>
@@ -150,6 +177,15 @@ Module RD.
       econstructor; eauto.
     Qed.
 
+    Lemma sync_step : forall (state state':D.State) u,
+        state' = state ->
+        D.step (D.Sync) state u state'.
+    Proof.
+      intros; subst.
+      destruct u.
+      econstructor; eauto.
+    Qed.
+
     Lemma disk_size_step : forall (state state':D.State) r,
         r = size state ->
         state' = state ->
@@ -159,7 +195,7 @@ Module RD.
       econstructor; eauto.
     Qed.
 
-    Hint Resolve read_step write_step disk_size_step.
+    Hint Resolve read_step write_step sync_step disk_size_step.
 
     (* The proof will require a refinement; we build one up based on the two
     disk state. *)
@@ -232,6 +268,7 @@ Module RD.
       match op with
       | D.Read a => Read td a
       | D.Write a b => Write td a b
+      | D.Sync => Sync td
       | D.DiskSize => DiskSize td
       end.
 
@@ -246,7 +283,7 @@ Module RD.
          recover_impl := _ <- irec td; Recover td;
       init_impl := then_init (iInit td) (Init td) |}.
 
-    Hint Resolve Read_rok Write_rok DiskSize_rok Recover_rok.
+    Hint Resolve Read_rok Write_rok Sync_rok DiskSize_rok Recover_rok.
 
     Theorem state_some_disks : forall state,
         exists d_0 d_1,
@@ -270,6 +307,7 @@ Module RD.
         + exists (rd_abstraction state); (intuition eauto); simplify.
         + exists (rd_abstraction state); (intuition eauto); simplify.
           eauto 10.
+        + exists (rd_abstraction state); (intuition eauto); simplify.
         + exists (rd_abstraction state); (intuition eauto); simplify.
       - eapply rec_noop_compose; eauto; simpl.
         eapply prog_spec_weaken; eauto;

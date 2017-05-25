@@ -1,16 +1,14 @@
 Require Import Prog.
 Require Import Disk.
 
+Require Export SeqDisk.SeqDiskDefs.
 Require Import Refinement.Interface.
 
 (* Defines programs over a single disk. *)
 
 Module D.
 
-  Inductive Op : Type -> Type :=
-  | Read (a:addr) : Op block
-  | Write (a:addr) (b:block) : Op unit
-  | DiskSize : Op nat.
+  Import SeqDiskDefs.D.
 
   Definition State := disk.
 
@@ -20,6 +18,9 @@ Module D.
       step (Read a) state r state
   | step_write : forall a b (state: State),
       step (Write a b) state tt (diskUpd state a b)
+  | step_sync : forall (state: State),
+      (* synchronous sync is a no-op *)
+      step (Sync) state tt state
   | step_disk_size : forall (state: State),
       step (DiskSize) state (size state) state.
 

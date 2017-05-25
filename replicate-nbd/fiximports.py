@@ -23,6 +23,7 @@ import_modules = {
         "Recovery",
         "ReplicatedDisk",
         "Server",
+        "Sync",
         "TwoDiskImpl",
         "TwoDiskOps",
     ],
