@@ -23,31 +23,42 @@ restrictive. While we have tried to avoid doing so, we do not prove completeness
 below.
  *)
 
-Ltac start_prim :=
-  intros; eapply prim_spec; intros;
-  repeat destruct_tuple;
-  simpl in *;
-  safe_intuition;
-  try solve [ intuition eauto ].
+Theorem maybe_holds_stable : forall state state' F0 F1,
+    TD.disk0 state |= F0 ->
+    TD.disk1 state |= F1 ->
+    TD.bg_step state state' ->
+    TD.disk0 state' |= F0 /\
+    TD.disk1 state' |= F1.
+Proof.
+  intros.
+  TD.inv_bg; simpl in *; eauto.
+Qed.
 
 Ltac cleanup :=
   repeat match goal with
          | [ |- forall _, _ ] => intros
-         | _ => progress simpl in *
-         | _ => progress safe_intuition
-         | _ => progress subst
-         | _ => destruct_tuple
-         | _ => deex
-         | _ => simpl_match
          | |- _ /\ _ => split; [ solve [ eauto || congruence ] | ]
          | |- _ /\ _ => split; [ | solve [ eauto || congruence ] ]
          | [ H: Working _ = Working _ |- _ ] => inversion H; subst; clear H
-         | [ |- exists (_:unit), _ ] => exists tt
+         | [ H: TD.bg_step _ _ |- _ ] =>
+           eapply maybe_holds_stable in H;
+           [ | solve [ eauto ] | solve [ eauto ] ]; destruct_ands
+         | [ H: _ |= eq _, H': _ = Some _ |- _ ] =>
+                  pose proof (holds_some_inv_eq _ H' H); clear H
+         | _ => deex
+         | _ => destruct_tuple
+         | _ => progress simpl in *
+         | _ => progress subst
+         | _ => progress safe_intuition
          | _ => solve [ eauto ]
          | _ => congruence
          end.
 
-Hint Resolve holds_in_some.
+Ltac prim :=
+  intros; eapply prim_spec; cleanup;
+  try TD.inv_step;
+  try solve [ destruct matches in *; cleanup ].
+
 Hint Resolve holds_in_some_eq.
 Hint Resolve holds_in_none_eq.
 Hint Resolve pred_missing.
@@ -75,11 +86,7 @@ Theorem TDRead0_ok : forall (i: Interface TD.API) a,
       (irec i)
       (refinement i).
 Proof.
-  start_prim; cleanup.
-  TD.inv_step.
-  TD.inv_bg; cleanup;
-    repeat (destruct matches in *; cleanup).
-  destruct matches in *; intuition eauto.
+  prim.
 Qed.
 
 Theorem TDRead1_ok : forall (i: Interface TD.API) a,
@@ -92,24 +99,20 @@ Theorem TDRead1_ok : forall (i: Interface TD.API) a,
              fun r state' =>
                match r with
                | Working v => TD.disk0 state' |= F /\
-                              TD.disk1 state' |= eq d_1 /\
-                              d_1 a |= eq v
+                             TD.disk1 state' |= eq d_1 /\
+                             d_1 a |= eq v
                | Failed => TD.disk0 state' |= F /\
-                           TD.disk1 state' |= missing
+                          TD.disk1 state' |= missing
                end;
            recover :=
              fun _ state' => TD.disk0 state' |= F /\
-                             TD.disk1 state' |= eq d_1;
+                      TD.disk1 state' |= eq d_1;
          |})
       (Prim i (TD.Read d1 a))
       (irec i)
       (refinement i).
 Proof.
-  start_prim; cleanup.
-  TD.inv_step.
-  TD.inv_bg; cleanup;
-    repeat (destruct matches in *; cleanup).
-  destruct matches in *; intuition eauto.
+  prim.
 Qed.
 
 Theorem TDWrite0_ok : forall (i: Interface TD.API) a b,
@@ -136,12 +139,9 @@ Theorem TDWrite0_ok : forall (i: Interface TD.API) a b,
       (irec i)
       (refinement i).
 Proof.
-  start_prim; cleanup.
-  TD.inv_step; simpl.
-  TD.inv_bg; cleanup;
-    repeat (destruct matches in *; cleanup).
-  destruct matches in *; intuition eauto.
+  prim.
 
+  destruct matches in *; cleanup.
   destruct (lt_dec a (size d_0));
     autorewrite with upd in *;
     eauto.
@@ -157,9 +157,9 @@ Theorem TDWrite1_ok : forall (i: Interface TD.API) a b,
              fun r state' =>
                match r with
                | Working _ => TD.disk0 state' |= F /\
-                              TD.disk1 state' |= eq (diskUpd d_1 a b)
+                             TD.disk1 state' |= eq (diskUpd d_1 a b)
                | Failed => TD.disk0 state' |= F /\
-                           TD.disk1 state' |= missing
+                          TD.disk1 state' |= missing
                end;
            recover :=
              fun _ state' =>
@@ -171,12 +171,9 @@ Theorem TDWrite1_ok : forall (i: Interface TD.API) a b,
       (irec i)
       (refinement i).
 Proof.
-  start_prim; cleanup.
-  TD.inv_step; simpl.
-  TD.inv_bg; cleanup;
-    repeat (destruct matches in *; cleanup).
-  destruct matches in *; intuition eauto.
+  prim.
 
+  destruct matches in *; cleanup.
   destruct (lt_dec a (size d_1));
     autorewrite with upd in *;
     eauto.
@@ -206,11 +203,7 @@ Theorem TDDiskSize0_ok : forall (i: Interface TD.API),
       (irec i)
       (refinement i).
 Proof.
-  start_prim; cleanup.
-  TD.inv_step.
-  TD.inv_bg; cleanup;
-    repeat (destruct matches in *; cleanup).
-  destruct matches in *; intuition eauto.
+  prim.
 Qed.
 
 Theorem TDDiskSize1_ok : forall (i: Interface TD.API),
@@ -237,11 +230,7 @@ Theorem TDDiskSize1_ok : forall (i: Interface TD.API),
       (irec i)
       (refinement i).
 Proof.
-  start_prim; cleanup.
-  TD.inv_step.
-  TD.inv_bg; cleanup;
-    repeat (destruct matches in *; cleanup).
-  destruct matches in *; intuition eauto.
+  prim.
 Qed.
 
 Hint Resolve
