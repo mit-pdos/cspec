@@ -1,16 +1,8 @@
 Require Import Prog.
-Require Import Disk.
 Require Import Automation.
 
+Require Export TwoDisk.TwoDiskDefs.
 Require Import Refinement.Interface.
-
-Inductive diskId := d0 | d1.
-
-Inductive DiskResult T :=
-| Working (v:T)
-| Failed.
-
-Arguments Failed {T}.
 
 Module TD.
 

@@ -9,7 +9,7 @@ import                   Replication.TwoDiskEnvironment
 import                   System.IO (SeekMode(..))
 import "unix-bytestring" System.Posix.IO.ByteString
 import                   System.Posix.Types (Fd)
-import                   TwoDiskAPI
+import                   TwoDiskDefs
 import                   Utils.Conversion
 
 getDisk :: Coq_diskId -> TwoDiskProg (Maybe Fd)

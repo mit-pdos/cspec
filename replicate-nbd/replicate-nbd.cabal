@@ -41,7 +41,9 @@ library
                      , Server
                      , Specif
                      , TwoDiskAPI
+                     , TwoDiskDefs
                      , TwoDiskImpl
+                     , TwoDiskOps
   build-depends:       base >= 4.7 && < 5
                      , ghc-prim
                      , bytestring

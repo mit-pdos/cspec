@@ -2,14 +2,12 @@ Require Import Automation.
 Require Import Disk.
 
 Require Import TwoDisk.TwoDiskAPI.
+Require Import TwoDisk.TwoDiskOps.
 Require Import Refinement.Interface.
 Require Import Refinement.ProgLang.Prog.
 Require Import Refinement.ProgLang.Hoare.
 
 Module TD.
-  Axiom read : diskId -> addr -> prog (DiskResult block).
-  Axiom write : diskId -> addr -> block -> prog (DiskResult unit).
-  Axiom diskSize : diskId -> prog (DiskResult nat).
 
   Definition td_op_impl T (op: TD.Op T) : prog T :=
     match op with
