@@ -20,16 +20,47 @@ Definition disk := diskOf blockset.
 Inductive covers : blockset -> blockset -> Prop :=
 | is_cover : forall b bs bs',
     (forall b', List.In b' bs' ->
-           b = b' \/ List.In b bs) ->
+           b' = b \/ List.In b' bs) ->
     covers (necons b bs) (necons b bs').
 
-Inductive covered : disk -> disk -> Prop :=
-| is_covered : forall d d',
-    size d = size d' ->
-    (forall a bs bs', d a = Some bs ->
-                 d' a = Some bs' ->
-                 covers bs bs') ->
-    covered d d'.
+Instance covers_preorder : PreOrder covers.
+Proof.
+  econstructor; hnf; intros.
+  - destruct x.
+    eapply is_cover; intros; eauto.
+  - inversion H; subst; clear H.
+    inversion H0; subst; clear H0.
+    eapply is_cover; intros.
+    specialize (H4 _ ltac:(eauto)).
+    intuition eauto.
+Qed.
+
+Record covered (d:disk) (d':disk) : Prop :=
+  is_covered
+    { covered_size_eq: size d = size d';
+      covers_pointwise: forall a bs bs',
+          d a = Some bs ->
+          d' a = Some bs' ->
+          covers bs bs'; }.
+
+Instance covered_preorder : PreOrder covered.
+Proof.
+  econstructor; hnf; intros.
+  - econstructor; intros; eauto.
+    assert (bs = bs') by congruence; subst.
+    reflexivity.
+  - econstructor; intros; eauto.
+    + destruct H, H0; congruence.
+    + pose proof (covers_pointwise H a).
+      pose proof (covers_pointwise H0 a).
+      destruct (y a) eqn:?.
+      specialize (H3 _ _ ltac:(eauto) ltac:(eauto)).
+      specialize (H4 _ _ ltac:(eauto) ltac:(eauto)).
+      etransitivity; eauto.
+      exfalso.
+      eauto using same_size_disks_not_different,
+      covered_size_eq.
+Qed.
 
 Definition flush (d:disk) : disk.
   refine {| size := size d;

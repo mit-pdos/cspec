@@ -40,6 +40,20 @@ Section GenericDisks.
     unfold disk_get in *; congruence.
   Qed.
 
+  Lemma same_size_disks_not_different : forall d d' a v,
+      size d = size d' ->
+      d a = Some v ->
+      d' a = None ->
+      False.
+  Proof.
+    intros.
+    pose proof (diskMem_domain d' a).
+    destruct (lt_dec a (size d')).
+    repeat deex; unfold disk_get in *; congruence.
+    pose proof (diskMem_domain d a).
+    destruct (lt_dec a (size d)); unfold disk_get in *; congruence.
+  Qed.
+
   Definition diskUpd d (a: addr) b : diskOf T.
   Proof.
     destruct (lt_dec a (size d)).
