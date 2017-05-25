@@ -267,6 +267,7 @@ Module RD.
             unfold spec_impl; simplify.
         + exists (rd_abstraction state); (intuition eauto); simplify.
         + exists (rd_abstraction state); (intuition eauto); simplify.
+          eauto 10.
         + exists (rd_abstraction state); (intuition eauto); simplify.
       - eapply rec_noop_compose; eauto; simpl.
         eapply prog_spec_weaken; eauto;
@@ -277,6 +278,7 @@ Module RD.
         pose proof (state_some_disks state); simplify.
         descend; intuition eauto.
         destruct v; simplify; finish.
+      - eapply crash_effect_compose; eauto using crash_effect_ok.
 
         Grab Existential Variables.
         all: auto.

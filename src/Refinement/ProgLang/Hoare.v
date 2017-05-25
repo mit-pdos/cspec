@@ -27,9 +27,6 @@ Definition refinement_compose
                         invariant rf2 (abstraction rf1 w);
      abstraction := fun w => abstraction rf2 (abstraction rf1 w); |}.
 
-Definition refinement_crash_ok `(rf: Refinement State) (crash_effect: State -> State) :=
-  forall w, abstraction rf (world_crash w) = crash_effect (abstraction rf w).
-
 Record Quadruple T R State :=
   Spec {
       pre: Prop;
