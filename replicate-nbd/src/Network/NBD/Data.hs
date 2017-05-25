@@ -67,6 +67,16 @@ nbd_REQUEST_MAGIC = 0x25609513
 nbd_REPLY_MAGIC :: Word32
 nbd_REPLY_MAGIC = 0x67446698
 
+-- request constants
+nbd_CMD_READ :: Word16
+nbd_CMD_READ = 0
+
+nbd_CMD_WRITE :: Word16
+nbd_CMD_WRITE = 1
+
+nbd_CMD_DISC :: Word16
+nbd_CMD_DISC = 2
+
 errCode :: ErrorCode -> Word32
 errCode err = case err of
   ESuccess -> 0

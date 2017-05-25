@@ -109,15 +109,17 @@ getCommand = do
     getWord64be <*> -- handle
     (fromIntegral <$> getWord64be) <*> -- offset
     (fromIntegral <$> getWord32be) -- length
-  case typ of
-    0 -> return $ Read handle (offset `div` blocksize) (len `div` blocksize)
-    1 -> do
-      dat <- sinkGet $ getBytes (fromIntegral len)
-      return $ Write handle
-        (offset `div` blocksize)
-        (len `div` blocksize) dat
-    2 -> return Disconnect
-    _ -> return $ UnknownOp handle
+  let command
+        | typ == nbd_CMD_READ =
+          return $ Read handle (offset `div` blocksize) (len `div` blocksize)
+        | typ == nbd_CMD_WRITE = do
+            dat <- sinkGet $ getBytes (fromIntegral len)
+            return $ Write handle
+              (offset `div` blocksize)
+              (len `div` blocksize) dat
+        | typ == nbd_CMD_DISC = return Disconnect
+        | otherwise = return $ UnknownOp handle in
+    command
 
 -- send an error code reply to the client (data is sent separately afterward,
 -- for reads)
