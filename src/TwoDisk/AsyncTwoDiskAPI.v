@@ -15,10 +15,6 @@ Module TD.
   (* help out type inference *)
   Implicit Type (state:State).
 
-  Definition bg_step state state'' :=
-    exists state', bg_failure state state' /\
-          disks_rel pflushed state state'.
-
   Inductive op_step : forall `(op: Op T), Semantics State T :=
   | step_read : forall a i r state,
       match get_disk i state with
@@ -57,7 +53,9 @@ Module TD.
   Definition wipe state := state.
 
   Definition API : InterfaceAPI Op State :=
-    background_step bg_step (@op_step) wipe.
+    {| op_sem := post_step (pre_step bg_failure (@op_step))
+                           (disks_rel pflushed);
+       crash_effect := wipe; |}.
 
   Ltac inv_step :=
     match goal with

@@ -50,6 +50,7 @@ Ltac cleanup :=
                   pose proof (holds_some_inv_eq _ H' H); clear H
          | _ => deex
          | _ => destruct_tuple
+         | _ => progress unfold pre_step in *
          | _ => progress simpl in *
          | _ => progress subst
          | _ => progress safe_intuition

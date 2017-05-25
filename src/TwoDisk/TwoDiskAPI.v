@@ -48,7 +48,8 @@ Module TD.
   Definition wipe state := state.
 
   Definition API : InterfaceAPI Op State :=
-    background_step bg_failure (@op_step) wipe.
+    {| op_sem := pre_step bg_failure (@op_step);
+       crash_effect := wipe; |}.
 
   Ltac inv_step :=
     match goal with

@@ -27,14 +27,21 @@ Record InterfaceAPI (opT: Type -> Type) (State:Type) :=
   { op_sem: forall T, opT T -> Semantics State T;
     crash_effect: State -> State; }.
 
-Definition background_step {opT State} (bg_step: State -> State -> Prop)
+Definition pre_step {opT State}
+           (bg_step: State -> State -> Prop)
+           (step: forall `(op: opT T), Semantics State T) :
+  forall T (op: opT T), Semantics State T :=
+  fun T (op: opT T) state v state'' =>
+    exists state', bg_step state state' /\
+          step op state' v state''.
+
+Definition post_step {opT State}
            (step: forall `(op: opT T), Semantics State T)
-           (* TODO: decide if this is a good cute name for a crash effect *)
-           (wipe: State -> State) :=
-  {| op_sem := fun T (op: opT T) state v state'' =>
-                 exists state', bg_step state state' /\
-                       step op state' v state'';
-     crash_effect := wipe |}.
+           (bg_step: State -> State -> Prop) :
+  forall T (op: opT T), Semantics State T :=
+  fun T (op: opT T) state v state'' =>
+    exists state', step op state v state' /\
+          bg_step state' state''.
 
 (* The specification for each operation. Note that after recovery, the abstract
 state is expected to be atomic. *)
