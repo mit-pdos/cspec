@@ -42,6 +42,11 @@ Arguments Crashed {T} w.
 (* Programs may have arbitrary behavior for each primitive. *)
 Axiom step:forall T, opT T -> Semantics world T.
 
+(* On crash, the world state is modified to remove mutable data according to
+[world_crash]. Not that this is a function; it should be a deterministic
+process to replace in-memory state with default values. *)
+Axiom world_crash: world -> world.
+
 (** [exec] specifies the execution semantics of complete programs using [step]
   as the small-step semantics of the primitive operations.
 
@@ -81,8 +86,6 @@ Arguments Recovered {T R} v w.
 (** Run rec in w until it finishes, restarting whenever it crashes.
 
    This models running rec in an infinite retry loop.
-
-   TODO: after every crash should insert a crash relation step
  *)
 Inductive exec_recover R (rec:prog R) (w:world) : R -> world -> Prop :=
 | ExecRecoverExec : forall v w',
@@ -90,7 +93,7 @@ Inductive exec_recover R (rec:prog R) (w:world) : R -> world -> Prop :=
     exec_recover rec w v w'
 | ExecRecoverCrashDuringRecovery : forall w' v w'',
     exec rec w (Crashed w') ->
-    exec_recover rec w' v w'' ->
+    exec_recover rec (world_crash w') v w'' ->
     exec_recover rec w v w''.
 
 (** [rexec] gives semantics for running a program and using some recovery
@@ -103,8 +106,6 @@ Inductive exec_recover R (rec:prog R) (w:world) : R -> world -> Prop :=
 
      Note that this is a thin wrapper that chains execution and recovery
      self-execution - the constructors are not recursive.
-
-     TODO: add a parameter for a crash relation here.
  *)
 Inductive rexec T R : prog T -> prog R -> world -> RResult T R -> Prop :=
 | RExec : forall (p:prog T) (rec:prog R) w v w',
@@ -112,7 +113,7 @@ Inductive rexec T R : prog T -> prog R -> world -> RResult T R -> Prop :=
     rexec p rec w (RFinished v w')
 | RExecCrash : forall (p:prog T) (rec:prog R) w w' rv w'',
     exec p w (Crashed w') ->
-    exec_recover rec w' rv w'' ->
+    exec_recover rec (world_crash w') rv w'' ->
     rexec p rec w (Recovered rv w'').
 
 Notation "x <- p1 ; p2" := (Bind p1 (fun x => p2))

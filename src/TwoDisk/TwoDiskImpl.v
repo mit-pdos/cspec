@@ -1,3 +1,4 @@
+Require Import Automation.
 Require Import Disk.
 
 Require Import TwoDisk.TwoDiskAPI.
@@ -30,6 +31,13 @@ Module TD.
 
   Axiom init_ok : init_invariant (init_impl impl) (recover_impl impl) refinement.
 
+  Axiom td_crash_ok : refinement_crash_ok refinement (fun state => state).
+
+  Axiom invariant_under_crashes : forall w, invariant refinement w ->
+                                       invariant refinement (world_crash w).
+
+  Hint Resolve invariant_under_crashes.
+
   Definition td : Interface TD.API.
     unshelve econstructor.
     - exact impl.
@@ -38,7 +46,13 @@ Module TD.
     - unfold rec_noop; simpl; intros.
       unfold prog_spec; simpl; intros.
       inv_rexec; inv_ret; eauto.
-      induction H3; inv_exec; eauto.
+      remember (world_crash w').
+      generalize dependent w'.
+      induction H3; intros; inv_exec;
+        rewrite ?td_crash_ok in *; eauto.
+      specialize (IHexec_recover (world_crash w'0)).
+      rewrite td_crash_ok in *.
+      safe_intuition eauto.
     - apply init_ok.
   Defined.
 
