@@ -29,6 +29,17 @@ Section GenericDisks.
   Implicit Type (d:diskOf T).
   Implicit Type (b: T).
 
+  Lemma disk_inbounds_not_none : forall a d,
+      a < size d ->
+      d a = None ->
+      False.
+  Proof.
+    intros.
+    pose proof (diskMem_domain d a).
+    destruct matches in *; repeat deex.
+    unfold disk_get in *; congruence.
+  Qed.
+
   Definition diskUpd d (a: addr) b : diskOf T.
   Proof.
     destruct (lt_dec a (size d)).

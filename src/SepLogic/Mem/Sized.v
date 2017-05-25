@@ -71,3 +71,15 @@ Proof.
   destruct (lt_eq_lt_dec sz sz') as [ [] | ]; auto;
     solve [ exfalso; eauto using sized_domain_not_lt ].
 Qed.
+
+Theorem sized_domain_pointwise : forall `(m: mem _ V) sz (f: V -> V),
+    sized_domain m sz ->
+    sized_domain (fun a => match m a with
+                        | Some v => Some (f v)
+                        | None => None
+                        end) sz.
+Proof.
+  unfold sized_domain; intros.
+  specialize (H a).
+  destruct matches; repeat simpl_match; eauto.
+Qed.
