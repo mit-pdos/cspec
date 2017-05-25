@@ -2,18 +2,22 @@ Require Import Automation.
 
 Require Export Disk.GenericDisk.
 
+(* we only import List for the [In] predicate *)
+Require List.
 Require Import Nonempty.
 Require Import Sized.
-Require Import List.
 
 Definition blockset := nonempty block.
+
+Definition latest (bs:blockset) : block := head bs.
+Definition buffer (b: block) (bs:blockset) : blockset := prepend b bs.
 
 Definition disk := diskOf blockset.
 
 Inductive covers : blockset -> blockset -> Prop :=
 | is_cover : forall b bs bs',
-    (forall b', In b' bs' ->
-           b = b' \/ In b bs) ->
+    (forall b', List.In b' bs' ->
+           b = b' \/ List.In b bs) ->
     covers (necons b bs) (necons b bs').
 
 Inductive covered : disk -> disk -> Prop :=
@@ -28,7 +32,7 @@ Definition flush (d:disk) : disk.
   refine {| size := size d;
             diskMem := fun a =>
                          match d a with
-                         | Some bs => Some (keep1 bs)
+                         | Some bs => Some (keepFirst bs)
                          | None => None
                          end; |}.
   apply sized_domain_pointwise.
@@ -37,6 +41,24 @@ Defined.
 
 Theorem flush_size_eq : forall d,
     size (flush d) = size d.
+Proof.
+  auto.
+Qed.
+
+(* discard write buffers (wipe in-memory state) *)
+Definition oldest (d:disk) : disk.
+  refine {| size := size d;
+            diskMem := fun a =>
+                         match d a with
+                         | Some bs => Some (keepLast bs)
+                         | None => None
+                         end; |}.
+  apply sized_domain_pointwise.
+  apply diskMem_domain.
+Defined.
+
+Theorem oldest_size_eq : forall d,
+    size (oldest d) = size d.
 Proof.
   auto.
 Qed.

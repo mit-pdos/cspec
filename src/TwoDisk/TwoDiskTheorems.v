@@ -29,7 +29,7 @@ Implicit Type (state:TD.State).
 Theorem maybe_holds_stable : forall state state' F0 F1,
     TD.disk0 state |= F0 ->
     TD.disk1 state |= F1 ->
-    TD.bg_step state state' ->
+    TD.bg_failure state state' ->
     TD.disk0 state' |= F0 /\
     TD.disk1 state' |= F1.
 Proof.
@@ -43,7 +43,7 @@ Ltac cleanup :=
          | |- _ /\ _ => split; [ solve [ eauto || congruence ] | ]
          | |- _ /\ _ => split; [ | solve [ eauto || congruence ] ]
          | [ H: Working _ = Working _ |- _ ] => inversion H; subst; clear H
-         | [ H: TD.bg_step _ _ |- _ ] =>
+         | [ H: TD.bg_failure _ _ |- _ ] =>
            eapply maybe_holds_stable in H;
            [ | solve [ eauto ] | solve [ eauto ] ]; destruct_ands
          | [ H: _ |= eq _, H': _ = Some _ |- _ ] =>

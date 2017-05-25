@@ -18,5 +18,8 @@ Definition prepend T (a:T) (l:nonempty T) : nonempty T :=
   let (x, xs) := l in
   necons a (x::xs).
 
-Definition keep1 T (l:nonempty T) : nonempty T :=
-  let (x, _) := l in necons x nil.
+Definition keepFirst T (l:nonempty T) : nonempty T :=
+  necons (head l) nil.
+
+Definition keepLast T (l:nonempty T) : nonempty T :=
+  necons (last l) nil.

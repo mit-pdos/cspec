@@ -56,17 +56,35 @@ Module TD.
       | d1 => Disks (disk0 state) (Some d) proof
       end.
 
-    Inductive bg_step {diskT} : State diskT -> State diskT -> Prop :=
-    | step_id : forall state, bg_step state state
+    Inductive bg_failure {diskT} : State diskT -> State diskT -> Prop :=
+    | step_id : forall state, bg_failure state state
     | step_fail0 : forall d_0 d_1 pf,
-        bg_step (Disks (Some d_0) (Some d_1) pf)
-                (Disks None (Some d_1) proof)
+        bg_failure (Disks (Some d_0) (Some d_1) pf)
+                   (Disks None (Some d_1) proof)
     | step_fail1 : forall d_0 d_1 pf,
-        bg_step (Disks (Some d_0) (Some d_1) pf)
-                (Disks (Some d_0) None proof).
+        bg_failure (Disks (Some d_0) (Some d_1) pf)
+                   (Disks (Some d_0) None proof).
+
+    (* apply a relation to the disks that are present *)
+    Inductive disks_rel {diskT} {rel: diskT -> diskT -> Prop} :
+      State diskT -> State diskT -> Prop :=
+    | both_disks_rel : forall d_0 d_1 d_0' d_1' pf,
+        rel d_0 d_0' ->
+        rel d_1 d_1' ->
+        disks_rel (Disks (Some d_0) (Some d_1) pf)
+                  (Disks (Some d_0') (Some d_1') proof)
+    | disk0_rel : forall d_0 d_0' pf,
+        rel d_0 d_0' ->
+        disks_rel (Disks (Some d_0) None pf)
+                  (Disks (Some d_0') None proof)
+    | disk1_rel : forall d_1 d_1' pf,
+        rel d_1 d_1' ->
+        disks_rel (Disks None (Some d_1) pf)
+                  (Disks None (Some d_1') proof).
 
   End TwoDiskState.
 
   Arguments Disks {diskT} disk0 disk1 some_disk_works.
+  Arguments disks_rel {diskT} rel state state'.
 
 End TD.
