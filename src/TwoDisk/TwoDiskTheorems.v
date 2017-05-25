@@ -2,6 +2,7 @@ Require Import Automation.
 Require Import MaybeHolds.
 
 Require Import Refinement.ProgLang.Hoare.
+Require Import Disk.SimpleDisk.
 Require Import TwoDisk.TwoDiskAPI.
 
 Require Import Refinement.Interface.

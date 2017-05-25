@@ -1,6 +1,7 @@
 Require Import Prog.
 Require Import Automation.
 
+Require Import Disk.SimpleDisk.
 Require Export TwoDisk.TwoDiskDefs.
 Require Import Refinement.Interface.
 

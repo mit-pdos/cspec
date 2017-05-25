@@ -1,4 +1,6 @@
-Require Export Disk.SimpleDisk.
+Require Export Disk.Sectors.
+
+Set Implicit Arguments.
 
 Inductive diskId := d0 | d1.
 
