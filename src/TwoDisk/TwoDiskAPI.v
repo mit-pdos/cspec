@@ -91,7 +91,10 @@ Module TD.
       end ->
       op_step (DiskSize i) state r state.
 
-  Definition API := background_step bg_step (@op_step).
+  Definition wipe (state:State) := state.
+
+  Definition API : InterfaceAPI Op State :=
+    background_step bg_step (@op_step) wipe.
 
   Ltac inv_step :=
     match goal with

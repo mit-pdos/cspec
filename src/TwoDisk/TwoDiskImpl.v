@@ -1,3 +1,4 @@
+Require Import Automation.
 Require Import Disk.
 
 Require Import TwoDisk.TwoDiskAPI.
@@ -30,6 +31,20 @@ Module TD.
 
   Axiom init_ok : init_invariant (init_impl impl) (recover_impl impl) refinement.
 
+  Axiom td_wipe_world_abstraction : forall w,
+      abstraction refinement (world_crash w) = abstraction refinement w.
+
+  Theorem td_crash_ok : crash_effect_valid refinement TD.wipe.
+  Proof.
+    constructor; simpl; unfold TD.wipe;
+      eauto using td_wipe_world_abstraction.
+  Qed.
+
+  Axiom invariant_under_crashes : forall w, invariant refinement w ->
+                                       invariant refinement (world_crash w).
+
+  Hint Resolve invariant_under_crashes.
+
   Definition td : Interface TD.API.
     unshelve econstructor.
     - exact impl.
@@ -38,8 +53,17 @@ Module TD.
     - unfold rec_noop; simpl; intros.
       unfold prog_spec; simpl; intros.
       inv_rexec; inv_ret; eauto.
-      induction H3; inv_exec; eauto.
+      remember (world_crash w').
+      generalize dependent w'.
+      induction H3; intros; inv_exec.
+      rewrite ?(wipe_world_abstraction td_crash_ok) in *;
+        unfold TD.wipe; eauto.
+      specialize (IHexec_recover (world_crash w'0)).
+      rewrite ?(wipe_world_abstraction td_crash_ok) in *;
+        unfold TD.wipe in *.
+      safe_intuition eauto.
     - apply init_ok.
+    - apply td_crash_ok.
   Defined.
 
 End TD.

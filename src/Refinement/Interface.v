@@ -24,13 +24,17 @@ The type [State] gives the abstract state of the API; the semantics of each
 operation will be defined in terms of how state of this type is manipulated.
  *)
 Record InterfaceAPI (opT: Type -> Type) (State:Type) :=
-  { op_sem: forall T, opT T -> Semantics State T; }.
+  { op_sem: forall T, opT T -> Semantics State T;
+    crash_effect: State -> State; }.
 
 Definition background_step {opT State} (bg_step: State -> State -> Prop)
-           (step: forall `(op: opT T), Semantics State T) :=
+           (step: forall `(op: opT T), Semantics State T)
+           (* TODO: decide if this is a good cute name for a crash effect *)
+           (wipe: State -> State) :=
   {| op_sem := fun T (op: opT T) state v state'' =>
                  exists state', bg_step state state' /\
-                       step op state' v state''; |}.
+                       step op state' v state'';
+     crash_effect := wipe |}.
 
 (* The specification for each operation. Note that after recovery, the abstract
 state is expected to be atomic. *)
@@ -43,8 +47,9 @@ Definition op_spec opT `(api: InterfaceAPI opT State) `(op: opT T) : Specificati
       recover :=
         fun r state' =>
           r = tt /\
-          (state' = state \/
-           exists v, op_sem api op state v state');
+          (state' = crash_effect api state \/
+           exists state1 v, op_sem api op state v state1 /\
+                       state' = crash_effect api state1);
     |}.
 
 Inductive InitResult := Initialized | InitFailed.
@@ -74,6 +79,11 @@ Definition init_invariant
             fun _ w' => True;
        |}) init rec (IdRefinement world).
 
+Record crash_effect_valid `(rf: Refinement State) (wipe: State -> State) :=
+  { wipe_world_abstraction: forall w, abstraction rf (world_crash w) =
+                                 wipe (abstraction rf w);
+    wipe_idempotent: forall state, wipe (wipe state) = wipe state; }.
+
 (* Finally, an Interface ties everything together: the parameter [api] specifies all details of how the implementation behaves, while the fields give an implementation and a refinement proof.
 
 Of note is that in addition to every method being correct ([impl_ok]), the
@@ -94,7 +104,9 @@ Record Interface opT State (api: InterfaceAPI opT State) :=
     init_ok:
       init_invariant
         (init_impl interface_impl) (recover_impl interface_impl)
-        refinement; }.
+        refinement;
+    crash_effect_ok:
+      crash_effect_valid refinement (crash_effect api); }.
 
 (* Helper function to get the implementation of a primitive operation from an
 [Interface]. *)
@@ -118,10 +130,10 @@ Theorem prim_spec : forall opT `(api: InterfaceAPI opT State)
             forall v state', op_sem api op state v state' ->
                     post (spec a state) v state') ->
     (forall a state, pre (spec a state) ->
-            recover (spec a state) tt state) ->
+            recover (spec a state) tt (crash_effect api state)) ->
     (forall a state, pre (spec a state) ->
             forall v state', post (spec a state) v state' ->
-                    recover (spec a state) tt state') ->
+                    recover (spec a state) tt (crash_effect api state')) ->
     prog_spec spec (Prim i op) (recover_impl (interface_impl i)) (refinement i).
 Proof.
   intros.
@@ -211,4 +223,18 @@ Proof.
     subst.
     inv_rexec; inv_exec.
     congruence.
+Qed.
+
+Theorem crash_effect_compose : forall `(rf1: Refinement State1)
+                                 `(rf2: LRefinement State1 State2)
+                                 (wipe1: State1 -> State1)
+                                 (wipe2: State2 -> State2),
+    crash_effect_valid rf1 wipe1 ->
+    (forall state, abstraction rf2 (wipe1 state) = wipe2 (abstraction rf2 state)) ->
+    (forall state, wipe2 (wipe2 state) = wipe2 state) ->
+    crash_effect_valid (refinement_compose rf1 rf2) wipe2.
+Proof.
+  intros.
+  constructor; simpl; intros; eauto.
+  rewrite (wipe_world_abstraction H); eauto.
 Qed.
