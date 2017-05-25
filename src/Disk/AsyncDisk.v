@@ -23,6 +23,14 @@ Inductive covers : blockset -> blockset -> Prop :=
            b' = b \/ List.In b' bs) ->
     covers (necons b bs) (necons b bs').
 
+Lemma covers_latest_eq : forall bs bs',
+    covers bs bs' ->
+    latest bs = latest bs'.
+Proof.
+  destruct bs, bs'; simpl; intros.
+  inversion H; eauto.
+Qed.
+
 Instance covers_preorder : PreOrder covers.
 Proof.
   econstructor; hnf; intros.

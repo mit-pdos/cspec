@@ -65,4 +65,10 @@ Module TD.
       safe_intuition
     end.
 
+  Ltac inv_failure :=
+    match goal with
+    | [ H: bg_failure _ _ |- _ ] =>
+      inversion H; subst; clear H
+    end.
+
 End TD.
