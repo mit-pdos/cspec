@@ -1,7 +1,7 @@
 Require Import Omega.
 
 Require Import Automation.
-Require Import Disk.
+Require Import Disk.SimpleDisk.
 
 Require Import Refinement.Interface.
 Require Import Refinement.ProgLang.Prog.

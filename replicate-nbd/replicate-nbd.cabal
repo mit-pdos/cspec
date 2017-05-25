@@ -27,7 +27,7 @@ library
                      , Bytes
                      , Datatypes
                      , Def
-                     , Disk
+                     , SimpleDisk
                      , DiskSize
                      , EquivDec
                      , GenericDisk

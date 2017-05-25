@@ -1,4 +1,4 @@
-Require Import Disk.
+Require Import Disk.SimpleDisk.
 Require Import Bytes.
 
 Parameter Handle:Type.

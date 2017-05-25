@@ -1,5 +1,5 @@
 Require Import Prog.
-Require Import Disk.
+Require Import Disk.SimpleDisk.
 
 Require Export SeqDisk.SeqDiskDefs.
 Require Import Refinement.Interface.

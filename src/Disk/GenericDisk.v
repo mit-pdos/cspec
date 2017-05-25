@@ -1,6 +1,6 @@
 Require Import Automation.
 
-Require Export Sectors.
+Require Export Disk.Sectors.
 Require Export SepLogic.Mem.
 
 Record diskOf T :=

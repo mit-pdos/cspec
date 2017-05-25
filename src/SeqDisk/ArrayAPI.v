@@ -1,5 +1,5 @@
 Require Import Bytes.
-Require Import Disk.
+Require Import Disk.SimpleDisk.
 
 Require Import SeqDisk.SeqDiskAPI.
 Require Import Refinement.ProgLang.

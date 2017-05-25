@@ -1,5 +1,5 @@
 Require Import Automation.
-Require Import Disk.
+Require Import Disk.SimpleDisk.
 
 Require Import TwoDisk.TwoDiskAPI.
 Require Import TwoDisk.TwoDiskOps.

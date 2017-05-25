@@ -1,4 +1,4 @@
-Require Export Disk.
+Require Export Disk.SimpleDisk.
 
 Inductive diskId := d0 | d1.
 
