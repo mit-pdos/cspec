@@ -30,6 +30,7 @@ library
                      , Disk
                      , DiskSize
                      , EquivDec
+                     , GenericDisk
                      , Hoare
                      , Init
                      , Interface
@@ -37,6 +38,7 @@ library
                      , Prog
                      , ReadWrite
                      , Recovery
+                     , Sectors
                      , SeqDiskAPI
                      , SeqDiskDefs
                      , Server

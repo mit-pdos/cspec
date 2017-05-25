@@ -73,7 +73,7 @@ Section ReplicatedDiskRecovery.
       contradiction.
     Qed.
 
-    Lemma disks_eq_inbounds : forall d a v v',
+    Lemma disks_eq_inbounds : forall T (d: diskOf T) a v v',
         a < size d ->
         d a |= eq v ->
         d a |= eq v' ->

@@ -4,8 +4,8 @@ module Replication.TwoDiskOps where
 import                   Control.Monad (void)
 import                   Control.Monad.Reader (reader, liftIO)
 import qualified         Data.ByteString as BS
-import                   Disk
 import                   Replication.TwoDiskEnvironment
+import                   Sectors
 import                   System.IO (SeekMode(..))
 import "unix-bytestring" System.Posix.IO.ByteString
 import                   System.Posix.Types (Fd)

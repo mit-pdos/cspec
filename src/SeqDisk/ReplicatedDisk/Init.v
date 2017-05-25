@@ -106,9 +106,13 @@ Section Init.
       step.
       destruct r; finish.
       + step.
-        destruct r; finish.
+        destruct r; simplify; finish.
+        (* TODO: why does the hint not trigger here? *)
+        descend; intuition eauto using equal_after_diskUpd.
       + step.
         destruct r; finish.
+        descend; intuition eauto using equal_after_diskUpd.
+        descend; intuition eauto using equal_after_diskUpd.
 
         Grab Existential Variables.
         exact block0.
