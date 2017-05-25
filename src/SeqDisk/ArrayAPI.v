@@ -29,6 +29,9 @@ Section ArrayDisk.
       apply (write (off+1) _ rest).
   Defined.
 
+  Definition sync : prog unit :=
+    Prim d (D.Sync).
+
   Definition recover : prog unit :=
     irec d.
 

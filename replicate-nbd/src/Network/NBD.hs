@@ -95,7 +95,7 @@ sendExportInformation len = sourcePut $ do
     putByteString zeroes
   where
     zeroes = BS.replicate 124 0
-    flags = nbd_FLAG_HAS_FLAGS
+    flags = nbd_FLAG_HAS_FLAGS .|. nbd_FLAG_SEND_FLUSH
 
 -- parse a command from the client during the transmission phase
 getCommand :: (MonadThrow m, MonadIO m) => ByteConduit m Request
@@ -117,6 +117,7 @@ getCommand = do
             return $ Write handle
               (offset `div` blocksize)
               (len `div` blocksize) dat
+        | typ == nbd_CMD_FLUSH = return $ NbdData.Flush handle
         | typ == nbd_CMD_DISC = return Disconnect
         | otherwise = return $ UnknownOp handle in
     command
@@ -144,6 +145,7 @@ handleCommands doLog e = handle
       case cmd of
         Read _ off len -> debug $ "read at " ++ show (off*blocksize) ++ " of length " ++ show (len*blocksize)
         Write _ off len _ -> debug $ "write at " ++ show (off*blocksize) ++ " of length " ++ show (len*blocksize)
+        NbdData.Flush _ -> debug "flush"
         Disconnect -> debug "disconnect command"
         UnknownOp _ -> debug "unknown command"
       r <- liftIO $ do

@@ -32,6 +32,13 @@ CoFixpoint handle : prog unit :=
              error := ESuccess;
              data := bnull |};
         handle
+    | Flush h =>
+      _ <- sync d;
+        _ <- sendResponse
+          {| rhandle := h;
+             error := ESuccess;
+             data := bnull |};
+        handle
     | UnknownOp h =>
       _ <- sendResponse
         {| rhandle := h;
