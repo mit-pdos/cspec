@@ -47,8 +47,7 @@ Module TD.
       end ->
       op_step (DiskSize i) state r state.
 
-  (* TODO: fill in the crash effect *)
-  Definition wipe state := state.
+  Definition wipe state := disks_map oldest state.
 
   Definition API : InterfaceAPI Op State :=
     {| op_sem := post_step (pre_step bg_failure (@op_step))

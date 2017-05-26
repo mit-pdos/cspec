@@ -82,6 +82,14 @@ Module TD.
         disks_rel (Disks None (Some d_1) pf)
                   (Disks None (Some d_1') proof).
 
+    Definition disks_map {diskT} (f: diskT -> diskT) (state: State diskT) : State diskT :=
+      match state with
+      | Disks (Some d_0) (Some d_1) pf => Disks (Some (f d_0)) (Some (f d_1)) proof
+      | Disks (Some d_0) None pf => Disks (Some (f d_0)) None proof
+      | Disks None (Some d_1) pf => Disks None (Some (f d_1)) proof
+      | _ => state
+      end.
+
   End TwoDiskState.
 
   Arguments Disks {diskT} disk0 disk1 some_disk_works.

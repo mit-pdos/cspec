@@ -133,6 +133,35 @@ Proof.
 Qed.
 
 Hint Resolve covered_none.
+Hint Resolve then_oldest_oldest.
+
+Theorem disk0_wipe_oldest : forall state F,
+    TD.disk0 state |= F ->
+    TD.disk0 (TD.wipe state) |= then_oldest F.
+Proof.
+  intros.
+  destruct state; simpl in *.
+  destruct matches; simpl in *; eauto.
+Qed.
+
+Theorem disk1_wipe_oldest : forall state F,
+    TD.disk1 state |= F ->
+    TD.disk1 (TD.wipe state) |= then_oldest F.
+Proof.
+  intros.
+  destruct state; simpl in *.
+  destruct matches; simpl in *; eauto.
+Qed.
+
+Theorem Stable_subrelation : forall A (rel rel': A -> A -> Prop) (P: A -> Prop),
+    (forall a a', rel a a' -> rel' a a') ->
+    Stable P rel' ->
+    Stable P rel.
+Proof.
+  firstorder.
+Qed.
+
+Hint Resolve disk0_wipe_oldest disk1_wipe_oldest.
 
 Theorem TDRead0_ok : forall (i: Interface TD.API) a,
     prog_spec
@@ -151,8 +180,8 @@ Theorem TDRead0_ok : forall (i: Interface TD.API) a,
                           TD.disk1 state' |= F
                end;
            recover :=
-             fun _ state' => TD.disk0 state' |= covered d_0 /\
-                      TD.disk1 state' |= F;
+             fun _ state' => TD.disk0 state' |= then_oldest (covered d_0) /\
+                      TD.disk1 state' |= then_oldest F;
          |})
       (Prim i (TD.Read d0 a))
       (irec i)
@@ -184,8 +213,8 @@ Theorem TDRead1_ok : forall (i: Interface TD.API) a,
                           TD.disk1 state' |= missing
                end;
            recover :=
-             fun _ state' => TD.disk0 state' |= F /\
-                      TD.disk1 state' |= covered d_1;
+             fun _ state' => TD.disk0 state' |= then_oldest F /\
+                      TD.disk1 state' |= then_oldest (covered d_1);
          |})
       (Prim i (TD.Read d1 a))
       (irec i)
@@ -261,9 +290,10 @@ Theorem TDWrite0_ok : forall (i: Interface TD.API) a b,
                end;
            recover :=
              fun _ state' =>
-               (TD.disk0 state' |= covered d_0 \/
-                a < size d_0 /\ TD.disk0 state' |= covered (diskUpdF d_0 a (buffer b))) /\
-               TD.disk1 state' |= F;
+               (TD.disk0 state' |= then_oldest (covered d_0) \/
+                a < size d_0 /\
+                TD.disk0 state' |= then_oldest (covered (diskUpdF d_0 a (buffer b)))) /\
+               TD.disk1 state' |= then_oldest F;
          |})
       (Prim i (TD.Write d0 a b))
       (irec i)
@@ -297,9 +327,10 @@ Theorem TDWrite1_ok : forall (i: Interface TD.API) a b,
                end;
            recover :=
              fun _ state' =>
-               TD.disk0 state' |= F /\
-               (TD.disk1 state' |= covered d_1 \/
-                a < size d_1 /\ TD.disk1 state' |= covered (diskUpdF d_1 a (buffer b)));
+               TD.disk0 state' |= then_oldest F /\
+               (TD.disk1 state' |= then_oldest (covered d_1) \/
+                a < size d_1 /\
+                TD.disk1 state' |= then_oldest (covered (diskUpdF d_1 a (buffer b))));
          |})
       (Prim i (TD.Write d1 a b))
       (irec i)
@@ -344,8 +375,8 @@ Theorem TDDiskSize0_ok : forall (i: Interface TD.API),
                end;
            recover :=
              fun _ state' =>
-               TD.disk0 state' |= covered d_0 /\
-               TD.disk1 state' |= F;
+               TD.disk0 state' |= then_oldest (covered d_0) /\
+               TD.disk1 state' |= then_oldest F;
          |})
       (Prim i (TD.DiskSize d0))
       (irec i)
@@ -375,8 +406,8 @@ Theorem TDDiskSize1_ok : forall (i: Interface TD.API),
                end;
            recover :=
              fun _ state' =>
-               TD.disk0 state' |= F /\
-               TD.disk1 state' |= covered d_1;
+               TD.disk0 state' |= then_oldest F /\
+               TD.disk1 state' |= then_oldest (covered d_1);
          |})
       (Prim i (TD.DiskSize d1))
       (irec i)
@@ -410,6 +441,17 @@ Qed.
 
 Hint Resolve stable_then_flush_pflushed.
 
+Theorem then_oldest_then_flush : forall F d,
+    then_oldest (then_flush F) d ->
+    then_flush F d.
+Proof.
+  unfold then_oldest, then_flush; intros; repeat deex.
+  exists d1; intuition.
+  eauto using covered_flush_oldest.
+Qed.
+
+Hint Resolve then_oldest_then_flush.
+
 Theorem TDSync0_ok : forall (i: Interface TD.API),
     prog_spec
       (fun '(F0, F1) state =>
@@ -423,10 +465,10 @@ Theorem TDSync0_ok : forall (i: Interface TD.API),
                TD.disk1 state' |= F1;
            recover :=
              fun _ state' =>
-               (TD.disk0 state' |= F0 /\
-                TD.disk1 state' |= F1) \/
+               (TD.disk0 state' |= then_oldest F0 /\
+                TD.disk1 state' |= then_oldest F1) \/
                (TD.disk0 state' |= then_flush F0 /\
-                TD.disk1 state' |= F1);
+                TD.disk1 state' |= then_oldest F1);
          |})
       (Prim i (TD.Sync d0))
       (irec i)
@@ -436,6 +478,8 @@ Proof.
   destruct matches in *; cleanup.
   eapply disks_rel_stable' in H1; (safe_intuition eauto); cleanup.
   eapply disks_rel_stable' in H1; (safe_intuition eauto); cleanup.
+  right; intuition.
+  eapply pred_weaken; eauto.
 Qed.
 
 Theorem TDSync1_ok : forall (i: Interface TD.API),
@@ -451,9 +495,9 @@ Theorem TDSync1_ok : forall (i: Interface TD.API),
                TD.disk1 state' |= then_flush F1;
            recover :=
              fun _ state' =>
-               (TD.disk0 state' |= F0 /\
-                TD.disk1 state' |= F1) \/
-               (TD.disk0 state' |= F0 /\
+               (TD.disk0 state' |= then_oldest F0 /\
+                TD.disk1 state' |= then_oldest F1) \/
+               (TD.disk0 state' |= then_oldest F0 /\
                 TD.disk1 state' |= then_flush F1);
          |})
       (Prim i (TD.Sync d1))
@@ -464,6 +508,8 @@ Proof.
   destruct matches in *; cleanup.
   eapply disks_rel_stable' in H1; (safe_intuition eauto); cleanup.
   eapply disks_rel_stable' in H1; (safe_intuition eauto); cleanup.
+  right; intuition.
+  eapply pred_weaken; eauto.
 Qed.
 
 Hint Resolve
