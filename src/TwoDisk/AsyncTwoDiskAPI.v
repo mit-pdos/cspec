@@ -27,10 +27,7 @@ Module TD.
       op_step (Read i a) state r state
   | step_write : forall a i b state r state',
       match get_disk i state with
-      | Some d => match d a with
-                 | Some bs0 => state' = set_disk i state (diskUpd d a (buffer b bs0))
-                 | None => state' = state
-                 end /\
+      | Some d => state' = set_disk i state (diskUpdF d a (buffer b)) /\
                  r = Working tt
       | None => r = Failed /\ state' = state
       end ->

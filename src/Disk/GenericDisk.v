@@ -144,6 +144,52 @@ Section GenericDisks.
     rewrite diskUpd_neq; auto.
   Qed.
 
+  Definition diskUpdF d (a: addr) (f: T -> T) : diskOf T.
+  Proof.
+    destruct (lt_dec a (size d)).
+    - destruct (d a).
+      refine (mkDisk (size d) (upd d a (f t)) _).
+      apply sized_domain_upd_lt; auto.
+      exact (diskMem_domain d).
+      exact d. (* impossible, a is in bounds *)
+    - exact d.
+  Defined.
+
+  Theorem diskUpdF_size_eq : forall d a f,
+      size (diskUpdF d a f) = size d.
+  Proof.
+    unfold diskUpdF; intros.
+    destruct matches; auto.
+  Qed.
+
+  Theorem diskUpdF_neq : forall d a f a',
+      a <> a' ->
+      diskUpdF d a f a' = d a'.
+  Proof.
+    unfold diskUpdF; intros.
+    destruct matches; simpl; eauto.
+    autorewrite with upd; auto.
+  Qed.
+
+  Theorem diskUpdF_oob : forall d a f,
+      ~a < size d ->
+      diskUpdF d a f = d.
+  Proof.
+    unfold diskUpdF; intros.
+    destruct matches; simpl; eauto.
+  Qed.
+
+  Theorem diskUpdF_inbounds : forall d a f,
+      a < size d ->
+      exists v, d a = Some v /\
+           diskUpdF d a f a = Some (f v).
+  Proof.
+    unfold diskUpdF; intros.
+    pose proof (diskMem_domain d a).
+    destruct matches; simpl; autorewrite with upd; eauto.
+    repeat deex; unfold disk_get in *; congruence.
+  Qed.
+
   (* disks are actually equal when their memories are equal; besides being useful
  in practice, this to some extent justifies the diskMem coercion, since disks
  are uniquely determined by their memories, subject to the sized_domain
@@ -189,6 +235,10 @@ Hint Rewrite diskUpd_oob_eq using (solve [ auto ]) : upd.
 Hint Rewrite diskUpd_size : upd.
 Hint Rewrite diskUpd_neq using (solve [ auto ]) : upd.
 Hint Rewrite diskUpd_none using (solve [ auto ]) : upd.
+
+Hint Rewrite diskUpdF_size_eq : upd.
+Hint Rewrite diskUpdF_oob using (solve [ auto ]) : upd.
+Hint Rewrite diskUpdF_neq using (solve [ auto ]) : upd.
 
 Hint Rewrite diskUpd_same using (solve [ auto ]) : upd.
 Hint Rewrite diskUpd_oob_noop using (solve [ auto ]) : upd.

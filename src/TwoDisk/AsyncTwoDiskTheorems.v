@@ -199,3 +199,119 @@ Proof.
   clear H5.
   eapply disks_rel_stable' in H1; (safe_intuition eauto); cleanup.
 Qed.
+
+(* TODO: move proofs somewhere more appropriate *)
+
+Lemma covers_buffer : forall b bs bs',
+    covers bs bs' ->
+    covers (buffer b bs) (buffer b bs').
+Proof.
+  intros.
+  inversion H; subst; simpl in *.
+  econstructor; intros; eauto.
+  simpl in *; intuition eauto.
+  eapply H0 in H2; intuition eauto.
+Qed.
+
+Hint Resolve covers_buffer.
+
+Lemma covered_diskUpd_buffer : forall d d' a b,
+    covered d d' ->
+    covered (diskUpdF d a (buffer b)) (diskUpdF d' a (buffer b)).
+Proof.
+  intros.
+  destruct H.
+  econstructor; intros; eauto.
+  autorewrite with upd; auto.
+  is_eq a a0; autorewrite with upd in *; eauto.
+  rename a0 into a.
+  destruct (lt_dec a (size d)).
+  - pose proof (@diskUpdF_inbounds _ d a (buffer b) ltac:(auto));
+      repeat deex.
+    assert (a < size d') by congruence.
+    pose proof (@diskUpdF_inbounds _ d' a (buffer b) ltac:(auto));
+      repeat deex.
+    pose proof (covers_pointwise _ _ _ ltac:(eauto) ltac:(eauto)).
+    repeat match goal with
+           | [ H: ?a = Some _,
+                  H': ?a = Some _ |- _ ] =>
+             rewrite H in H'; inversion H'; subst
+           end.
+    eauto.
+  - autorewrite with upd in *.
+    congruence.
+Qed.
+
+Hint Resolve covered_diskUpd_buffer.
+
+Theorem TDWrite0_ok : forall (i: Interface TD.API) a b,
+    prog_spec
+      (fun '(d_0, F) state =>
+         {|
+           pre := TD.disk0 state |= covered d_0 /\
+                  TD.disk1 state |= F /\
+                  Stable F pflushed;
+           post :=
+             fun r state' =>
+               match r with
+               | Working _ => TD.disk0 state' |= covered (diskUpdF d_0 a (buffer b)) /\
+                             TD.disk1 state' |= F
+               | Failed => TD.disk0 state' |= missing /\
+                          TD.disk1 state' |= F
+               end;
+           recover :=
+             fun _ state' =>
+               (TD.disk0 state' |= covered d_0 \/
+                a < size d_0 /\ TD.disk0 state' |= covered (diskUpdF d_0 a (buffer b))) /\
+               TD.disk1 state' |= F;
+         |})
+      (Prim i (TD.Write d0 a b))
+      (irec i)
+      (refinement i).
+Proof.
+  prim.
+  destruct matches in *; cleanup.
+  eapply disks_rel_stable' in H1; (safe_intuition eauto); cleanup.
+  eapply disks_rel_stable' in H1; (safe_intuition eauto); cleanup.
+
+  destruct matches in *; cleanup.
+  destruct (lt_dec a (size d_0));
+    autorewrite with upd in *;
+    eauto.
+Qed.
+
+Theorem TDWrite1_ok : forall (i: Interface TD.API) a b,
+    prog_spec
+      (fun '(F, d_1) state =>
+         {|
+           pre := TD.disk0 state |= F /\
+                  TD.disk1 state |= covered d_1 /\
+                  Stable F pflushed;
+           post :=
+             fun r state' =>
+               match r with
+               | Working _ => TD.disk0 state' |= F /\
+                             TD.disk1 state' |= covered (diskUpdF d_1 a (buffer b))
+               | Failed => TD.disk0 state' |= F /\
+                          TD.disk1 state' |= missing
+               end;
+           recover :=
+             fun _ state' =>
+               TD.disk0 state' |= F /\
+               (TD.disk1 state' |= covered d_1 \/
+                a < size d_1 /\ TD.disk1 state' |= covered (diskUpdF d_1 a (buffer b)));
+         |})
+      (Prim i (TD.Write d1 a b))
+      (irec i)
+      (refinement i).
+Proof.
+  prim.
+  destruct matches in *; cleanup.
+  eapply disks_rel_stable' in H1; (safe_intuition eauto); cleanup.
+  eapply disks_rel_stable' in H1; (safe_intuition eauto); cleanup.
+
+  destruct matches in *; cleanup.
+  destruct (lt_dec a (size d_1));
+    autorewrite with upd in *;
+    eauto.
+Qed.
