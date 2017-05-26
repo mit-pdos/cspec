@@ -87,6 +87,23 @@ Proof.
   auto.
 Qed.
 
+(* flush applied to a predicate
+
+TODO: better explanation, possibly change name
+ *)
+Definition then_flush (P: disk -> Prop) : disk -> Prop :=
+  fun d' => exists d, P d /\ covered (flush d) d'.
+
+Lemma then_flush_flush : forall (F: disk -> Prop) d,
+    F d ->
+    then_flush F (flush d).
+Proof.
+  unfold then_flush; intros.
+  exists d; intuition.
+Qed.
+
+Hint Resolve then_flush_flush.
+
 (* discard write buffers (wipe in-memory state) *)
 Definition oldest (d:disk) : disk.
   refine {| size := size d;
@@ -136,4 +153,49 @@ Proof.
 
   assert (~a < size d') by congruence.
   autorewrite with upd; auto.
+Qed.
+
+Instance pflushed_preorder : PreOrder pflushed.
+Proof.
+  econstructor; hnf; intros.
+  - eapply pflushed_indomain; intros; eauto.
+    destruct matches; eauto.
+    reflexivity.
+  - inversion_clear H.
+    inversion_clear H0.
+    eapply pflushed_indomain; intros; eauto.
+    congruence.
+    specialize (H2 a).
+    specialize (H3 a).
+    destruct matches in *; try contradiction.
+    etransitivity; eauto.
+Qed.
+
+Theorem pflushed_is_covered : forall d d',
+    pflushed d d' ->
+    covered d d'.
+Proof.
+  intros.
+  inversion_clear H.
+  econstructor; intros; eauto.
+  specialize (H1 a); repeat simpl_match; eauto.
+Qed.
+
+Lemma covers_keepFirst : forall bs,
+    covers bs (keepFirst bs).
+Proof.
+  intros.
+  destruct bs; unfold keepFirst; simpl.
+  econstructor; simpl; contradiction.
+Qed.
+
+Theorem flush_is_pflushed : forall d d',
+    d' = flush d ->
+    pflushed d d'.
+Proof.
+  intros; subst.
+  eapply pflushed_indomain; intros; eauto.
+  simpl.
+  destruct matches.
+  apply covers_keepFirst.
 Qed.

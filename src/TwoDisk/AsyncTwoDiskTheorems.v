@@ -387,3 +387,91 @@ Proof.
   eapply disks_rel_stable' in H1; (safe_intuition eauto); cleanup.
   eapply disks_rel_stable' in H1; (safe_intuition eauto); cleanup.
 Qed.
+
+Lemma maybe_holds_then_flush : forall F md d,
+    md |= F ->
+    md = Some d ->
+    then_flush F (flush d).
+Proof.
+  intros; subst; simpl in *.
+  eauto.
+Qed.
+
+Hint Resolve maybe_holds_then_flush.
+
+Lemma stable_then_flush_pflushed : forall F,
+    Stable (then_flush F) pflushed.
+Proof.
+  unfold Stable, then_flush; intros.
+  repeat deex.
+  exists d; intuition.
+  etransitivity; eauto using pflushed_is_covered.
+Qed.
+
+Hint Resolve stable_then_flush_pflushed.
+
+Theorem TDSync0_ok : forall (i: Interface TD.API),
+    prog_spec
+      (fun '(F0, F1) state =>
+         {|
+           pre := TD.disk0 state |= F0 /\
+                  TD.disk1 state |= F1 /\
+                  Stable F1 pflushed;
+           post :=
+             fun r state' =>
+               TD.disk0 state' |= then_flush F0 /\
+               TD.disk1 state' |= F1;
+           recover :=
+             fun _ state' =>
+               (TD.disk0 state' |= F0 /\
+                TD.disk1 state' |= F1) \/
+               (TD.disk0 state' |= then_flush F0 /\
+                TD.disk1 state' |= F1);
+         |})
+      (Prim i (TD.Sync d0))
+      (irec i)
+      (refinement i).
+Proof.
+  prim.
+  destruct matches in *; cleanup.
+  eapply disks_rel_stable' in H1; (safe_intuition eauto); cleanup.
+  eapply disks_rel_stable' in H1; (safe_intuition eauto); cleanup.
+Qed.
+
+Theorem TDSync1_ok : forall (i: Interface TD.API),
+    prog_spec
+      (fun '(F0, F1) state =>
+         {|
+           pre := TD.disk0 state |= F0 /\
+                  TD.disk1 state |= F1 /\
+                  Stable F0 pflushed;
+           post :=
+             fun r state' =>
+               TD.disk0 state' |= F0 /\
+               TD.disk1 state' |= then_flush F1;
+           recover :=
+             fun _ state' =>
+               (TD.disk0 state' |= F0 /\
+                TD.disk1 state' |= F1) \/
+               (TD.disk0 state' |= F0 /\
+                TD.disk1 state' |= then_flush F1);
+         |})
+      (Prim i (TD.Sync d1))
+      (irec i)
+      (refinement i).
+Proof.
+  prim.
+  destruct matches in *; cleanup.
+  eapply disks_rel_stable' in H1; (safe_intuition eauto); cleanup.
+  eapply disks_rel_stable' in H1; (safe_intuition eauto); cleanup.
+Qed.
+
+Hint Resolve
+     TDRead0_ok
+     TDRead1_ok
+     TDWrite0_ok
+     TDWrite1_ok
+     TDDiskSize0_ok
+     TDDiskSize1_ok
+     TDSync0_ok
+     TDSync1_ok.
