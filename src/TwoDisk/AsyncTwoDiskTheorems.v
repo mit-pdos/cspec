@@ -315,3 +315,75 @@ Proof.
     autorewrite with upd in *;
     eauto.
 Qed.
+
+Lemma covered_size_eq' : forall d d',
+    covered d d' ->
+    size d' = size d.
+Proof.
+  intros.
+  symmetry; eauto using covered_size_eq.
+Qed.
+
+Hint Resolve covered_size_eq'.
+
+Theorem TDDiskSize0_ok : forall (i: Interface TD.API),
+    prog_spec
+      (fun '(d_0, F) state =>
+         {|
+           pre := TD.disk0 state |= covered d_0 /\
+                  TD.disk1 state |= F /\
+                  Stable F pflushed;
+           post :=
+             fun r state' =>
+               match r with
+               | Working n => n = size d_0 /\
+                             TD.disk0 state' |= covered d_0 /\
+                             TD.disk1 state' |= F
+               | Failed => TD.disk0 state' |= missing /\
+                          TD.disk1 state' |= F
+               end;
+           recover :=
+             fun _ state' =>
+               TD.disk0 state' |= covered d_0 /\
+               TD.disk1 state' |= F;
+         |})
+      (Prim i (TD.DiskSize d0))
+      (irec i)
+      (refinement i).
+Proof.
+  prim.
+  destruct matches in *; cleanup.
+  eapply disks_rel_stable' in H1; (safe_intuition eauto); cleanup.
+  eapply disks_rel_stable' in H1; (safe_intuition eauto); cleanup.
+Qed.
+
+Theorem TDDiskSize1_ok : forall (i: Interface TD.API),
+    prog_spec
+      (fun '(F, d_1) state =>
+         {|
+           pre := TD.disk0 state |= F /\
+                  TD.disk1 state |= covered d_1 /\
+                  Stable F pflushed;
+           post :=
+             fun r state' =>
+               match r with
+               | Working n => n = size d_1 /\
+                             TD.disk0 state' |= F /\
+                             TD.disk1 state' |= covered d_1
+               | Failed => TD.disk0 state' |= F /\
+                          TD.disk1 state' |= missing
+               end;
+           recover :=
+             fun _ state' =>
+               TD.disk0 state' |= F /\
+               TD.disk1 state' |= covered d_1;
+         |})
+      (Prim i (TD.DiskSize d1))
+      (irec i)
+      (refinement i).
+Proof.
+  prim.
+  destruct matches in *; cleanup.
+  eapply disks_rel_stable' in H1; (safe_intuition eauto); cleanup.
+  eapply disks_rel_stable' in H1; (safe_intuition eauto); cleanup.
+Qed.
