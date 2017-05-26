@@ -1,4 +1,4 @@
-Require Import Disk.
+Require Import Disk.SimpleDisk.
 Require Import Bytes.
 
 Parameter Handle:Type.
@@ -6,6 +6,7 @@ Parameter Handle:Type.
 Inductive Request :=
 | Read (h:Handle) (off:addr) (blocks:nat)
 | Write (h:Handle) (off:addr) (len:nat) (dat:bytes (len*blockbytes))
+| Flush (h:Handle)
 | Disconnect
 | UnknownOp (h:Handle).
 

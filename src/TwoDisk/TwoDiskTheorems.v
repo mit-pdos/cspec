@@ -1,8 +1,8 @@
 Require Import Automation.
 Require Import MaybeHolds.
-Require Import Disk.
 
 Require Import Refinement.ProgLang.Hoare.
+Require Import Disk.SimpleDisk.
 Require Import TwoDisk.TwoDiskAPI.
 
 Require Import Refinement.Interface.
@@ -23,10 +23,13 @@ restrictive. While we have tried to avoid doing so, we do not prove completeness
 below.
  *)
 
+(* help out type inference *)
+Implicit Type (state:TD.State).
+
 Theorem maybe_holds_stable : forall state state' F0 F1,
     TD.disk0 state |= F0 ->
     TD.disk1 state |= F1 ->
-    TD.bg_step state state' ->
+    TD.bg_failure state state' ->
     TD.disk0 state' |= F0 /\
     TD.disk1 state' |= F1.
 Proof.
@@ -40,13 +43,14 @@ Ltac cleanup :=
          | |- _ /\ _ => split; [ solve [ eauto || congruence ] | ]
          | |- _ /\ _ => split; [ | solve [ eauto || congruence ] ]
          | [ H: Working _ = Working _ |- _ ] => inversion H; subst; clear H
-         | [ H: TD.bg_step _ _ |- _ ] =>
+         | [ H: TD.bg_failure _ _ |- _ ] =>
            eapply maybe_holds_stable in H;
            [ | solve [ eauto ] | solve [ eauto ] ]; destruct_ands
          | [ H: _ |= eq _, H': _ = Some _ |- _ ] =>
                   pose proof (holds_some_inv_eq _ H' H); clear H
          | _ => deex
          | _ => destruct_tuple
+         | _ => progress unfold pre_step in *
          | _ => progress simpl in *
          | _ => progress subst
          | _ => progress safe_intuition
@@ -233,10 +237,33 @@ Proof.
   prim.
 Qed.
 
+Theorem TDSync_ok : forall (i: Interface TD.API) d_ident,
+    prog_spec
+      (fun '(F0, F1) state =>
+         {|
+           pre := TD.disk0 state |= F0 /\
+                  TD.disk1 state |= F1;
+           post :=
+             fun r state' =>
+               TD.disk0 state' |= F0 /\
+               TD.disk1 state' |= F1;
+           recover :=
+             fun _ state' =>
+               TD.disk0 state' |= F0 /\
+               TD.disk1 state' |= F1;
+         |})
+      (Prim i (TD.Sync d_ident))
+      (irec i)
+      (refinement i).
+Proof.
+  destruct d_ident; prim.
+Qed.
+
 Hint Resolve
      TDRead0_ok
      TDRead1_ok
      TDWrite0_ok
      TDWrite1_ok
      TDDiskSize0_ok
-     TDDiskSize1_ok.
+     TDDiskSize1_ok
+     TDSync_ok.

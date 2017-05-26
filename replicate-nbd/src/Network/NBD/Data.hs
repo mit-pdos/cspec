@@ -52,10 +52,11 @@ instance Enum NbdOption where
 nbd_C_OPT_MAGIC :: Word64
 nbd_C_OPT_MAGIC = 0x49484156454F5054 -- same as nbd_NEW_MAGIC
 
--- if we supported other flags (including read-only, flush), then we would want
--- to have an enum(set) for export flags
 nbd_FLAG_HAS_FLAGS :: Bits a => a
 nbd_FLAG_HAS_FLAGS = bit 0
+
+nbd_FLAG_SEND_FLUSH :: Bits a => a
+nbd_FLAG_SEND_FLUSH = bit 2
 
 -- Handle is a Word64, defined by extraction
 type ByteCount = Int
@@ -66,6 +67,19 @@ nbd_REQUEST_MAGIC = 0x25609513
 
 nbd_REPLY_MAGIC :: Word32
 nbd_REPLY_MAGIC = 0x67446698
+
+-- request constants
+nbd_CMD_READ :: Word16
+nbd_CMD_READ = 0
+
+nbd_CMD_WRITE :: Word16
+nbd_CMD_WRITE = 1
+
+nbd_CMD_DISC :: Word16
+nbd_CMD_DISC = 2
+
+nbd_CMD_FLUSH :: Word16
+nbd_CMD_FLUSH = 3
 
 errCode :: ErrorCode -> Word32
 errCode err = case err of

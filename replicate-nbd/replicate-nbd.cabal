@@ -27,9 +27,10 @@ library
                      , Bytes
                      , Datatypes
                      , Def
-                     , Disk
+                     , SimpleDisk
                      , DiskSize
                      , EquivDec
+                     , GenericDisk
                      , Hoare
                      , Init
                      , Interface
@@ -37,11 +38,16 @@ library
                      , Prog
                      , ReadWrite
                      , Recovery
+                     , Sectors
                      , SeqDiskAPI
+                     , SeqDiskDefs
                      , Server
                      , Specif
+                     , Sync
                      , TwoDiskAPI
+                     , TwoDiskDefs
                      , TwoDiskImpl
+                     , TwoDiskOps
   build-depends:       base >= 4.7 && < 5
                      , ghc-prim
                      , bytestring

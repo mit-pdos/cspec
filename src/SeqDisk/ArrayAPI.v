@@ -1,11 +1,13 @@
 Require Import Bytes.
-Require Import Disk.
+Require Import Disk.SimpleDisk.
 
 Require Import SeqDisk.SeqDiskAPI.
 Require Import Refinement.ProgLang.
 Require Import Refinement.Interface.
 
 Opaque blockbytes.
+
+(* TODO: re-use this code for asynchronous single-disk API *)
 
 Section ArrayDisk.
 
@@ -26,6 +28,9 @@ Section ArrayDisk.
       apply (Bind (Prim d (D.Write off b))); intros _.
       apply (write (off+1) _ rest).
   Defined.
+
+  Definition sync : prog unit :=
+    Prim d (D.Sync).
 
   Definition recover : prog unit :=
     irec d.

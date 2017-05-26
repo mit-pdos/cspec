@@ -11,6 +11,7 @@ Require Import NBD.NbdData.
 Axiom getRequest : prog Request.
 Axiom sendResponse : Response -> prog unit.
 
+(* TODO: re-use this code for asynchronous implementation *)
 Definition d := RD.rd TD.td.
 
 CoFixpoint handle : prog unit :=
@@ -26,6 +27,13 @@ CoFixpoint handle : prog unit :=
         handle
     | Write h off _ dat =>
       _ <- write d off _ dat;
+        _ <- sendResponse
+          {| rhandle := h;
+             error := ESuccess;
+             data := bnull |};
+        handle
+    | Flush h =>
+      _ <- sync d;
         _ <- sendResponse
           {| rhandle := h;
              error := ESuccess;

@@ -1,7 +1,7 @@
 Require Import TwoDisk.TwoDiskAPI.
 Require Import MaybeHolds.
 
-Lemma both_disks_not_missing : forall state,
+Lemma both_disks_not_missing : forall (state: TD.State),
     TD.disk0 state |= missing ->
     TD.disk1 state |= missing ->
     False.

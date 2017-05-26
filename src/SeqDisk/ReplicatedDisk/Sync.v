@@ -16,34 +16,21 @@ Section ReplicatedDisk.
 
   Variable (td:Interface TD.API).
 
-  Definition DiskSize : prog nat :=
-    msz <- Prim td (TD.DiskSize d0);
-      match msz with
-      | Working sz => Ret sz
-      | Failed => msz <- Prim td (TD.DiskSize d1);
-                   match msz with
-                   | Working sz => Ret sz
-                   | Failed => Ret 0
-                   end
-      end.
+  Definition Sync : prog unit :=
+    _ <- Prim td (TD.Sync d0);
+      _ <- Prim td (TD.Sync d1);
+      Ret tt.
 
-    Hint Resolve both_disks_not_missing : false.
-
-    Hint Resolve TDDiskSize0_ok.
-    Hint Resolve TDDiskSize1_ok.
-
-    Theorem DiskSize_ok :
+    Theorem Sync_ok :
       prog_spec
         (fun '(d_0, d_1) state =>
            {|
              pre :=
                TD.disk0 state |= eq d_0 /\
-               TD.disk1 state |= eq d_1 /\
-               size d_0 = size d_1;
+               TD.disk1 state |= eq d_1;
              post :=
                fun r state' =>
-                 r = size d_0 /\
-                 r = size d_1 /\
+                 r = tt /\
                  TD.disk0 state' |= eq d_0 /\
                  TD.disk1 state' |= eq d_1;
              recover :=
@@ -51,18 +38,17 @@ Section ReplicatedDisk.
                  TD.disk0 state' |= eq d_0 /\
                  TD.disk1 state' |= eq d_1;
            |})
-        (DiskSize)
+        (Sync)
         (irec td)
         (refinement td).
     Proof.
-      unfold DiskSize.
+      unfold Sync.
 
       step.
-
-      destruct r; step.
-      destruct r; step.
+      step.
+      step.
     Qed.
 
 End ReplicatedDisk.
 
-Hint Resolve DiskSize_ok.
+Hint Resolve Sync_ok.
