@@ -4,265 +4,168 @@ Require Export Disk.GenericDisk.
 
 (* we only import List for the [In] predicate *)
 Require List.
-Require Import Nonempty.
 Require Import Sized.
 
-Definition blockset := nonempty block.
+(* TODO: document these definitions *)
 
-Definition latest (bs:blockset) : block := head bs.
-Definition buffer (b: block) (bs:blockset) : blockset := prepend b bs.
+Record blockstate :=
+  { cache_val: option block;
+    durable_val: block; }.
 
-(* TODO: we may want to use only (current value, on-platter value) for the
-representation, and use disksets or diskset-like things only for predicates *)
+Definition disk := diskOf blockstate.
 
-Definition disk := diskOf blockset.
+Record blockhist :=
+  { current_val: block;
+    (* the durable value could be current_val or one of the following *)
+    durable_vals: list block; }.
 
-Inductive covers : blockset -> blockset -> Prop :=
-| is_cover : forall b bs bs',
-    (forall b', List.In b' bs' ->
-           b' = b \/ List.In b' bs) ->
-    covers (necons b bs) (necons b bs').
+(* a spec-only disk giving the possible durable states of each address *)
+Definition histdisk := diskOf blockhist.
 
-Lemma covers_latest_eq : forall bs bs',
-    covers bs bs' ->
-    latest bs = latest bs'.
-Proof.
-  destruct bs, bs'; simpl; intros.
-  inversion H; eauto.
-Qed.
+Class AsyncBlock B :=
+  { flushBlock: B -> B;
+    pflushBlock: B -> B -> Prop;
+    pflushBlock_preorder: PreOrder pflushBlock;
+    buffer: block -> B -> B;
+    curr_val: B -> block; }.
 
-Instance covers_preorder : PreOrder covers.
+Definition wipeBlockstate (bs: blockstate) : blockstate :=
+  {| cache_val := None;
+     durable_val := durable_val bs; |}.
+
+Inductive pflush_blockstate: blockstate -> blockstate -> Prop :=
+| pflush_blockstate_id: forall bs,
+    pflush_blockstate bs bs
+| pflush_blockstate_flush: forall bs b,
+    cache_val bs = Some b ->
+    pflush_blockstate bs {| cache_val := None;
+                            durable_val := b |}.
+
+Instance pflush_blockstate_preorder : PreOrder pflush_blockstate.
 Proof.
   econstructor; hnf; intros.
-  - destruct x.
-    eapply is_cover; intros; eauto.
+  - constructor.
+  - inversion H; subst; clear H; auto.
+    inversion H0; subst; clear H0; auto.
+    econstructor; eauto.
+    simpl in *.
+    congruence.
+Qed.
+
+Instance blockstate_async: AsyncBlock blockstate :=
+  {| flushBlock := fun bs => match cache_val bs with
+                          | Some b => {| cache_val := None;
+                                        durable_val := b |}
+                          | None => bs
+                          end;
+     pflushBlock := pflush_blockstate;
+     buffer := fun b bs => {| cache_val := Some b;
+                           durable_val := durable_val bs; |};
+     curr_val := fun bs => match cache_val bs with
+                        | Some b => b
+                        | None => durable_val bs
+                        end;
+  |}.
+
+Definition subset A (l l': list A) :=
+  forall a, List.In a l -> List.In a l'.
+
+Instance subset_preorder {A} : PreOrder (subset (A:=A)).
+Proof.
+  econstructor; hnf; intros.
+  unfold subset; intros; eauto.
+  unfold subset in *; eauto.
+Qed.
+
+Inductive pflush_blockhist: blockhist -> blockhist -> Prop :=
+| pflush_blockhist_subset: forall h h',
+    current_val h = current_val h' ->
+    subset (durable_vals h') (durable_vals h) ->
+    pflush_blockhist h h'.
+
+Instance pflush_blockhist_preorder : PreOrder pflush_blockhist.
+Proof.
+  econstructor; hnf; intros.
+  - econstructor; eauto.
+    reflexivity.
   - inversion H; subst; clear H.
     inversion H0; subst; clear H0.
-    eapply is_cover; intros.
-    specialize (H4 _ ltac:(eauto)).
-    intuition eauto.
-Qed.
-
-Record covered (d:disk) (d':disk) : Prop :=
-  is_covered
-    { covered_size_eq: size d = size d';
-      (* TODO: express this as a match, automation will be way simpler *)
-      covers_pointwise: forall a bs bs',
-          d a = Some bs ->
-          d' a = Some bs' ->
-          covers bs bs'; }.
-
-Instance covered_preorder : PreOrder covered.
-Proof.
-  econstructor; hnf; intros.
-  - econstructor; intros; eauto.
-    assert (bs = bs') by congruence; subst.
-    reflexivity.
-  - econstructor; intros; eauto.
-    + destruct H, H0; congruence.
-    + pose proof (covers_pointwise H a).
-      pose proof (covers_pointwise H0 a).
-      destruct (y a) eqn:?.
-      specialize (H3 _ _ ltac:(eauto) ltac:(eauto)).
-      specialize (H4 _ _ ltac:(eauto) ltac:(eauto)).
-      etransitivity; eauto.
-      exfalso.
-      eauto using same_size_disks_not_different,
-      covered_size_eq.
-Qed.
-
-Definition flush (d:disk) : disk.
-  refine {| size := size d;
-            diskMem := fun a =>
-                         match d a with
-                         | Some bs => Some (keepFirst bs)
-                         | None => None
-                         end; |}.
-  apply sized_domain_pointwise.
-  apply diskMem_domain.
-Defined.
-
-Theorem flush_size_eq : forall d,
-    size (flush d) = size d.
-Proof.
-  auto.
-Qed.
-
-(* flush applied to a predicate
-
-TODO: better explanation, possibly change name
- *)
-Definition then_flush (P: disk -> Prop) : disk -> Prop :=
-  fun d' => exists d, P d /\ covered (flush d) d'.
-
-Lemma then_flush_flush : forall (F: disk -> Prop) d,
-    F d ->
-    then_flush F (flush d).
-Proof.
-  unfold then_flush; intros.
-  exists d; intuition.
-Qed.
-
-Hint Resolve then_flush_flush.
-
-(* discard write buffers (wipe in-memory state) *)
-Definition oldest (d:disk) : disk.
-  refine {| size := size d;
-            diskMem := fun a =>
-                         match d a with
-                         | Some bs => Some (keepLast bs)
-                         | None => None
-                         end; |}.
-  apply sized_domain_pointwise.
-  apply diskMem_domain.
-Defined.
-
-Theorem oldest_size_eq : forall d,
-    size (oldest d) = size d.
-Proof.
-  auto.
-Qed.
-
-Definition then_oldest (P: disk -> Prop) : disk -> Prop :=
-  fun d' => exists d, P d /\ covered (oldest d) d'.
-
-Lemma then_oldest_oldest : forall (F: disk -> Prop) d,
-    F d ->
-    then_oldest F (oldest d).
-Proof.
-  unfold then_oldest; intros.
-  exists d; intuition.
-Qed.
-
-Lemma covers_nil_tl : forall b0 b0' bs',
-    covers (necons b0 nil) (necons b0' bs') ->
-    b0 = b0' /\
-    (forall b, List.In b bs' -> b = b0).
-Proof.
-  intros.
-  inversion H; subst; simpl in *; intuition.
-  destruct (H1 b); auto; try contradiction.
-Qed.
-
-Lemma last_in_list : forall A (l: list A) (a:A),
-    List.In (List.last l a) l \/ List.last l a = a.
-Proof.
-  induction l; simpl; intros; eauto.
-  destruct (IHl a0); subst.
-  destruct l; eauto.
-  destruct l; eauto.
-Qed.
-
-Lemma covers_first_last : forall bs bs' bs'',
-    covers (keepFirst bs) bs' ->
-    covers (keepLast bs') bs'' ->
-    covers (keepFirst bs) bs''.
-Proof.
-  destruct bs, bs', bs'';
-    unfold keepFirst, keepLast;
-    simpl;
-    intros.
-  apply covers_nil_tl in H; intuition subst.
-  assert (List.last xs0 x0 = x0).
-  destruct (last_in_list xs0 x0); eauto.
-  congruence.
-Qed.
-
-Theorem covered_flush_oldest : forall d d' d'',
-    covered (flush d) d' ->
-    covered (oldest d') d'' ->
-    covered (flush d) d''.
-Proof.
-  intros.
-  destruct H, H0.
-  econstructor; intros.
-  - pose proof (oldest_size_eq d').
+    econstructor; eauto.
     congruence.
-  - simpl in *.
-    specialize (covers_pointwise0 a).
-    specialize (covers_pointwise1 a).
-    destruct matches in *;
-      try solve [ exfalso; eauto using same_size_disks_not_different ].
-    inversion H; subst.
-    specialize (covers_pointwise0 _ _ ltac:(eauto) ltac:(eauto)).
-    specialize (covers_pointwise1 _ _ ltac:(eauto) ltac:(eauto)).
-    eauto using covers_first_last.
-Qed.
-
-(* partial flush at each address; expressed for convenient inversion *)
-Inductive pflushed : disk -> disk -> Prop :=
-| is_pflushed : forall d d',
-    size d = size d' ->
-    (forall a, match d a, d' a with
-          | Some bs, Some bs' => covers bs bs'
-          | None, None => ~a < size d
-          | _, _ => False
-          end) ->
-    pflushed d d'.
-
-Local Hint Resolve disk_inbounds_not_none.
-
-Theorem pflushed_indomain : forall d d',
-    size d = size d' ->
-    (forall a, a < size d ->
-          match d a, d' a with
-          | Some bs, Some bs' => covers bs bs'
-          | _, _ => True
-          end) ->
-    pflushed d d'.
-Proof.
-  intros.
-  econstructor; intros; eauto.
-  specialize (H0 a).
-  destruct (lt_dec a (size d)); intuition eauto.
-  assert (a < size d') by congruence.
-  destruct matches; eauto.
-
-  assert (~a < size d') by congruence.
-  autorewrite with upd; auto.
-Qed.
-
-Instance pflushed_preorder : PreOrder pflushed.
-Proof.
-  econstructor; hnf; intros.
-  - eapply pflushed_indomain; intros; eauto.
-    destruct matches; eauto.
-    reflexivity.
-  - inversion_clear H.
-    inversion_clear H0.
-    eapply pflushed_indomain; intros; eauto.
-    congruence.
-    specialize (H2 a).
-    specialize (H3 a).
-    destruct matches in *; try contradiction.
     etransitivity; eauto.
 Qed.
 
-Theorem pflushed_is_covered : forall d d',
-    pflushed d d' ->
-    covered d d'.
+Definition bufferHist (b:block) (h:blockhist) : blockhist :=
+  {| current_val := b;
+     durable_vals :=
+       current_val h :: durable_vals h; |}.
+
+Instance blockhist_async: AsyncBlock blockhist :=
+  {| flushBlock := fun bs => {| current_val := current_val bs;
+                             durable_vals := nil |};
+     pflushBlock := pflush_blockhist;
+     buffer := bufferHist;
+     curr_val := current_val; |}.
+
+Theorem curr_val_blockstate : forall c p,
+    curr_val {| cache_val := c;
+                durable_val := p |} =
+    match c with
+    | Some b => b
+    | None => p
+    end.
 Proof.
-  intros.
-  inversion_clear H.
-  econstructor; intros; eauto.
-  specialize (H1 a); repeat simpl_match; eauto.
+  auto.
 Qed.
 
-Lemma covers_keepFirst : forall bs,
-    covers bs (keepFirst bs).
+Theorem curr_val_some_cache : forall b (bs: blockstate),
+    cache_val bs = Some b ->
+    curr_val bs = b.
 Proof.
-  intros.
-  destruct bs; unfold keepFirst; simpl.
-  econstructor; simpl; contradiction.
+  simpl; intros; simpl_match; auto.
 Qed.
 
-Theorem flush_is_pflushed : forall d d',
-    d' = flush d ->
-    pflushed d d'.
+Theorem curr_val_blockhist : forall (h: blockhist),
+    curr_val h = current_val h.
 Proof.
-  intros; subst.
-  eapply pflushed_indomain; intros; eauto.
-  simpl.
-  destruct matches.
-  apply covers_keepFirst.
+  auto.
 Qed.
+
+Hint Rewrite curr_val_blockstate : block.
+Hint Rewrite curr_val_blockhist : block.
+
+Definition flush {B} {async:AsyncBlock B} (d:diskOf B) : diskOf B :=
+  mapDisk d flushBlock.
+
+Definition pflush {B} {async:AsyncBlock B} : diskOf B -> diskOf B -> Prop :=
+  fun d d' => pointwise_rel pflushBlock d d'.
+
+Instance pflush_preorder {B} {async:AsyncBlock B} : PreOrder (pflush (async:=async)).
+Proof.
+  unshelve eapply pointwise_rel_preorder.
+  apply pflushBlock_preorder.
+Qed.
+
+Definition wipeDisk (d:disk) : disk :=
+  mapDisk d wipeBlockstate.
+
+Record collapsesTo (h:blockhist) (bs:blockstate) : Prop :=
+  is_collapse
+    { collapse_current: curr_val h = curr_val bs;
+      collapse_durable: List.In (durable_val bs) (curr_val h::durable_vals h); }.
+
+Definition covered (d:diskOf blockhist) (d':disk) :=
+  pointwise_rel collapsesTo d d'.
+
+Lemma collapsesTo_buffer : forall h bs b,
+    collapsesTo h bs ->
+    collapsesTo (buffer b h) (buffer b bs).
+Proof.
+  simpl; intros.
+  destruct H.
+  econstructor; eauto.
+  simpl; intuition eauto.
+Qed.
+
+Global Opaque curr_val.
+Global Opaque buffer.

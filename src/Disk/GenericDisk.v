@@ -40,20 +40,6 @@ Section GenericDisks.
     unfold disk_get in *; congruence.
   Qed.
 
-  Lemma same_size_disks_not_different : forall d d' a v,
-      size d = size d' ->
-      d a = Some v ->
-      d' a = None ->
-      False.
-  Proof.
-    intros.
-    pose proof (diskMem_domain d' a).
-    destruct (lt_dec a (size d')).
-    repeat deex; unfold disk_get in *; congruence.
-    pose proof (diskMem_domain d a).
-    destruct (lt_dec a (size d)); unfold disk_get in *; congruence.
-  Qed.
-
   Definition diskUpd d (a: addr) b : diskOf T.
   Proof.
     destruct (lt_dec a (size d)).
@@ -242,3 +228,91 @@ Hint Rewrite diskUpdF_neq using (solve [ auto ]) : upd.
 
 Hint Rewrite diskUpd_same using (solve [ auto ]) : upd.
 Hint Rewrite diskUpd_oob_noop using (solve [ auto ]) : upd.
+
+Lemma same_size_disks_not_different : forall T T' (d: diskOf T) (d': diskOf T') a v,
+    size d = size d' ->
+    d a = Some v ->
+    d' a = None ->
+    False.
+Proof.
+  intros.
+  pose proof (diskMem_domain d' a).
+  destruct (lt_dec a (size d')).
+  repeat deex; unfold disk_get in *; congruence.
+  pose proof (diskMem_domain d a).
+  destruct (lt_dec a (size d)); unfold disk_get in *; congruence.
+Qed.
+
+(* expressed for nice inversion *)
+Record pointwise_rel T T' (rel: T -> T' -> Prop) (d: diskOf T) (d': diskOf T') : Prop :=
+  { sizes_eq: size d = size d';
+    pointwise_rel_holds: forall a,
+        match d a, d' a with
+        | Some bs, Some bs' => rel bs bs'
+        | None, None => ~a < size d
+        | _, _ => False
+        end; }.
+
+Local Hint Resolve disk_inbounds_not_none.
+
+(* convenience to prove pointwise_rel with minimal proof *)
+Theorem pointwise_rel_indomain : forall T T' (rel: T -> T' -> Prop) d d',
+    size d = size d' ->
+    (forall a, a < size d ->
+          match d a, d' a with
+          | Some bs, Some bs' => rel bs bs'
+          | _, _ => True
+          end) ->
+    pointwise_rel rel d d'.
+Proof.
+  intros.
+  econstructor; intros; eauto.
+  specialize (H0 a).
+  destruct (lt_dec a (size d)); intuition eauto.
+  assert (a < size d') by congruence.
+  destruct matches; eauto.
+
+  assert (~a < size d') by congruence.
+  autorewrite with upd; auto.
+Qed.
+
+Theorem pointwise_rel_trans : forall T (rel: T -> T -> Prop),
+    forall (Htrans: forall x y z, rel x y -> rel y z -> rel x z),
+    forall d d' d'',
+      pointwise_rel rel d d' ->
+      pointwise_rel rel d' d'' ->
+      pointwise_rel rel d d''.
+Proof.
+  intros.
+  destruct H.
+  destruct H0.
+  eapply pointwise_rel_indomain; intros.
+  congruence.
+  specialize (pointwise_rel_holds0 a).
+  specialize (pointwise_rel_holds1 a).
+  destruct matches in *; eauto; try contradiction.
+Qed.
+
+Instance pointwise_rel_preorder {T} {rel: T -> T -> Prop} {po:PreOrder rel} :
+  PreOrder (pointwise_rel rel).
+Proof.
+  econstructor; hnf; intros.
+  - eapply pointwise_rel_indomain; intros; eauto.
+    destruct matches; eauto.
+    reflexivity.
+  - eapply pointwise_rel_trans; eauto.
+    intros.
+    etransitivity; eauto.
+Qed.
+
+Definition mapDisk {T T'} (d:diskOf T) (f: T -> T') : diskOf T'.
+Proof.
+  refine {| size := size d;
+            diskMem := fun a =>
+                         match d a with
+                         | Some v => Some (f v)
+                         | None => None
+                         end; |}.
+  apply sized_domain_pointwise.
+  apply diskMem_domain.
+Defined.

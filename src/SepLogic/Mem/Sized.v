@@ -72,7 +72,7 @@ Proof.
     solve [ exfalso; eauto using sized_domain_not_lt ].
 Qed.
 
-Theorem sized_domain_pointwise : forall `(m: mem _ V) sz (f: V -> V),
+Theorem sized_domain_pointwise : forall `(m: mem _ V) sz V' (f: V -> V'),
     sized_domain m sz ->
     sized_domain (fun a => match m a with
                         | Some v => Some (f v)
@@ -82,4 +82,5 @@ Proof.
   unfold sized_domain; intros.
   specialize (H a).
   destruct matches; repeat simpl_match; eauto.
+  repeat deex; congruence.
 Qed.

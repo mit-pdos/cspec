@@ -19,7 +19,7 @@ Module TD.
   | step_read : forall a i r state,
       match get_disk i state with
       | Some d => match d a with
-                 | Some b0 => r = Working (latest b0)
+                 | Some b0 => r = Working (curr_val b0)
                  | None => exists b, r = Working b
                  end
       | None => r = Failed
@@ -47,11 +47,11 @@ Module TD.
       end ->
       op_step (DiskSize i) state r state.
 
-  Definition wipe state := disks_map oldest state.
+  Definition wipe state := disks_map wipeDisk state.
 
   Definition API : InterfaceAPI Op State :=
     {| op_sem := post_step (pre_step bg_failure (@op_step))
-                           (disks_rel pflushed);
+                           (disks_rel pflush);
        crash_effect := wipe; |}.
 
   Ltac inv_step :=
