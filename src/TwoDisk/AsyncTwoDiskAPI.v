@@ -47,6 +47,7 @@ Module TD.
       end ->
       op_step (DiskSize i) state r state.
 
+  (* TODO: fill in the crash effect *)
   Definition wipe state := state.
 
   Definition API : InterfaceAPI Op State :=
