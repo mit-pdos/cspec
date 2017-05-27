@@ -6,11 +6,11 @@ Require Import Disk.SimpleDisk.
 Require Import Refinement.Interface.
 Require Import Refinement.ProgLang.Prog.
 Require Import Refinement.ProgLang.Hoare.
-Require Import TwoDisk.TwoDiskAPI.
-Require Import TwoDisk.TwoDiskTheorems.
 Require Import
-        SeqDisk.ReplicatedDisk.Step
-        SeqDisk.ReplicatedDisk.TwoDiskFacts.
+        TwoDisk.TwoDiskAPI
+        TwoDisk.TwoDiskTheorems
+        TwoDisk.TwoDiskFacts.
+Require Import SeqDisk.ReplicatedDisk.Step.
 
 Require Import MaybeHolds.
 
