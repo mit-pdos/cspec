@@ -293,6 +293,30 @@ Proof.
   destruct matches in *; eauto; try contradiction.
 Qed.
 
+Definition rel_compose T T' T'' (rel: T -> T' -> Prop)
+           (rel': T' -> T'' -> Prop) :
+  T -> T'' -> Prop :=
+  fun a a'' => exists a', rel a a' /\ rel' a' a''.
+
+Theorem pointwise_rel_trans' : forall T T' T''
+                                 (rel: T -> T' -> Prop)
+                                 (rel': T' -> T'' -> Prop),
+    forall d d' d'',
+      pointwise_rel rel d d' ->
+      pointwise_rel rel' d' d'' ->
+      pointwise_rel (rel_compose rel rel') d d''.
+Proof.
+  intros.
+  destruct H.
+  destruct H0.
+  eapply pointwise_rel_indomain; intros.
+  congruence.
+  specialize (pointwise_rel_holds0 a).
+  specialize (pointwise_rel_holds1 a).
+  destruct matches in *; eauto; try contradiction.
+  unfold rel_compose; eauto.
+Qed.
+
 Instance pointwise_rel_preorder {T} {rel: T -> T -> Prop} {po:PreOrder rel} :
   PreOrder (pointwise_rel rel).
 Proof.
@@ -303,6 +327,18 @@ Proof.
   - eapply pointwise_rel_trans; eauto.
     intros.
     etransitivity; eauto.
+Qed.
+
+Theorem pointwise_rel_weaken : forall T T' (rel rel': T -> T' -> Prop) d d',
+    pointwise_rel rel d d' ->
+    (forall x y, rel x y -> rel' x y) ->
+    pointwise_rel rel' d d'.
+Proof.
+  intros.
+  destruct H.
+  eapply pointwise_rel_indomain; intros; eauto.
+  specialize (pointwise_rel_holds0 a).
+  destruct matches in *; eauto; try contradiction.
 Qed.
 
 Definition mapDisk {T T'} (d:diskOf T) (f: T -> T') : diskOf T'.
@@ -316,3 +352,11 @@ Proof.
   apply sized_domain_pointwise.
   apply diskMem_domain.
 Defined.
+
+Theorem pointwise_rel_mapDisk : forall T T' (d: diskOf T) (f: T -> T'),
+    pointwise_rel (fun a a' => a' = f a) d (mapDisk d f).
+Proof.
+  intros.
+  eapply pointwise_rel_indomain; intros; eauto.
+  simpl; destruct matches.
+Qed.

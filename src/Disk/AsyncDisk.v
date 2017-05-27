@@ -154,7 +154,7 @@ Record collapsesTo (h:blockhist) (bs:blockstate) : Prop :=
     { collapse_current: curr_val h = curr_val bs;
       collapse_durable: List.In (durable_val bs) (curr_val h::durable_vals h); }.
 
-Definition covered (d:diskOf blockhist) (d':disk) :=
+Definition covered (d:histdisk) (d':disk) :=
   pointwise_rel collapsesTo d d'.
 
 Lemma collapsesTo_buffer : forall h bs b,
@@ -165,6 +165,49 @@ Proof.
   destruct H.
   econstructor; eauto.
   simpl; intuition eauto.
+Qed.
+
+Inductive histcrash : blockhist -> blockstate -> Prop :=
+| hist_crash_curr : forall h,
+    histcrash h {| cache_val := None;
+                   durable_val := curr_val h; |}
+| hist_crash_prev : forall h b,
+    List.In b (durable_vals h) ->
+    histcrash h {| cache_val := None;
+                   durable_val := b; |}.
+
+Local Hint Constructors histcrash.
+
+Definition crashesTo : histdisk -> disk -> Prop :=
+  pointwise_rel histcrash.
+
+Theorem collapse_wipe_flush_to_crash : forall h bs bs',
+    collapsesTo h bs ->
+    pflushBlock (wipeBlockstate bs) bs' ->
+    histcrash h bs'.
+Proof.
+  unfold wipeBlockstate; intros.
+  inversion H; subst; clear H.
+  inversion H0; subst; clear H0.
+  autorewrite with block in *.
+  simpl in *; intuition eauto.
+  replace (durable_val bs); eauto.
+  simpl in *; congruence.
+Qed.
+
+Theorem wipe_crashesTo : forall d0 d d',
+    covered d0 d ->
+    pflush (wipeDisk d) d' ->
+    crashesTo d0 d'.
+Proof.
+  unfold covered, pflush, crashesTo, wipeDisk.
+  intros.
+  pose proof (pointwise_rel_mapDisk d wipeBlockstate).
+  eapply pointwise_rel_trans' in H0; eauto.
+  eapply pointwise_rel_trans' in H0; eauto.
+  eapply pointwise_rel_weaken; eauto.
+  unfold rel_compose; intros; repeat deex.
+  eauto using collapse_wipe_flush_to_crash.
 Qed.
 
 Global Opaque curr_val.
