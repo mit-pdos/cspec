@@ -61,8 +61,8 @@ Section AsyncReplicatedDisk.
                  TD.disk1 state' |= covered d;
              recover :=
                fun _ state' =>
-                 TD.disk0 state' |= then_wipe (covered d) /\
-                 TD.disk1 state' |= then_wipe (covered d);
+                 TD.disk0 state' |= crashesTo d /\
+                 TD.disk1 state' |= crashesTo d;
            |})
         (Read a)
         (irec td)
@@ -90,13 +90,13 @@ Section AsyncReplicatedDisk.
                  TD.disk1 state' |= covered (diskUpdF d a (buffer b));
              recover :=
                fun _ state' =>
-                 (TD.disk0 state' |= then_wipe (covered d) /\
-                  TD.disk1 state' |= then_wipe (covered d)) \/
+                 (TD.disk0 state' |= crashesTo d /\
+                  TD.disk1 state' |= crashesTo d) \/
                  (a < size d /\
-                  TD.disk0 state' |= then_wipe (covered (diskUpdF d a (buffer b))) /\
-                  TD.disk1 state' |= then_wipe (covered d)) \/
-                 (TD.disk0 state' |= then_wipe (covered (diskUpdF d a (buffer b))) /\
-                  TD.disk1 state' |= then_wipe (covered (diskUpdF d a (buffer b))));
+                  TD.disk0 state' |= crashesTo (diskUpdF d a (buffer b)) /\
+                  TD.disk1 state' |= crashesTo d) \/
+                 (TD.disk0 state' |= crashesTo (diskUpdF d a (buffer b)) /\
+                  TD.disk1 state' |= crashesTo (diskUpdF d a (buffer b)));
            |})
         (Write a b)
         (irec td)

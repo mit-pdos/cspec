@@ -172,6 +172,18 @@ Qed.
 
 Hint Resolve then_wipe_wipe.
 
+Theorem then_wipe_crashesTo : forall d md,
+    md |= then_wipe (covered d) ->
+    md |= crashesTo d.
+Proof.
+  intros.
+  eapply pred_weaken; intros; eauto.
+  unfold then_wipe in *; repeat deex.
+  eauto using wipe_crashesTo.
+Qed.
+
+Hint Resolve then_wipe_crashesTo.
+
 Theorem disk0_wipe : forall state state' F,
     TD.disk0 state |= F ->
     TD.wipe state state' ->
@@ -219,7 +231,7 @@ Theorem TDRead0_ok : forall (i: Interface TD.API) a,
                           TD.disk1 state' |= F
                end;
            recover :=
-             fun _ state' => TD.disk0 state' |= then_wipe (covered d_0) /\
+             fun _ state' => TD.disk0 state' |= crashesTo d_0 /\
                       TD.disk1 state' |= then_wipe F;
          |})
       (Prim i (TD.Read d0 a))
@@ -253,7 +265,7 @@ Theorem TDRead1_ok : forall (i: Interface TD.API) a,
                end;
            recover :=
              fun _ state' => TD.disk0 state' |= then_wipe F /\
-                      TD.disk1 state' |= then_wipe (covered d_1);
+                      TD.disk1 state' |= crashesTo d_1;
          |})
       (Prim i (TD.Read d1 a))
       (irec i)
@@ -314,9 +326,9 @@ Theorem TDWrite0_ok : forall (i: Interface TD.API) a b,
                end;
            recover :=
              fun _ state' =>
-               (TD.disk0 state' |= then_wipe (covered d_0) \/
+               (TD.disk0 state' |= crashesTo d_0 \/
                 a < size d_0 /\
-                TD.disk0 state' |= then_wipe (covered (diskUpdF d_0 a (buffer b)))) /\
+                TD.disk0 state' |= crashesTo (diskUpdF d_0 a (buffer b))) /\
                TD.disk1 state' |= then_wipe F;
          |})
       (Prim i (TD.Write d0 a b))
@@ -352,9 +364,9 @@ Theorem TDWrite1_ok : forall (i: Interface TD.API) a b,
            recover :=
              fun _ state' =>
                TD.disk0 state' |= then_wipe F /\
-               (TD.disk1 state' |= then_wipe (covered d_1) \/
+               (TD.disk1 state' |= crashesTo d_1 \/
                 a < size d_1 /\
-                TD.disk1 state' |= then_wipe (covered (diskUpdF d_1 a (buffer b))));
+                TD.disk1 state' |= crashesTo (diskUpdF d_1 a (buffer b)));
          |})
       (Prim i (TD.Write d1 a b))
       (irec i)
@@ -399,7 +411,7 @@ Theorem TDDiskSize0_ok : forall (i: Interface TD.API),
                end;
            recover :=
              fun _ state' =>
-               TD.disk0 state' |= then_wipe (covered d_0) /\
+               TD.disk0 state' |= crashesTo d_0 /\
                TD.disk1 state' |= then_wipe F;
          |})
       (Prim i (TD.DiskSize d0))
@@ -431,7 +443,7 @@ Theorem TDDiskSize1_ok : forall (i: Interface TD.API),
            recover :=
              fun _ state' =>
                TD.disk0 state' |= then_wipe F /\
-               TD.disk1 state' |= then_wipe (covered d_1);
+               TD.disk1 state' |= crashesTo d_1;
          |})
       (Prim i (TD.DiskSize d1))
       (irec i)
