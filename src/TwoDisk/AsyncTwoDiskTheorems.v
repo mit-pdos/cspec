@@ -594,6 +594,14 @@ Proof.
   eapply pred_weaken; eauto.
 Qed.
 
+Lemma then_wipe_missing : forall md,
+    md |= then_wipe missing ->
+    md |= missing.
+Proof.
+  unfold then_wipe, missing; intros.
+  destruct md; simpl in *; repeat deex; eauto.
+Qed.
+
 Hint Resolve
      TDRead0_ok
      TDRead1_ok

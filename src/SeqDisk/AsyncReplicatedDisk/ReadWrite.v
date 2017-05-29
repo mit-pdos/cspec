@@ -38,14 +38,6 @@ Section AsyncReplicatedDisk.
 
   Implicit Type (state:TD.State).
 
-  Lemma then_wipe_missing : forall md,
-      md |= then_wipe missing ->
-      md |= missing.
-  Proof.
-    unfold then_wipe, missing; intros.
-    destruct md; simpl in *; repeat deex; eauto.
-  Qed.
-
   Hint Resolve then_wipe_missing.
 
   Theorem Read_ok : forall a,
