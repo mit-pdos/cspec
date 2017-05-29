@@ -86,11 +86,6 @@ Definition init_invariant
             fun _ w' => True;
        |}) init rec (IdRefinement world).
 
-Record crash_effect_valid `(rf: Refinement State) (wipe: State -> State) :=
-  { wipe_world_abstraction: forall w, abstraction rf (world_crash w) =
-                                 wipe (abstraction rf w);
-    wipe_idempotent: forall state, wipe (wipe state) = wipe state; }.
-
 (* Finally, an Interface ties everything together: the parameter [api] specifies all details of how the implementation behaves, while the fields give an implementation and a refinement proof.
 
 Of note is that in addition to every method being correct ([impl_ok]), the
@@ -107,13 +102,13 @@ Record Interface opT State (api: InterfaceAPI opT State) :=
                   (recover_impl interface_impl)
                   refinement;
     ret_rec_ok:
-      rec_noop (recover_impl interface_impl) refinement;
+      rec_noop (recover_impl interface_impl) refinement (crash_effect api);
     init_ok:
       init_invariant
         (init_impl interface_impl) (recover_impl interface_impl)
         refinement;
     crash_effect_ok:
-      crash_effect_valid refinement (crash_effect api); }.
+      crash_effect_valid refinement world_crash (crash_effect api); }.
 
 (* Helper function to get the implementation of a primitive operation from an
 [Interface]. *)
@@ -157,7 +152,7 @@ Definition irec opT `(api: InterfaceAPI opT State) `(i: Interface api) : prog un
   recover_impl (interface_impl i).
 
 Lemma irec_ret_ok : forall opT `(api: InterfaceAPI opT State) `(i: Interface api),
-    rec_noop (irec i) (refinement i).
+    rec_noop (irec i) (refinement i) (crash_effect api).
 Proof.
   intros.
   eapply ret_rec_ok.
@@ -236,12 +231,12 @@ Theorem crash_effect_compose : forall `(rf1: Refinement State1)
                                  `(rf2: LRefinement State1 State2)
                                  (wipe1: State1 -> State1)
                                  (wipe2: State2 -> State2),
-    crash_effect_valid rf1 wipe1 ->
+    wipe_valid rf1 wipe1 ->
     (forall state, abstraction rf2 (wipe1 state) = wipe2 (abstraction rf2 state)) ->
     (forall state, wipe2 (wipe2 state) = wipe2 state) ->
-    crash_effect_valid (refinement_compose rf1 rf2) wipe2.
+    wipe_valid (refinement_compose rf1 rf2) wipe2.
 Proof.
   intros.
   constructor; simpl; intros; eauto.
-  rewrite (wipe_world_abstraction H); eauto.
+  rewrite (wipe_abstraction H); eauto.
 Qed.

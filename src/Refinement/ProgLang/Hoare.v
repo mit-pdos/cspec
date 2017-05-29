@@ -338,24 +338,26 @@ Proof.
   destruct r; intuition eauto.
 Qed.
 
-Definition rec_noop `(rec: prog R) `(rf: Refinement State) :=
+Definition rec_noop `(rec: prog R) `(rf: Refinement State) (wipe: State -> State) :=
   forall T (v:T),
     prog_spec
       (fun (_:unit) state =>
          {| pre := True;
             post := fun r state' => r = v /\
                              state' = state;
-            recover := fun _ state' => state' = state; |}) (Ret v) rec rf.
+            recover := fun _ state' => state' = wipe state; |})
+      (Ret v) rec rf.
 
 (* for recovery proofs about pure programs *)
 
 Theorem ret_spec : forall `(rf: Refinement State)
-                         `(spec: Specification A T R State)
-                         (v:T) (rec: prog R),
-    rec_noop rec rf ->
+                     (wipe: State -> State)
+                     `(spec: Specification A T R State)
+                     (v:T) (rec: prog R),
+    rec_noop rec rf wipe ->
     (forall a state, pre (spec a state) ->
             post (spec a state) v state /\
-            forall r, recover (spec a state) r state) ->
+            forall r, recover (spec a state) r (wipe state)) ->
     prog_spec spec (Ret v) rec rf.
 Proof.
   intros.
@@ -369,31 +371,65 @@ Proof.
   intuition eauto.
 Qed.
 
+Record crash_effect_valid `(rf: LRefinement State1 State2)
+       (wipe1: State1 -> State1)
+       (wipe2: State2 -> State2) :=
+  { wipe_abstraction: forall w, abstraction rf (wipe1 w) =
+                           wipe2 (abstraction rf w);
+    wipe_idempotent: forall state, wipe2 (wipe2 state) = wipe2 state; }.
+
+Definition wipe_valid `(rf: Refinement State)
+           (wipe: State -> State) := crash_effect_valid rf world_crash wipe.
+
+Definition crash_invariant `(rf:LRefinement State1 State2)
+           (wipe: State1 -> State1) : State1 -> Prop :=
+  fun state' => exists state, invariant rf state /\ state' = wipe state.
+
+Lemma crash_invariant_from_invariant : forall `(rf: LRefinement State1 State2)
+                                         (wipe: State1 -> State1),
+    forall state, invariant rf state ->
+         crash_invariant rf wipe (wipe state).
+Proof.
+  unfold crash_invariant; eauto.
+Qed.
+
+Hint Resolve crash_invariant_from_invariant.
+
 Theorem rec_noop_compose : forall `(rec: prog unit) `(rec2: prog unit)
                              `(rf1: Refinement State1)
-                             `(rf2: LRefinement State1 State2),
-    rec_noop rec rf1 ->
-    prog_spec
-      (fun (_:unit) state =>
-         {| pre := invariant rf2 state;
-            post :=
-              fun _ state' => invariant rf2 state' /\
-                       abstraction rf2 state' = abstraction rf2 state;
-            recover :=
-              fun _ state' => invariant rf2 state' /\
-                       abstraction rf2 state' = abstraction rf2 state;
-         |}) rec2 rec rf1 ->
-    rec_noop (_ <- rec; rec2) (refinement_compose rf1 rf2).
+                             (wipe1: State1 -> State1)
+                             `(rf2: LRefinement State1 State2)
+                             (wipe2: State2 -> State2),
+    forall (Hwipe: crash_effect_valid rf2 wipe1 wipe2),
+      rec_noop rec rf1 wipe1 ->
+      prog_spec
+        (fun (_:unit) state =>
+           {| pre := crash_invariant rf2 wipe1 state;
+              post :=
+                fun _ state' => invariant rf2 state' /\
+                         abstraction rf2 state' = wipe2 (abstraction rf2 state);
+              recover :=
+                fun _ state' => crash_invariant rf2 wipe1 state' /\
+                         abstraction rf2 state' = wipe2 (abstraction rf2 state);
+           |}) rec2 rec rf1 ->
+      rec_noop (_ <- rec; rec2) (refinement_compose rf1 rf2) wipe2.
 Proof.
   unfold rec_noop; intros.
   eapply spec_refinement_compose; simpl.
   eapply compose_recovery; eauto.
-  eapply idempotent_loopspec; eauto.
-  unfold idempotent; simpl; intuition eauto.
-  descend; intuition (eauto; congruence).
-  simpl; intuition.
-  descend; intuition (subst; eauto).
-  descend; intuition (subst; eauto).
+  - (* loopspec for rec2 *)
+    eapply idempotent_loopspec; eauto.
+    unfold idempotent; simpl; intuition eauto.
+    descend; intuition (eauto; try congruence).
+    normalize_eq.
+    apply (wipe_idempotent Hwipe).
+  - (* chain specifications *)
+    simpl; intuition.
+    descend; intuition (subst; eauto).
+    descend; intuition (subst; eauto).
+    normalize_eq.
+    rewrite (wipe_abstraction Hwipe).
+    apply (wipe_idempotent Hwipe).
 Qed.
 
 Theorem spec_exec_equiv : forall `(spec: Specification A T R State)

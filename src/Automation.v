@@ -197,6 +197,16 @@ Tactic Notation "hide_fn" constr(fn) :=
 Ltac is_eq a a' :=
   destruct (a == a'); unfold equiv, complement in *; subst.
 
+(** * Normalize systems of equality *)
+
+(* TODO: there are many possibilities to make this tactic more robust, for
+example by breaking rewrite cycles; as the need arises, add these features *)
+Ltac normalize_eq :=
+  repeat match goal with
+         | [ H: _ = _ |- _ ] =>
+           rewrite H
+         end.
+
 (** * Uncategorized *)
 
 Create HintDb false.

@@ -33,7 +33,7 @@ Module TD.
   Axiom td_wipe_world_abstraction : forall w,
       abstraction refinement (world_crash w) = abstraction refinement w.
 
-  Theorem td_crash_ok : crash_effect_valid refinement TD.wipe.
+  Theorem td_crash_ok : wipe_valid refinement TD.wipe.
   Proof.
     constructor; simpl; unfold TD.wipe;
       eauto using td_wipe_world_abstraction.
@@ -55,10 +55,10 @@ Module TD.
       remember (world_crash w').
       generalize dependent w'.
       induction H3; intros; inv_exec.
-      rewrite ?(wipe_world_abstraction td_crash_ok) in *;
+      rewrite ?(wipe_abstraction td_crash_ok) in *;
         unfold TD.wipe; eauto.
       specialize (IHexec_recover (world_crash w'0)).
-      rewrite ?(wipe_world_abstraction td_crash_ok) in *;
+      rewrite ?(wipe_abstraction td_crash_ok) in *;
         unfold TD.wipe in *.
       safe_intuition eauto.
     - apply init_ok.

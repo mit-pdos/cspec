@@ -295,6 +295,14 @@ Module RD.
       exfalso; eauto.
     Qed.
 
+    Theorem rd_crash_effect_valid :
+      crash_effect_valid {| invariant := rd_invariant;
+                            abstraction := rd_abstraction |}
+                         TD.wipe (fun (state:D.State) => state).
+    Proof.
+      econstructor; eauto.
+    Qed.
+
     Definition rd : Interface D.API.
       unshelve econstructor.
       - exact impl.
@@ -310,15 +318,18 @@ Module RD.
         + exists (rd_abstraction state); (intuition eauto); simplify.
         + exists (rd_abstraction state); (intuition eauto); simplify.
       - eapply rec_noop_compose; eauto; simpl.
+        apply rd_crash_effect_valid.
         eapply prog_spec_weaken; eauto;
           unfold spec_impl; simplify.
-        exists (rd_abstraction state), FullySynced; intuition eauto.
+        unfold crash_invariant in *; simpl in *; repeat deex.
+        exists (rd_abstraction state0), FullySynced; intuition eauto.
       - eapply then_init_compose; eauto.
         eapply prog_spec_weaken; unfold spec_impl; simplify.
         pose proof (state_some_disks state); simplify.
         descend; intuition eauto.
         destruct v; simplify; finish.
-      - eapply crash_effect_compose; eauto using crash_effect_ok.
+      - eapply crash_effect_compose; unfold wipe_valid;
+          eauto using crash_effect_ok.
 
         Grab Existential Variables.
         all: auto.
