@@ -458,6 +458,14 @@ Qed.
 Definition then_flush (F: disk -> Prop) : disk -> Prop :=
   fun d' => exists d, F d /\ pflush (flush d) d'.
 
+Theorem then_flush_covered : forall d d',
+    then_flush (covered d) d' ->
+    covered (flush d) d'.
+Proof.
+  unfold then_flush; intros; repeat deex.
+  eauto using covered_flush_pflush.
+Qed.
+
 Lemma maybe_holds_then_flush : forall F md d,
     md |= F ->
     md = Some d ->

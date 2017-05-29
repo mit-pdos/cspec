@@ -224,5 +224,39 @@ Proof.
   eauto using collapse_wipe_flush_to_crash.
 Qed.
 
+Theorem pflush_flush : forall (h: blockhist) (bs bs': blockstate),
+    collapsesTo h bs ->
+    pflushBlock (flushBlock bs) bs' ->
+    collapsesTo (flushBlock h) bs'.
+Proof.
+  intros.
+  inversion H; subst; clear H;
+    autorewrite with block in *.
+  inversion H0; subst; clear H0; simpl in *;
+    destruct matches in *;
+    simpl in *;
+    (intuition eauto);
+    try congruence;
+    try solve [ constructor; simpl in *; repeat simpl_match; eauto ].
+Qed.
+
+Theorem covered_flush_pflush : forall d d' d'',
+    covered d d' ->
+    pflush (flush d') d'' ->
+    covered (flush d) d''.
+Proof.
+  unfold covered, pflush, flush; intros.
+  destruct H, H0.
+  eapply pointwise_rel_indomain; intros.
+  simpl in *; congruence.
+
+  repeat match goal with
+         | [ H: forall _, _ |- _ ] => specialize (H a)
+         end.
+  cbn [mapDisk disk_get diskMem] in *.
+  destruct matches in *; try contradiction.
+  eapply pflush_flush; eauto.
+Qed.
+
 Global Opaque curr_val.
 Global Opaque buffer.
