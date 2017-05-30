@@ -20,7 +20,7 @@ hs: extract
 	cd replicate-nbd; stack build
 
 Makefile.coq: Makefile $(CODE) _CoqProject
-	coq_makefile -f _CoqProject > Makefile.coq
+	coq_makefile -f _CoqProject -o Makefile.coq
 
 clean: Makefile.coq
 	$(MAKE) -f Makefile.coq clean
