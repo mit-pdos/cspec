@@ -131,8 +131,22 @@ Proof.
   auto.
 Qed.
 
+Theorem curr_val_buffer_blockstate : forall (bs: blockstate) b,
+    curr_val (buffer b bs) = b.
+Proof.
+  auto.
+Qed.
+
+Theorem curr_val_buffer_blockhist : forall (bs: blockhist) b,
+    curr_val (buffer b bs) = b.
+Proof.
+  auto.
+Qed.
+
 Hint Rewrite curr_val_blockstate : block.
 Hint Rewrite curr_val_blockhist : block.
+Hint Rewrite curr_val_buffer_blockhist : block.
+Hint Rewrite curr_val_buffer_blockstate : block.
 
 Definition flush {B} {async:AsyncBlock B} (d:diskOf B) : diskOf B :=
   mapDisk d flushBlock.
