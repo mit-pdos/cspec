@@ -244,7 +244,7 @@ Proof.
 Qed.
 
 Record pointwise_prop T (P: T -> Prop) (d: diskOf T) : Prop :=
-  { pointwise_prop_holds :=
+  { pointwise_prop_holds :
       forall a, match d a with
            | Some bs => P bs
            | None => True
