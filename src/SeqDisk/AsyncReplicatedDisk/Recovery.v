@@ -67,6 +67,8 @@ Section AsyncReplicatedDisk.
       forall b, List.In b (durable_vals h) ->
            b = curr_val h.
 
+    Definition disk_synced := pointwise_prop block_synced.
+
     (* crashesTo_one_of d_0 d_1 d says [forall a, d(a) = d_0(a) \/ d(a) = d_1(a)];
      this isn't a pointwise_rel, unfortunately *)
     Record crashesTo_one_of (d_0 d_1 d:histdisk) : Prop :=
@@ -74,9 +76,8 @@ Section AsyncReplicatedDisk.
         matches_one_size1 : size d_1 = size d;
         matches_one_pointwise : forall a,
             match d_0 a, d_1 a, d a with
-            | Some h0, Some h1, Some h => (histblock h0 (curr_val h) \/
-                                          histblock h1 (curr_val h)) /\
-                                         block_synced h
+            | Some h0, Some h1, Some h => histblock h0 (curr_val h) \/
+                                         histblock h1 (curr_val h)
             | None, None, None => True
             | _, _, _ => False
             end;
@@ -93,7 +94,8 @@ Section AsyncReplicatedDisk.
                exists d,
                  TD.disk0 state' |= covered d /\
                  TD.disk1 state' |= covered d /\
-                 crashesTo_one_of d_0 d_1 d;
+                 crashesTo_one_of d_0 d_1 d /\
+                 disk_synced d;
            recover :=
              fun (_:unit) state' =>
                (* either disk could change due to failures *)
@@ -101,7 +103,9 @@ Section AsyncReplicatedDisk.
                  TD.disk0 state' |= crashesTo d_0' /\
                  TD.disk1 state' |= crashesTo d_1' /\
                  crashesTo_one_of d_0 d_1 d_0' /\
-                 crashesTo_one_of d_0 d_1 d_1';
+                 crashesTo_one_of d_0 d_1 d_1' /\
+                 disk_synced d_0' /\
+                 disk_synced d_1';
          |}).
 
     Theorem Recover_rok :
@@ -139,12 +143,17 @@ Section AsyncReplicatedDisk.
       forall d_0 d_1 d_0' d_1' : histdisk,
         crashesTo_one_of d_0 d_1 d_0' ->
         crashesTo_one_of d_0 d_1 d_1' ->
+        disk_synced d_0' ->
+        disk_synced d_1' ->
         forall d' : histdisk,
           crashesTo_one_of d_0' d_1' d' ->
           crashesTo_one_of d_0 d_1 d'.
     Proof.
       intros.
-      destruct H, H0, H1.
+      repeat match goal with
+             | [ H: disk_synced _ |- _ ] => destruct H
+             | [ H: crashesTo_one_of _ _ _ |- _ ] => destruct H
+             end.
       econstructor; intros; try congruence.
       repeat match goal with
              | [ H: forall (_:addr), _ |- _ ] =>
