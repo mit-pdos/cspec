@@ -407,10 +407,10 @@ Theorem rec_noop_compose : forall `(rec: prog unit) `(rec2: prog unit)
            {| pre := crash_invariant rf2 wipe1 state;
               post :=
                 fun _ state' => invariant rf2 state' /\
-                         abstraction rf2 state' = wipe2 (abstraction rf2 state);
+                         abstraction rf2 state' = abstraction rf2 state;
               recover :=
                 fun _ state' => crash_invariant rf2 wipe1 state' /\
-                         abstraction rf2 state' = wipe2 (abstraction rf2 state);
+                         abstraction rf2 state' = abstraction rf2 state;
            |}) rec2 rec rf1 ->
       rec_noop (_ <- rec; rec2) (refinement_compose rf1 rf2) wipe2.
 Proof.
@@ -421,15 +421,11 @@ Proof.
     eapply idempotent_loopspec; eauto.
     unfold idempotent; simpl; intuition eauto.
     descend; intuition (eauto; try congruence).
-    normalize_eq.
-    apply (wipe_idempotent Hwipe).
   - (* chain specifications *)
     simpl; intuition.
     descend; intuition (subst; eauto).
     descend; intuition (subst; eauto).
-    normalize_eq.
-    rewrite (wipe_abstraction Hwipe).
-    apply (wipe_idempotent Hwipe).
+    rewrite (wipe_abstraction Hwipe) in *; auto.
 Qed.
 
 Theorem spec_exec_equiv : forall `(spec: Specification A T R State)
