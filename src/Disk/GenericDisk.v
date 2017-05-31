@@ -243,6 +243,13 @@ Proof.
   destruct (lt_dec a (size d)); unfold disk_get in *; congruence.
 Qed.
 
+Record pointwise_prop T (P: T -> Prop) (d: diskOf T) : Prop :=
+  { pointwise_prop_holds :=
+      forall a, match d a with
+           | Some bs => P bs
+           | None => True
+           end; }.
+
 (* expressed for nice inversion *)
 Record pointwise_rel T T' (rel: T -> T' -> Prop) (d: diskOf T) (d': diskOf T') : Prop :=
   { sizes_eq: size d = size d';
