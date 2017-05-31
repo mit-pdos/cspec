@@ -143,10 +143,17 @@ Proof.
   auto.
 Qed.
 
+Theorem durable_val_buffer : forall (bs: blockhist) b,
+    durable_vals (buffer b bs) = cons (current_val bs) (durable_vals bs).
+Proof.
+  auto.
+Qed.
+
 Hint Rewrite curr_val_blockstate : block.
 Hint Rewrite curr_val_blockhist : block.
 Hint Rewrite curr_val_buffer_blockhist : block.
 Hint Rewrite curr_val_buffer_blockstate : block.
+Hint Rewrite durable_val_buffer : block.
 
 Definition flush {B} {async:AsyncBlock B} (d:diskOf B) : diskOf B :=
   mapDisk d flushBlock.

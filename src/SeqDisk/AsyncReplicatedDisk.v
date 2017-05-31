@@ -112,6 +112,76 @@ Module RD.
       eapply pred_weaken; eauto.
     Qed.
 
+    Lemma histblock_buffer : forall h b' b,
+        histblock h b ->
+        histblock (buffer b' h) b.
+    Proof.
+      intros.
+      econstructor.
+      autorewrite with block.
+      inversion H; subst.
+      econstructor.
+      autorewrite with block; auto.
+      constructor 2; auto.
+    Qed.
+
+    Hint Resolve histblock_buffer.
+
+    Lemma crashesTo_upd_or_not : forall d a b d',
+        crashesTo_one_of (diskUpdF d a (buffer b)) d d' ->
+        crashesTo_one_of (diskUpdF d a (buffer b)) (diskUpdF d a (buffer b)) d'.
+    Proof.
+      intros.
+      destruct H.
+      econstructor; intros; try congruence.
+      specialize (crashesTo_one_pointwise a0).
+      is_eq a a0; autorewrite with upd in *.
+      destruct matches in *; try contradiction.
+      erewrite diskUpdF_eq in * by eauto.
+      inversion Heqo; subst.
+      intuition eauto.
+
+      destruct matches in *.
+    Qed.
+
+    Hint Resolve crashesTo_upd_or_not.
+
+    Theorem Write_rok : forall a b,
+        prog_spec
+          (fun d state =>
+             {|
+               pre :=
+                 TD.disk0 state |= covered d /\
+                 TD.disk1 state |= covered d;
+               post :=
+                 fun r state' =>
+                   r = tt /\
+                   TD.disk0 state' |= covered (diskUpdF d a (buffer b)) /\
+                   TD.disk1 state' |= covered (diskUpdF d a (buffer b));
+               recover :=
+                 fun _ state' =>
+                   (TD.disk0 state' |= crashesTo d /\
+                    TD.disk1 state' |= crashesTo d) \/
+                   (TD.disk0 state' |= crashesTo (diskUpdF d a (buffer b)) /\
+                    TD.disk1 state' |= crashesTo (diskUpdF d a (buffer b)));
+             |})
+          (Write td a b) (_ <- irec td; Recover td)
+          (refinement td).
+    Proof.
+      start.
+      rename a0 into d.
+      descend; (intuition eauto); simplify.
+      - descend; (intuition eauto); simplify.
+        left.
+        intuition eauto using pred_weaken.
+      - descend; (intuition eauto); simplify.
+        right.
+        intuition eauto using pred_weaken.
+      - descend; (intuition eauto); simplify.
+        right.
+        intuition eauto using pred_weaken.
+    Qed.
+
   End ReplicatedDisk.
 
 End RD.

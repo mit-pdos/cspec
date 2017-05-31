@@ -176,6 +176,16 @@ Section GenericDisks.
     repeat deex; unfold disk_get in *; congruence.
   Qed.
 
+  Theorem diskUpdF_eq : forall d a f v,
+      d a = Some v ->
+      diskUpdF d a f a = Some (f v).
+  Proof.
+    unfold diskUpdF; intros.
+    pose proof (diskMem_domain d a).
+    destruct matches; simpl; autorewrite with upd; eauto.
+    repeat deex; unfold disk_get in *; congruence.
+  Qed.
+
   (* disks are actually equal when their memories are equal; besides being useful
  in practice, this to some extent justifies the diskMem coercion, since disks
  are uniquely determined by their memories, subject to the sized_domain
