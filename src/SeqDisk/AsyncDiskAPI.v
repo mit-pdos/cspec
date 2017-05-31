@@ -12,6 +12,8 @@ Module D.
 
   Definition State := disk.
 
+  Definition wipe : State -> State := wipeDisk.
+
   Inductive step : forall `(op: Op T), Semantics State T :=
   | step_read : forall a r (state: State),
       (forall b, state a = Some b -> r = curr_val b) ->
@@ -24,6 +26,6 @@ Module D.
       step (DiskSize) state (size state) state.
 
   Definition API := {| op_sem := post_step (@step) pflush;
-                       crash_effect := wipeDisk; |}.
+                       crash_effect := wipe; |}.
 
 End D.
