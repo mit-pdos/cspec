@@ -69,12 +69,15 @@ Section AsyncReplicatedDisk.
 
     Definition disk_synced := pointwise_prop block_synced.
 
-    (* crashesTo_one_of d_0 d_1 d says [forall a, d(a) = d_0(a) \/ d(a) = d_1(a)];
-     this isn't a pointwise_rel, unfortunately *)
+    (* crashesTo_one_of d_0 d_1 d says [forall a, d_0(a) ~> d(a) \/ d_1(a) ~> d(a)]
+    where [h ~> h'] is made-up notation for h crashing to the current value in
+    h' (with any set of durable writes in h').
+
+     This isn't a pointwise_rel, unfortunately, since it covers three disks. *)
     Record crashesTo_one_of (d_0 d_1 d:histdisk) : Prop :=
-      { matches_one_size0 : size d_0 = size d;
-        matches_one_size1 : size d_1 = size d;
-        matches_one_pointwise : forall a,
+      { crashesTo_one_size0 : size d_0 = size d;
+        crashesTo_one_size1 : size d_1 = size d;
+        crashesTo_one_pointwise : forall a,
             match d_0 a, d_1 a, d a with
             | Some h0, Some h1, Some h => histblock h0 (curr_val h) \/
                                          histblock h1 (curr_val h)
@@ -92,8 +95,8 @@ Section AsyncReplicatedDisk.
            post :=
              fun (_:unit) state' =>
                exists d,
-                 TD.disk0 state' |= covered d /\
-                 TD.disk1 state' |= covered d /\
+                 TD.disk0 state' |= crashesTo d /\
+                 TD.disk1 state' |= crashesTo d /\
                  crashesTo_one_of d_0 d_1 d /\
                  disk_synced d;
            recover :=
