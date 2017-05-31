@@ -63,22 +63,20 @@ Section AsyncReplicatedDisk.
         _ <- Prim td (TD.Sync d1);
         Ret tt.
 
-    (* true after a wipe or sync *)
+    Definition block_synced (h:blockhist) :=
+      forall b, List.In b (durable_vals h) ->
+           b = curr_val h.
 
-    Definition block_synced : blockhist -> Prop :=
-      fun h => forall b, List.In b (durable_vals h) ->
-                 curr_val h = b.
-
-    Definition disk_synced : histdisk -> Prop := pointwise_prop block_synced.
-
-    (* matches_one_of d_0 d_1 d says [forall a, d(a) = d_0(a) \/ d(a) = d_1(a)];
+    (* crashesTo_one_of d_0 d_1 d says [forall a, d(a) = d_0(a) \/ d(a) = d_1(a)];
      this isn't a pointwise_rel, unfortunately *)
-    Record matches_one_of (d_0 d_1 d:histdisk) : Prop :=
+    Record crashesTo_one_of (d_0 d_1 d:histdisk) : Prop :=
       { matches_one_size0 : size d_0 = size d;
         matches_one_size1 : size d_1 = size d;
         matches_one_pointwise : forall a,
             match d_0 a, d_1 a, d a with
-            | Some b0, Some b1, Some b => b = b0 \/ b = b1
+            | Some h0, Some h1, Some h => (histblock h0 (curr_val h) \/
+                                          histblock h1 (curr_val h)) /\
+                                         block_synced h
             | None, None, None => True
             | _, _, _ => False
             end;
@@ -88,27 +86,22 @@ Section AsyncReplicatedDisk.
       (fun '(d_0, d_1) state =>
          {|
            pre :=
-             TD.disk0 state |= covered d_0 /\
-             TD.disk1 state |= covered d_1 /\
-             disk_synced d_0 /\
-             disk_synced d_1;
+             TD.disk0 state |= crashesTo d_0 /\
+             TD.disk1 state |= crashesTo d_1;
            post :=
              fun (_:unit) state' =>
                exists d,
                  TD.disk0 state' |= covered d /\
                  TD.disk1 state' |= covered d /\
-                 matches_one_of d_0 d_1 d /\
-                 disk_synced d;
+                 crashesTo_one_of d_0 d_1 d;
            recover :=
              fun (_:unit) state' =>
                (* either disk could change due to failures *)
                exists d_0' d_1',
-                 TD.disk0 state' |= covered d_0' /\
-                 TD.disk1 state' |= covered d_1' /\
-                 matches_one_of d_0 d_1 d_0' /\
-                 matches_one_of d_0 d_1 d_1' /\
-                 disk_synced d_0' /\
-                 disk_synced d_1';
+                 TD.disk0 state' |= crashesTo d_0' /\
+                 TD.disk1 state' |= crashesTo d_1' /\
+                 crashesTo_one_of d_0 d_1 d_0' /\
+                 crashesTo_one_of d_0 d_1 d_1';
          |}).
 
     Theorem Recover_rok :
@@ -120,13 +113,35 @@ Section AsyncReplicatedDisk.
     Proof.
     Admitted.
 
-    Lemma matches_one_of_trans:
+    Lemma histblock_curr_eq : forall h b,
+        b = curr_val h ->
+        histblock h b.
+    Proof.
+      intros; subst.
+      constructor.
+    Qed.
+
+    Lemma histblock_trans : forall h h',
+        histblock h (curr_val h') ->
+        block_synced h' ->
+        forall h'', histblock h' (curr_val h'') ->
+               histblock h (curr_val h'').
+    Proof.
+      unfold block_synced; intros.
+      inversion H1; subst; try congruence.
+      apply H0 in H2.
+      congruence.
+    Qed.
+
+    Hint Resolve histblock_trans.
+
+    Lemma crashesTo_one_of_trans:
       forall d_0 d_1 d_0' d_1' : histdisk,
-        matches_one_of d_0 d_1 d_0' ->
-        matches_one_of d_0 d_1 d_1' ->
+        crashesTo_one_of d_0 d_1 d_0' ->
+        crashesTo_one_of d_0 d_1 d_1' ->
         forall d' : histdisk,
-          matches_one_of d_0' d_1' d' ->
-          matches_one_of d_0 d_1 d'.
+          crashesTo_one_of d_0' d_1' d' ->
+          crashesTo_one_of d_0 d_1 d'.
     Proof.
       intros.
       destruct H, H0, H1.
@@ -138,7 +153,7 @@ Section AsyncReplicatedDisk.
       destruct matches in *; intuition subst; eauto.
     Qed.
 
-    Hint Resolve matches_one_of_trans.
+    Hint Resolve crashesTo_one_of_trans.
 
     Theorem Recover_ok :
       prog_loopspec

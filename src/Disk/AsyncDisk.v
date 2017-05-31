@@ -181,15 +181,20 @@ Proof.
   simpl; intuition eauto.
 Qed.
 
-Inductive histcrash : blockhist -> blockstate -> Prop :=
-| hist_crash_curr : forall h,
-    histcrash h {| cache_val := None;
-                   durable_val := curr_val h; |}
-| hist_crash_prev : forall h b,
+Inductive histblock : blockhist -> block -> Prop :=
+| hist_block_curr : forall h,
+    histblock h (curr_val h)
+| hist_block_prev : forall h b,
     List.In b (durable_vals h) ->
+    histblock h b.
+
+Inductive histcrash : blockhist -> blockstate -> Prop :=
+| histcrash_block : forall h b,
+    histblock h b ->
     histcrash h {| cache_val := None;
                    durable_val := b; |}.
 
+Local Hint Constructors histblock.
 Local Hint Constructors histcrash.
 
 Definition crashesTo : histdisk -> disk -> Prop :=
