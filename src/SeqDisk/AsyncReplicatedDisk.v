@@ -448,7 +448,26 @@ Module RD.
             unfold spec_impl; simplify.
         + exists (covering (rd_abstraction state)).
           (intuition eauto); simplify.
-          all: admit.
+          admit. (* not actually true: disk1 needs a broader covering *)
+          unfold post_step.
+          exists (rd_abstraction state).
+          destruct matches in *.
+          intuition eauto.
+          admit. (* seems a bit problematic: there's no ordering to the spec, so
+          the non-determinism could increase for the histories, but we're
+          required to prove that every address has less caching *)
+          intuition eauto.
+          admit. (* same issue *)
+
+          admit. (* here is where the crash function is problematic: we know
+          that we're in a crash state of the correct abstraction, but it does
+          not have to be the one that removes in-memory state (it might be
+          flushed according to crashesTo) *)
+
+          admit. (* the invariant should be true, but something from recovery is
+          lost here: we have a crashesTo, but it's actually guaranteed to be of
+          a synced disk, so that crashesTo does nothing (this should be stated
+          more explicitly and carried through in the Read_rok spec above) *)
         + all: admit.
         + all: admit.
         + all: admit.
