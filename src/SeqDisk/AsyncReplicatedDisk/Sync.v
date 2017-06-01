@@ -21,20 +21,22 @@ Section ReplicatedDisk.
       _ <- Prim td (TD.Sync d1);
       Ret tt.
 
-  Theorem disk0_wipe_flush_stable : forall state d,
+  Theorem disk0_wipe_flush_stable : forall state state' d,
       TD.disk0 state |= then_flush (covered d) ->
-      TD.disk0 (TD.wipe state) |= then_flush (covered d).
+      TD.wipe state state' ->
+      TD.disk0 state' |= then_flush (covered d).
   Proof.
-    intros.
+    unfold TD.wipe; intros; subst.
     destruct state; simpl in *.
     destruct disk0, disk1; simpl in *; eauto.
   Qed.
 
-  Theorem disk1_wipe_flush_stable : forall state d,
+  Theorem disk1_wipe_flush_stable : forall state state' d,
       TD.disk1 state |= then_flush (covered d) ->
-      TD.disk1 (TD.wipe state) |= then_flush (covered d).
+      TD.wipe state state' ->
+      TD.disk1 state' |= then_flush (covered d).
   Proof.
-    intros.
+    unfold TD.wipe; intros; subst.
     destruct state; simpl in *.
     destruct disk0, disk1; simpl in *; eauto.
   Qed.

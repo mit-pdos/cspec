@@ -10,9 +10,9 @@ Module D.
 
   Import SeqDiskDefs.D.
 
-  Definition State := disk.
+  Definition State := histdisk.
 
-  Definition wipe : State -> State := wipeDisk.
+  Definition wipe : State -> State -> Prop := wipeHist.
 
   Inductive step : forall `(op: Op T), Semantics State T :=
   | step_read : forall a r (state: State),

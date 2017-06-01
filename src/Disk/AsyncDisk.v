@@ -201,6 +201,15 @@ Inductive histcrash : blockhist -> blockstate -> Prop :=
     histcrash h {| cache_val := None;
                    durable_val := b; |}.
 
+Inductive histcrash_to_hist : blockhist -> blockhist -> Prop :=
+| histcrash_to_hist_block : forall h b,
+    histblock h b ->
+    histcrash_to_hist h {| current_val := b;
+                           durable_vals := nil; |}.
+
+Definition wipeHist : histdisk -> histdisk -> Prop :=
+  pointwise_rel histcrash_to_hist.
+
 Local Hint Constructors histblock.
 Local Hint Constructors histcrash.
 

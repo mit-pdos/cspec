@@ -294,20 +294,9 @@ Module RD.
     (* The proof will require a refinement; we build one up based on the
     two-disk state. *)
 
-    (* TODO: fix [D.State] to allow two durable values *)
-    Definition rd_abstraction (state:TD.State) : D.State :=
-      match state with
-      | TD.Disks (Some d) _ _ => d
-      | TD.Disks None (Some d) _ => d
-      | _ => empty_disk (* impossible *)
-      end.
-
-    Definition rd_invariant (state:TD.State) :=
-      match state with
-      | TD.Disks (Some d_0) (Some d_1) _ =>
-        exists d, covered d d_0 /\ covered d d_1
-      | _ => True
-      end.
+    Definition rd_abstraction (state:TD.State) (d:D.State) :=
+      TD.disk0 state |= covered d /\
+      TD.disk1 state |= covered d.
 
     (* We re-express the abstraction and invariant's behavior in terms of the
        maybe holds (m |= F) statements in all of our specifications. *)
@@ -346,46 +335,7 @@ Module RD.
 
     Hint Resolve covered_covering.
 
-    Lemma invariant_to_disks_eq0 : forall state,
-        rd_invariant state ->
-        TD.disk0 state |= covered (covering (rd_abstraction state)).
-    Proof.
-      crush.
-    Qed.
-
-    Lemma invariant_to_disks_eq1 : forall state,
-        rd_invariant state ->
-        TD.disk1 state |= covered (covering (rd_abstraction state)).
-    Proof.
-      crush.
-      (* TODO: this doesn't hold; covering needs to incorporate the crash states
-      for both disks *)
-    Abort.
-
-    Lemma disks_eq_to_invariant : forall state d,
-        TD.disk0 state |= covered d ->
-        TD.disk1 state |= covered d ->
-        rd_invariant state.
-    Proof.
-      crush.
-    Qed.
-
-    Lemma disks_eq_to_abstraction : forall state d,
-        TD.disk0 state |= eq d ->
-        TD.disk1 state |= eq d ->
-        rd_abstraction state = d.
-    Proof.
-      crush.
-      solve_false.
-    Qed.
-
-    Hint Resolve invariant_to_disks_eq0 (* invariant_to_disks_eq1 *).
-    Hint Resolve disks_eq_to_invariant disks_eq_to_abstraction.
-
-    (* Finally, we put together the pieces of the [Interface]. Here we also
-    convert from our specificatiosn above to the exact form that an Interface
-    uses; the proofs are automatic after defining the lemmas above about D.step
-    and the layer refinement. *)
+    (* Finally, we put together the pieces of the [Interface]. *)
 
     Definition d_op_impl T (op:D.Op T) : prog T :=
       match op with
@@ -398,8 +348,7 @@ Module RD.
     Definition rd_refinement :=
       refinement_compose
         (refinement td)
-        {| invariant := rd_invariant;
-           abstraction := rd_abstraction; |}.
+        {| abstraction := rd_abstraction; |}.
 
     Definition impl : InterfaceImpl D.Op :=
       {| op_impl := d_op_impl;
@@ -417,23 +366,7 @@ Module RD.
       destruct disk0, disk1; simpl; eauto.
       exists (covering d), empty_disk; eauto.
       exists empty_disk, (covering d); eauto.
-      exfalso; eauto.
-    Qed.
-
-    Theorem rd_crash_effect_valid :
-      crash_effect_valid {| invariant := rd_invariant;
-                            abstraction := rd_abstraction |}
-                         TD.wipe D.wipe.
-    Proof.
-      econstructor; intros; simpl.
-      - unfold rd_abstraction.
-        destruct w; simpl.
-        destruct disk0, disk1; auto.
-        exfalso; eauto.
-      - eapply diskMem_ext_eq.
-        extensionality a.
-        simpl.
-        destruct matches.
+      solve_false.
     Qed.
 
     Definition rd : Interface D.API.
@@ -445,50 +378,39 @@ Module RD.
         destruct op; unfold op_spec;
           apply spec_refinement_compose;
           eapply prog_spec_weaken; eauto;
-            unfold spec_impl; simplify.
-        + exists (covering (rd_abstraction state)).
-          (intuition eauto); simplify.
-          admit. (* not actually true: disk1 needs a broader covering *)
+            unfold spec_impl, rd_abstraction; simplify.
+        + descend; intuition eauto.
+          exists state2; intuition eauto.
           unfold post_step.
-          exists (rd_abstraction state).
-          destruct matches in *.
-          intuition eauto.
-          admit. (* seems a bit problematic: there's no ordering to the spec, so
-          the non-determinism could increase for the histories, but we're
-          required to prove that every address has less caching *)
-          intuition eauto.
-          admit. (* same issue *)
-
-          admit. (* here is where the crash function is problematic: we know
-          that we're in a crash state of the correct abstraction, but it does
-          not have to be the one that removes in-memory state (it might be
-          flushed according to crashesTo) *)
-
-          admit. (* the invariant should be true, but something from recovery is
-          lost here: we have a crashesTo, but it's actually guaranteed to be of
-          a synced disk, so that crashesTo does nothing (this should be stated
-          more explicitly and carried through in the Read_rok spec above) *)
+          descend; intuition eauto.
+          reflexivity.
+          simplify.
+          admit. (* recovery should not promise two crashesTo relations; we need
+          to know that both disks are actually the same (pick a crash block for
+          every address and then promise both disks are just those blocks with
+          no histories) *)
         + all: admit.
         + all: admit.
         + all: admit.
 
       - eapply rec_noop_compose; eauto; simpl.
-        apply rd_crash_effect_valid.
         eapply prog_spec_weaken; eauto;
-          unfold spec_impl; simplify.
-        unfold crash_invariant in *; simpl in *; repeat deex.
-        admit.
-
+          unfold spec_impl, rd_abstraction; simplify.
+        unfold TD.wipe in *; subst.
+        exists a, a.
+        intuition eauto.
+        admit. (* this is a special case of wipe_crashesTo *)
+        admit. (* same as above *)
+        repeat deex.
+        admit. (* need to go from disk_synced to crashesTo being trivial *)
+        repeat deex.
+        admit. (* same as above *)
       - eapply then_init_compose; eauto.
         eapply prog_spec_weaken; unfold spec_impl; simplify.
         pose proof (state_some_disks state); simplify.
         descend; intuition eauto.
         destruct v; simplify; finish.
-
-      - eapply crash_effect_compose; unfold wipe_valid;
-          eauto using crash_effect_ok; simpl; intros.
-        apply rd_crash_effect_valid.
-        apply rd_crash_effect_valid.
+        unfold rd_abstraction; eauto.
     Admitted.
 
   End ReplicatedDisk.
