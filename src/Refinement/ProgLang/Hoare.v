@@ -9,23 +9,20 @@ Require Import ProgTheorems.
 (* A LRefinement (for "layer refinement") goes between State1 (implementation)
 and State2 (spec) *)
 Record LRefinement State1 State2 :=
-  { invariant : State1 -> Prop;
-    abstraction : State1 -> State2; }.
+  { abstraction : State1 -> State2 -> Prop; }.
 
 (* TODO: come up with a good, short name for terms of type Refinement (currently
 using [rf], which I'm not too happy with) *)
 Definition Refinement State := LRefinement world State.
 
 Definition IdRefinement State : LRefinement State State :=
-  {| invariant := fun _ => True;
-     abstraction := fun state => state; |}.
+  {| abstraction := fun state state' => state' = state; |}.
 
 Definition refinement_compose
            `(rf1: Refinement State1)
            `(rf2: LRefinement State1 State2) :=
-  {| invariant := fun w => invariant rf1 w /\
-                        invariant rf2 (abstraction rf1 w);
-     abstraction := fun w => abstraction rf2 (abstraction rf1 w); |}.
+  {| abstraction := fun w state' => exists state, abstraction rf2 state state' /\
+                                  abstraction rf1 w state; |}.
 
 Record Quadruple T R State :=
   Spec {
@@ -41,18 +38,17 @@ Generalizable Variable A.
 Definition prog_spec `(spec: Specification A T R State) `(p: prog T)
            `(rec: prog R)
            `(rf: Refinement State) :=
-  forall a w,
-    let state := abstraction rf w in
+  forall a w state,
+    abstraction rf w state ->
     pre (spec a state) ->
-    invariant rf w ->
     forall r, rexec p rec w r ->
          match r with
-         | RFinished v w' => let state' := abstraction rf w' in
-                            post (spec a state) v state' /\
-                            invariant rf w'
-         | Recovered v w' => let state' := abstraction rf w' in
-                            recover (spec a state) v state' /\
-                            invariant rf w'
+         | RFinished v w' => exists state',
+                            abstraction rf w' state' /\
+                            post (spec a state) v state'
+         | Recovered v w' => exists state',
+                            abstraction rf w' state' /\
+                            recover (spec a state) v state'
          end.
 
 Definition spec_impl
@@ -74,9 +70,9 @@ Theorem prog_spec_weaken : forall `(spec1: Specification A T R State)
     prog_spec spec2 p rec rf.
 Proof.
   unfold prog_spec at 2; intros.
-  eapply H0 in H1; eauto; repeat deex.
+  eapply H0 in H2; eauto; repeat deex.
   eapply H in H3; eauto.
-  destruct r; simpl in *; intuition eauto.
+  destruct r; simpl in *; repeat deex; intuition eauto.
 Qed.
 
 Hint Resolve tt.
@@ -111,8 +107,8 @@ Proof.
     | [ Hexec: exec p _ _ |- _ ] =>
       eapply RExec in Hexec
     end.
-    eapply H0 in H1; repeat deex.
-    eapply H in H9; simpl in *; safe_intuition eauto.
+    eapply H0 in H2; repeat deex.
+    eapply H in H9; simpl in *; safe_intuition (repeat deex; eauto).
     match goal with
     | [ Hexec: exec (rx _) _ _ |- _ ] =>
       eapply RExec in Hexec;
@@ -122,15 +118,15 @@ Proof.
     + (* p crashed before running *)
       assert (exec p w' (Crashed w')) as Hexec by constructor.
       eapply RExecCrash in Hexec; eauto.
-      eapply H0 in H1; repeat deex.
-      eapply H in Hexec; simpl in *; safe_intuition eauto.
+      eapply H0 in H2; repeat deex.
+      eapply H in Hexec; simpl in *; safe_intuition (repeat deex; eauto).
     + (* p finished, rx crashed *)
       match goal with
       | [ Hexec: exec p _ _ |- _ ] =>
         eapply RExec in Hexec
       end.
-      eapply H0 in H1; repeat deex.
-      eapply H in H10; simpl in *; safe_intuition eauto.
+      eapply H0 in H2; repeat deex.
+      eapply H in H10; simpl in *; safe_intuition (repeat deex; eauto).
       match goal with
       | [ Hexec: exec (rx _) _ _ |- _ ] =>
         eapply RExecCrash in Hexec; eauto;
@@ -141,8 +137,8 @@ Proof.
       | [ Hexec: exec p _ _ |- _ ] =>
         eapply RExecCrash in Hexec; eauto
       end.
-      eapply H0 in H1; repeat deex.
-      eapply H in H10; simpl in *; safe_intuition eauto.
+      eapply H0 in H2; repeat deex.
+      eapply H in H10; simpl in *; safe_intuition (repeat deex; eauto).
 Qed.
 
 (** * splitting spec into multiple cases *)
@@ -163,8 +159,8 @@ Theorem spec_cases : forall `(spec: Specification A T R State)
     prog_spec spec p rec rf.
 Proof.
   unfold prog_spec at 2; intros.
-  apply H in H0.
-  eapply H0 in H2; eauto.
+  apply H in H1.
+  eapply H1 in H2; eauto.
   simpl in *; eauto.
 Qed.
 
@@ -206,33 +202,32 @@ Qed.
 Definition prog_loopspec `(spec: Specification A unit unit State)
            `(rec': prog unit) `(rec: prog unit)
            (rf: Refinement State) :=
-  forall a w,
-    let state := abstraction rf w in
+  forall a w state,
+    abstraction rf w state ->
     pre (spec a state) ->
-    invariant rf w ->
     forall rv rv' w',
       Relation_Operators.clos_refl_trans_1n
         (fun '(_, w) '(rv', w') => rexec rec' rec w (Recovered rv' w'))
         (rv, w) (rv', w') ->
       forall rv'' w'',
         exec rec' w' (Finished rv'' w'') ->
-        let state'' := abstraction rf w'' in
-        post (spec a state) rv'' state'' /\
-        invariant rf w''.
+        exists state'',
+          abstraction rf w'' state'' /\
+          post (spec a state) rv'' state''.
 
 Definition idempotent `(spec: Specification A T unit State) :=
   forall a state,
     pre (spec a state) ->
     forall v state', recover (spec a state) v state' ->
-                     (* idempotency: crash invariant implies precondition to
-                        re-run on every crash *)
-                     exists a', pre (spec a' state') /\
-                           (* postcondition transitivity: establishing the
-                              postcondition from a crash state is sufficient to
-                              establish it with respect to the original initial
-                              state (note all with the same ghost state) *)
-                                forall rv state'', post (spec a' state') rv state'' ->
-                                                   post (spec a state) rv state''.
+            (* idempotency: crash invariant implies precondition to
+               re-run on every crash *)
+            exists a', pre (spec a' state') /\
+                  (* postcondition transitivity: establishing the
+                     postcondition from a crash state is sufficient to
+                     establish it with respect to the original initial
+                     state (note all with the same ghost state) *)
+                  forall rv state'', post (spec a' state') rv state'' ->
+                                post (spec a state) rv state''.
 
 Theorem idempotent_loopspec : forall `(rec: prog unit) `(rec': prog unit)
                                      `(spec: Specification A unit unit State)
@@ -248,12 +243,15 @@ Proof.
          end.
 
   generalize dependent a.
+  generalize dependent state.
   induction H2; intros.
   - eapply RExec in H3.
     eapply Hspec in H3; eauto.
-  - eapply Hspec in H0; simpl in *; safe_intuition eauto.
-    eapply H in H0; eauto; repeat deex.
-    specialize (IHclos_refl_trans_1n a'); intuition eauto.
+  - eapply Hspec in H0; simpl in *; safe_intuition (repeat deex; eauto).
+    eapply H in H4; eauto; repeat deex.
+    specialize (H4 _ _ ltac:(eauto)); repeat deex; intuition.
+    specialize (IHclos_refl_trans_1n _ ltac:(eauto) _ ltac:(eauto)).
+    safe_intuition (repeat deex; eauto).
 Qed.
 
 Theorem compose_recovery : forall `(spec: Specification A'' T unit State)
@@ -278,7 +276,7 @@ Theorem compose_recovery : forall `(spec: Specification A'' T unit State)
 Proof.
   intros.
   unfold prog_spec; intros.
-  eapply Hspec_spec' in H; safe_intuition;
+  eapply Hspec_spec' in H0; safe_intuition;
     repeat deex.
   clear Hspec_spec'.
   destruct r.
@@ -286,7 +284,7 @@ Proof.
     | [ Hexec: rexec p _ _ _ |- _ ] =>
       eapply rexec_finish_any_rec in Hexec;
         eapply Hspec in Hexec
-    end; simpl in *; intuition eauto.
+    end; simpl in *; intuition (repeat deex; eauto).
   - inv_rexec.
     match goal with
     | [ Hexec: exec_recover _ _ _ _ |- _ ] =>
@@ -299,118 +297,115 @@ Proof.
     match goal with
     | [ Hexec: rexec p _ _ _ |- _ ] =>
       eapply Hspec in Hexec
-    end; simpl in *; safe_intuition eauto.
+    end; simpl in *; safe_intuition (repeat deex; eauto).
     (* H3: recover -> exists a' *)
-    (* H1: recover *)
-    eapply H3 in H1; repeat deex.
+    (* H6: recover *)
+    eapply H3 in H6; repeat deex.
     match goal with
     | [ Hexec: exec rec' _ _ |- _ ] =>
       eapply Hrspec in Hexec
-    end; simpl in *; safe_intuition eauto.
+    end; simpl in *; safe_intuition (repeat deex; eauto).
 Qed.
 
 Theorem spec_refinement_compose :
   forall `(spec: Specification A T R State2)
-         `(p: prog T) `(rec: prog R)
-         `(rf2: LRefinement State1 State2)
-         `(rf1: Refinement State1),
+    `(p: prog T) `(rec: prog R)
+    `(rf2: LRefinement State1 State2)
+    `(rf1: Refinement State1),
     prog_spec
-      (fun (a:A) state =>
-         let state2 := abstraction rf2 state in
+      (fun '(a, state2) state =>
          {| pre := pre (spec a state2) /\
-                   invariant rf2 state;
+                   abstraction rf2 state state2;
             post :=
               fun v state' =>
-                let state2' := abstraction rf2 state' in
-                post (spec a state2) v state2' /\
-                invariant rf2 state';
+                exists state2',
+                  post (spec a state2) v state2' /\
+                  abstraction rf2 state' state2';
             recover :=
               fun v state' =>
-                let state2' := abstraction rf2 state' in
-                recover (spec a state2) v state2' /\
-                invariant rf2 state'; |}) p rec rf1 ->
+                exists state2',
+                  recover (spec a state2) v state2' /\
+                  abstraction rf2 state' state2'; |}) p rec rf1 ->
     prog_spec spec p rec (refinement_compose rf1 rf2).
 Proof.
   intros.
   unfold prog_spec, refinement_compose;
-    simpl; intros; safe_intuition.
-  eapply H in H2; simpl in *; eauto.
-  destruct r; intuition eauto.
+    simpl; intros; safe_intuition (repeat deex).
+  eapply (H (a, state)) in H2; simpl in *; eauto.
+  destruct r; intuition (repeat deex; eauto).
 Qed.
 
-Definition rec_noop `(rec: prog R) `(rf: Refinement State) (wipe: State -> State) :=
+Definition rec_noop `(rec: prog R) `(rf: Refinement State) (wipe: State -> State -> Prop) :=
   forall T (v:T),
     prog_spec
       (fun (_:unit) state =>
          {| pre := True;
             post := fun r state' => r = v /\
                              state' = state;
-            recover := fun _ state' => state' = wipe state; |})
+            recover := fun _ state' => wipe state state'; |})
       (Ret v) rec rf.
 
 (* for recovery proofs about pure programs *)
 
 Theorem ret_spec : forall `(rf: Refinement State)
-                     (wipe: State -> State)
+                     (wipe: State -> State -> Prop)
                      `(spec: Specification A T R State)
                      (v:T) (rec: prog R),
     rec_noop rec rf wipe ->
     (forall a state, pre (spec a state) ->
             post (spec a state) v state /\
-            forall r, recover (spec a state) r (wipe state)) ->
+            (* TODO: is it ok for this to be for all state'? *)
+            forall state', wipe state state' ->
+                  forall r, recover (spec a state) r state') ->
     prog_spec spec (Ret v) rec rf.
 Proof.
   intros.
   unfold prog_spec; intros.
   eapply H in H3; simpl in *; eauto.
-  eapply H0 in H1.
-  destruct r; safe_intuition; subst.
-  replace (abstraction rf w0).
-  intuition eauto.
-  replace (abstraction rf w0).
-  intuition eauto.
+  eapply H0 in H2.
+  destruct r; safe_intuition (repeat deex; eauto).
 Qed.
 
 Record crash_effect_valid `(rf: LRefinement State1 State2)
-       (wipe1: State1 -> State1)
-       (wipe2: State2 -> State2) :=
-  { wipe_abstraction: forall w, abstraction rf (wipe1 w) =
-                           wipe2 (abstraction rf w);
-    wipe_idempotent: forall state, wipe2 (wipe2 state) = wipe2 state; }.
+       (wipe1: State1 -> State1 -> Prop)
+       (wipe2: State2 -> State2 -> Prop) :=
+  { wipe_abstraction: forall w state state', wipe1 w state ->
+                                abstraction rf state state' ->
+                                exists w', abstraction rf w w' /\
+                                      wipe2 w' state';
+    wipe_abstraction': forall w w' state', abstraction rf w w' ->
+                                  wipe2 w' state' ->
+                                  exists state, wipe1 w state /\
+                                       abstraction rf state state';
+    wipe_trans: forall state state' state'', wipe2 state state' ->
+                                wipe2 state' state'' ->
+                                wipe2 state state''; }.
 
-Definition wipe_valid `(rf: Refinement State)
-           (wipe: State -> State) := crash_effect_valid rf world_crash wipe.
+Definition wipe_valid
+           `(rf: Refinement State)
+           (wipe: State -> State -> Prop) :=
+  crash_effect_valid rf (fun w w' => w' = world_crash w) wipe.
 
-Definition crash_invariant `(rf:LRefinement State1 State2)
-           (wipe: State1 -> State1) : State1 -> Prop :=
-  fun state' => exists state, invariant rf state /\ state' = wipe state.
 
-Lemma crash_invariant_from_invariant : forall `(rf: LRefinement State1 State2)
-                                         (wipe: State1 -> State1),
-    forall state, invariant rf state ->
-         crash_invariant rf wipe (wipe state).
-Proof.
-  unfold crash_invariant; eauto.
-Qed.
-
-Hint Resolve crash_invariant_from_invariant.
-
+(* TODO: this is proven, but is it useful? *)
 Theorem rec_noop_compose : forall `(rec: prog unit) `(rec2: prog unit)
                              `(rf1: Refinement State1)
-                             (wipe1: State1 -> State1)
+                             (wipe1: State1 -> State1 -> Prop)
                              `(rf2: LRefinement State1 State2)
-                             (wipe2: State2 -> State2),
+                             (wipe2: State2 -> State2 -> Prop)
+                             (crash_invariant: State1 -> Prop),
     forall (Hwipe: crash_effect_valid rf2 wipe1 wipe2),
       rec_noop rec rf1 wipe1 ->
       prog_spec
-        (fun (_:unit) state =>
-           {| pre := crash_invariant rf2 wipe1 state;
+        (fun (state0':State2) state =>
+           {| pre := exists state0, abstraction rf2 state0 state0' /\
+                               wipe1 state0 state;
               post :=
-                fun _ state' => invariant rf2 state' /\
-                         abstraction rf2 state' = abstraction rf2 state;
+                fun _ state' => exists state0, abstraction rf2 state' state0 /\
+                                   wipe2 state0' state0;
               recover :=
-                fun _ state' => crash_invariant rf2 wipe1 state' /\
-                         abstraction rf2 state' = abstraction rf2 state;
+                fun _ state' => exists state0, abstraction rf2 state0 state0' /\
+                                   wipe1 state0 state';
            |}) rec2 rec rf1 ->
       rec_noop (_ <- rec; rec2) (refinement_compose rf1 rf2) wipe2.
 Proof.
@@ -420,12 +415,11 @@ Proof.
   - (* loopspec for rec2 *)
     eapply idempotent_loopspec; eauto.
     unfold idempotent; simpl; intuition eauto.
-    descend; intuition (eauto; try congruence).
   - (* chain specifications *)
-    simpl; intuition.
+    simpl; intuition idtac.
+    simpl in *.
     descend; intuition (subst; eauto).
-    descend; intuition (subst; eauto).
-    rewrite (wipe_abstraction Hwipe) in *; auto.
+    descend; intuition (repeat deex; eauto).
 Qed.
 
 Theorem spec_exec_equiv : forall `(spec: Specification A T R State)
