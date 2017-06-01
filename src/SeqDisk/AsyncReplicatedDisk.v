@@ -369,6 +369,78 @@ Module RD.
       solve_false.
     Qed.
 
+    Lemma wipe_disk0_crashesTo : forall state d,
+        TD.disk0 state |= covered d ->
+        TD.disk0 (TD.disks_map wipeDisk state) |= crashesTo d.
+    Proof.
+      intros.
+      destruct state.
+      destruct disk0, disk1; simpl in *; eauto.
+      eapply wipe_crashesTo; eauto.
+      reflexivity.
+      eapply wipe_crashesTo; eauto.
+      reflexivity.
+    Qed.
+
+    Lemma wipe_disk1_crashesTo : forall state d,
+        TD.disk1 state |= covered d ->
+        TD.disk1 (TD.disks_map wipeDisk state) |= crashesTo d.
+    Proof.
+      intros.
+      destruct state.
+      destruct disk0, disk1; simpl in *; eauto.
+      eapply wipe_crashesTo; eauto.
+      reflexivity.
+      eapply wipe_crashesTo; eauto.
+      reflexivity.
+    Qed.
+
+    Hint Resolve wipe_disk0_crashesTo wipe_disk1_crashesTo.
+
+    Lemma crashesTo_synced_covered : forall d d',
+        crashesTo d d' ->
+        disk_synced d ->
+        covered d d'.
+    Proof.
+      intros.
+      destruct H, H0.
+      eapply pointwise_rel_indomain; intros; eauto.
+      repeat match goal with
+             | [ H: forall (_:addr), _ |- _ ] =>
+               specialize (H a)
+             end.
+      destruct matches in *.
+      inversion pointwise_rel_holds; subst; clear pointwise_rel_holds.
+      unfold block_synced in *.
+      inversion H0; subst; clear H0.
+      econstructor; simpl; eauto.
+      eapply pointwise_prop_holds in H1; subst.
+      econstructor; simpl; eauto.
+    Qed.
+
+    Hint Resolve crashesTo_synced_covered.
+
+    Lemma crashesTo_one_of_same_wipeHist : forall d d',
+        crashesTo_one_of d d d' ->
+        disk_synced d' ->
+        wipeHist d d'.
+    Proof.
+      intros.
+      destruct H, H0.
+      eapply pointwise_rel_indomain; intros; eauto.
+      repeat match goal with
+             | [ H: forall (_:addr), _ |- _ ] =>
+               specialize (H a)
+             end.
+      destruct matches in *.
+      assert (histblock b (curr_val b0)) by intuition.
+      clear crashesTo_one_pointwise.
+      (* histcrash_to_hist requires that the tail be nil, which is silly, since
+      a block is synced according to the weaker block_synced property *)
+    Admitted.
+
+    Hint Resolve crashesTo_one_of_same_wipeHist.
+
     Definition rd : Interface D.API.
       unshelve econstructor.
       - exact impl.
@@ -394,17 +466,15 @@ Module RD.
         + all: admit.
 
       - eapply rec_noop_compose; eauto; simpl.
-        eapply prog_spec_weaken; eauto;
-          unfold spec_impl, rd_abstraction; simplify.
+        unfold Recover_spec, rd_abstraction; simplify.
         unfold TD.wipe in *; subst.
-        exists a, a.
+        exists state0', state0'.
         intuition eauto.
-        admit. (* this is a special case of wipe_crashesTo *)
-        admit. (* same as above *)
         repeat deex.
-        admit. (* need to go from disk_synced to crashesTo being trivial *)
-        repeat deex.
-        admit. (* same as above *)
+        unfold D.wipe.
+        descend; intuition eauto.
+        eapply pred_weaken; eauto.
+        eapply pred_weaken; eauto.
       - eapply then_init_compose; eauto.
         eapply prog_spec_weaken; unfold spec_impl; simplify.
         pose proof (state_some_disks state); simplify.
