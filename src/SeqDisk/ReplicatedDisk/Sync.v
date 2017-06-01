@@ -21,33 +21,35 @@ Section ReplicatedDisk.
       _ <- Prim td (TD.Sync d1);
       Ret tt.
 
-    Theorem Sync_ok :
-      prog_spec
-        (fun '(d_0, d_1) state =>
-           {|
-             pre :=
-               TD.disk0 state |= eq d_0 /\
-               TD.disk1 state |= eq d_1;
-             post :=
-               fun r state' =>
-                 r = tt /\
-                 TD.disk0 state' |= eq d_0 /\
-                 TD.disk1 state' |= eq d_1;
-             recover :=
-               fun _ state' =>
-                 TD.disk0 state' |= eq d_0 /\
-                 TD.disk1 state' |= eq d_1;
-           |})
-        (Sync)
-        (irec td)
-        (refinement td).
-    Proof.
-      unfold Sync.
+  Hint Unfold TD.wipe : rd.
 
-      step.
-      step.
-      step.
-    Qed.
+  Theorem Sync_ok :
+    prog_spec
+      (fun '(d_0, d_1) state =>
+         {|
+           pre :=
+             TD.disk0 state |= eq d_0 /\
+             TD.disk1 state |= eq d_1;
+           post :=
+             fun r state' =>
+               r = tt /\
+               TD.disk0 state' |= eq d_0 /\
+               TD.disk1 state' |= eq d_1;
+           recover :=
+             fun _ state' =>
+               TD.disk0 state' |= eq d_0 /\
+               TD.disk1 state' |= eq d_1;
+         |})
+      (Sync)
+      (irec td)
+      (refinement td).
+  Proof.
+    unfold Sync.
+
+    step.
+    step.
+    step.
+  Qed.
 
 End ReplicatedDisk.
 

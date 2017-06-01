@@ -172,20 +172,22 @@ Qed.
 
 Hint Resolve then_wipe_wipe.
 
-Theorem disk0_wipe : forall state F,
+Theorem disk0_wipe : forall state state' F,
     TD.disk0 state |= F ->
-    TD.disk0 (TD.wipe state) |= then_wipe F.
+    TD.wipe state state' ->
+    TD.disk0 state' |= then_wipe F.
 Proof.
-  intros.
+  unfold TD.wipe; intros; subst.
   destruct state; simpl in *.
   destruct matches; simpl in *; eauto.
 Qed.
 
-Theorem disk1_wipe : forall state F,
+Theorem disk1_wipe : forall state state' F,
     TD.disk1 state |= F ->
-    TD.disk1 (TD.wipe state) |= then_wipe F.
+    TD.wipe state state' ->
+    TD.disk1 state' |= then_wipe F.
 Proof.
-  intros.
+  unfold TD.wipe; intros; subst.
   destruct state; simpl in *.
   destruct matches; simpl in *; eauto.
 Qed.
@@ -538,6 +540,7 @@ Proof.
   eapply disks_rel_stable' in H1; (safe_intuition eauto); cleanup.
   right; intuition.
   eapply pred_weaken; eauto.
+  eapply pred_weaken; eauto.
 Qed.
 
 Theorem TDSync1_ok : forall (i: Interface TD.API),
@@ -567,6 +570,7 @@ Proof.
   eapply disks_rel_stable' in H1; (safe_intuition eauto); cleanup.
   eapply disks_rel_stable' in H1; (safe_intuition eauto); cleanup.
   right; intuition.
+  eapply pred_weaken; eauto.
   eapply pred_weaken; eauto.
 Qed.
 

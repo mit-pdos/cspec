@@ -64,6 +64,8 @@ Section ReplicatedDiskRecovery.
         _ <- recover_at sz;
         Ret tt.
 
+    Hint Unfold TD.wipe : rd.
+
     Lemma if_lt_dec : forall A n m (a a':A),
         n < m ->
         (if lt_dec n m then a else a') = a.
@@ -395,11 +397,11 @@ Section ReplicatedDiskRecovery.
     Proof.
       induction a; simpl; intros.
       - step.
-        destruct s; intuition eauto.
+        destruct s; intuition (subst; eauto).
         congruence.
         inversion H1.
       - step.
-        destruct s; intuition.
+        destruct s; intuition (subst; eauto).
         exists d, FullySynced; intuition eauto.
         destruct r; step.
 
@@ -413,7 +415,7 @@ Section ReplicatedDiskRecovery.
         simplify; finish.
         destruct v; intuition eauto.
         destruct i; intuition eauto.
-        destruct i; intuition eauto.
+        destruct i; intuition (subst; eauto).
     Qed.
 
     Hint Resolve recover_at_ok.
@@ -476,7 +478,7 @@ Section ReplicatedDiskRecovery.
         exists d, (OutOfSync a b); intuition eauto.
         step.
 
-        destruct r; intuition eauto.
+        destruct r; intuition (subst; eauto).
         destruct i; intuition eauto.
         destruct i; intuition eauto.
     Qed.

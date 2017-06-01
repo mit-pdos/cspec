@@ -200,7 +200,7 @@ Module RD.
     (* The proof will require a refinement; we build one up based on the two
     disk state. *)
 
-    Definition rd_abstraction (state:TD.State) : D.State :=
+    Definition abstraction_f (state:TD.State) : D.State :=
       match state with
       | TD.Disks (Some d) _ _ => d
       | TD.Disks None (Some d) _ => d
@@ -213,6 +213,10 @@ Module RD.
         d_0 = d_1
       | _ => True
       end.
+
+    Definition rd_abstraction (state:TD.State) (state':D.State) :=
+      rd_invariant state /\
+      state' = abstraction_f state.
 
     (* We re-express the abstraction and invariant's behavior in terms of the
        maybe holds (m |= F) statements in all of our specifications. *)
@@ -227,14 +231,14 @@ Module RD.
 
     Lemma invariant_to_disks_eq0 : forall state,
         rd_invariant state ->
-        TD.disk0 state |= eq (rd_abstraction state).
+        TD.disk0 state |= eq (abstraction_f state).
     Proof.
       crush.
     Qed.
 
     Lemma invariant_to_disks_eq1 : forall state,
         rd_invariant state ->
-        TD.disk1 state |= eq (rd_abstraction state).
+        TD.disk1 state |= eq (abstraction_f state).
     Proof.
       crush.
     Qed.
@@ -250,14 +254,26 @@ Module RD.
     Lemma disks_eq_to_abstraction : forall state d,
         TD.disk0 state |= eq d ->
         TD.disk1 state |= eq d ->
-        rd_abstraction state = d.
+        d = abstraction_f state.
     Proof.
       crush.
       solve_false.
     Qed.
 
+    Lemma disks_eq_to_abstraction' : forall state d,
+        TD.disk0 state |= eq d ->
+        TD.disk1 state |= eq d ->
+        abstraction_f state = d.
+    Proof.
+      intros.
+      symmetry; eauto using disks_eq_to_abstraction.
+    Qed.
+
     Hint Resolve invariant_to_disks_eq0 invariant_to_disks_eq1.
-    Hint Resolve disks_eq_to_invariant disks_eq_to_abstraction.
+    Hint Resolve
+         disks_eq_to_invariant
+         disks_eq_to_abstraction
+         disks_eq_to_abstraction'.
 
     (* Finally, we put together the pieces of the [Interface]. Here we also
     convert from our specificatiosn above to the exact form that an Interface
@@ -272,11 +288,10 @@ Module RD.
       | D.DiskSize => DiskSize td
       end.
 
-    Definition rd_refinement :=
+    Definition rd_refinement : Refinement D.State :=
       refinement_compose
         (refinement td)
-        {| invariant := rd_invariant;
-           abstraction := rd_abstraction; |}.
+        {| abstraction := rd_abstraction; |}.
 
     Definition impl : InterfaceImpl D.Op :=
       {| op_impl := d_op_impl;
@@ -296,12 +311,20 @@ Module RD.
     Qed.
 
     Theorem rd_crash_effect_valid :
-      crash_effect_valid {| invariant := rd_invariant;
-                            abstraction := rd_abstraction |}
-                         TD.wipe (fun (state:D.State) => state).
+      crash_effect_valid {| abstraction := rd_abstraction; |}
+                         TD.wipe (fun (state state':D.State) => state' = state).
     Proof.
-      econstructor; eauto.
+      econstructor; unfold TD.wipe; intuition (subst; eauto).
     Qed.
+
+    Theorem rd_abstraction_f : forall state,
+        rd_invariant state ->
+        rd_abstraction state (abstraction_f state).
+    Proof.
+      unfold rd_abstraction; intuition.
+    Qed.
+
+    Hint Resolve rd_abstraction_f.
 
     Definition rd : Interface D.API.
       unshelve econstructor.
@@ -311,25 +334,29 @@ Module RD.
         destruct op; unfold op_spec;
           apply spec_refinement_compose;
           eapply prog_spec_weaken; eauto;
-            unfold spec_impl; simplify.
-        + exists (rd_abstraction state); (intuition eauto); simplify.
-        + exists (rd_abstraction state); (intuition eauto); simplify.
-          eauto 10.
-        + exists (rd_abstraction state); (intuition eauto); simplify.
-        + exists (rd_abstraction state); (intuition eauto); simplify.
+            unfold spec_impl, rd_abstraction; simplify.
+        + exists (abstraction_f state); (intuition eauto); simplify; finish.
+        + exists (abstraction_f state); (intuition eauto); simplify; finish.
+          exists (abstraction_f state'); intuition eauto.
+          right; descend; intuition eauto.
+        + exists (abstraction_f state); (intuition eauto); simplify.
+          descend; intuition eauto.
+          descend; intuition eauto.
+        + exists (abstraction_f state); (intuition eauto); simplify.
+          descend; intuition eauto.
+          descend; intuition eauto.
       - eapply rec_noop_compose; eauto; simpl.
-        apply rd_crash_effect_valid.
         eapply prog_spec_weaken; eauto;
-          unfold spec_impl; simplify.
-        unfold crash_invariant in *; simpl in *; repeat deex.
-        exists (rd_abstraction state0), FullySynced; intuition eauto.
+          unfold spec_impl, rd_abstraction; simplify.
+        unfold TD.wipe in *; subst.
+        exists (abstraction_f state0), FullySynced; intuition eauto.
+        descend; intuition eauto.
+        exists state'; eauto.
       - eapply then_init_compose; eauto.
         eapply prog_spec_weaken; unfold spec_impl; simplify.
         pose proof (state_some_disks state); simplify.
         descend; intuition eauto.
         destruct v; simplify; finish.
-      - eapply crash_effect_compose; unfold wipe_valid;
-          eauto using crash_effect_ok.
 
         Grab Existential Variables.
         all: auto.
