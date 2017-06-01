@@ -366,6 +366,7 @@ Proof.
   destruct r; safe_intuition (repeat deex; eauto).
 Qed.
 
+(* TODO: this is currently unused; is it necessary? *)
 Record crash_effect_valid `(rf: LRefinement State1 State2)
        (wipe1: State1 -> State1 -> Prop)
        (wipe2: State2 -> State2 -> Prop) :=
@@ -386,15 +387,12 @@ Definition wipe_valid
            (wipe: State -> State -> Prop) :=
   crash_effect_valid rf (fun w w' => w' = world_crash w) wipe.
 
-
 (* TODO: this is proven, but is it useful? *)
 Theorem rec_noop_compose : forall `(rec: prog unit) `(rec2: prog unit)
                              `(rf1: Refinement State1)
                              (wipe1: State1 -> State1 -> Prop)
                              `(rf2: LRefinement State1 State2)
-                             (wipe2: State2 -> State2 -> Prop)
-                             (crash_invariant: State1 -> Prop),
-    forall (Hwipe: crash_effect_valid rf2 wipe1 wipe2),
+                             (wipe2: State2 -> State2 -> Prop),
       rec_noop rec rf1 wipe1 ->
       prog_spec
         (fun (state0':State2) state =>

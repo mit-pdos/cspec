@@ -25,7 +25,7 @@ operation will be defined in terms of how state of this type is manipulated.
  *)
 Record InterfaceAPI (opT: Type -> Type) (State:Type) :=
   { op_sem: forall T, opT T -> Semantics State T;
-    crash_effect: State -> State; }.
+    crash_effect: State -> State -> Prop; }.
 
 Definition pre_step {opT State}
            (bg_step: State -> State -> Prop)
@@ -54,9 +54,9 @@ Definition op_spec opT `(api: InterfaceAPI opT State) `(op: opT T) : Specificati
       recover :=
         fun r state' =>
           r = tt /\
-          (state' = crash_effect api state \/
+          (crash_effect api state state' \/
            exists state1 v, op_sem api op state v state1 /\
-                       state' = crash_effect api state1);
+                       crash_effect api state1 state');
     |}.
 
 Inductive InitResult := Initialized | InitFailed.
@@ -79,7 +79,7 @@ Definition init_invariant
        {| pre := True;
           post :=
             fun r w' => match r with
-                     | Initialized => invariant rf w'
+                     | Initialized => exists state, abstraction rf w' state
                      | InitFailed => True
                      end;
           recover :=
@@ -106,9 +106,7 @@ Record Interface opT State (api: InterfaceAPI opT State) :=
     init_ok:
       init_invariant
         (init_impl interface_impl) (recover_impl interface_impl)
-        refinement;
-    crash_effect_ok:
-      crash_effect_valid refinement world_crash (crash_effect api); }.
+        refinement; }.
 
 (* Helper function to get the implementation of a primitive operation from an
 [Interface]. *)
@@ -132,10 +130,14 @@ Theorem prim_spec : forall opT `(api: InterfaceAPI opT State)
             forall v state', op_sem api op state v state' ->
                     post (spec a state) v state') ->
     (forall a state, pre (spec a state) ->
-            recover (spec a state) tt (crash_effect api state)) ->
+            forall state',
+              crash_effect api state state' ->
+              recover (spec a state) tt state') ->
     (forall a state, pre (spec a state) ->
             forall v state', post (spec a state) v state' ->
-                    recover (spec a state) tt (crash_effect api state')) ->
+                    forall state'',
+                      crash_effect api state' state'' ->
+                      recover (spec a state) tt state'') ->
     prog_spec spec (Prim i op) (recover_impl (interface_impl i)) (refinement i).
 Proof.
   intros.
@@ -179,7 +181,7 @@ Theorem init_invariant_any_rec : forall (init: prog InitResult)
     init_invariant init rec' rf.
 Proof.
   unfold init_invariant, prog_spec; simpl; intros.
-  destruct matches; subst.
+  destruct matches; subst; eauto.
   eapply rexec_finish_any_rec in H2.
   eapply H in H2; eauto.
 Qed.
@@ -203,7 +205,7 @@ Theorem then_init_compose : forall (init1 init2: prog InitResult)
          {| pre := True;
             post :=
               fun r state' => match r with
-                       | Initialized => invariant rf2 state'
+                       | Initialized => exists state'', abstraction rf2 state' state''
                        | InitFailed => True
                        end;
             recover :=
@@ -217,26 +219,13 @@ Proof.
   descend; intuition eauto.
   destruct r.
   - clear H.
-    unfold prog_spec in *; (intuition eauto); simpl in *.
-    eapply H in H0; eauto.
-    destruct matches in *; safe_intuition eauto.
+    unfold prog_spec in *; (intuition eauto); simpl in *;
+      subst; repeat deex.
+    eapply H in H3; eauto.
+    destruct matches in *; safe_intuition (repeat deex; eauto).
+    descend; intuition eauto.
   - unfold prog_spec; simpl; intros.
-    destruct matches.
-    subst.
+    destruct matches; subst; eauto.
     inv_rexec; inv_exec.
     congruence.
-Qed.
-
-Theorem crash_effect_compose : forall `(rf1: Refinement State1)
-                                 `(rf2: LRefinement State1 State2)
-                                 (wipe1: State1 -> State1)
-                                 (wipe2: State2 -> State2),
-    wipe_valid rf1 wipe1 ->
-    (forall state, abstraction rf2 (wipe1 state) = wipe2 (abstraction rf2 state)) ->
-    (forall state, wipe2 (wipe2 state) = wipe2 state) ->
-    wipe_valid (refinement_compose rf1 rf2) wipe2.
-Proof.
-  intros.
-  constructor; simpl; intros; eauto.
-  rewrite (wipe_abstraction H); eauto.
 Qed.
