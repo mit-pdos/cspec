@@ -27,6 +27,7 @@ Ltac simplify :=
          | _ => progress simpl in *
          | _ => progress safe_intuition
          | _ => progress subst
+         | _ => progress autounfold with rd in *
          | _ => progress autorewrite with rd in *
          | [ u: unit |- _ ] => destruct u
          | [ crashinv: _ -> Prop |- _ ] =>
@@ -41,7 +42,7 @@ Ltac finish :=
   repeat match goal with
          | _ => solve_false
          | _ => congruence
-         | _ => solve [ intuition eauto ]
+         | _ => solve [ intuition (subst; eauto; try congruence) ]
          | _ =>
            (* if we can solve all the side conditions automatically, then it's
            safe to run descend *)

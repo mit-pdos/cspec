@@ -28,9 +28,7 @@ Section ReplicatedDisk.
       end.
 
     Hint Resolve both_disks_not_missing : false.
-
-    Hint Resolve TDDiskSize0_ok.
-    Hint Resolve TDDiskSize1_ok.
+    Hint Unfold TD.wipe : rd.
 
     Theorem DiskSize_ok :
       prog_spec

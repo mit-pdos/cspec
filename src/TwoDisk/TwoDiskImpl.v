@@ -30,19 +30,18 @@ Module TD.
 
   Axiom init_ok : init_invariant (init_impl impl) (recover_impl impl) refinement.
 
-  Axiom td_wipe_world_abstraction : forall w,
-      abstraction refinement (world_crash w) = abstraction refinement w.
+  Axiom td_wipe_world_abstraction : forall w state,
+      abstraction refinement (world_crash w) state <->
+      abstraction refinement w state.
+
+  Hint Resolve -> td_wipe_world_abstraction.
+  Hint Resolve <- td_wipe_world_abstraction.
 
   Theorem td_crash_ok : wipe_valid refinement TD.wipe.
   Proof.
     constructor; simpl; unfold TD.wipe;
-      eauto using td_wipe_world_abstraction.
+      intros; subst; eauto.
   Qed.
-
-  Axiom invariant_under_crashes : forall w, invariant refinement w ->
-                                       invariant refinement (world_crash w).
-
-  Hint Resolve invariant_under_crashes.
 
   Definition td : Interface TD.API.
     unshelve econstructor.
@@ -54,15 +53,9 @@ Module TD.
       inv_rexec; inv_ret; eauto.
       remember (world_crash w').
       generalize dependent w'.
-      induction H3; intros; inv_exec.
-      rewrite ?(wipe_abstraction td_crash_ok) in *;
-        unfold TD.wipe; eauto.
-      specialize (IHexec_recover (world_crash w'0)).
-      rewrite ?(wipe_abstraction td_crash_ok) in *;
-        unfold TD.wipe in *.
-      safe_intuition eauto.
+      unfold TD.wipe.
+      induction H3; intros; inv_exec; eauto.
     - apply init_ok.
-    - apply td_crash_ok.
   Defined.
 
 End TD.

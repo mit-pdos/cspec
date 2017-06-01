@@ -25,6 +25,6 @@ Module D.
       step (DiskSize) state (size state) state.
 
   Definition API := {| op_sem := @step;
-                       crash_effect := fun state => state; |}.
+                       crash_effect := fun state state' => state' = state; |}.
 
 End D.

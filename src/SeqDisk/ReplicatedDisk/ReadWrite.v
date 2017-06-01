@@ -35,6 +35,7 @@ Section ReplicatedDiskReadWrite.
 
   Hint Resolve pred_missing.
   Hint Resolve both_disks_not_missing : false.
+  Hint Unfold TD.wipe : rd.
 
   Implicit Type (state:TD.State).
 

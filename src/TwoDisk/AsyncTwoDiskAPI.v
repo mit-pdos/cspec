@@ -47,7 +47,7 @@ Module TD.
       end ->
       op_step (DiskSize i) state r state.
 
-  Definition wipe state := disks_map wipeDisk state.
+  Definition wipe state state' := state' = disks_map wipeDisk state.
 
   Definition API : InterfaceAPI Op State :=
     {| op_sem := post_step (pre_step bg_failure (@op_step))

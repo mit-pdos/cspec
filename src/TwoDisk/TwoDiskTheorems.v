@@ -51,6 +51,7 @@ Ltac cleanup :=
          | _ => deex
          | _ => destruct_tuple
          | _ => progress unfold pre_step in *
+         | _ => progress unfold TD.wipe in *
          | _ => progress simpl in *
          | _ => progress subst
          | _ => progress safe_intuition
