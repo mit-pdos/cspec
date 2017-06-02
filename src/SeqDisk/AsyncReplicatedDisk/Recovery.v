@@ -387,6 +387,82 @@ Section AsyncReplicatedDisk.
       descend; intuition eauto.
     Qed.
 
+    Hint Resolve fixup_ok.
+
+    Lemma lt_S_trans : forall a b,
+        S a < b ->
+        a < b.
+    Proof.
+      intros.
+      omega.
+    Qed.
+
+    Hint Resolve lt_S_trans.
+
+    Theorem recover_at_ok : forall a,
+        prog_spec
+          (fun '(d0__i, d1__i) state =>
+             {|
+               pre :=
+                 exists d_0 d_1,
+                 a < size d_0 /\
+                 TD.disk0 state |= covered d_0 /\
+                 TD.disk1 state |= covered d_1 /\
+                 equal_after a d_0 d_1 /\
+                 crashesTo_one_of' d0__i d1__i d_0 /\
+                 crashesTo_one_of' d0__i d1__i d_1;
+               post :=
+                 fun r state' =>
+                   match r with
+                   | Continue =>
+                     exists d_0' d_1',
+                     TD.disk0 state' |= covered d_0' /\
+                     TD.disk1 state' |= covered d_1' /\
+                     equal_after 0 d_0' d_1' /\
+                     crashesTo_one_of' d0__i d1__i d_0' /\
+                     crashesTo_one_of' d0__i d1__i d_1'
+                   | DiskFailed d0 =>
+                     exists d_1',
+                     TD.disk0 state' |= covered d_1' /\
+                     TD.disk1 state' |= covered d_1' /\
+                     crashesTo_one_of' d0__i d1__i d_1'
+                   | DiskFailed d1 =>
+                     exists d_0',
+                     TD.disk0 state' |= covered d_0' /\
+                     TD.disk1 state' |= covered d_0' /\
+                     crashesTo_one_of' d0__i d1__i d_0'
+                   end;
+               recover :=
+                 fun (_:unit) state' =>
+                   (* either disk could change due to failures *)
+                   exists d_0' d_1',
+                     TD.disk0 state' |= crashesTo d_0' /\
+                     TD.disk1 state' |= crashesTo d_1' /\
+                     crashesTo_one_of' d0__i d1__i d_0' /\
+                     crashesTo_one_of' d0__i d1__i d_1';
+             |})
+          (recover_at a)
+          (irec td)
+          (refinement td).
+    Proof.
+      induction a; simpl.
+      - step.
+        descend; (intuition eauto); simplify; finish.
+      - step.
+        descend; (intuition eauto); simplify; finish.
+
+        destruct r; step.
+        descend; (intuition eauto); simplify; finish.
+        exists d_0', d_1'; intuition eauto.
+        assert (size d_0' = size d_0) as Hsize.
+        repeat match goal with
+               | [ H: crashesTo_one_of' _ _ _ |- _ ] =>
+                 destruct H
+               end; congruence.
+        rewrite Hsize; eauto.
+        destruct i; simplify; finish.
+    Qed.
+
     (* crashesTo_one_of d_0 d_1 d says [forall a, d_0(a) ~> d(a) \/ d_1(a) ~> d(a)]
     where [h ~> h'] is made-up notation for h crashing to the current value in
     h' (with h also having durable values from the union of d_0(a) and d_1(a)).
