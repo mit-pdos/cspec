@@ -7,25 +7,62 @@ Section Ensembles.
 
   Implicit Types (x y:U).
 
-  Definition Ensemble := U -> Prop.
+  Record Ensemble :=
+    fromSet { Contains: U -> Prop }.
 
   Implicit Type (A:Ensemble).
 
-  Inductive add A x : Ensemble :=
-  | add_new: add A x x
-  | add_prev: forall y, A y -> add A x y.
+  Definition In x A := Contains A x.
 
-  Inductive Singleton x : Ensemble :=
-  | in_singleton: Singleton x x.
+  Definition Add x A : Ensemble :=
+    fromSet (fun y => y = x \/ In y A).
 
-  Definition In x A : Prop := A x.
+  Theorem Add_val : forall x y A,
+      y = x ->
+      In y (Add x A).
+  Proof.
+    destruct A; simpl; eauto.
+  Qed.
 
-  Definition contains A A' := forall x, A x -> A' x.
-  Definition same_set A A' := forall x, A x <-> A' x.
+  Theorem Add_prev : forall x y A,
+      In y A ->
+      In y (Add x A).
+  Proof.
+    destruct A; simpl; eauto.
+  Qed.
+
+  Theorem Add_inv : forall A x y,
+      In y (Add x A) ->
+      y = x \/ In y A.
+  Proof.
+    destruct A; simpl; intuition.
+  Qed.
+
+  Definition Singleton x : Ensemble :=
+    fromSet (fun y => y = x).
+
+  Theorem Singleton_has : forall x y,
+      y = x ->
+      In y (Singleton x).
+  Proof.
+    compute; auto.
+  Qed.
+
+  Theorem Singleton_inv : forall x y,
+      In y (Singleton x) ->
+      y = x.
+  Proof.
+    compute; auto.
+  Qed.
+
+  Definition contains A A' := forall x, In x A -> In x A'.
+  Definition same_set A A' := forall x, In x A <-> In x A'.
 
   Theorem Ensemble_ext : forall A A', same_set A A' -> A = A'.
   Proof.
     unfold same_set; intros.
+    destruct A, A'; simpl in *.
+    f_equal.
     extensionality x.
     apply propositional_extensionality.
     auto.
@@ -35,5 +72,9 @@ End Ensembles.
 
 Arguments Ensemble U : clear implicits.
 
-Hint Constructors add.
-Hint Constructors Singleton.
+Hint Resolve Add_val Add_prev Singleton_has.
+
+Notation "x ∈ A" := (In x A)
+                      (at level 10, A at level 10,
+                       no associativity,
+                       only printing).

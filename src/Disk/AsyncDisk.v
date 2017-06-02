@@ -18,7 +18,7 @@ Definition disk := diskOf blockstate.
 Record blockhist :=
   { current_val: block;
     durable_vals: Ensemble block;
-    durable_includes_current: durable_vals current_val; }.
+    durable_includes_current: In current_val durable_vals; }.
 
 (* a spec-only disk giving the possible durable states of each address *)
 Definition histdisk := diskOf blockhist.
@@ -71,12 +71,12 @@ Instance blockstate_async: AsyncBlock blockstate :=
 Definition bufferHist (b:block) (h:blockhist) : blockhist :=
   {| current_val := b;
      durable_vals :=
-       add (durable_vals h) b;
+       Add b (durable_vals h);
      durable_includes_current := ltac:(eauto); |}.
 
 Inductive wipeBlockhist : blockhist -> blockhist -> Prop :=
 | histcrash_to_hist_block : forall h b pf,
-    durable_vals h b ->
+    In b (durable_vals h) ->
     wipeBlockhist h {| current_val := b;
                        durable_vals := Singleton b;
                        durable_includes_current := pf; |}.
@@ -126,7 +126,7 @@ Proof.
 Qed.
 
 Theorem durable_val_buffer : forall (bs: blockhist) b,
-    durable_vals (buffer b bs) = add (durable_vals bs) b.
+    durable_vals (buffer b bs) = Add b (durable_vals bs).
 Proof.
   auto.
 Qed.
@@ -177,12 +177,13 @@ Proof.
   simpl; intros.
   destruct H.
   econstructor; simpl; eauto.
-  unfold In; autorewrite with block; auto.
+  autorewrite with block.
+  eauto.
 Qed.
 
 Inductive histcrash : blockhist -> blockstate -> Prop :=
 | histcrash_block : forall h b,
-    durable_vals h b ->
+    In b (durable_vals h) ->
     histcrash h {| cache_val := None;
                    durable_val := b; |}.
 

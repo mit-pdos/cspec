@@ -1,4 +1,5 @@
 Require Import Automation.
+Require Import Pocs.Ensemble.
 Require Import Disk.AsyncDisk.
 
 Require Import Refinement.Interface.
@@ -73,8 +74,8 @@ Section AsyncReplicatedDisk.
         crashesTo_one_size1 : size d_1 = size d;
         crashesTo_one_pointwise : forall a,
             match d_0 a, d_1 a, d a with
-            | Some h0, Some h1, Some h => durable_vals h0 (curr_val h) \/
-                                         durable_vals h1 (curr_val h)
+            | Some h0, Some h1, Some h => In (curr_val h) (durable_vals h0) \/
+                                         In (curr_val h) (durable_vals h1)
             | None, None, None => True
             | _, _, _ => False
             end;
@@ -115,14 +116,15 @@ Section AsyncReplicatedDisk.
     Admitted.
 
     Lemma histblock_trans : forall h h',
-        durable_vals h (curr_val h') ->
+        In (curr_val h') (durable_vals h) ->
         hist_flushed h' ->
-        forall h'', durable_vals h' (curr_val h'') ->
-               durable_vals h (curr_val h'').
+        forall h'', In (curr_val h'') (durable_vals h') ->
+               In (curr_val h'') (durable_vals h).
     Proof.
       unfold hist_flushed; intros.
       rewrite H0 in *.
-      inversion H1; auto.
+      apply Singleton_inv in H1.
+      congruence.
     Qed.
 
     Hint Resolve histblock_trans.

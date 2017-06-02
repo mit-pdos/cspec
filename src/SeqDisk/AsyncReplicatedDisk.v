@@ -1,4 +1,5 @@
 Require Import Automation.
+Require Import Pocs.Ensemble.
 Require Import Disk.AsyncDisk.
 
 Require Import Refinement.ProgLang.Prog.
@@ -47,7 +48,7 @@ Module RD.
     Implicit Type (state:TD.State).
 
     Lemma histblock_histcrash_trans : forall h h' h'',
-        durable_vals h (curr_val h') ->
+        In (curr_val h') (durable_vals h) ->
         hist_flushed h' ->
         histcrash h' h'' ->
         histcrash h h''.
@@ -108,8 +109,8 @@ Module RD.
     Qed.
 
     Lemma histblock_buffer : forall h b' b,
-        durable_vals h b ->
-        durable_vals (buffer b' h) b.
+        In b (durable_vals h) ->
+        In b (durable_vals (buffer b' h)).
     Proof.
       intros.
       autorewrite with block.
@@ -321,9 +322,8 @@ Module RD.
 
     Definition state_hist (bs:blockstate) : blockhist :=
       {| current_val := curr_val bs;
-         durable_vals := Ensemble.add
-                           (Ensemble.Singleton (durable_val bs))
-                           (curr_val bs);
+         durable_vals := Add (curr_val bs)
+                           (Singleton (durable_val bs));
          durable_includes_current := ltac:(auto); |}.
 
     Definition covering (d:disk) : histdisk :=
@@ -334,7 +334,6 @@ Module RD.
     Proof.
       unfold state_hist; destruct b; simpl; intros.
       econstructor; simpl; eauto.
-      unfold Ensemble.In; auto.
     Qed.
 
     Lemma covered_covering : forall d,
@@ -440,6 +439,12 @@ Module RD.
 
     Hint Resolve crashesTo_synced_covered.
 
+    Lemma or_equal : forall (P:Prop),
+        P \/ P -> P.
+    Proof.
+      intuition.
+    Qed.
+
     Lemma crashesTo_one_of_same_wipeHist : forall d d',
         crashesTo_one_of d d d' ->
         histdisk_flushed d' ->
@@ -454,8 +459,7 @@ Module RD.
              end.
       repeat simpl_match.
       inversion pointwise_prop_holds.
-      assert (durable_vals bs (curr_val bs')) by intuition.
-      clear crashesTo_one_pointwise.
+      apply or_equal in crashesTo_one_pointwise.
       (* TODO: need equality-based theorems to prove inductive properties in
       AsyncDisk *)
       destruct bs'; simpl in *.
