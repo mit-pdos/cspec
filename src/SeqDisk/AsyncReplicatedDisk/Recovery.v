@@ -77,16 +77,19 @@ Section AsyncReplicatedDisk.
 
     (* crashesTo_one_of d_0 d_1 d says [forall a, d_0(a) ~> d(a) \/ d_1(a) ~> d(a)]
     where [h ~> h'] is made-up notation for h crashing to the current value in
-    h' (with any set of durable writes in h').
+    h' (with h also having durable values from the union of d_0(a) and d_1(a)).
 
      This isn't a pointwise_rel, unfortunately, since it covers three disks. *)
-    Record crashesTo_one_of (d_0 d_1 d:histdisk) : Prop :=
-      { crashesTo_one_size0 : size d_0 = size d;
-        crashesTo_one_size1 : size d_1 = size d;
-        crashesTo_one_pointwise : forall a,
+    Record crashesTo_one_of' (d_0 d_1 d:histdisk) : Prop :=
+      { crashesTo_one'_size0 : size d_0 = size d;
+        crashesTo_one'_size1 : size d_1 = size d;
+        crashesTo_one'_pointwise : forall a,
             match d_0 a, d_1 a, d a with
-            | Some h0, Some h1, Some h => In (curr_val h) (durable_vals h0) \/
-                                         In (curr_val h) (durable_vals h1)
+            | Some h0, Some h1, Some h => (In (curr_val h) (durable_vals h0) \/
+                                          In (curr_val h) (durable_vals h1)) /\
+                                         contains (durable_vals h)
+                                                  (Union (durable_vals h0)
+                                                         (durable_vals h1))
             | None, None, None => True
             | _, _, _ => False
             end;
@@ -149,8 +152,8 @@ Section AsyncReplicatedDisk.
 
     Hint Resolve equal_after_upd.
 
-    Lemma crashesTo_one_curr_val : forall d0__i d1__i d a v,
-        crashesTo_one_of d0__i d1__i d ->
+    Lemma crashesTo_one'_curr_val : forall d0__i d1__i d a v,
+        crashesTo_one_of' d0__i d1__i d ->
         d a |= curr_val_eq v ->
         forall bs0 bs1, d0__i a = Some bs0 ->
                    d1__i a = Some bs1 ->
@@ -158,18 +161,20 @@ Section AsyncReplicatedDisk.
                    In v (durable_vals bs1).
     Proof.
       intros.
-      apply crashesTo_one_pointwise with (a:=a) in H.
+      apply crashesTo_one'_pointwise with (a:=a) in H.
       repeat simpl_match.
-      destruct matches in *; try contradiction.
+      unfold curr_val_eq in *.
+      destruct matches in *; simpl in *; try contradiction.
+      intuition (subst; eauto).
     Qed.
 
-    Lemma crashesTo_one_of_upd:
+    Lemma crashesTo_one_of'_upd:
       forall (a : nat) (d0__i d1__i : histdisk) (d_0 : diskOf blockhist) (d_1 : histdisk),
-        crashesTo_one_of d0__i d1__i d_0 ->
-        crashesTo_one_of d0__i d1__i d_1 ->
+        crashesTo_one_of' d0__i d1__i d_0 ->
+        crashesTo_one_of' d0__i d1__i d_1 ->
         forall v : block,
           d_0 a |= curr_val_eq v ->
-          crashesTo_one_of d0__i d1__i (diskUpdF d_1 a (buffer v)).
+          crashesTo_one_of' d0__i d1__i (diskUpdF d_1 a (buffer v)).
     Proof.
       intros.
       destruct H, H0.
@@ -185,7 +190,9 @@ Section AsyncReplicatedDisk.
       - unfold maybe_holds, curr_val_eq in *; repeat simpl_match; subst.
         erewrite diskUpdF_eq by eauto.
         autorewrite with block in *.
-        intuition eauto.
+        safe_intuition eauto.
+        split; eauto.
+        eauto using contains_Add.
       - simpl_match.
         intuition eauto.
       - is_eq a a0; autorewrite with upd;
@@ -193,7 +200,107 @@ Section AsyncReplicatedDisk.
           auto.
     Qed.
 
-    Hint Resolve crashesTo_one_of_upd.
+    Hint Resolve crashesTo_one_of'_upd.
+
+    Definition state_hist (bs:blockstate) : blockhist :=
+      {| current_val := curr_val bs;
+         durable_vals := Add (curr_val bs)
+                           (Singleton (durable_val bs));
+         durable_includes_current := ltac:(auto); |}.
+
+    Definition covering (d:disk) : histdisk :=
+      mapDisk state_hist d.
+
+    Lemma collapsesTo_state_hist : forall b,
+        collapsesTo (state_hist b) b.
+    Proof.
+      unfold state_hist; destruct b; simpl; intros.
+      econstructor; simpl; eauto.
+    Qed.
+
+    Lemma covered_covering : forall d,
+        covered (covering d) d.
+    Proof.
+      intros.
+      eapply pointwise_rel_indomain; intros; auto.
+      simpl in *; repeat simpl_match.
+      inversion H0; subst.
+      eauto using collapsesTo_state_hist.
+    Qed.
+
+    Theorem crashesTo_covering_flushed : forall d,
+        disk_flushed d ->
+        crashesTo (covering d) d.
+    Proof.
+      intros.
+      econstructor; intros; simpl; eauto.
+      apply pointwise_prop_holds with (a:=a) in H.
+      destruct matches.
+      unfold block_flushed in *.
+      destruct b; simpl in *; subst.
+      econstructor; eauto.
+      unfold state_hist; autorewrite with block; simpl.
+      eauto.
+    Qed.
+
+    Hint Resolve crashesTo_covering_flushed.
+
+    Lemma covering_flushed_flushed : forall d,
+        disk_flushed d ->
+        histdisk_flushed (covering d).
+    Proof.
+      destruct 1; intros.
+      econstructor; intros.
+      specialize (pointwise_prop_holds a).
+      simpl.
+      destruct matches.
+      unfold block_flushed, hist_flushed, state_hist in *.
+      destruct b; simpl in *; subst;
+        autorewrite with block;
+        simpl.
+      eapply Ensemble_ext.
+      split; intuition eauto.
+      eapply Add_inv in H; intuition.
+    Qed.
+
+    Hint Resolve covering_flushed_flushed.
+
+    Lemma crashesTo_one_of'_covering : forall d0__i d1__i d d',
+        crashesTo d d' ->
+        crashesTo_one_of' d0__i d1__i d ->
+        crashesTo_one_of' d0__i d1__i (covering d').
+    Proof.
+      intros.
+      destruct H, H0.
+      econstructor; simpl; try congruence; intros.
+      repeat match goal with
+             | [ H: forall (_:addr), _ |- _ ] =>
+               specialize (H a)
+             end.
+      destruct matches in *; try contradiction.
+      inversion pointwise_rel_holds; subst; clear pointwise_rel_holds.
+      unfold state_hist.
+      autorewrite with block; simpl.
+      rewrite Add_element by eauto.
+      rewrite contains_Singleton.
+      simpl.
+      safe_intuition.
+      apply H1 in H.
+      eauto.
+    Qed.
+
+    Theorem crashesTo_one_of'_flush : forall d d0__i d1__i d',
+        crashesTo d d' ->
+        crashesTo_one_of' d0__i d1__i d ->
+        exists d'',
+          crashesTo d'' d' /\
+          crashesTo_one_of' d0__i d1__i d'' /\
+          histdisk_flushed d''.
+    Proof.
+      intros.
+      exists (covering d');
+        intuition eauto using crashesTo_one_of'_covering.
+    Qed.
 
     Theorem fixup_ok : forall a,
         prog_spec
@@ -205,8 +312,8 @@ Section AsyncReplicatedDisk.
                  TD.disk0 state |= covered d_0 /\
                  TD.disk1 state |= covered d_1 /\
                  equal_after (S a) d_0 d_1 /\
-                 crashesTo_one_of d0__i d1__i d_0 /\
-                 crashesTo_one_of d0__i d1__i d_1;
+                 crashesTo_one_of' d0__i d1__i d_0 /\
+                 crashesTo_one_of' d0__i d1__i d_1;
                post :=
                  fun r state' =>
                    match r with
@@ -215,18 +322,18 @@ Section AsyncReplicatedDisk.
                      TD.disk0 state' |= covered d_0' /\
                      TD.disk1 state' |= covered d_1' /\
                      equal_after a d_0' d_1' /\
-                     crashesTo_one_of d0__i d1__i d_0' /\
-                     crashesTo_one_of d0__i d1__i d_1'
+                     crashesTo_one_of' d0__i d1__i d_0' /\
+                     crashesTo_one_of' d0__i d1__i d_1'
                    | DiskFailed d0 =>
                      exists d_1',
                      TD.disk0 state' |= covered d_1' /\
                      TD.disk1 state' |= covered d_1' /\
-                     crashesTo_one_of d0__i d1__i d_1'
+                     crashesTo_one_of' d0__i d1__i d_1'
                    | DiskFailed d1 =>
                      exists d_0',
                      TD.disk0 state' |= covered d_0' /\
                      TD.disk1 state' |= covered d_0' /\
-                     crashesTo_one_of d0__i d1__i d_0'
+                     crashesTo_one_of' d0__i d1__i d_0'
                    end;
                recover :=
                  fun (_:unit) state' =>
@@ -234,8 +341,8 @@ Section AsyncReplicatedDisk.
                    exists d_0' d_1',
                      TD.disk0 state' |= crashesTo d_0' /\
                      TD.disk1 state' |= crashesTo d_1' /\
-                     crashesTo_one_of d0__i d1__i d_0' /\
-                     crashesTo_one_of d0__i d1__i d_1';
+                     crashesTo_one_of' d0__i d1__i d_0' /\
+                     crashesTo_one_of' d0__i d1__i d_1';
              |})
           (fixup a)
           (irec td)
@@ -279,6 +386,23 @@ Section AsyncReplicatedDisk.
       descend; intuition eauto.
       descend; intuition eauto.
     Qed.
+
+    (* crashesTo_one_of d_0 d_1 d says [forall a, d_0(a) ~> d(a) \/ d_1(a) ~> d(a)]
+    where [h ~> h'] is made-up notation for h crashing to the current value in
+    h' (with h also having durable values from the union of d_0(a) and d_1(a)).
+
+     This isn't a pointwise_rel, unfortunately, since it covers three disks. *)
+    Record crashesTo_one_of (d_0 d_1 d:histdisk) : Prop :=
+      { crashesTo_one_size0 : size d_0 = size d;
+        crashesTo_one_size1 : size d_1 = size d;
+        crashesTo_one_pointwise : forall a,
+            match d_0 a, d_1 a, d a with
+            | Some h0, Some h1, Some h => In (curr_val h) (durable_vals h0) \/
+                                          In (curr_val h) (durable_vals h1)
+            | None, None, None => True
+            | _, _, _ => False
+            end;
+      }.
 
     Definition Recover_spec :=
       (fun '(d_0, d_1) state =>
@@ -348,7 +472,7 @@ Section AsyncReplicatedDisk.
              | [ H: forall (_:addr), _ |- _ ] =>
                specialize (H a)
              end.
-      destruct matches in *; intuition subst; eauto.
+      destruct matches in *; try contradiction; intuition eauto.
     Qed.
 
     Hint Resolve crashesTo_one_of_trans.

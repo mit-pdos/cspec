@@ -1,5 +1,6 @@
 Require Import FunctionalExtensionality.
 Require Import PropExtensionality.
+Require Import RelationClasses.
 
 Section Ensembles.
 
@@ -55,7 +56,37 @@ Section Ensembles.
     compute; auto.
   Qed.
 
+  Definition Union A A' : Ensemble :=
+    fromSet (fun y => In y A \/ In y A').
+
+  Theorem Union_has_l : forall A A' x,
+      In x A ->
+      In x (Union A A').
+  Proof.
+    compute; auto.
+  Qed.
+
+  Theorem Union_has_r : forall A A' x,
+      In x A' ->
+      In x (Union A A').
+  Proof.
+    compute; auto.
+  Qed.
+
+  Theorem Union_inv : forall A A' x,
+      In x (Union A A') ->
+      In x A \/ In x A'.
+  Proof.
+    compute; auto.
+  Qed.
+
   Definition contains A A' := forall x, In x A -> In x A'.
+
+  Global Instance contains_preorder : PreOrder contains.
+  Proof.
+    firstorder.
+  Defined.
+
   Definition same_set A A' := forall x, In x A <-> In x A'.
 
   Theorem Ensemble_ext : forall A A', same_set A A' -> A = A'.
@@ -68,11 +99,67 @@ Section Ensembles.
     auto.
   Qed.
 
+  Lemma contains_Add : forall x A A',
+      contains A A' ->
+      In x A' ->
+      contains (Add x A) A'.
+  Proof.
+    destruct A, A'; compute; intros.
+    intuition (subst; eauto).
+  Qed.
+
+  Lemma contains_Add_inv : forall x A A',
+      contains (Add x A) A' ->
+      contains A A' /\
+      In x A'.
+  Proof.
+    destruct A, A'; compute; intros.
+    intuition (subst; eauto).
+  Qed.
+
+  Theorem Add_element : forall x A,
+      In x A ->
+      Add x A = A.
+  Proof.
+    intros.
+    apply Ensemble_ext.
+    split; compute; eauto.
+    destruct A; simpl; intuition (subst; eauto).
+  Qed.
+
+  Theorem contains_Singleton : forall x A,
+      contains (Singleton x) A <->
+      In x A.
+  Proof.
+    destruct A; compute; intuition (subst; auto).
+  Qed.
+
+  Theorem contains_Union_respectful : forall A0 A1 A0' A1',
+      contains A0 A0' ->
+      contains A1 A1' ->
+      contains (Union A0 A1) (Union A0' A1').
+  Proof.
+    destruct A0, A1, A0', A1'; compute; intuition.
+  Qed.
+
+  Theorem contains_Union_both : forall A A0 A1,
+      contains A0 A ->
+      contains A1 A ->
+      contains (Union A0 A1) A.
+  Proof.
+    destruct A, A0, A1; compute; intuition.
+  Qed.
+
 End Ensembles.
 
 Arguments Ensemble U : clear implicits.
 
-Hint Resolve Add_val Add_prev Singleton_has.
+Hint Resolve Add_val Add_prev Singleton_has Union_has_l Union_has_r.
+
+Hint Resolve -> contains_Singleton.
+Hint Resolve <- contains_Singleton.
+
+Hint Resolve contains_Union_both.
 
 Notation "x ∈ A" := (In x A)
                       (at level 10, A at level 10,

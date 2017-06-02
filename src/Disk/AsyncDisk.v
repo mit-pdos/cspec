@@ -220,7 +220,28 @@ Proof.
   unfold block_flushed; simpl; auto.
 Qed.
 
-Hint Resolve flush_flushed wipe_flushed.
+Lemma histcrash_block_flushed : forall h bs,
+    histcrash h bs ->
+    block_flushed bs.
+Proof.
+  intros.
+  inversion H; subst.
+  econstructor; eauto.
+Qed.
+
+Theorem crash_flushed : forall d d',
+    crashesTo d d' ->
+    disk_flushed d'.
+Proof.
+  intros.
+  econstructor; simpl; intros.
+  eapply pointwise_rel_holds with (a:=a) in H.
+  destruct matches in *;
+    try contradiction;
+    eauto using histcrash_block_flushed.
+Qed.
+
+Hint Resolve flush_flushed wipe_flushed crash_flushed.
 
 Theorem flushed_pflush : forall (d d':disk),
     disk_flushed d ->
