@@ -25,7 +25,7 @@ Module D.
   | step_disk_size : forall (state: State),
       step (DiskSize) state (size state) state.
 
-  Definition API := {| op_sem := post_step (@step) pflush;
+  Definition API := {| op_sem := @step;
                        crash_effect := wipe; |}.
 
 End D.

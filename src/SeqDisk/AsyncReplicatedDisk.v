@@ -81,6 +81,39 @@ Module RD.
 
     Hint Resolve crashesTo_one_of_same.
 
+    Lemma wipeBlockhist_eq : forall h h',
+        In (curr_val h') (durable_vals h) ->
+        hist_flushed h' ->
+        wipeBlockhist h h'.
+    Proof.
+      intros.
+      inversion H0.
+      destruct h'; simpl in *.
+      generalize durable_includes_current.
+      rewrite H2; autorewrite with block; simpl.
+      intros.
+      econstructor; eauto.
+    Qed.
+
+    Lemma crashesTo_one_of_same_wipeHist : forall hd hd',
+        crashesTo_one_of hd' hd' hd ->
+        histdisk_flushed hd ->
+        wipeHist hd' hd.
+    Proof.
+      intros.
+      destruct H, H0.
+      eapply pointwise_rel_indomain; intros; try congruence.
+      repeat match goal with
+             | [ H: forall (_:addr), _  |- _ ] =>
+               specialize (H a)
+             end.
+      repeat simpl_match.
+      eapply wipeBlockhist_eq; eauto.
+      intuition.
+    Qed.
+
+    Hint Resolve crashesTo_one_of_same_wipeHist.
+
     Theorem Read_rok : forall a,
         prog_spec
           (fun d state =>
@@ -94,8 +127,10 @@ Module RD.
                    TD.disk1 state' |= covered d;
                recover :=
                  fun _ state' =>
-                   TD.disk0 state' |= crashesTo d /\
-                   TD.disk1 state' |= crashesTo d;
+                   exists d',
+                     TD.disk0 state' |= crashesTo d' /\
+                     TD.disk1 state' |= crashesTo d' /\
+                     wipeHist d d';
              |})
           (Read td a) (_ <- irec td; Recover td)
           (refinement td).
@@ -104,8 +139,7 @@ Module RD.
       rename a0 into d.
       descend; (intuition eauto); simplify.
       descend; (intuition eauto); simplify.
-      eapply pred_weaken; eauto.
-      eapply pred_weaken; eauto.
+      descend; intuition eauto.
     Qed.
 
     Lemma histblock_buffer : forall h b' b,
@@ -152,10 +186,11 @@ Module RD.
                    TD.disk1 state' |= covered (diskUpdF d a (buffer b));
                recover :=
                  fun _ state' =>
-                   (TD.disk0 state' |= crashesTo d /\
-                    TD.disk1 state' |= crashesTo d) \/
-                   (TD.disk0 state' |= crashesTo (diskUpdF d a (buffer b)) /\
-                    TD.disk1 state' |= crashesTo (diskUpdF d a (buffer b)));
+                   exists d',
+                   TD.disk0 state' |= crashesTo d' /\
+                   TD.disk1 state' |= crashesTo d' /\
+                   (wipeHist d d' \/
+                    wipeHist (diskUpdF d a (buffer b)) d');
              |})
           (Write td a b) (_ <- irec td; Recover td)
           (refinement td).
@@ -163,15 +198,9 @@ Module RD.
       start.
       rename a0 into d.
       descend; (intuition eauto); simplify.
-      - descend; (intuition eauto); simplify.
-        left.
-        intuition eauto using pred_weaken.
-      - descend; (intuition eauto); simplify.
-        right.
-        intuition eauto using pred_weaken.
-      - descend; (intuition eauto); simplify.
-        right.
-        intuition eauto using pred_weaken.
+      - descend; (intuition eauto); simplify; finish.
+      - descend; (intuition eauto); simplify; finish.
+      - descend; (intuition eauto); simplify; finish.
     Qed.
 
     Theorem DiskSize_rok :
@@ -187,8 +216,10 @@ Module RD.
                  TD.disk1 state' |= covered d;
              recover :=
                fun _ state' =>
-                 TD.disk0 state' |= crashesTo d /\
-                 TD.disk1 state' |= crashesTo d;
+                 exists d',
+                   TD.disk0 state' |= crashesTo d' /\
+                   TD.disk1 state' |= crashesTo d' /\
+                   wipeHist d d';
            |})
         (DiskSize td) (_ <- irec td; Recover td)
         (refinement td).
@@ -196,10 +227,8 @@ Module RD.
       start.
 
       rename a into d.
-      descend; (intuition eauto); simplify.
-      descend; (intuition eauto); simplify.
-      eapply pred_weaken; eauto.
-      eapply pred_weaken; eauto.
+      descend; (intuition eauto); simplify; finish.
+      descend; (intuition eauto); simplify; finish.
     Qed.
 
     (* TODO: simplify this proof *)
@@ -237,8 +266,10 @@ Module RD.
                  TD.disk1 state' |= then_flush (covered d);
              recover :=
                fun _ state' =>
-                 TD.disk0 state' |= crashesTo d /\
-                 TD.disk1 state' |= crashesTo d;
+                 exists d',
+                 TD.disk0 state' |= crashesTo d' /\
+                 TD.disk1 state' |= crashesTo d' /\
+                 wipeHist d d';
            |})
         (Sync td) (_ <- irec td; Recover td)
         (refinement td).
@@ -247,12 +278,12 @@ Module RD.
 
       rename a into d.
       descend; (intuition eauto); simplify.
-      - descend; (intuition eauto); simplify;
-          eauto using pred_weaken.
-      - descend; (intuition eauto); simplify;
-          eauto using pred_weaken.
-      - descend; (intuition eauto); simplify;
-          eauto using pred_weaken.
+      - descend; (intuition eauto); simplify; finish.
+      - descend; (intuition eauto); simplify; finish.
+        eauto using pred_weaken.
+      - descend; (intuition eauto); simplify; finish.
+        eauto using pred_weaken.
+        eauto using pred_weaken.
     Qed.
 
     (* Now we gather up the implementation and all the correctness proofs,
@@ -439,37 +470,30 @@ Module RD.
 
     Hint Resolve crashesTo_synced_covered.
 
-    Lemma or_equal : forall (P:Prop),
-        P \/ P -> P.
+    Lemma wipeBlock_hist_flushed : forall h h',
+        wipeBlockhist h h' ->
+        hist_flushed h'.
     Proof.
-      intuition.
-    Qed.
-
-    Lemma crashesTo_one_of_same_wipeHist : forall d d',
-        crashesTo_one_of d d d' ->
-        histdisk_flushed d' ->
-        wipeHist d d'.
-    Proof.
-      intros.
-      destruct H, H0.
-      eapply pointwise_rel_indomain; intros; eauto.
-      repeat match goal with
-             | [ H: forall (_:addr), _ |- _ ] =>
-               specialize (H a)
-             end.
-      repeat simpl_match.
-      inversion pointwise_prop_holds.
-      apply or_equal in crashesTo_one_pointwise.
-      (* TODO: need equality-based theorems to prove inductive properties in
-      AsyncDisk *)
-      destruct bs'; simpl in *.
-      generalize durable_includes_current.
-      rewrite H3.
-      autorewrite with block; simpl; intros.
+      destruct 1.
       econstructor; eauto.
     Qed.
 
-    Hint Resolve crashesTo_one_of_same_wipeHist.
+    Hint Resolve wipeBlock_hist_flushed.
+
+    Theorem wipeHist_flushed : forall d d',
+        wipeHist d d' ->
+        histdisk_flushed d'.
+    Proof.
+      intros.
+      destruct H.
+      econstructor; intros.
+      specialize (pointwise_rel_holds a).
+      destruct matches in *; try contradiction; eauto.
+    Qed.
+
+    Hint Resolve wipeHist_flushed.
+
+    Hint Resolve then_flush_covered.
 
     Definition rd : Interface D.API.
       unshelve econstructor.
@@ -481,19 +505,15 @@ Module RD.
           apply spec_refinement_compose;
           eapply prog_spec_weaken; eauto;
             unfold spec_impl, rd_abstraction; simplify.
-        + descend; intuition eauto.
-          exists state2; intuition eauto.
-          unfold post_step.
-          descend; intuition eauto.
-          reflexivity.
-          simplify.
-          admit. (* recovery should not promise two crashesTo relations; we need
-          to know that both disks are actually the same (pick a crash block for
-          every address and then promise both disks are just those blocks with
-          no histories) *)
-        + all: admit.
-        + all: admit.
-        + all: admit.
+        + descend; (intuition eauto); simplify.
+          descend; intuition eauto using pred_weaken.
+        + descend; (intuition eauto); simplify.
+          descend; intuition eauto using pred_weaken.
+        + descend; (intuition eauto); simplify.
+          descend; intuition eauto using pred_weaken.
+          descend; intuition eauto using pred_weaken.
+        + descend; (intuition eauto); simplify.
+          descend; intuition eauto using pred_weaken.
 
       - eapply rec_noop_compose; eauto; simpl.
         unfold Recover_spec, rd_abstraction; simplify.
@@ -511,7 +531,10 @@ Module RD.
         descend; intuition eauto.
         destruct v; simplify; finish.
         unfold rd_abstraction; eauto.
-    Admitted.
+
+        Grab Existential Variables.
+        all: auto.
+    Defined.
 
   End ReplicatedDisk.
 
