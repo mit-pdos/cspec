@@ -295,6 +295,31 @@ Definition hist_flushed (h:blockhist) : Prop :=
 Definition histdisk_flushed : histdisk -> Prop :=
   pointwise_prop hist_flushed.
 
+Lemma wipeBlockhist_eq : forall h h',
+    In (curr_val h') (durable_vals h) ->
+    hist_flushed h' ->
+    wipeBlockhist h h'.
+Proof.
+  intros.
+  inversion H0.
+  destruct h'; simpl in *.
+  generalize durable_includes_current0.
+  rewrite H2; autorewrite with block; simpl.
+  intros.
+  econstructor; eauto.
+Qed.
+
+Theorem histdisk_flushed_flush : forall d,
+    histdisk_flushed (flush d).
+Proof.
+  intros.
+  econstructor; intros; simpl.
+  destruct matches.
+  econstructor.
+Qed.
+
+Hint Resolve histdisk_flushed_flush.
+
 (** * predicate transformers *)
 
 Definition then_wipe (F: disk -> Prop) : disk -> Prop :=

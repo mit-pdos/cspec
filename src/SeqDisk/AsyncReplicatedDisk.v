@@ -81,20 +81,6 @@ Module RD.
 
     Hint Resolve crashesTo_one_of_same.
 
-    Lemma wipeBlockhist_eq : forall h h',
-        In (curr_val h') (durable_vals h) ->
-        hist_flushed h' ->
-        wipeBlockhist h h'.
-    Proof.
-      intros.
-      inversion H0.
-      destruct h'; simpl in *.
-      generalize durable_includes_current.
-      rewrite H2; autorewrite with block; simpl.
-      intros.
-      econstructor; eauto.
-    Qed.
-
     Lemma crashesTo_one_of_same_wipeHist : forall hd hd',
         crashesTo_one_of hd' hd' hd ->
         histdisk_flushed hd ->

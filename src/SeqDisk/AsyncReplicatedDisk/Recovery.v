@@ -63,6 +63,7 @@ Section AsyncReplicatedDisk.
     Definition Recover : prog unit :=
       sz <- DiskSize td;
         _ <- recover_at sz;
+        _ <- Prim td (TD.Sync d0);
         _ <- Prim td (TD.Sync d1);
         Ret tt.
 
@@ -98,7 +99,7 @@ Section AsyncReplicatedDisk.
     Hint Resolve pred_weaken.
 
     Lemma equal_after_already_eq : forall a (d_0 d_1:histdisk) v,
-        a < size d_0 ->
+        a <= size d_0 ->
         d_0 a |= curr_val_eq v ->
         d_1 a |= curr_val_eq v ->
         equal_after (S a) d_0 d_1 ->
@@ -308,7 +309,7 @@ Section AsyncReplicatedDisk.
              {|
                pre :=
                  exists d_0 d_1,
-                 a < size d_0 /\
+                 a <= size d_0 /\
                  TD.disk0 state |= covered d_0 /\
                  TD.disk1 state |= covered d_1 /\
                  equal_after (S a) d_0 d_1 /\
@@ -326,13 +327,13 @@ Section AsyncReplicatedDisk.
                      crashesTo_one_of' d0__i d1__i d_1'
                    | DiskFailed d0 =>
                      exists d_1',
-                     TD.disk0 state' |= covered d_1' /\
+                     TD.disk0 state' |= missing /\
                      TD.disk1 state' |= covered d_1' /\
                      crashesTo_one_of' d0__i d1__i d_1'
                    | DiskFailed d1 =>
                      exists d_0',
                      TD.disk0 state' |= covered d_0' /\
-                     TD.disk1 state' |= covered d_0' /\
+                     TD.disk1 state' |= missing /\
                      crashesTo_one_of' d0__i d1__i d_0'
                    end;
                recover :=
@@ -389,15 +390,15 @@ Section AsyncReplicatedDisk.
 
     Hint Resolve fixup_ok.
 
-    Lemma lt_S_trans : forall a b,
-        S a < b ->
-        a < b.
+    Lemma le_S_trans : forall a b,
+        S a <= b ->
+        a <= b.
     Proof.
       intros.
       omega.
     Qed.
 
-    Hint Resolve lt_S_trans.
+    Hint Resolve le_S_trans.
 
     Theorem recover_at_ok : forall a,
         prog_spec
@@ -405,7 +406,7 @@ Section AsyncReplicatedDisk.
              {|
                pre :=
                  exists d_0 d_1,
-                 a < size d_0 /\
+                 a <= size d_0 /\
                  TD.disk0 state |= covered d_0 /\
                  TD.disk1 state |= covered d_1 /\
                  equal_after a d_0 d_1 /\
@@ -423,13 +424,13 @@ Section AsyncReplicatedDisk.
                      crashesTo_one_of' d0__i d1__i d_1'
                    | DiskFailed d0 =>
                      exists d_1',
-                     TD.disk0 state' |= covered d_1' /\
+                     TD.disk0 state' |= missing /\
                      TD.disk1 state' |= covered d_1' /\
                      crashesTo_one_of' d0__i d1__i d_1'
                    | DiskFailed d1 =>
                      exists d_0',
                      TD.disk0 state' |= covered d_0' /\
-                     TD.disk1 state' |= covered d_0' /\
+                     TD.disk1 state' |= missing /\
                      crashesTo_one_of' d0__i d1__i d_0'
                    end;
                recover :=
@@ -508,6 +509,123 @@ Section AsyncReplicatedDisk.
                  histdisk_flushed d_1';
          |}).
 
+    Theorem equal_after_size : forall d d',
+        size d = size d' ->
+        equal_after (size d) d d'.
+    Proof.
+      intros.
+      econstructor; intros; eauto.
+      assert (~a' < size d) by omega.
+      assert (~a' < size d') by congruence.
+      autorewrite with upd; auto.
+    Qed.
+
+    Hint Resolve recover_at_ok.
+
+    Lemma crashesTo_to_covered : forall d d'',
+        crashesTo d d'' ->
+        exists d', wipeHist d d' /\
+              covered d' d''.
+    Proof.
+      intros.
+      exists (covering d''); intuition eauto using covered_covering.
+      autounfold with disk in *; pointwise.
+      inversion H; subst.
+      eapply wipeBlockhist_eq; simpl; eauto.
+      unfold hist_flushed, state_hist; autorewrite with block; simpl.
+      rewrite Add_element; auto.
+    Qed.
+
+    Lemma maybe_holds_crashesTo_to_covered : forall d md,
+        md |= crashesTo d ->
+        exists d', wipeHist d d' /\
+          md |= covered d'.
+    Proof.
+      destruct md; simpl; intros.
+      eapply crashesTo_to_covered in H; deex; eauto.
+      (* technically this theorem requires a wipeHist even if there's no
+      crashesTo... *)
+      exists (mapDisk (fun h =>
+                    {| current_val := curr_val h;
+                       durable_vals := Singleton (curr_val h);
+                       durable_includes_current := ltac:(auto) |}) d).
+      split; auto.
+      econstructor; intros; simpl; eauto.
+      destruct matches.
+      eapply wipeBlockhist_eq; simpl;
+        autorewrite with block; simpl.
+      eapply durable_includes_current.
+      unfold hist_flushed; simpl; eauto.
+    Qed.
+
+    Hint Resolve equal_after_size.
+
+    Lemma crashesTo_one_of'_eq0 : forall d_0 d_1,
+        size d_0 = size d_1 ->
+        crashesTo_one_of' d_0 d_1 d_0.
+    Proof.
+      intros.
+      econstructor; intros; eauto.
+      destruct matches; eauto using same_size_disks_not_different.
+      intuition eauto using durable_includes_current.
+      eauto using contains_Union_l, contains_Union_r.
+    Qed.
+
+    Lemma crashesTo_one_of'_eq1 : forall d_0 d_1,
+        size d_0 = size d_1 ->
+        crashesTo_one_of' d_0 d_1 d_1.
+    Proof.
+      intros.
+      econstructor; intros; eauto.
+      destruct matches; eauto using same_size_disks_not_different.
+      intuition eauto using durable_includes_current.
+      eauto using contains_Union_l, contains_Union_r.
+    Qed.
+
+    Lemma blockhist_eq : forall h h',
+        current_val h = current_val h' ->
+        durable_vals h = durable_vals h' ->
+        h = h'.
+    Proof.
+      destruct h, h'; simpl; intros; subst.
+      f_equal.
+      apply ProofIrrelevance.proof_irrelevance.
+    Qed.
+
+    Theorem equal_after_0_flush : forall d d',
+        equal_after 0 d d' ->
+        flush d = flush d'.
+    Proof.
+      intros.
+      eapply diskMem_ext_eq.
+      extensionality a; simpl.
+      apply equal_after_holds with (a':=a) in H.
+      destruct matches; try contradiction.
+      f_equal.
+      eapply blockhist_eq; simpl; eauto.
+      autorewrite with block in *.
+      rewrite H; auto.
+      omega.
+    Qed.
+
+    Theorem then_flush_crashesTo_flush : forall d d',
+        then_flush (covered d) d' ->
+        crashesTo (flush d) d'.
+    Proof.
+      unfold then_flush; intros; repeat deex.
+      autounfold with disk in *; pointwise.
+      econstructor; simpl; eauto.
+      eapply collapse_current in H.
+      erewrite curr_val_some_cache in * by eauto.
+      eauto.
+      destruct b0; simpl in *; subst.
+      econstructor; simpl; eauto.
+      inversion H; subst; autorewrite with block in *.
+      auto.
+    Qed.
+
+    Hint Resolve then_flush_crashesTo_flush.
+
     Theorem Recover_rok :
       prog_spec
         Recover_spec
@@ -515,6 +633,71 @@ Section AsyncReplicatedDisk.
         (irec td)
         (refinement td).
     Proof.
+      unfold Recover, Recover_spec.
+      spec_cases; simpl; intros.
+      destruct a as [d_0 d_1]; simplify.
+      eapply maybe_holds_crashesTo_to_covered in H; deex.
+      eapply maybe_holds_crashesTo_to_covered in H0; deex.
+      rename d' into d_0'.
+      rename d'0 into d_1'.
+      assert (size d_0' = size d_1').
+      destruct H, H0; congruence.
+      step.
+      descend; intuition eauto.
+
+      step.
+      descend; (intuition eauto); simplify; finish.
+      descend; intuition eauto.
+      apply crashesTo_one_of'_eq0 with (d_1:=d_1'); eauto.
+      apply crashesTo_one_of'_eq1; eauto.
+
+      step.
+      destruct r; simplify.
+      descend; intuition eauto.
+      step.
+      descend; intuition eauto.
+      step.
+      intuition.
+      exists (flush d_0'0); intuition eauto.
+      erewrite equal_after_0_flush by eauto; eauto.
+      admit. (* some chaining of crashesTo_one_of, crashesTo_one_of', and wipeHist *)
+
+      admit. (* need to do something with TD.wipe? *)
+
+      (* bunch of crash invariants: *)
+      admit.
+      admit.
+      admit.
+      admit.
+
+      (* some disk missing *)
+      { destruct i; simplify; descend; (intuition eauto); simplify.
+        step.
+        descend; intuition eauto.
+        step.
+        intuition.
+        admit.
+        admit. (* TD.wipe again *)
+        admit.
+        admit.
+        admit.
+        admit.
+
+        step.
+        descend; intuition eauto.
+        step.
+        descend; intuition eauto.
+        admit.
+        admit.
+        admit.
+        admit.
+        admit.
+        admit.
+      }
+
+      (* analogues of crashesTo_one_of'_eq{0,1} *)
+      admit.
+      admit.
     Admitted.
 
     Lemma histblock_trans : forall h h',
