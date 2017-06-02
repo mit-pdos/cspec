@@ -99,13 +99,19 @@ Section Ensembles.
     auto.
   Qed.
 
+  Ltac t := intros;
+            repeat match goal with
+                   | [ A: Ensemble |- _ ] => destruct A
+                   end;
+            compute in *;
+            try solve [ intuition (subst; eauto) ].
+
   Lemma contains_Add : forall x A A',
       contains A A' ->
       In x A' ->
       contains (Add x A) A'.
   Proof.
-    destruct A, A'; compute; intros.
-    intuition (subst; eauto).
+    t.
   Qed.
 
   Lemma contains_Add_inv : forall x A A',
@@ -113,8 +119,7 @@ Section Ensembles.
       contains A A' /\
       In x A'.
   Proof.
-    destruct A, A'; compute; intros.
-    intuition (subst; eauto).
+    t.
   Qed.
 
   Theorem Add_element : forall x A,
@@ -123,15 +128,14 @@ Section Ensembles.
   Proof.
     intros.
     apply Ensemble_ext.
-    split; compute; eauto.
-    destruct A; simpl; intuition (subst; eauto).
+    t.
   Qed.
 
   Theorem contains_Singleton : forall x A,
       contains (Singleton x) A <->
       In x A.
   Proof.
-    destruct A; compute; intuition (subst; auto).
+    t.
   Qed.
 
   Theorem contains_Union_respectful : forall A0 A1 A0' A1',
@@ -139,7 +143,7 @@ Section Ensembles.
       contains A1 A1' ->
       contains (Union A0 A1) (Union A0' A1').
   Proof.
-    destruct A0, A1, A0', A1'; compute; intuition.
+    t.
   Qed.
 
   Theorem contains_Union_both : forall A A0 A1,
@@ -147,7 +151,19 @@ Section Ensembles.
       contains A1 A ->
       contains (Union A0 A1) A.
   Proof.
-    destruct A, A0, A1; compute; intuition.
+    t.
+  Qed.
+
+  Theorem contains_Union_l : forall A A',
+      contains A (Union A A').
+  Proof.
+    t.
+  Qed.
+
+  Theorem contains_Union_r : forall A A',
+      contains A' (Union A A').
+  Proof.
+    t.
   Qed.
 
 End Ensembles.
