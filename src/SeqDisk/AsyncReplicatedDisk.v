@@ -122,7 +122,7 @@ Module RD.
                       TD.disk1 state |= covered d;
                post :=
                  fun r state' =>
-                   d a |= (fun bs => curr_val bs = r) /\
+                   d a |= curr_val_eq r /\
                    TD.disk0 state' |= covered d /\
                    TD.disk1 state' |= covered d;
                recover :=
@@ -293,7 +293,7 @@ Module RD.
     convenient terms (in some cases, just for the sake of the automation). *)
 
     Lemma read_step : forall a (state state':D.State) b,
-        state a |= (fun bs => curr_val bs = b) ->
+        state a |= curr_val_eq b ->
         state' = state ->
         D.step (D.Read a) state b state'.
     Proof.

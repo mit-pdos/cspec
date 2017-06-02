@@ -1,3 +1,5 @@
+Require Import Omega.
+
 Require Import Automation.
 Require Import Pocs.Ensemble.
 Require Import Disk.AsyncDisk.
@@ -64,6 +66,15 @@ Section AsyncReplicatedDisk.
         _ <- Prim td (TD.Sync d1);
         Ret tt.
 
+    Record equal_after (a:addr) (d_0 d_1:histdisk) : Prop :=
+      { equal_after_sizes_eq : size d_0 = size d_1;
+        equal_after_holds : forall a', a <= a' ->
+                                  match d_0 a', d_1 a' with
+                                  | Some b0, Some b1 => curr_val b0 = curr_val b1
+                                  | None, None => True
+                                  | _, _ => False
+                                  end; }.
+
     (* crashesTo_one_of d_0 d_1 d says [forall a, d_0(a) ~> d(a) \/ d_1(a) ~> d(a)]
     where [h ~> h'] is made-up notation for h crashing to the current value in
     h' (with any set of durable writes in h').
@@ -80,6 +91,194 @@ Section AsyncReplicatedDisk.
             | _, _, _ => False
             end;
       }.
+
+    Hint Resolve pred_weaken.
+
+    Lemma equal_after_already_eq : forall a (d_0 d_1:histdisk) v,
+        a < size d_0 ->
+        d_0 a |= curr_val_eq v ->
+        d_1 a |= curr_val_eq v ->
+        equal_after (S a) d_0 d_1 ->
+        equal_after a d_0 d_1.
+    Proof.
+      intros.
+      destruct H2.
+      econstructor; intros; eauto.
+      apply Lt.le_lt_or_eq in H2; intuition subst.
+      eapply equal_after_holds0.
+      omega.
+      destruct matches; simpl in *;
+        eauto using same_size_disks_not_different.
+    Qed.
+
+    Hint Resolve equal_after_already_eq.
+
+    Lemma equal_after_upd : forall a (d_0 d_1:histdisk) v,
+        d_0 a |= curr_val_eq v ->
+        equal_after (S a) d_0 d_1 ->
+        equal_after a d_0 (diskUpdF d_1 a (buffer v)).
+    Proof.
+      intros.
+      destruct H0.
+      econstructor; autorewrite with upd; intros; eauto.
+      apply Lt.le_lt_or_eq in H0; intuition subst.
+      specialize (equal_after_holds0 a' ltac:(omega)).
+      destruct matches in *|- ;
+        autorewrite with upd;
+        eauto.
+      is_eq a a';
+        autorewrite with upd;
+        repeat simpl_match;
+        eauto.
+      unfold maybe_holds, curr_val_eq in *;
+        simpl_match; subst.
+      erewrite diskUpdF_eq by eauto; auto.
+
+      is_eq a a';
+        autorewrite with upd;
+        repeat simpl_match;
+        auto.
+
+      destruct (d_0 a') eqn:?, (d_1 a') eqn:?; simpl in *;
+        autorewrite with upd;
+        unfold disk_get in *;
+        try solve [ exfalso; eauto using same_size_disks_not_different ].
+      erewrite diskUpdF_eq; eauto.
+      simpl_match; auto.
+    Qed.
+
+    Hint Resolve equal_after_upd.
+
+    Lemma crashesTo_one_curr_val : forall d0__i d1__i d a v,
+        crashesTo_one_of d0__i d1__i d ->
+        d a |= curr_val_eq v ->
+        forall bs0 bs1, d0__i a = Some bs0 ->
+                   d1__i a = Some bs1 ->
+                   In v (durable_vals bs0) \/
+                   In v (durable_vals bs1).
+    Proof.
+      intros.
+      apply crashesTo_one_pointwise with (a:=a) in H.
+      repeat simpl_match.
+      destruct matches in *; try contradiction.
+    Qed.
+
+    Lemma crashesTo_one_of_upd:
+      forall (a : nat) (d0__i d1__i : histdisk) (d_0 : diskOf blockhist) (d_1 : histdisk),
+        crashesTo_one_of d0__i d1__i d_0 ->
+        crashesTo_one_of d0__i d1__i d_1 ->
+        forall v : block,
+          d_0 a |= curr_val_eq v ->
+          crashesTo_one_of d0__i d1__i (diskUpdF d_1 a (buffer v)).
+    Proof.
+      intros.
+      destruct H, H0.
+      econstructor;
+        autorewrite with upd; try congruence.
+      intros.
+      repeat match goal with
+             | [ H: forall (_:addr), _ |- _ ] =>
+               specialize (H a0)
+             end.
+      destruct matches in *|-; autorewrite with upd; eauto.
+      is_eq a a0; autorewrite with upd in *.
+      - unfold maybe_holds, curr_val_eq in *; repeat simpl_match; subst.
+        erewrite diskUpdF_eq by eauto.
+        autorewrite with block in *.
+        intuition eauto.
+      - simpl_match.
+        intuition eauto.
+      - is_eq a a0; autorewrite with upd;
+          repeat simpl_match;
+          auto.
+    Qed.
+
+    Hint Resolve crashesTo_one_of_upd.
+
+    Theorem fixup_ok : forall a,
+        prog_spec
+          (fun '(d0__i, d1__i) state =>
+             {|
+               pre :=
+                 exists d_0 d_1,
+                 a < size d_0 /\
+                 TD.disk0 state |= covered d_0 /\
+                 TD.disk1 state |= covered d_1 /\
+                 equal_after (S a) d_0 d_1 /\
+                 crashesTo_one_of d0__i d1__i d_0 /\
+                 crashesTo_one_of d0__i d1__i d_1;
+               post :=
+                 fun r state' =>
+                   match r with
+                   | Continue =>
+                     exists d_0' d_1',
+                     TD.disk0 state' |= covered d_0' /\
+                     TD.disk1 state' |= covered d_1' /\
+                     equal_after a d_0' d_1' /\
+                     crashesTo_one_of d0__i d1__i d_0' /\
+                     crashesTo_one_of d0__i d1__i d_1'
+                   | DiskFailed d0 =>
+                     exists d_1',
+                     TD.disk0 state' |= covered d_1' /\
+                     TD.disk1 state' |= covered d_1' /\
+                     crashesTo_one_of d0__i d1__i d_1'
+                   | DiskFailed d1 =>
+                     exists d_0',
+                     TD.disk0 state' |= covered d_0' /\
+                     TD.disk1 state' |= covered d_0' /\
+                     crashesTo_one_of d0__i d1__i d_0'
+                   end;
+               recover :=
+                 fun (_:unit) state' =>
+                   (* either disk could change due to failures *)
+                   exists d_0' d_1',
+                     TD.disk0 state' |= crashesTo d_0' /\
+                     TD.disk1 state' |= crashesTo d_1' /\
+                     crashesTo_one_of d0__i d1__i d_0' /\
+                     crashesTo_one_of d0__i d1__i d_1';
+             |})
+          (fixup a)
+          (irec td)
+          (refinement td).
+    Proof.
+      unfold fixup.
+      step.
+      descend; intuition eauto.
+
+      destruct r; try step.
+      descend; intuition eauto.
+
+      destruct r; try step.
+      descend; intuition eauto.
+
+      is_eq v v0; try step.
+      intuition.
+      descend; intuition eauto.
+      descend; intuition eauto.
+
+      descend; intuition eauto.
+      step.
+      destruct matches; simplify.
+      intuition.
+      descend; intuition eauto.
+      descend; intuition eauto.
+
+      intuition.
+      descend; intuition eauto.
+      descend; intuition eauto.
+      descend; intuition eauto.
+      descend; intuition eauto.
+
+      intuition.
+      descend; intuition eauto.
+      descend; intuition eauto.
+      descend; intuition eauto.
+
+      intuition.
+      descend; intuition eauto.
+      descend; intuition eauto.
+      descend; intuition eauto.
+    Qed.
 
     Definition Recover_spec :=
       (fun '(d_0, d_1) state =>

@@ -49,7 +49,7 @@ Section AsyncReplicatedDisk.
                     TD.disk1 state |= covered d;
              post :=
                fun r state' =>
-                 d a |= (fun bs => curr_val bs = r) /\
+                 d a |= curr_val_eq r /\
                  TD.disk0 state' |= covered d /\
                  TD.disk1 state' |= covered d;
              recover :=

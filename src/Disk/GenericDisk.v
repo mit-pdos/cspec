@@ -165,6 +165,14 @@ Section GenericDisks.
     destruct matches; simpl; eauto.
   Qed.
 
+  Theorem diskUpdF_none : forall d a f,
+      d a = None ->
+      diskUpdF d a f = d.
+  Proof.
+    unfold diskUpdF; intros.
+    destruct matches; simpl; eauto.
+  Qed.
+
   Theorem diskUpdF_inbounds : forall d a f,
       a < size d ->
       exists v, d a = Some v /\
@@ -234,6 +242,7 @@ Hint Rewrite diskUpd_none using (solve [ auto ]) : upd.
 
 Hint Rewrite diskUpdF_size_eq : upd.
 Hint Rewrite diskUpdF_oob using (solve [ auto ]) : upd.
+Hint Rewrite diskUpdF_none using (solve [ auto ]) : upd.
 Hint Rewrite diskUpdF_neq using (solve [ auto ]) : upd.
 
 Hint Rewrite diskUpd_same using (solve [ auto ]) : upd.

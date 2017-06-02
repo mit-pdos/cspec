@@ -125,10 +125,13 @@ Qed.
 Hint Resolve covered_stable_pflush.
 Hint Resolve missing_stable.
 
+Definition curr_val_eq {B} {async:AsyncBlock B} (b:block) : B -> Prop :=
+  fun bs => curr_val bs = b.
+
 Lemma covered_some_latest : forall (d: histdisk) (d': disk) a bs,
     d' a = Some bs ->
     covered d d' ->
-    d a |= (fun bs' => curr_val bs' = curr_val bs).
+    d a |= curr_val_eq (curr_val bs).
 Proof.
   intros.
   pose proof (pointwise_rel_holds H0 a).
@@ -152,9 +155,6 @@ Proof.
 Qed.
 
 Hint Resolve covered_none.
-
-Definition curr_val_eq {B} {async:AsyncBlock B} (b:block) : B -> Prop :=
-  fun bs => curr_val bs = b.
 
 Lemma covered_curr_val:
   forall (a : addr) (d : histdisk) (d' : disk) (b : blockstate),
@@ -243,7 +243,7 @@ Theorem TDRead1_ok : forall (i: Interface TD.API) a,
                match r with
                | Working v => TD.disk0 state' |= F /\
                              TD.disk1 state' |= covered d_1 /\
-                             d_1 a |= (fun bs => curr_val bs = v)
+                             d_1 a |= curr_val_eq v
                | Failed => TD.disk0 state' |= F /\
                           TD.disk1 state' |= missing
                end;
