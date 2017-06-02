@@ -200,6 +200,7 @@ Module RD.
       descend; (intuition eauto); simplify.
       - descend; (intuition eauto); simplify; finish.
       - descend; (intuition eauto); simplify; finish.
+        autorewrite with upd; eauto.
       - descend; (intuition eauto); simplify; finish.
     Qed.
 

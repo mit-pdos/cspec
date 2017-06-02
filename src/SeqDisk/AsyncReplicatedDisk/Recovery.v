@@ -485,7 +485,10 @@ Section AsyncReplicatedDisk.
          {|
            pre :=
              TD.disk0 state |= crashesTo d_0 /\
-             TD.disk1 state |= crashesTo d_1;
+             TD.disk1 state |= crashesTo d_1 /\
+             (* we put this later to help sequential eauto calls from
+             instantiating d_1 to d_0 *)
+             size d_0 = size d_1;
            post :=
              fun (_:unit) state' =>
                exists d,
@@ -564,6 +567,10 @@ Section AsyncReplicatedDisk.
       - eapply Recover_rok.
       - unfold idempotent; intuition; simplify.
         descend; intuition eauto.
+        repeat match goal with
+               | [ H: crashesTo_one_of _ _ _ |- _ ] =>
+                 destruct H
+               end; congruence.
         repeat deex.
         descend; intuition eauto.
     Qed.
