@@ -63,12 +63,6 @@ Section AsyncReplicatedDisk.
         _ <- Prim td (TD.Sync d1);
         Ret tt.
 
-    Definition block_synced (h:blockhist) :=
-      forall b, List.In b (durable_vals h) ->
-           b = curr_val h.
-
-    Definition disk_synced := pointwise_prop block_synced.
-
     (* crashesTo_one_of d_0 d_1 d says [forall a, d_0(a) ~> d(a) \/ d_1(a) ~> d(a)]
     where [h ~> h'] is made-up notation for h crashing to the current value in
     h' (with any set of durable writes in h').
@@ -79,8 +73,8 @@ Section AsyncReplicatedDisk.
         crashesTo_one_size1 : size d_1 = size d;
         crashesTo_one_pointwise : forall a,
             match d_0 a, d_1 a, d a with
-            | Some h0, Some h1, Some h => histblock h0 (curr_val h) \/
-                                         histblock h1 (curr_val h)
+            | Some h0, Some h1, Some h => durable_vals h0 (curr_val h) \/
+                                         durable_vals h1 (curr_val h)
             | None, None, None => True
             | _, _, _ => False
             end;
@@ -98,7 +92,7 @@ Section AsyncReplicatedDisk.
                  TD.disk0 state' |= crashesTo d /\
                  TD.disk1 state' |= crashesTo d /\
                  crashesTo_one_of d_0 d_1 d /\
-                 disk_synced d;
+                 histdisk_flushed d;
            recover :=
              fun (_:unit) state' =>
                (* either disk could change due to failures *)
@@ -107,8 +101,8 @@ Section AsyncReplicatedDisk.
                  TD.disk1 state' |= crashesTo d_1' /\
                  crashesTo_one_of d_0 d_1 d_0' /\
                  crashesTo_one_of d_0 d_1 d_1' /\
-                 disk_synced d_0' /\
-                 disk_synced d_1';
+                 histdisk_flushed d_0' /\
+                 histdisk_flushed d_1';
          |}).
 
     Theorem Recover_rok :
@@ -120,24 +114,15 @@ Section AsyncReplicatedDisk.
     Proof.
     Admitted.
 
-    Lemma histblock_curr_eq : forall h b,
-        b = curr_val h ->
-        histblock h b.
-    Proof.
-      intros; subst.
-      constructor.
-    Qed.
-
     Lemma histblock_trans : forall h h',
-        histblock h (curr_val h') ->
-        block_synced h' ->
-        forall h'', histblock h' (curr_val h'') ->
-               histblock h (curr_val h'').
+        durable_vals h (curr_val h') ->
+        hist_flushed h' ->
+        forall h'', durable_vals h' (curr_val h'') ->
+               durable_vals h (curr_val h'').
     Proof.
-      unfold block_synced; intros.
-      inversion H1; subst; try congruence.
-      apply H0 in H2.
-      congruence.
+      unfold hist_flushed; intros.
+      rewrite H0 in *.
+      inversion H1; auto.
     Qed.
 
     Hint Resolve histblock_trans.
@@ -146,15 +131,15 @@ Section AsyncReplicatedDisk.
       forall d_0 d_1 d_0' d_1' : histdisk,
         crashesTo_one_of d_0 d_1 d_0' ->
         crashesTo_one_of d_0 d_1 d_1' ->
-        disk_synced d_0' ->
-        disk_synced d_1' ->
+        histdisk_flushed d_0' ->
+        histdisk_flushed d_1' ->
         forall d' : histdisk,
           crashesTo_one_of d_0' d_1' d' ->
           crashesTo_one_of d_0 d_1 d'.
     Proof.
       intros.
       repeat match goal with
-             | [ H: disk_synced _ |- _ ] => destruct H
+             | [ H: histdisk_flushed _ |- _ ] => destruct H
              | [ H: crashesTo_one_of _ _ _ |- _ ] => destruct H
              end.
       econstructor; intros; try congruence.

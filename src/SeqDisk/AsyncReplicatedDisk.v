@@ -46,30 +46,22 @@ Module RD.
 
     Implicit Type (state:TD.State).
 
-    (* TODO: clean up this proof *)
     Lemma histblock_histcrash_trans : forall h h' h'',
-        histblock h (curr_val h') ->
-        block_synced h' ->
+        durable_vals h (curr_val h') ->
+        hist_flushed h' ->
         histcrash h' h'' ->
         histcrash h h''.
     Proof.
-      unfold block_synced; intros.
+      unfold hist_flushed; intros.
       inversion H1; subst; clear H1.
-      constructor.
-      inversion H; subst; clear H.
+      rewrite H0 in *.
       inversion H2; subst; clear H2.
-      apply histblock_curr_eq; congruence.
-      eapply H0 in H.
-      apply histblock_curr_eq; congruence.
-      inversion H2; subst; clear H2.
-      econstructor; eauto.
-      apply H0 in H; subst.
       econstructor; eauto.
     Qed.
 
     Lemma crashesTo_one_of_same : forall d hd hd',
         crashesTo hd d ->
-        disk_synced hd ->
+        histdisk_flushed hd ->
         crashesTo_one_of hd' hd' hd ->
         crashesTo hd' d.
     Proof.
@@ -81,6 +73,7 @@ Module RD.
              | [ H: forall (_:addr), _  |- _ ] =>
                specialize (H a)
              end.
+      repeat simpl_match.
       destruct matches in *;
         intuition eauto using histblock_histcrash_trans.
     Qed.
@@ -115,16 +108,12 @@ Module RD.
     Qed.
 
     Lemma histblock_buffer : forall h b' b,
-        histblock h b ->
-        histblock (buffer b' h) b.
+        durable_vals h b ->
+        durable_vals (buffer b' h) b.
     Proof.
       intros.
-      econstructor.
       autorewrite with block.
-      inversion H; subst.
-      econstructor.
-      autorewrite with block; auto.
-      constructor 2; auto.
+      eauto.
     Qed.
 
     Hint Resolve histblock_buffer.
@@ -212,6 +201,28 @@ Module RD.
       eapply pred_weaken; eauto.
     Qed.
 
+    (* TODO: simplify this proof *)
+    Lemma then_flush_crashesTo : forall d d',
+        then_flush (covered d) d' ->
+        crashesTo d d'.
+    Proof.
+      unfold then_flush; intros; repeat deex.
+      autounfold with disk in *; pointwise.
+      apply collapse_current in H.
+      apply curr_val_some_cache in Heqo1.
+      econstructor; eauto.
+      subst.
+      rewrite <- H.
+      eapply durable_includes_current.
+      destruct b0; simpl in *; subst.
+      econstructor; eauto.
+      apply collapse_current in H; autorewrite with block in *; simpl in *.
+      subst.
+      eapply durable_includes_current.
+    Qed.
+
+    Hint Resolve then_flush_crashesTo.
+
     Theorem Sync_rok :
       prog_spec
         (fun d state =>
@@ -235,15 +246,13 @@ Module RD.
 
       rename a into d.
       descend; (intuition eauto); simplify.
-      - descend; (intuition eauto); simplify.
-        eauto using pred_weaken.
-        eauto using pred_weaken.
-      - descend; (intuition eauto); simplify.
-        all: admit. (* need to show crashesTo is weaker than then_flush
-        (flushing is one possible crash state, so this should be true) *)
-      - descend; (intuition eauto); simplify.
-        all: admit.
-    Admitted.
+      - descend; (intuition eauto); simplify;
+          eauto using pred_weaken.
+      - descend; (intuition eauto); simplify;
+          eauto using pred_weaken.
+      - descend; (intuition eauto); simplify;
+          eauto using pred_weaken.
+    Qed.
 
     (* Now we gather up the implementation and all the correctness proofs,
     expressing them in terms of the high-level API in D.API. *)
@@ -312,16 +321,20 @@ Module RD.
 
     Definition state_hist (bs:blockstate) : blockhist :=
       {| current_val := curr_val bs;
-         durable_vals := durable_val bs::nil |}.
+         durable_vals := Ensemble.add
+                           (Ensemble.Singleton (durable_val bs))
+                           (curr_val bs);
+         durable_includes_current := ltac:(auto); |}.
 
     Definition covering (d:disk) : histdisk :=
-      mapDisk d state_hist.
+      mapDisk state_hist d.
 
     Lemma collapsesTo_state_hist : forall b,
         collapsesTo (state_hist b) b.
     Proof.
       unfold state_hist; destruct b; simpl; intros.
       econstructor; simpl; eauto.
+      unfold Ensemble.In; auto.
     Qed.
 
     Lemma covered_covering : forall d,
@@ -329,8 +342,9 @@ Module RD.
     Proof.
       intros.
       eapply pointwise_rel_indomain; intros; auto.
-      simpl.
-      destruct matches; eauto using collapsesTo_state_hist.
+      simpl in *; repeat simpl_match.
+      inversion H0; subst.
+      eauto using collapsesTo_state_hist.
     Qed.
 
     Hint Resolve covered_covering.
@@ -369,6 +383,18 @@ Module RD.
       solve_false.
     Qed.
 
+    (* TODO: move up to AsyncDisk. Might be useful elsewhere, too. *)
+    Lemma wipe_crashesTo : forall d d',
+        covered d d' ->
+        crashesTo d (wipeDisk d').
+    Proof.
+      autounfold with disk; intros.
+      pointwise.
+      unfold wipeBlockstate.
+      econstructor; eauto.
+      eapply collapse_durable; eauto.
+    Qed.
+
     Lemma wipe_disk0_crashesTo : forall state d,
         TD.disk0 state |= covered d ->
         TD.disk0 (TD.disks_map wipeDisk state) |= crashesTo d.
@@ -376,10 +402,9 @@ Module RD.
       intros.
       destruct state.
       destruct disk0, disk1; simpl in *; eauto.
+
       eapply wipe_crashesTo; eauto.
-      reflexivity.
       eapply wipe_crashesTo; eauto.
-      reflexivity.
     Qed.
 
     Lemma wipe_disk1_crashesTo : forall state d,
@@ -390,39 +415,34 @@ Module RD.
       destruct state.
       destruct disk0, disk1; simpl in *; eauto.
       eapply wipe_crashesTo; eauto.
-      reflexivity.
       eapply wipe_crashesTo; eauto.
-      reflexivity.
     Qed.
 
     Hint Resolve wipe_disk0_crashesTo wipe_disk1_crashesTo.
 
     Lemma crashesTo_synced_covered : forall d d',
         crashesTo d d' ->
-        disk_synced d ->
+        histdisk_flushed d ->
         covered d d'.
     Proof.
-      intros.
-      destruct H, H0.
-      eapply pointwise_rel_indomain; intros; eauto.
-      repeat match goal with
-             | [ H: forall (_:addr), _ |- _ ] =>
-               specialize (H a)
-             end.
-      destruct matches in *.
-      inversion pointwise_rel_holds; subst; clear pointwise_rel_holds.
-      unfold block_synced in *.
-      inversion H0; subst; clear H0.
-      econstructor; simpl; eauto.
-      eapply pointwise_prop_holds in H1; subst.
-      econstructor; simpl; eauto.
+      autounfold with disk; intros; pointwise.
+      (* TODO: this should be part of pointwise *)
+      apply pointwise_prop_holds with (a:=a) in H0;
+        simpl_match.
+      inversion H0.
+      inversion H; subst; clear H.
+      rewrite H2 in *.
+      inversion H1; subst.
+      econstructor; eauto.
+      simpl.
+      eapply durable_includes_current.
     Qed.
 
     Hint Resolve crashesTo_synced_covered.
 
     Lemma crashesTo_one_of_same_wipeHist : forall d d',
         crashesTo_one_of d d d' ->
-        disk_synced d' ->
+        histdisk_flushed d' ->
         wipeHist d d'.
     Proof.
       intros.
@@ -432,12 +452,18 @@ Module RD.
              | [ H: forall (_:addr), _ |- _ ] =>
                specialize (H a)
              end.
-      destruct matches in *.
-      assert (histblock b (curr_val b0)) by intuition.
+      repeat simpl_match.
+      inversion pointwise_prop_holds.
+      assert (durable_vals bs (curr_val bs')) by intuition.
       clear crashesTo_one_pointwise.
-      (* histcrash_to_hist requires that the tail be nil, which is silly, since
-      a block is synced according to the weaker block_synced property *)
-    Admitted.
+      (* TODO: need equality-based theorems to prove inductive properties in
+      AsyncDisk *)
+      destruct bs'; simpl in *.
+      generalize durable_includes_current.
+      rewrite H3.
+      autorewrite with block; simpl; intros.
+      econstructor; eauto.
+    Qed.
 
     Hint Resolve crashesTo_one_of_same_wipeHist.
 

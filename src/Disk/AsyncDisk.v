@@ -1,4 +1,5 @@
 Require Import Automation.
+Require Import Pocs.Ensemble.
 
 Require Export Disk.GenericDisk.
 
@@ -16,8 +17,8 @@ Definition disk := diskOf blockstate.
 
 Record blockhist :=
   { current_val: block;
-    (* the durable value could be current_val or one of the following *)
-    durable_vals: list block; }.
+    durable_vals: Ensemble block;
+    durable_includes_current: durable_vals current_val; }.
 
 (* a spec-only disk giving the possible durable states of each address *)
 Definition histdisk := diskOf blockhist.
@@ -67,43 +68,24 @@ Instance blockstate_async: AsyncBlock blockstate :=
                         end;
   |}.
 
-Definition subset A (l l': list A) :=
-  forall a, List.In a l -> List.In a l'.
-
-Instance subset_preorder {A} : PreOrder (subset (A:=A)).
-Proof.
-  econstructor; hnf; intros.
-  unfold subset; intros; eauto.
-  unfold subset in *; eauto.
-Qed.
-
-Inductive pflush_blockhist: blockhist -> blockhist -> Prop :=
-| pflush_blockhist_subset: forall h h',
-    current_val h = current_val h' ->
-    subset (durable_vals h') (durable_vals h) ->
-    pflush_blockhist h h'.
-
-Instance pflush_blockhist_preorder : PreOrder pflush_blockhist.
-Proof.
-  econstructor; hnf; intros.
-  - econstructor; eauto.
-    reflexivity.
-  - inversion H; subst; clear H.
-    inversion H0; subst; clear H0.
-    econstructor; eauto.
-    congruence.
-    etransitivity; eauto.
-Qed.
-
 Definition bufferHist (b:block) (h:blockhist) : blockhist :=
   {| current_val := b;
      durable_vals :=
-       current_val h :: durable_vals h; |}.
+       add (durable_vals h) b;
+     durable_includes_current := ltac:(eauto); |}.
+
+Inductive wipeBlockhist : blockhist -> blockhist -> Prop :=
+| histcrash_to_hist_block : forall h b pf,
+    durable_vals h b ->
+    wipeBlockhist h {| current_val := b;
+                       durable_vals := Singleton b;
+                       durable_includes_current := pf; |}.
 
 Instance blockhist_async: AsyncBlock blockhist :=
   {| flushBlock := fun bs => {| current_val := current_val bs;
-                             durable_vals := nil |};
-     pflushBlock := pflush_blockhist;
+                             durable_vals := Singleton (current_val bs);
+                             durable_includes_current := ltac:(auto); |};
+     pflushBlock := eq;
      buffer := bufferHist;
      curr_val := current_val; |}.
 
@@ -144,7 +126,7 @@ Proof.
 Qed.
 
 Theorem durable_val_buffer : forall (bs: blockhist) b,
-    durable_vals (buffer b bs) = cons (current_val bs) (durable_vals bs).
+    durable_vals (buffer b bs) = add (durable_vals bs) b.
 Proof.
   auto.
 Qed.
@@ -155,11 +137,14 @@ Hint Rewrite curr_val_buffer_blockhist : block.
 Hint Rewrite curr_val_buffer_blockstate : block.
 Hint Rewrite durable_val_buffer : block.
 
-Definition flush {B} {async:AsyncBlock B} (d:diskOf B) : diskOf B :=
-  mapDisk d flushBlock.
+Global Opaque curr_val.
+Global Opaque buffer.
+
+Definition flush {B} {async:AsyncBlock B} : diskOf B -> diskOf B :=
+  mapDisk flushBlock.
 
 Definition pflush {B} {async:AsyncBlock B} : diskOf B -> diskOf B -> Prop :=
-  fun d d' => pointwise_rel pflushBlock d d'.
+   pointwise_rel pflushBlock.
 
 Instance pflush_preorder {B} {async:AsyncBlock B} : PreOrder (pflush (async:=async)).
 Proof.
@@ -167,16 +152,23 @@ Proof.
   apply pflushBlock_preorder.
 Qed.
 
-Definition wipeDisk (d:disk) : disk :=
-  mapDisk d wipeBlockstate.
+Definition wipeDisk : disk -> disk :=
+  mapDisk wipeBlockstate.
+
+Definition wipeHist : histdisk -> histdisk -> Prop :=
+  pointwise_rel wipeBlockhist.
+
+Hint Unfold wipeHist : disk.
 
 Record collapsesTo (h:blockhist) (bs:blockstate) : Prop :=
   is_collapse
     { collapse_current: curr_val h = curr_val bs;
-      collapse_durable: List.In (durable_val bs) (curr_val h::durable_vals h); }.
+      collapse_durable: In (durable_val bs) (durable_vals h); }.
 
 Definition covered (d:histdisk) (d':disk) :=
   pointwise_rel collapsesTo d d'.
+
+Hint Unfold pflush wipeDisk covered : disk.
 
 Lemma collapsesTo_buffer : forall h bs b,
     collapsesTo h bs ->
@@ -184,100 +176,135 @@ Lemma collapsesTo_buffer : forall h bs b,
 Proof.
   simpl; intros.
   destruct H.
-  econstructor; eauto.
-  simpl; intuition eauto.
+  econstructor; simpl; eauto.
+  unfold In; autorewrite with block; auto.
 Qed.
-
-Inductive histblock : blockhist -> block -> Prop :=
-| hist_block_curr : forall h,
-    histblock h (curr_val h)
-| hist_block_prev : forall h b,
-    List.In b (durable_vals h) ->
-    histblock h b.
 
 Inductive histcrash : blockhist -> blockstate -> Prop :=
 | histcrash_block : forall h b,
-    histblock h b ->
+    durable_vals h b ->
     histcrash h {| cache_val := None;
                    durable_val := b; |}.
 
-Inductive histcrash_to_hist : blockhist -> blockhist -> Prop :=
-| histcrash_to_hist_block : forall h b,
-    histblock h b ->
-    histcrash_to_hist h {| current_val := b;
-                           durable_vals := nil; |}.
-
-Definition wipeHist : histdisk -> histdisk -> Prop :=
-  pointwise_rel histcrash_to_hist.
-
-Local Hint Constructors histblock.
 Local Hint Constructors histcrash.
 
 Definition crashesTo : histdisk -> disk -> Prop :=
   pointwise_rel histcrash.
 
-Theorem collapse_wipe_flush_to_crash : forall h bs bs',
-    collapsesTo h bs ->
-    pflushBlock (wipeBlockstate bs) bs' ->
-    histcrash h bs'.
-Proof.
-  unfold wipeBlockstate; intros.
-  inversion H; subst; clear H.
-  inversion H0; subst; clear H0.
-  autorewrite with block in *.
-  simpl in *; intuition eauto.
-  replace (durable_val bs); eauto.
-  simpl in *; congruence.
-Qed.
+Hint Unfold crashesTo : disk.
 
-Theorem wipe_crashesTo : forall d0 d d',
-    covered d0 d ->
-    pflush (wipeDisk d) d' ->
-    crashesTo d0 d'.
-Proof.
-  unfold covered, pflush, crashesTo, wipeDisk.
-  intros.
-  pose proof (pointwise_rel_mapDisk d wipeBlockstate).
-  eapply pointwise_rel_trans' in H0; eauto.
-  eapply pointwise_rel_trans' in H0; eauto.
-  eapply pointwise_rel_weaken; eauto.
-  unfold rel_compose; intros; repeat deex.
-  eauto using collapse_wipe_flush_to_crash.
-Qed.
+(* Special properties after flushing. *)
 
-Theorem pflush_flush : forall (h: blockhist) (bs bs': blockstate),
-    collapsesTo h bs ->
-    pflushBlock (flushBlock bs) bs' ->
-    collapsesTo (flushBlock h) bs'.
+Definition block_flushed (bs:blockstate) : Prop :=
+  cache_val bs = None.
+
+Definition disk_flushed : disk -> Prop :=
+  pointwise_prop block_flushed.
+
+Theorem flush_flushed : forall (d:disk),
+    disk_flushed (flush d).
 Proof.
   intros.
-  inversion H; subst; clear H;
-    autorewrite with block in *.
-  inversion H0; subst; clear H0; simpl in *;
-    destruct matches in *;
-    simpl in *;
-    (intuition eauto);
-    try congruence;
-    try solve [ constructor; simpl in *; repeat simpl_match; eauto ].
+  econstructor; simpl; intros.
+  destruct matches.
+  unfold block_flushed; simpl; auto.
 Qed.
 
-Theorem covered_flush_pflush : forall d d' d'',
-    covered d d' ->
-    pflush (flush d') d'' ->
-    covered (flush d) d''.
+Theorem wipe_flushed : forall (d:disk),
+    disk_flushed (wipeDisk d).
 Proof.
-  unfold covered, pflush, flush; intros.
-  destruct H, H0.
-  eapply pointwise_rel_indomain; intros.
-  simpl in *; congruence.
+  intros.
+  econstructor; simpl; intros.
+  destruct matches.
+  unfold block_flushed; simpl; auto.
+Qed.
 
-  repeat match goal with
-         | [ H: forall _, _ |- _ ] => specialize (H a)
-         end.
-  cbn [mapDisk disk_get diskMem] in *.
+Hint Resolve flush_flushed wipe_flushed.
+
+Theorem flushed_pflush : forall (d d':disk),
+    disk_flushed d ->
+    pflush d d' ->
+    d' = d.
+Proof.
+  intros.
+  eapply diskMem_ext_eq.
+  extensionality a.
+  apply pointwise_prop_holds with (a:=a) in H.
+  apply pointwise_rel_holds with (a:=a) in H0.
+  unfold disk_get in *.
   destruct matches in *; try contradiction.
-  eapply pflush_flush; eauto.
+  inversion H0; subst; try congruence.
 Qed.
 
-Global Opaque curr_val.
-Global Opaque buffer.
+Theorem flushed_flush : forall (d:disk),
+    disk_flushed d ->
+    flush d = d.
+Proof.
+  intros.
+  eapply diskMem_ext_eq.
+  extensionality a.
+  simpl.
+  apply pointwise_prop_holds with (a:=a) in H.
+  unfold disk_get in *.
+  destruct matches in *; try contradiction.
+Qed.
+
+Theorem flushed_crash : forall (d:disk),
+    disk_flushed d ->
+    wipeDisk d = d.
+Proof.
+  intros.
+  eapply diskMem_ext_eq.
+  extensionality a.
+  simpl.
+  apply pointwise_prop_holds with (a:=a) in H.
+  unfold disk_get in *.
+  destruct matches in *; try contradiction.
+  unfold block_flushed, wipeBlockstate in *.
+  destruct b; simpl in *; subst; auto.
+Qed.
+
+Hint Rewrite flushed_flush flushed_crash
+     using (solve [ eauto ]) : flush.
+
+Definition hist_flushed (h:blockhist) : Prop :=
+  durable_vals h = Singleton (curr_val h).
+
+Definition histdisk_flushed : histdisk -> Prop :=
+  pointwise_prop hist_flushed.
+
+(** * predicate transformers *)
+
+Definition then_wipe (F: disk -> Prop) : disk -> Prop :=
+  fun d' => exists d, F d /\ d' = wipeDisk d.
+
+Lemma collapsesTo_wipe : forall h bs,
+    collapsesTo h bs ->
+    histcrash h (wipeBlockstate bs).
+Proof.
+  inversion 1; intros.
+  econstructor; eauto.
+Qed.
+
+Lemma then_wipe_covered : forall d d',
+    then_wipe (covered d) d' ->
+    crashesTo d d'.
+Proof.
+  unfold then_wipe; intros; deex.
+  autounfold with disk in *.
+  pointwise; simpl in *; destruct matches in *.
+  inversion Heqo0; subst.
+  eauto using collapsesTo_wipe.
+Qed.
+
+Definition then_flush (F: disk -> Prop) : disk -> Prop :=
+  fun d' => exists d, F d /\ d' = flush d.
+
+Lemma then_flush_flushed : forall F d,
+    then_flush F d ->
+    disk_flushed d.
+Proof.
+  unfold then_flush; intros; deex; auto.
+Qed.
+
+Hint Resolve then_flush_flushed.

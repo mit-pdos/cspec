@@ -262,87 +262,41 @@ Record pointwise_prop T (P: T -> Prop) (d: diskOf T) : Prop :=
 
 (* expressed for nice inversion *)
 Record pointwise_rel T T' (rel: T -> T' -> Prop) (d: diskOf T) (d': diskOf T') : Prop :=
-  { sizes_eq: size d = size d';
+  { pointwise_sizes_eq: size d = size d';
     pointwise_rel_holds: forall a,
         match d a, d' a with
         | Some bs, Some bs' => rel bs bs'
-        | None, None => ~a < size d
+        | None, None => True
         | _, _ => False
         end; }.
 
-Local Hint Resolve disk_inbounds_not_none.
+Ltac pointwise_at a :=
+  repeat match goal with
+         | [ H: pointwise_rel _ _ _ |- _ ] =>
+           apply pointwise_rel_holds with (a:=a) in H
+         end.
 
-(* convenience to prove pointwise_rel with minimal proof *)
-Theorem pointwise_rel_indomain : forall T T' (rel: T -> T' -> Prop) d d',
-    size d = size d' ->
-    (forall a, a < size d ->
-          match d a, d' a with
-          | Some bs, Some bs' => rel bs bs'
-          | _, _ => True
-          end) ->
-    pointwise_rel rel d d'.
-Proof.
-  intros.
-  econstructor; intros; eauto.
-  specialize (H0 a).
-  destruct (lt_dec a (size d)); intuition eauto.
-  assert (a < size d') by congruence.
-  destruct matches; eauto.
-
-  assert (~a < size d') by congruence.
-  autorewrite with upd; auto.
-Qed.
-
-Theorem pointwise_rel_trans : forall T (rel: T -> T -> Prop),
-    forall (Htrans: forall x y z, rel x y -> rel y z -> rel x z),
-    forall d d' d'',
-      pointwise_rel rel d d' ->
-      pointwise_rel rel d' d'' ->
-      pointwise_rel rel d d''.
-Proof.
-  intros.
-  destruct H.
-  destruct H0.
-  eapply pointwise_rel_indomain; intros.
-  congruence.
-  specialize (pointwise_rel_holds0 a).
-  specialize (pointwise_rel_holds1 a).
-  destruct matches in *; eauto; try contradiction.
-Qed.
-
-Definition rel_compose T T' T'' (rel: T -> T' -> Prop)
-           (rel': T' -> T'' -> Prop) :
-  T -> T'' -> Prop :=
-  fun a a'' => exists a', rel a a' /\ rel' a' a''.
-
-Theorem pointwise_rel_trans' : forall T T' T''
-                                 (rel: T -> T' -> Prop)
-                                 (rel': T' -> T'' -> Prop),
-    forall d d' d'',
-      pointwise_rel rel d d' ->
-      pointwise_rel rel' d' d'' ->
-      pointwise_rel (rel_compose rel rel') d d''.
-Proof.
-  intros.
-  destruct H.
-  destruct H0.
-  eapply pointwise_rel_indomain; intros.
-  congruence.
-  specialize (pointwise_rel_holds0 a).
-  specialize (pointwise_rel_holds1 a).
-  destruct matches in *; eauto; try contradiction.
-  unfold rel_compose; eauto.
-Qed.
+Ltac pointwise :=
+  match goal with
+  | [ |- pointwise_rel _ _ _ ] =>
+    econstructor;
+    [ repeat match goal with
+             | [ H: pointwise_rel _ _ _ |- _ ] =>
+               apply pointwise_sizes_eq in H
+             end; simpl in *; try congruence |
+      let a := fresh "a" in
+      intro a; pointwise_at a;
+      simpl in *;
+      destruct matches in *; eauto; try contradiction ]
+  end.
 
 Instance pointwise_rel_preorder {T} {rel: T -> T -> Prop} {po:PreOrder rel} :
   PreOrder (pointwise_rel rel).
 Proof.
   econstructor; hnf; intros.
-  - eapply pointwise_rel_indomain; intros; eauto.
-    destruct matches; eauto.
+  - pointwise.
     reflexivity.
-  - eapply pointwise_rel_trans; eauto.
-    intros.
+  - pointwise.
     etransitivity; eauto.
 Qed.
 
@@ -352,13 +306,10 @@ Theorem pointwise_rel_weaken : forall T T' (rel rel': T -> T' -> Prop) d d',
     pointwise_rel rel' d d'.
 Proof.
   intros.
-  destruct H.
-  eapply pointwise_rel_indomain; intros; eauto.
-  specialize (pointwise_rel_holds0 a).
-  destruct matches in *; eauto; try contradiction.
+  pointwise.
 Qed.
 
-Definition mapDisk {T T'} (d:diskOf T) (f: T -> T') : diskOf T'.
+Definition mapDisk {T T'} (f: T -> T') (d:diskOf T) : diskOf T'.
 Proof.
   refine {| size := size d;
             diskMem := fun a =>
@@ -369,11 +320,3 @@ Proof.
   apply sized_domain_pointwise.
   apply diskMem_domain.
 Defined.
-
-Theorem pointwise_rel_mapDisk : forall T T' (d: diskOf T) (f: T -> T'),
-    pointwise_rel (fun a a' => a' = f a) d (mapDisk d f).
-Proof.
-  intros.
-  eapply pointwise_rel_indomain; intros; eauto.
-  simpl; destruct matches.
-Qed.

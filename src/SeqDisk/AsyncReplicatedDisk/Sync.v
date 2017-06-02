@@ -28,7 +28,8 @@ Section ReplicatedDisk.
   Proof.
     unfold TD.wipe; intros; subst.
     destruct state; simpl in *.
-    destruct disk0, disk1; simpl in *; eauto.
+    destruct disk0, disk1; simpl in *;
+      autorewrite with flush; eauto.
   Qed.
 
   Theorem disk1_wipe_flush_stable : forall state state' d,
@@ -38,13 +39,13 @@ Section ReplicatedDisk.
   Proof.
     unfold TD.wipe; intros; subst.
     destruct state; simpl in *.
-    destruct disk0, disk1; simpl in *; eauto.
+    destruct disk0, disk1; simpl in *;
+      autorewrite with flush; eauto.
   Qed.
 
   Hint Resolve disk0_wipe_flush_stable disk1_wipe_flush_stable.
 
   Hint Resolve pred_weaken.
-  Hint Resolve then_wipe_crashesTo.
 
   Theorem Sync_ok :
     prog_spec

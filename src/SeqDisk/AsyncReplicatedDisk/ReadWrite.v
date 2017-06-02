@@ -39,6 +39,7 @@ Section AsyncReplicatedDisk.
   Implicit Type (state:TD.State).
 
   Hint Resolve then_wipe_missing.
+  Hint Resolve pred_weaken.
 
   Theorem Read_ok : forall a,
       prog_spec
@@ -103,9 +104,8 @@ Section AsyncReplicatedDisk.
     step.
     destruct r; (intuition eauto); simplify.
     destruct (lt_dec a (size a')).
-    eauto 10.
+    right; left; intuition eauto.
     autorewrite with upd in *; eauto.
-
     destruct r; step.
   Qed.
 

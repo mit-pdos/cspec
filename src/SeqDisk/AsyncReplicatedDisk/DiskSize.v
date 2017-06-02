@@ -30,7 +30,7 @@ Section ReplicatedDisk.
     Hint Resolve both_disks_not_missing : false.
 
     Hint Resolve then_wipe_missing.
-    Hint Resolve then_wipe_crashesTo.
+    Hint Resolve pred_weaken.
 
     Theorem DiskSize_ok :
       prog_spec
