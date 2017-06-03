@@ -626,6 +626,41 @@ Section AsyncReplicatedDisk.
 
     Hint Resolve then_flush_crashesTo_flush.
 
+    Theorem crashesTo_one_of'_to_crashesTo_one_of : forall d_0 d_1 d,
+        crashesTo_one_of' d_0 d_1 d ->
+        crashesTo_one_of d_0 d_1 d.
+    Proof.
+      destruct 1; intros.
+      econstructor; intros; eauto.
+      specialize (crashesTo_one'_pointwise0 a).
+      destruct matches; intuition eauto.
+    Qed.
+
+    Theorem crashesTo_one_of'_respects_wipeHist : forall d_0 d_0' d_1 d_1' d,
+        crashesTo_one_of' d_0' d_1' d ->
+        wipeHist d_0 d_0' ->
+        wipeHist d_1 d_1' ->
+        crashesTo_one_of' d_0 d_1 (flush d).
+    Proof.
+      intros.
+      destruct H, H0, H1.
+      econstructor; intros; simpl; try congruence.
+      repeat match goal with
+             | [ H: forall (_:addr), _ |- _ ] =>
+               specialize (H a)
+             end.
+      destruct matches in *;
+        autorewrite with block in *;
+        safe_intuition;
+        repeat match goal with
+               | [ H: wipeBlockhist _ _ |- _ ] =>
+                 inversion H; subst; clear H
+               end; simpl in *;
+          autorewrite with ensemble;
+          simpl;
+          try solve [ intuition (subst; eauto) ].
+    Qed.
+
     Theorem Recover_rok :
       prog_spec
         Recover_spec
@@ -660,7 +695,8 @@ Section AsyncReplicatedDisk.
       intuition.
       exists (flush d_0'0); intuition eauto.
       erewrite equal_after_0_flush by eauto; eauto.
-      admit. (* some chaining of crashesTo_one_of, crashesTo_one_of', and wipeHist *)
+      eapply crashesTo_one_of'_to_crashesTo_one_of.
+      eapply crashesTo_one_of'_respects_wipeHist; eauto.
 
       admit. (* need to do something with TD.wipe? *)
 

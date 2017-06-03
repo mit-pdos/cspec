@@ -177,6 +177,10 @@ Hint Resolve <- contains_Singleton.
 
 Hint Resolve contains_Union_both.
 
+(* TODO: since when were implicits inferred here? *)
+Hint Rewrite @Add_element using (solve [ auto ]) : ensemble.
+Hint Rewrite @contains_Singleton : ensemble.
+
 Notation "x ∈ A" := (In x A)
                       (at level 10, A at level 10,
                        no associativity,
