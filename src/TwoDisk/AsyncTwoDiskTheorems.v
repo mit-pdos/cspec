@@ -91,13 +91,7 @@ Proof.
   unfold Stable; intros.
   rename a into d'.
   rename a' into d''.
-  inversion_clear H0.
-  inversion_clear H1.
-  eapply pointwise_rel_indomain; intros; eauto.
-  congruence.
-  specialize (pointwise_rel_holds a).
-  specialize (pointwise_rel_holds0 a).
-  destruct matches in *; eauto; try contradiction.
+  pointwise.
 Qed.
 
 Theorem collapse_flush : forall h bs bs',
@@ -108,8 +102,9 @@ Proof.
   simpl; intros.
   inversion H0; subst; clear H0; eauto.
   destruct H; simpl in *.
-  erewrite curr_val_some_cache in * by eauto.
+  erewrite curr_val_some_cache in * by eauto; subst.
   econstructor; simpl; eauto.
+  apply durable_includes_current.
 Qed.
 
 Theorem covered_stable_pflush : forall d,
@@ -130,10 +125,13 @@ Qed.
 Hint Resolve covered_stable_pflush.
 Hint Resolve missing_stable.
 
+Definition curr_val_eq {B} {async:AsyncBlock B} (b:block) : B -> Prop :=
+  fun bs => curr_val bs = b.
+
 Lemma covered_some_latest : forall (d: histdisk) (d': disk) a bs,
     d' a = Some bs ->
     covered d d' ->
-    d a |= (fun bs' => curr_val bs' = curr_val bs).
+    d a |= curr_val_eq (curr_val bs).
 Proof.
   intros.
   pose proof (pointwise_rel_holds H0 a).
@@ -153,54 +151,49 @@ Proof.
   intros.
   destruct (d a) eqn:?; eauto.
   exfalso.
-  eauto using same_size_disks_not_different, sizes_eq.
+  eauto using same_size_disks_not_different, pointwise_sizes_eq.
 Qed.
 
 Hint Resolve covered_none.
 
-Definition then_wipe (F: disk -> Prop) : disk -> Prop :=
-  fun d' => exists d, F d /\ pflush (wipeDisk d) d'.
-
-Theorem then_wipe_wipe : forall (F: disk -> Prop) d,
-    F d ->
-    then_wipe F (wipeDisk d).
+Lemma covered_curr_val:
+  forall (a : addr) (d : histdisk) (d' : disk) (b : blockstate),
+    d' a = Some b ->
+    covered d d' ->
+    d a |= curr_val_eq (curr_val b).
 Proof.
-  unfold then_wipe; intros.
-  descend; intuition eauto.
-  reflexivity.
+  intros.
+  destruct (d a) eqn:?; simpl; auto.
+  apply pointwise_rel_holds with (a:=a) in H0;
+    repeat simpl_match.
+  apply collapse_current in H0.
+  auto.
 Qed.
 
-Hint Resolve then_wipe_wipe.
+Hint Resolve covered_curr_val.
 
-Theorem disk0_wipe : forall state state' F,
+Theorem then_wipe_wipe0 : forall state state' F,
     TD.disk0 state |= F ->
     TD.wipe state state' ->
     TD.disk0 state' |= then_wipe F.
 Proof.
-  unfold TD.wipe; intros; subst.
-  destruct state; simpl in *.
-  destruct matches; simpl in *; eauto.
+  unfold TD.wipe, then_wipe; intros; subst.
+  destruct state.
+  destruct disk0, disk1; simpl in *; eauto.
 Qed.
 
-Theorem disk1_wipe : forall state state' F,
+Theorem then_wipe_wipe1 : forall state state' F,
     TD.disk1 state |= F ->
     TD.wipe state state' ->
     TD.disk1 state' |= then_wipe F.
 Proof.
-  unfold TD.wipe; intros; subst.
-  destruct state; simpl in *.
-  destruct matches; simpl in *; eauto.
+  unfold TD.wipe, then_wipe; intros; subst.
+  destruct state.
+  destruct disk0, disk1; simpl in *; eauto.
 Qed.
 
-Theorem Stable_subrelation : forall A (rel rel': A -> A -> Prop) (P: A -> Prop),
-    (forall a a', rel a a' -> rel' a a') ->
-    Stable P rel' ->
-    Stable P rel.
-Proof.
-  firstorder.
-Qed.
-
-Hint Resolve disk0_wipe disk1_wipe.
+Hint Resolve then_wipe_wipe0 then_wipe_wipe1.
+Hint Resolve then_wipe_covered.
 
 Theorem TDRead0_ok : forall (i: Interface TD.API) a,
     prog_spec
@@ -214,12 +207,12 @@ Theorem TDRead0_ok : forall (i: Interface TD.API) a,
                match r with
                | Working v => TD.disk0 state' |= covered d_0 /\
                              TD.disk1 state' |= F /\
-                             d_0 a |= (fun bs => curr_val bs = v)
+                             d_0 a |= curr_val_eq v
                | Failed => TD.disk0 state' |= missing /\
                           TD.disk1 state' |= F
                end;
            recover :=
-             fun _ state' => TD.disk0 state' |= then_wipe (covered d_0) /\
+             fun _ state' => TD.disk0 state' |= crashesTo d_0 /\
                       TD.disk1 state' |= then_wipe F;
          |})
       (Prim i (TD.Read d0 a))
@@ -233,6 +226,9 @@ Proof.
   - assert (TD.disk0 state'0 |= missing) by eauto.
     clear H0.
     eapply disks_rel_stable' in H1; (safe_intuition eauto); cleanup.
+  - eapply pred_weaken; eauto.
+  - destruct matches in *; cleanup;
+      eauto using pred_weaken.
 Qed.
 
 Theorem TDRead1_ok : forall (i: Interface TD.API) a,
@@ -247,13 +243,13 @@ Theorem TDRead1_ok : forall (i: Interface TD.API) a,
                match r with
                | Working v => TD.disk0 state' |= F /\
                              TD.disk1 state' |= covered d_1 /\
-                             d_1 a |= (fun bs => curr_val bs = v)
+                             d_1 a |= curr_val_eq v
                | Failed => TD.disk0 state' |= F /\
                           TD.disk1 state' |= missing
                end;
            recover :=
              fun _ state' => TD.disk0 state' |= then_wipe F /\
-                      TD.disk1 state' |= then_wipe (covered d_1);
+                      TD.disk1 state' |= crashesTo d_1;
          |})
       (Prim i (TD.Read d1 a))
       (irec i)
@@ -266,33 +262,52 @@ Proof.
   - assert (TD.disk1 state'0 |= missing) by eauto.
     clear H5.
     eapply disks_rel_stable' in H1; (safe_intuition eauto); cleanup.
+  - eapply pred_weaken; eauto.
+  - destruct matches in *; cleanup;
+      eauto using pred_weaken.
 Qed.
 
 (* TODO: move proofs somewhere more appropriate *)
+
+Lemma pointwise_rel_indomain : forall B B' (rel: B -> B' -> Prop)
+                                 (d: diskOf B) (d': diskOf B'),
+    size d = size d' ->
+    (forall a bs bs', a < size d ->
+                 d a = Some bs ->
+                 d' a = Some bs' ->
+                 rel bs bs') ->
+    pointwise_rel rel d d'.
+Proof.
+  intros.
+  econstructor; intros; eauto.
+  destruct matches; eauto using same_size_disks_not_different.
+  eapply H0; eauto.
+  pose proof (diskMem_domain d a).
+  destruct matches in *.
+  unfold disk_get in *; congruence.
+Qed.
+
+Hint Resolve collapsesTo_buffer.
 
 Lemma covered_diskUpd_buffer : forall d d' a b,
     covered d d' ->
     covered (diskUpdF d a (buffer b)) (diskUpdF d' a (buffer b)).
 Proof.
-  intros.
-  destruct H.
-  eapply pointwise_rel_indomain; intros.
-  autorewrite with upd; auto.
-
-  autorewrite with upd in *.
-  assert (a0 < size d') by congruence.
-  specialize (pointwise_rel_holds a0).
-  pose proof (@diskUpdF_inbounds _ d a (buffer b)).
-  pose proof (@diskUpdF_inbounds _ d' a (buffer b)).
-  is_eq a a0;
-    autorewrite with upd in *; destruct matches in *;
-    intuition eauto.
-  repeat deex;
-    repeat match goal with
-           | [ H: Some _ = Some _ |- _ ] =>
-             inversion H; subst; clear H
-           end; simpl in *.
-  eauto using collapsesTo_buffer.
+  unfold covered; intros.
+  eapply pointwise_rel_indomain; autorewrite with upd in *; intros.
+  eauto using pointwise_sizes_eq.
+  apply pointwise_rel_holds with (a:=a0) in H.
+  destruct matches in *; try contradiction.
+  is_eq a a0.
+  - try erewrite diskUpdF_eq in * by eauto;
+      repeat match goal with
+             | [ H: Some _ = Some _ |- _ ] =>
+               inversion H; subst; clear H
+             end.
+    eauto.
+  - autorewrite with upd in *.
+    congruence.
+  - exfalso; eauto using disk_inbounds_not_none.
 Qed.
 
 Hint Resolve covered_diskUpd_buffer.
@@ -314,9 +329,9 @@ Theorem TDWrite0_ok : forall (i: Interface TD.API) a b,
                end;
            recover :=
              fun _ state' =>
-               (TD.disk0 state' |= then_wipe (covered d_0) \/
+               (TD.disk0 state' |= crashesTo d_0 \/
                 a < size d_0 /\
-                TD.disk0 state' |= then_wipe (covered (diskUpdF d_0 a (buffer b)))) /\
+                TD.disk0 state' |= crashesTo (diskUpdF d_0 a (buffer b))) /\
                TD.disk1 state' |= then_wipe F;
          |})
       (Prim i (TD.Write d0 a b))
@@ -328,10 +343,15 @@ Proof.
   eapply disks_rel_stable' in H1; (safe_intuition eauto); cleanup.
   eapply disks_rel_stable' in H1; (safe_intuition eauto); cleanup.
 
-  destruct matches in *; cleanup.
   destruct (lt_dec a (size d_0));
     autorewrite with upd in *;
-    eauto.
+    eauto using pred_weaken.
+  destruct matches in *; cleanup;
+    try solve [ left + right; eauto using pred_weaken ].
+  destruct (lt_dec a (size d_0));
+    autorewrite with upd in *;
+    eauto using pred_weaken.
+  right; eauto using pred_weaken.
 Qed.
 
 Theorem TDWrite1_ok : forall (i: Interface TD.API) a b,
@@ -352,9 +372,9 @@ Theorem TDWrite1_ok : forall (i: Interface TD.API) a b,
            recover :=
              fun _ state' =>
                TD.disk0 state' |= then_wipe F /\
-               (TD.disk1 state' |= then_wipe (covered d_1) \/
+               (TD.disk1 state' |= crashesTo d_1 \/
                 a < size d_1 /\
-                TD.disk1 state' |= then_wipe (covered (diskUpdF d_1 a (buffer b))));
+                TD.disk1 state' |= crashesTo (diskUpdF d_1 a (buffer b)));
          |})
       (Prim i (TD.Write d1 a b))
       (irec i)
@@ -365,10 +385,15 @@ Proof.
   eapply disks_rel_stable' in H1; (safe_intuition eauto); cleanup.
   eapply disks_rel_stable' in H1; (safe_intuition eauto); cleanup.
 
-  destruct matches in *; cleanup.
   destruct (lt_dec a (size d_1));
     autorewrite with upd in *;
-    eauto.
+    eauto using pred_weaken.
+  destruct matches in *; cleanup;
+    try solve [ left + right; eauto using pred_weaken ].
+  destruct (lt_dec a (size d_1));
+    autorewrite with upd in *;
+    eauto using pred_weaken.
+  right; eauto using pred_weaken.
 Qed.
 
 Lemma covered_size_eq' : forall d d',
@@ -376,7 +401,7 @@ Lemma covered_size_eq' : forall d d',
     size d' = size d.
 Proof.
   intros.
-  symmetry; eauto using sizes_eq.
+  symmetry; eauto using pointwise_sizes_eq.
 Qed.
 
 Hint Resolve covered_size_eq'.
@@ -399,7 +424,7 @@ Theorem TDDiskSize0_ok : forall (i: Interface TD.API),
                end;
            recover :=
              fun _ state' =>
-               TD.disk0 state' |= then_wipe (covered d_0) /\
+               TD.disk0 state' |= crashesTo d_0 /\
                TD.disk1 state' |= then_wipe F;
          |})
       (Prim i (TD.DiskSize d0))
@@ -410,6 +435,9 @@ Proof.
   destruct matches in *; cleanup.
   eapply disks_rel_stable' in H1; (safe_intuition eauto); cleanup.
   eapply disks_rel_stable' in H1; (safe_intuition eauto); cleanup.
+  eauto using pred_weaken.
+  destruct matches in *; cleanup;
+    eauto using pred_weaken.
 Qed.
 
 Theorem TDDiskSize1_ok : forall (i: Interface TD.API),
@@ -431,7 +459,7 @@ Theorem TDDiskSize1_ok : forall (i: Interface TD.API),
            recover :=
              fun _ state' =>
                TD.disk0 state' |= then_wipe F /\
-               TD.disk1 state' |= then_wipe (covered d_1);
+               TD.disk1 state' |= crashesTo d_1;
          |})
       (Prim i (TD.DiskSize d1))
       (irec i)
@@ -441,10 +469,31 @@ Proof.
   destruct matches in *; cleanup.
   eapply disks_rel_stable' in H1; (safe_intuition eauto); cleanup.
   eapply disks_rel_stable' in H1; (safe_intuition eauto); cleanup.
+  eauto using pred_weaken.
+  destruct matches in *; cleanup;
+    eauto using pred_weaken.
 Qed.
 
-Definition then_flush (F: disk -> Prop) : disk -> Prop :=
-  fun d' => exists d, F d /\ pflush (flush d) d'.
+(* TODO: simplify this proof *)
+Theorem then_flush_covered : forall d d',
+    then_flush (covered d) d' ->
+    covered (flush d) d'.
+Proof.
+  unfold then_flush; intros; repeat deex.
+  autounfold with disk in *; pointwise.
+  assert (curr_val b0 = b1).
+  destruct b0; simpl in *; subst; auto.
+  apply collapse_current in H.
+  econstructor; autorewrite with block in *; simpl; eauto.
+  congruence.
+  replace (current_val b) with b1 by congruence.
+  unfold Ensemble.In; auto.
+  apply collapse_current in H.
+  econstructor; autorewrite with block in *; simpl; eauto.
+  destruct b0; simpl in *; subst.
+  autorewrite with block in *; subst.
+  unfold Ensemble.In; auto.
+Qed.
 
 Lemma maybe_holds_then_flush : forall F md d,
     md |= F ->
@@ -454,7 +503,6 @@ Proof.
   unfold then_flush.
   intros; subst; simpl in *.
   exists d; intuition eauto.
-  reflexivity.
 Qed.
 
 Hint Resolve maybe_holds_then_flush.
@@ -465,7 +513,7 @@ Proof.
   unfold Stable, then_flush; intros.
   repeat deex.
   exists d; intuition.
-  etransitivity; eauto.
+  eapply flushed_pflush in H0; eauto.
 Qed.
 
 Hint Resolve stable_then_flush_pflush.
@@ -492,22 +540,8 @@ Theorem then_wipe_then_flush : forall F d,
     then_flush F d.
 Proof.
   unfold then_wipe, then_flush; intros; repeat deex.
-  exists d1; intuition.
-  destruct H0, H1.
-  eapply pointwise_rel_indomain; intros.
-  etransitivity; eauto.
-  simpl in *.
-  specialize (pointwise_rel_holds a).
-  specialize (pointwise_rel_holds0 a).
-  destruct matches in *; eauto; try contradiction;
-    repeat match goal with
-           | [ H: pflush_blockstate _ _ |- _ ] =>
-             eapply pflush_blockstate_uncached in H;
-               eauto; subst
-           end.
-  unfold wipeBlockstate in *; simpl in *; constructor.
-  destruct b1; simpl in *; subst.
-  unfold wipeBlockstate in *; simpl in *; constructor.
+  exists d; intuition.
+  autorewrite with flush; auto.
 Qed.
 
 Hint Resolve then_wipe_then_flush.
@@ -572,6 +606,14 @@ Proof.
   right; intuition.
   eapply pred_weaken; eauto.
   eapply pred_weaken; eauto.
+Qed.
+
+Lemma then_wipe_missing : forall md,
+    md |= then_wipe missing ->
+    md |= missing.
+Proof.
+  unfold then_wipe, missing; intros.
+  destruct md; simpl in *; repeat deex; eauto.
 Qed.
 
 Hint Resolve

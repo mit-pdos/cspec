@@ -346,12 +346,9 @@ Module RD.
           descend; intuition eauto.
           descend; intuition eauto.
       - eapply rec_noop_compose; eauto; simpl.
-        eapply prog_spec_weaken; eauto;
-          unfold spec_impl, rd_abstraction; simplify.
-        unfold TD.wipe in *; subst.
+        unfold TD.wipe, rd_abstraction, Recover_spec; simplify.
         exists (abstraction_f state0), FullySynced; intuition eauto.
         descend; intuition eauto.
-        exists state'; eauto.
       - eapply then_init_compose; eauto.
         eapply prog_spec_weaken; unfold spec_impl; simplify.
         pose proof (state_some_disks state); simplify.

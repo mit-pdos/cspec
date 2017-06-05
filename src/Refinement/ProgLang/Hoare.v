@@ -387,37 +387,33 @@ Definition wipe_valid
            (wipe: State -> State -> Prop) :=
   crash_effect_valid rf (fun w w' => w' = world_crash w) wipe.
 
-(* TODO: this is proven, but is it useful? *)
 Theorem rec_noop_compose : forall `(rec: prog unit) `(rec2: prog unit)
                              `(rf1: Refinement State1)
                              (wipe1: State1 -> State1 -> Prop)
+                             `(spec: Specification A unit unit State1)
                              `(rf2: LRefinement State1 State2)
                              (wipe2: State2 -> State2 -> Prop),
-      rec_noop rec rf1 wipe1 ->
-      prog_spec
-        (fun (state0':State2) state =>
-           {| pre := exists state0, abstraction rf2 state0 state0' /\
-                               wipe1 state0 state;
-              post :=
-                fun _ state' => exists state0, abstraction rf2 state' state0 /\
-                                   wipe2 state0' state0;
-              recover :=
-                fun _ state' => exists state0, abstraction rf2 state0 state0' /\
-                                   wipe1 state0 state';
-           |}) rec2 rec rf1 ->
-      rec_noop (_ <- rec; rec2) (refinement_compose rf1 rf2) wipe2.
+    rec_noop rec rf1 wipe1 ->
+    prog_loopspec spec rec2 rec rf1 ->
+    forall (Hspec: forall state0 state0' state,
+          abstraction rf2 state0 state0' ->
+          wipe1 state0 state ->
+          exists a, pre (spec a state) /\
+               forall state' r state'',
+                 post (spec a state') r state'' ->
+                 exists state2', wipe2 state0' state2' /\
+                            abstraction rf2 state'' state2'),
+    rec_noop (_ <- rec; rec2) (refinement_compose rf1 rf2) wipe2.
 Proof.
   unfold rec_noop; intros.
   eapply spec_refinement_compose; simpl.
   eapply compose_recovery; eauto.
-  - (* loopspec for rec2 *)
-    eapply idempotent_loopspec; eauto.
-    unfold idempotent; simpl; intuition eauto.
-  - (* chain specifications *)
-    simpl; intuition idtac.
-    simpl in *.
-    descend; intuition (subst; eauto).
-    descend; intuition (repeat deex; eauto).
+  simpl; intuition idtac.
+  simpl in *.
+  descend; intuition (subst; eauto).
+  specialize (Hspec _ _ _ ltac:(eauto) ltac:(eauto)).
+  repeat deex.
+  descend; intuition (repeat deex; eauto).
 Qed.
 
 Theorem spec_exec_equiv : forall `(spec: Specification A T R State)
