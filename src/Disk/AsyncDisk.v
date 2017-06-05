@@ -309,7 +309,7 @@ Proof.
   econstructor; eauto.
 Qed.
 
-Theorem histdisk_flushed_flush : forall d,
+Theorem histdisk_flush_is_flushed : forall d,
     histdisk_flushed (flush d).
 Proof.
   intros.
@@ -318,7 +318,26 @@ Proof.
   econstructor.
 Qed.
 
-Hint Resolve histdisk_flushed_flush.
+Theorem histdisk_flushed_flush : forall d,
+    histdisk_flushed d ->
+    flush d = d.
+Proof.
+  intros.
+  eapply diskMem_ext_eq.
+  extensionality a; simpl.
+  apply pointwise_prop_holds with (a:=a) in H.
+  unfold disk_get in *.
+  destruct matches.
+  f_equal.
+  destruct b.
+  inversion H; simpl in *.
+  autorewrite with block in *; simpl in *.
+  subst.
+  f_equal.
+  apply ProofIrrelevance.proof_irrelevance.
+Qed.
+
+Hint Resolve histdisk_flush_is_flushed.
 
 (** * predicate transformers *)
 

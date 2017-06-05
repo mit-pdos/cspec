@@ -661,6 +661,88 @@ Section AsyncReplicatedDisk.
           try solve [ intuition (subst; eauto) ].
     Qed.
 
+    Theorem crashesTo_one_of'_respects_flushed : forall d_0 d_0' d_1 d_1' d,
+        crashesTo_one_of' d_0' d_1' d ->
+        wipeHist d_0 d_0' ->
+        wipeHist d_1 d_1' ->
+        histdisk_flushed d ->
+        crashesTo_one_of' d_0 d_1 d.
+    Proof.
+      intros.
+      rewrite <- histdisk_flushed_flush by eauto.
+      eauto using crashesTo_one_of'_respects_wipeHist.
+    Qed.
+
+    Ltac weaken_to H pf :=
+      eapply pred_weaken in H; [ | now apply pf ].
+
+    Hint Resolve crashesTo_one_of'_to_crashesTo_one_of.
+    Hint Resolve crashesTo_one_of'_respects_wipeHist.
+    Hint Resolve crashesTo_one_of'_respects_flushed.
+
+    Theorem then_wipe_crashesTo_flush : forall md d d0__i d1__i,
+        md |= then_wipe (covered d) ->
+        crashesTo_one_of' d0__i d1__i d ->
+        exists d',
+          md |= crashesTo d' /\
+          crashesTo_one_of' d0__i d1__i d' /\
+          histdisk_flushed d'.
+    Proof.
+      destruct md; simpl in *; intros.
+      eauto using crashesTo_one_of'_flush.
+      exists (flush d); intuition eauto.
+      destruct H0.
+      econstructor; intros; simpl; eauto.
+      specialize (crashesTo_one'_pointwise0 a).
+      destruct matches; simpl in *.
+      autorewrite with block ensemble in *; simpl in *.
+      intuition eauto.
+    Qed.
+
+    Theorem then_flush_missing : forall d,
+        then_flush missing d ->
+        missing d.
+    Proof.
+      unfold then_flush, missing; intros.
+      repeat deex; auto.
+    Qed.
+
+    Theorem then_wipe_missing : forall d,
+        then_wipe missing d ->
+        missing d.
+    Proof.
+      unfold then_wipe, missing; intros.
+      repeat deex; auto.
+    Qed.
+
+    Ltac crush :=
+      repeat match goal with
+             | [ H: TD.disk0 ?state |= _,
+                    H': TD.wipe ?state _ |- _ ] =>
+               eapply then_wipe_wipe0 in H; [ | now eauto ]
+             | [ H: TD.disk1 ?state |= _,
+                    H': TD.wipe ?state _ |- _ ] =>
+               eapply then_wipe_wipe1 in H; [ | now eauto ]
+             | [ H: _ |= then_wipe (then_flush _) |- _ ] =>
+               weaken_to H then_wipe_then_flush
+             | [ H: _ |= then_flush missing |- _ ] =>
+               weaken_to H then_flush_missing
+             | [ H: _ |= then_wipe missing |- _ ] =>
+               weaken_to H then_wipe_missing
+             | [ H: _ |= then_wipe (covered ?d),
+                    H': crashesTo_one_of' _ _ ?d |- _ ] =>
+                 eapply then_wipe_crashesTo_flush in H; eauto; repeat deex
+             | [ H: ?md |= crashesTo ?d'
+                 |- ?md |= crashesTo ?d] =>
+               is_evar d; instantiate (1 := d'); eauto
+             | [ H: ?md |= then_flush (covered ?d')
+                 |- ?md |= crashesTo ?d] =>
+               is_evar d; instantiate (1 := flush d'); eauto
+             | [ H: ?md |= then_wipe (covered ?d')
+                 |- ?md |= crashesTo ?d] =>
+               is_evar d; instantiate (1 := d'); eauto
+             end.
+
     Theorem Recover_rok :
       prog_spec
         Recover_spec
@@ -693,18 +775,23 @@ Section AsyncReplicatedDisk.
       descend; intuition eauto.
       step.
       intuition.
-      exists (flush d_0'0); intuition eauto.
+      descend; intuition (crush; eauto).
       erewrite equal_after_0_flush by eauto; eauto.
-      eapply crashesTo_one_of'_to_crashesTo_one_of.
-      eapply crashesTo_one_of'_respects_wipeHist; eauto.
 
-      admit. (* need to do something with TD.wipe? *)
+      crush.
+      descend; intuition (crush; eauto).
 
-      (* bunch of crash invariants: *)
-      admit.
-      admit.
-      admit.
-      admit.
+      crush.
+      descend; intuition (crush; eauto).
+
+      crush.
+      descend; intuition (crush; eauto).
+
+      crush.
+      descend; intuition (crush; eauto).
+
+      crush.
+      descend; intuition (crush; eauto).
 
       (* some disk missing *)
       { destruct i; simplify; descend; (intuition eauto); simplify.
@@ -712,23 +799,54 @@ Section AsyncReplicatedDisk.
         descend; intuition eauto.
         step.
         intuition.
-        admit.
-        admit. (* TD.wipe again *)
-        admit.
-        admit.
-        admit.
-        admit.
+
+        crush.
+        descend; intuition (crush; eauto).
+
+        crush.
+        (* TODO: automate using same disk for both disks *)
+        exists (flush d_1'0), (flush d_1'0).
+        descend; intuition (crush; eauto).
+
+        crush.
+        descend; intuition (crush; eauto).
+
+        crush.
+        exists (flush d_1'0), (flush d_1'0).
+        descend; intuition (crush; eauto).
+
+        crush.
+        descend; intuition (crush; eauto).
+
+        crush.
+        descend; intuition (crush; eauto).
 
         step.
         descend; intuition eauto.
         step.
         descend; intuition eauto.
-        admit.
-        admit.
-        admit.
-        admit.
-        admit.
-        admit.
+
+        crush.
+        descend; intuition (crush; eauto).
+
+        crush.
+        exists (flush d_0'0), (flush d_0'0).
+        descend; intuition (crush; eauto).
+
+        crush.
+        exists (flush d_0'0), (flush d_0'0).
+        descend; intuition (crush; eauto).
+
+        crush.
+        exists (flush d_0'0), (flush d_0'0).
+        descend; intuition (crush; eauto).
+
+        crush.
+        descend; intuition (crush; eauto).
+
+        crush.
+        exists (flush d_0'0), (flush d_0'0).
+        descend; intuition (crush; eauto).
       }
 
       (* analogues of crashesTo_one_of'_eq{0,1} *)
