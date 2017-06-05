@@ -680,6 +680,53 @@ Section AsyncReplicatedDisk.
     Hint Resolve crashesTo_one_of'_respects_wipeHist.
     Hint Resolve crashesTo_one_of'_respects_flushed.
 
+    Lemma crashesTo_one_of'_stable_flush : forall d0__i d1__i d,
+        crashesTo_one_of' d0__i d1__i d ->
+        crashesTo_one_of' d0__i d1__i (flush d).
+    Proof.
+      intros.
+      destruct H.
+      econstructor; intros; simpl; eauto.
+      specialize (crashesTo_one'_pointwise0 a).
+      destruct matches; simpl in *.
+      autorewrite with block ensemble in *; simpl in *.
+      intuition eauto.
+    Qed.
+
+    Theorem crashesTo_one_of'_stable_wipeHist : forall d_0 d_1 d d',
+        crashesTo_one_of' d_0 d_1 d ->
+        wipeHist d d' ->
+        crashesTo_one_of' d_0 d_1 d'.
+    Proof.
+      intros.
+      destruct H, H0.
+      econstructor; intros; try congruence.
+      repeat match goal with
+             | [ H: forall (_:addr), _ |- _ ] =>
+               specialize (H a)
+             end.
+      destruct matches in *; try contradiction.
+      inversion pointwise_rel_holds; subst; clear pointwise_rel_holds.
+      simpl in *; autorewrite with block ensemble in *; simpl in *.
+      safe_intuition.
+      eapply H1 in H; simpl in *.
+      eauto.
+    Qed.
+
+    Theorem maybe_holds_crashesTo_flush : forall md d d0__i d1__i,
+        md |= crashesTo d ->
+        crashesTo_one_of' d0__i d1__i d ->
+        exists d',
+          md |= crashesTo d' /\
+          crashesTo_one_of' d0__i d1__i d' /\
+          histdisk_flushed d'.
+    Proof.
+      destruct md; simpl in *; intros.
+      eauto using crashesTo_one_of'_flush.
+      exists (flush d);
+        intuition eauto using crashesTo_one_of'_stable_flush.
+    Qed.
+
     Theorem then_wipe_crashesTo_flush : forall md d d0__i d1__i,
         md |= then_wipe (covered d) ->
         crashesTo_one_of' d0__i d1__i d ->
@@ -690,13 +737,8 @@ Section AsyncReplicatedDisk.
     Proof.
       destruct md; simpl in *; intros.
       eauto using crashesTo_one_of'_flush.
-      exists (flush d); intuition eauto.
-      destruct H0.
-      econstructor; intros; simpl; eauto.
-      specialize (crashesTo_one'_pointwise0 a).
-      destruct matches; simpl in *.
-      autorewrite with block ensemble in *; simpl in *.
-      intuition eauto.
+      exists (flush d);
+        intuition eauto using crashesTo_one_of'_stable_flush.
     Qed.
 
     Theorem then_flush_missing : forall d,
@@ -849,10 +891,22 @@ Section AsyncReplicatedDisk.
         descend; intuition (crush; eauto).
       }
 
-      (* analogues of crashesTo_one_of'_eq{0,1} *)
-      admit.
-      admit.
-    Admitted.
+      repeat match goal with
+             | [ H: _ |= crashesTo ?d,
+                    H': crashesTo_one_of' _ _ ?d |- _ ] =>
+               (* don't repeat if the disk is already known to be flushed *)
+               lazymatch goal with
+               | [ H: histdisk_flushed d |- _ ] => fail
+               | _ =>
+                 eapply maybe_holds_crashesTo_flush in H; eauto; repeat deex
+               end
+             end.
+      descend; intuition eauto.
+
+      descend;
+        intuition eauto using
+                  crashesTo_one_of'_eq0, crashesTo_one_of'_eq1.
+    Qed.
 
     Lemma histblock_trans : forall h h',
         In (curr_val h') (durable_vals h) ->

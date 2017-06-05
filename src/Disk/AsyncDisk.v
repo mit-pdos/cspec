@@ -337,7 +337,30 @@ Proof.
   apply ProofIrrelevance.proof_irrelevance.
 Qed.
 
+Theorem wipeBlockhist_hist_flushed : forall h h',
+    wipeBlockhist h h' ->
+    hist_flushed h'.
+Proof.
+  intros.
+  inversion H; subst.
+  econstructor; eauto.
+Qed.
+
+Hint Resolve wipeBlockhist_hist_flushed.
+
+Theorem wipeHist_flushed : forall d d',
+    wipeHist d d' ->
+    histdisk_flushed d'.
+Proof.
+  intros.
+  destruct H.
+  econstructor; intros.
+  specialize (pointwise_rel_holds a).
+  destruct matches in *; try contradiction; eauto.
+Qed.
+
 Hint Resolve histdisk_flush_is_flushed.
+Hint Resolve wipeHist_flushed.
 
 (** * predicate transformers *)
 
