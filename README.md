@@ -1,6 +1,17 @@
 # 6.826-labs
 Labs for 6.826 (POCS)
 
+## TODO
+
+### Experiment with transition systems
+
+I believe that we can make the analogy to transition systems more clear than it currently is. There are several changes that would go into improving this connection:
+
+- Make the state of the system include the program (note that the type of states would be parametrized by the return type). A small step can peel off one bind, or switch to recovery. Executing means turning the program into a `Ret`. Note that we still need to record whether we're in recovery, since the type of the program will change to `prog unit` (at this point we can build this into the framework).
+- Now a program is really synonymous with a transition system: just consider starting states that have that program. Currently we have something close with `exec p`, but folding the program into the state makes the state uniform (the type of the transition relation is actually `Relation (State T)`).
+- Bring back explicit programming languages. "All programs" is no longer about all contexts, but instead it's a representation of all initial states, so it's a more natural idea. This is a clean solution.
+- Programs are a special case of a transition system (notably, the states are unusual in that they inform the transition relation greatly, as they have code in them). However, we can define refinement without reference to programs. Nonetheless Hoare-style specs are a great way to describe the transition relation identified with a program (including the recovery transitions). In theory we can do an example of a refinement between two transition systems whose rules are coded up completely manually.
+
 ## Hacking
 
 ```
