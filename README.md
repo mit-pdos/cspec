@@ -22,6 +22,8 @@ See the [replicate-nbd README](replicate-nbd/README.md).
 
 # Reading guide
 
+Note that this guide has not been updated to reflect the addition of asynchronous disk replication.
+
 * [Automation.v](src/Automation.v): a bunch of nice Ltac
 * [Bytes.v](src/Bytes.v): (currently axiomatic) definition of byte strings of known lengths.
 * [ExtrBytes.v](src/ExtrBytes.v): extraction of axiomatic `bytes` definitions to Haskell
