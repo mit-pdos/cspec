@@ -41,4 +41,4 @@ End Upd.
 
 Hint Rewrite upd_eq : upd.
 Hint Rewrite upd_upd : upd.
-Hint Rewrite upd_neq using (solve [ auto ]) : upd.
+Hint Rewrite upd_neq using (solve [ auto || congruence ]) : upd.
