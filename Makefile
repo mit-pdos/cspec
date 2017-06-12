@@ -1,32 +1,41 @@
-.PHONY: coq default extract hs clean
+CODE := $(shell find src -name "*.v")
+COQRFLAGS := -R build Pocs
 
-CODE := $(shell git ls-files "*.v")
-
+.PHONY: default
 default: _CoqProject coq extract
 
-coq: Makefile.coq
-	$(MAKE) -f Makefile.coq
+build/%.v: src/%.v
+	@mkdir -p $(@D)
+	@rm -f $@
+	@ln -s $(shell pwd)/$< $@
+.PRECIOUS: build/%.v
 
-# TODO: fold this into the _CoqProject and Makefile.coq, find some other way to
-# add the post-processing on the generated Haskell
-ExtractReplicatedDisk.vo: coq replicate-nbd/fiximports.py
-	@echo "COQC ExtractReplicatedDisk.v"
-	@coqc -R src Pocs -noglob ExtractReplicatedDisk.v
+build/%.v.d: build/%.v $(patsubst src/%.v,build/%.v,$(CODE))
+	coqdep -c $(COQRFLAGS) $< > $@
+.PRECIOUS: build/%.v.d
+
+-include $(patsubst src/%.v,build/%.v.d,$(CODE))
+
+build/%.vo: build/%.v
+	coqc -q $(COQRFLAGS) $<
+.PRECIOUS: build/%.vo
+
+.PHONY: coq
+coq: $(patsubst src/%.v,build/%.vo,$(CODE))
+
+.PHONY: extract
+extract: ExtractReplicatedDisk.v coq replicate-nbd/fiximports.py
+	coqtop -R src Pocs -noglob < $<
 	./scripts/add-preprocess.sh replicate-nbd/src/*.hs
 
-extract: ExtractReplicatedDisk.vo
-
+.PHONY: hs
 hs: extract
 	cd replicate-nbd; stack build
 
-Makefile.coq: Makefile $(CODE) _CoqProject
-	coq_makefile -f _CoqProject -o Makefile.coq
-
-clean: Makefile.coq
-	$(MAKE) -f Makefile.coq clean
-	rm -f Makefile.coq _CoqProject
+.PHONY: clean
+clean:
+	rm -rf build
 	rm -f replicate-nbd/src/*.hs
-	rm -f *.vo *.glob
 
-_CoqProject: $(CODE) _CoqProject.in
-	{ cat _CoqProject.in; git ls-files "src/*.v"; } > $@
+_CoqProject: _CoqProject.in
+	cat _CoqProject.in > $@
