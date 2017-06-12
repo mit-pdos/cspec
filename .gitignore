@@ -1,7 +1,10 @@
 /_CoqProject
 /build
+/.lia.cache
 # emacs
 *.aux
+# vim
+*.swp
 # CoqIDE files
 \#*#
 # Coq compiled files
