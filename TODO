@@ -5,9 +5,3 @@ Things to clean up:
 
 - have a single Require Import statement that brings in all the useful things, including
   EquivDec and Omega.
-
-- where do we specify that the initial state after StatDB's init
-  completes, corresponds to an empty history?  probably should
-  add a [init : State -> Prop] field to [InterfaceAPI] in
-  src/Refinement/Interface.v
-

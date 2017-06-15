@@ -36,10 +36,14 @@ Module Vars.
 
   Definition wipe state state' := state = state'.
   Definition bg_step state state' := state = state'.
+  Definition inited state := True.
 
   Definition API : InterfaceAPI Op State :=
-    {| op_sem := pre_step bg_step (@op_step);
-       crash_effect := wipe; |}.
+    {|
+      op_sem := pre_step bg_step (@op_step);
+      crash_effect := wipe;
+      init_sem := inited;
+    |}.
 
   Ltac inv_step :=
     match goal with

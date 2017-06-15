@@ -24,7 +24,13 @@ Module D.
   | step_disk_size : forall (state: State),
       step (DiskSize) state (size state) state.
 
-  Definition API := {| op_sem := @step;
-                       crash_effect := fun state state' => state' = state; |}.
+  Definition inited (state: State) := True.
+
+  Definition API :=
+    {|
+      op_sem := @step;
+      crash_effect := fun state state' => state' = state;
+      init_sem := inited;
+    |}.
 
 End D.

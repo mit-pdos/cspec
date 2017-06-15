@@ -28,7 +28,7 @@ Module TD.
       prog_spec (op_spec TD.API op) (op_impl impl T op)
                 (recover_impl impl) abstr.
 
-  Axiom init_ok : init_invariant (init_impl impl) (recover_impl impl) abstr.
+  Axiom init_ok : init_invariant (init_impl impl) (recover_impl impl) abstr TD.inited.
 
   Axiom td_wipe_world_abstraction : forall w state,
       abstraction abstr (world_crash w) state <->

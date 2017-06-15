@@ -27,8 +27,11 @@ The type [State] gives the abstract state of the API; the semantics of each
 operation will be defined in terms of how state of this type is manipulated.
  *)
 Record InterfaceAPI (opT: Type -> Type) (State:Type) :=
-  { op_sem: forall T, opT T -> Semantics State T;
-    crash_effect: State -> State -> Prop; }.
+  {
+    op_sem: forall T, opT T -> Semantics State T;
+    crash_effect: State -> State -> Prop;
+    init_sem: State -> Prop;
+  }.
 
 Definition pre_step {opT State}
            (bg_step: State -> State -> Prop)
@@ -76,13 +79,14 @@ Record InterfaceImpl opT :=
 
 Definition init_invariant
            (init: prog InitResult) (rec: prog unit)
-           `(abs: Abstraction State) :=
+           `(abs: Abstraction State) (init_sem: State -> Prop) :=
   prog_spec
     (fun (_:unit) w =>
        {| pre := True;
           post :=
             fun r w' => match r with
-                     | Initialized => exists state, abstraction abs w' state
+                     | Initialized =>
+                       exists state, abstraction abs w' state /\ init_sem state
                      | InitFailed => True
                      end;
           recover :=
@@ -112,7 +116,7 @@ Record Interface opT State (api: InterfaceAPI opT State) :=
     init_ok:
       init_invariant
         (init_impl interface_impl) (recover_impl interface_impl)
-        interface_abs; }.
+        interface_abs (init_sem api); }.
 
 (* Helper function to get the implementation of a primitive operation from an
 [Interface]. *)
@@ -182,9 +186,10 @@ Definition then_init (init1 init2: prog InitResult) : prog InitResult :=
 
 Theorem init_invariant_any_rec : forall (init: prog InitResult)
                                    (rec rec': prog unit)
-                                   `(abs: Abstraction State),
-    init_invariant init rec abs ->
-    init_invariant init rec' abs.
+                                   `(abs: Abstraction State)
+                                   (init_sem: State -> Prop),
+    init_invariant init rec abs init_sem ->
+    init_invariant init rec' abs init_sem.
 Proof.
   unfold init_invariant, prog_spec; simpl; intros.
   destruct matches; subst; eauto.
@@ -193,7 +198,7 @@ Proof.
 Qed.
 
 Theorem iInit_init_ok : forall opT `(api: InterfaceAPI opT State) `(i: Interface api),
-    init_invariant (iInit i) (irec i) (interface_abs i).
+    init_invariant (iInit i) (irec i) (interface_abs i) (init_sem api).
 Proof.
   intros.
   eapply init_ok.
@@ -204,19 +209,22 @@ Hint Resolve iInit_init_ok.
 Theorem then_init_compose : forall (init1 init2: prog InitResult)
                               (rec rec': prog unit)
                               `(abs1: Abstraction State1)
-                              `(abs2: LayerAbstraction State1 State2),
-    init_invariant init1 rec abs1 ->
+                              `(abs2: LayerAbstraction State1 State2)
+                              (init1_sem: State1 -> Prop)
+                              (init2_sem: State2 -> Prop),
+    init_invariant init1 rec abs1 init1_sem ->
     prog_spec
       (fun (_:unit) state =>
          {| pre := True;
             post :=
               fun r state' => match r with
-                       | Initialized => exists state'', abstraction abs2 state' state''
+                       | Initialized =>
+                         exists state'', abstraction abs2 state' state'' /\ init2_sem state''
                        | InitFailed => True
                        end;
             recover :=
               fun _ state' => True; |}) init2 rec abs1 ->
-    init_invariant (then_init init1 init2) rec' (abstraction_compose abs1 abs2).
+    init_invariant (then_init init1 init2) rec' (abstraction_compose abs1 abs2) init2_sem.
 Proof.
   intros.
   eapply init_invariant_any_rec with rec.

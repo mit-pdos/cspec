@@ -17,9 +17,11 @@ Module Vars.
     end.
 
   Definition impl : InterfaceImpl Vars.Op :=
-    {| op_impl := vars_op_impl;
-       recover_impl := Ret tt;
-       init_impl := Ret Initialized; |}.
+    {|
+      op_impl := vars_op_impl;
+      recover_impl := Ret tt;
+      init_impl := Ret Initialized;
+    |}.
 
   Axiom abstr : Abstraction Vars.State.
 
@@ -27,7 +29,7 @@ Module Vars.
       prog_spec (op_spec Vars.API op) (op_impl impl T op)
                 (recover_impl impl) abstr.
 
-  Axiom init_ok : init_invariant (init_impl impl) (recover_impl impl) abstr.
+  Axiom init_ok : init_invariant (init_impl impl) (recover_impl impl) abstr Vars.inited.
 
   Axiom vars_wipe_world_abstraction : forall w state,
       abstraction abstr (world_crash w) state <->

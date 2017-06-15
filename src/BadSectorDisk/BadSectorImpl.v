@@ -32,7 +32,7 @@ Module BadSectorDisk.
       prog_spec (op_spec BadSectorDisk.API op) (op_impl impl T op)
                 (recover_impl impl) abstr.
 
-  Axiom init_ok : init_invariant (init_impl impl) (recover_impl impl) abstr.
+  Axiom init_ok : init_invariant (init_impl impl) (recover_impl impl) abstr BadSectorDisk.inited.
 
   Definition bs : Interface BadSectorDisk.API.
     unshelve econstructor.

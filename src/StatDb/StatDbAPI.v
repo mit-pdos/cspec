@@ -21,7 +21,13 @@ Module StatDB.
       r = Nat.div (fold_right plus 0 state) (length state) ->
       step Mean state (Some r) state.
 
-  Definition API := {| op_sem := @step;
-                       crash_effect := fun state state' => state' = state; |}.
+  Definition inited (state: State) := state = nil.
+
+  Definition API :=
+    {|
+      op_sem := @step;
+      crash_effect := fun state state' => state' = state;
+      init_sem := inited;
+    |}.
 
 End StatDB.

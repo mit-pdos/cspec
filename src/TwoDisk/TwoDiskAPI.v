@@ -46,10 +46,14 @@ Module TD.
       op_step (DiskSize i) state r state.
 
   Definition wipe state state' := state' = state.
+  Definition inited state := True.
 
   Definition API : InterfaceAPI Op State :=
-    {| op_sem := pre_step bg_failure (@op_step);
-       crash_effect := wipe; |}.
+    {|
+      op_sem := pre_step bg_failure (@op_step);
+      crash_effect := wipe;
+      init_sem := inited;
+    |}.
 
   Ltac inv_step :=
     match goal with

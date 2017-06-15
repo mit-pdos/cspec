@@ -163,6 +163,7 @@ Module StatDB.
           (* XXX why is there no constraint on the initial state?? *)
           instantiate (1 := nil).
           unfold statdb_abstraction; intuition.
+          reflexivity.
         * admit.
     Admitted.
 
