@@ -1,4 +1,26 @@
-CODE := $(shell find src -name "*.v")
+CODE := $(wildcard src/*.v)
+CODE += $(wildcard src/SepLogic/*.v)
+CODE += $(wildcard src/SepLogic/Pred/*.v)
+CODE += $(wildcard src/SepLogic/Mem/*.v)
+CODE += $(wildcard src/Refinement/*.v)
+CODE += $(wildcard src/Refinement/ProgLang/*.v)
+CODE += $(wildcard src/Disk/*.v)
+
+## For StatDB lab
+CODE += $(wildcard src/Variables/*.v)
+CODE += $(wildcard src/StatDb/*.v)
+
+## For bad sector remapping lab
+CODE += $(wildcard src/BadSectorDisk/*.v)
+# CODE += $(wildcard src/RemappedDisk/*.v)
+CODE += $(wildcard src/NBD/*.v)
+
+## For disk mirroring lab
+CODE += $(wildcard src/TwoDisk/*.v)
+CODE += $(wildcard src/SeqDisk/ReplicatedDisk/*.v)
+CODE += $(wildcard src/SeqDisk/AsyncReplicatedDisk/*.v)
+CODE += $(wildcard src/SeqDisk/*.v)
+
 COQRFLAGS := -R build Pocs
 
 .PHONY: default
