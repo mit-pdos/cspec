@@ -89,7 +89,7 @@ Theorem TDRead0_ok : forall (i: Interface TD.API) a,
          |})
       (Prim i (TD.Read d0 a))
       (irec i)
-      (refinement i).
+      (interface_abs i).
 Proof.
   prim.
 Qed.
@@ -115,7 +115,7 @@ Theorem TDRead1_ok : forall (i: Interface TD.API) a,
          |})
       (Prim i (TD.Read d1 a))
       (irec i)
-      (refinement i).
+      (interface_abs i).
 Proof.
   prim.
 Qed.
@@ -142,7 +142,7 @@ Theorem TDWrite0_ok : forall (i: Interface TD.API) a b,
          |})
       (Prim i (TD.Write d0 a b))
       (irec i)
-      (refinement i).
+      (interface_abs i).
 Proof.
   prim.
 
@@ -174,7 +174,7 @@ Theorem TDWrite1_ok : forall (i: Interface TD.API) a b,
          |})
       (Prim i (TD.Write d1 a b))
       (irec i)
-      (refinement i).
+      (interface_abs i).
 Proof.
   prim.
 
@@ -206,7 +206,7 @@ Theorem TDDiskSize0_ok : forall (i: Interface TD.API),
          |})
       (Prim i (TD.DiskSize d0))
       (irec i)
-      (refinement i).
+      (interface_abs i).
 Proof.
   prim.
 Qed.
@@ -233,7 +233,7 @@ Theorem TDDiskSize1_ok : forall (i: Interface TD.API),
          |})
       (Prim i (TD.DiskSize d1))
       (irec i)
-      (refinement i).
+      (interface_abs i).
 Proof.
   prim.
 Qed.
@@ -255,7 +255,7 @@ Theorem TDSync_ok : forall (i: Interface TD.API) d_ident,
          |})
       (Prim i (TD.Sync d_ident))
       (irec i)
-      (refinement i).
+      (interface_abs i).
 Proof.
   destruct d_ident; prim.
 Qed.

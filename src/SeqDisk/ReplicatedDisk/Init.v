@@ -97,7 +97,7 @@ Section Init.
            |})
         (init_at a)
         (irec td)
-        (refinement td).
+        (interface_abs td).
   Proof.
     induction a; simpl; intros.
     - step.
@@ -143,7 +143,7 @@ Section Init.
            |})
         (DiskSizes)
         (irec td)
-        (refinement td).
+        (interface_abs td).
   Proof.
     unfold DiskSizes; step.
     destruct r; step.
@@ -198,7 +198,7 @@ Section Init.
            |})
         (Init)
         (irec td)
-        (refinement td).
+        (interface_abs td).
   Proof.
     unfold Init; step.
     step.

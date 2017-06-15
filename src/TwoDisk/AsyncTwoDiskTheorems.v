@@ -217,7 +217,7 @@ Theorem TDRead0_ok : forall (i: Interface TD.API) a,
          |})
       (Prim i (TD.Read d0 a))
       (irec i)
-      (refinement i).
+      (interface_abs i).
 Proof.
   prim.
   destruct matches in *; cleanup.
@@ -253,7 +253,7 @@ Theorem TDRead1_ok : forall (i: Interface TD.API) a,
          |})
       (Prim i (TD.Read d1 a))
       (irec i)
-      (refinement i).
+      (interface_abs i).
 Proof.
   prim.
   destruct matches in *; cleanup.
@@ -336,7 +336,7 @@ Theorem TDWrite0_ok : forall (i: Interface TD.API) a b,
          |})
       (Prim i (TD.Write d0 a b))
       (irec i)
-      (refinement i).
+      (interface_abs i).
 Proof.
   prim.
   destruct matches in *; cleanup.
@@ -378,7 +378,7 @@ Theorem TDWrite1_ok : forall (i: Interface TD.API) a b,
          |})
       (Prim i (TD.Write d1 a b))
       (irec i)
-      (refinement i).
+      (interface_abs i).
 Proof.
   prim.
   destruct matches in *; cleanup.
@@ -429,7 +429,7 @@ Theorem TDDiskSize0_ok : forall (i: Interface TD.API),
          |})
       (Prim i (TD.DiskSize d0))
       (irec i)
-      (refinement i).
+      (interface_abs i).
 Proof.
   prim.
   destruct matches in *; cleanup.
@@ -463,7 +463,7 @@ Theorem TDDiskSize1_ok : forall (i: Interface TD.API),
          |})
       (Prim i (TD.DiskSize d1))
       (irec i)
-      (refinement i).
+      (interface_abs i).
 Proof.
   prim.
   destruct matches in *; cleanup.
@@ -566,7 +566,7 @@ Theorem TDSync0_ok : forall (i: Interface TD.API),
          |})
       (Prim i (TD.Sync d0))
       (irec i)
-      (refinement i).
+      (interface_abs i).
 Proof.
   prim.
   destruct matches in *; cleanup.
@@ -597,7 +597,7 @@ Theorem TDSync1_ok : forall (i: Interface TD.API),
          |})
       (Prim i (TD.Sync d1))
       (irec i)
-      (refinement i).
+      (interface_abs i).
 Proof.
   prim.
   destruct matches in *; cleanup.

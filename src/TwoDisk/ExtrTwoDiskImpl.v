@@ -8,4 +8,4 @@ Extract Constant write => "TD.write".
 Extract Constant sync => "TD.sync".
 Extract Constant diskSize => "TD.diskSize".
 
-Extract Constant TwoDiskImpl.TD.refinement => "Hoare.Build_LRefinement".
+Extract Constant TwoDiskImpl.TD.abstr => "Hoare.Build_LayerAbstraction".

@@ -21,22 +21,22 @@ Module Vars.
        recover_impl := Ret tt;
        init_impl := Ret Initialized; |}.
 
-  Axiom refinement : Refinement Vars.State.
+  Axiom abstr : Abstraction Vars.State.
 
   Axiom impl_ok :  forall (T : Type) (op : Vars.Op T),
       prog_spec (op_spec Vars.API op) (op_impl impl T op)
-                (recover_impl impl) refinement.
+                (recover_impl impl) abstr.
 
-  Axiom init_ok : init_invariant (init_impl impl) (recover_impl impl) refinement.
+  Axiom init_ok : init_invariant (init_impl impl) (recover_impl impl) abstr.
 
   Axiom vars_wipe_world_abstraction : forall w state,
-      abstraction refinement (world_crash w) state <->
-      abstraction refinement w state.
+      abstraction abstr (world_crash w) state <->
+      abstraction abstr w state.
 
   Hint Resolve -> vars_wipe_world_abstraction.
   Hint Resolve <- vars_wipe_world_abstraction.
 
-  Theorem vars_crash_ok : wipe_valid refinement Vars.wipe.
+  Theorem vars_crash_ok : wipe_valid abstr Vars.wipe.
   Proof.
     constructor; simpl; unfold Vars.wipe;
       intros; subst; eauto.
@@ -45,7 +45,7 @@ Module Vars.
   Definition vars : Interface Vars.API.
     unshelve econstructor.
     - exact impl.
-    - exact refinement.
+    - exact abstr.
     - apply impl_ok.
     - unfold rec_noop; simpl; intros.
       unfold prog_spec; simpl; intros.

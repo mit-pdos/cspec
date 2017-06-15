@@ -4,25 +4,22 @@ Require Import ProgTheorems.
 
 (* TODO: document how specifications are structured *)
 
-(** * refinement composition *)
+(** * abstraction composition *)
 
-(* A LRefinement (for "layer refinement") goes between State1 (implementation)
-and State2 (spec) *)
-Record LRefinement State1 State2 :=
+(* A LayerAbstraction goes between State1 (implementation) and State2 (spec) *)
+Record LayerAbstraction State1 State2 :=
   { abstraction : State1 -> State2 -> Prop; }.
 
-(* TODO: come up with a good, short name for terms of type Refinement (currently
-using [rf], which I'm not too happy with) *)
-Definition Refinement State := LRefinement world State.
+Definition Abstraction State := LayerAbstraction world State.
 
-Definition IdRefinement State : LRefinement State State :=
+Definition IdAbstraction State : LayerAbstraction State State :=
   {| abstraction := fun state state' => state' = state; |}.
 
-Definition refinement_compose
-           `(rf1: Refinement State1)
-           `(rf2: LRefinement State1 State2) :=
-  {| abstraction := fun w state' => exists state, abstraction rf2 state state' /\
-                                  abstraction rf1 w state; |}.
+Definition abstraction_compose
+           `(abs1: Abstraction State1)
+           `(abs2: LayerAbstraction State1 State2) :=
+  {| abstraction := fun w state' => exists state, abstraction abs2 state state' /\
+                                  abstraction abs1 w state; |}.
 
 Record Quadruple T R State :=
   Spec {
@@ -37,17 +34,17 @@ Generalizable Variable A.
 
 Definition prog_spec `(spec: Specification A T R State) `(p: prog T)
            `(rec: prog R)
-           `(rf: Refinement State) :=
+           `(abs: Abstraction State) :=
   forall a w state,
-    abstraction rf w state ->
+    abstraction abs w state ->
     pre (spec a state) ->
     forall r, rexec p rec w r ->
          match r with
          | RFinished v w' => exists state',
-                            abstraction rf w' state' /\
+                            abstraction abs w' state' /\
                             post (spec a state) v state'
          | Recovered v w' => exists state',
-                            abstraction rf w' state' /\
+                            abstraction abs w' state' /\
                             recover (spec a state) v state'
          end.
 
@@ -64,10 +61,10 @@ Definition spec_impl
 Theorem prog_spec_weaken : forall `(spec1: Specification A T R State)
                               `(spec2: Specification A' T R State)
                               `(p: prog T) `(rec: prog R)
-                              (rf: Refinement State),
-    prog_spec spec1 p rec rf ->
+                              (abs: Abstraction State),
+    prog_spec spec1 p rec abs ->
     spec_impl spec1 spec2 ->
-    prog_spec spec2 p rec rf.
+    prog_spec spec2 p rec abs.
 Proof.
   unfold prog_spec at 2; intros.
   eapply H0 in H2; eauto; repeat deex.
@@ -81,8 +78,8 @@ Theorem prog_spec_rx : forall `(spec: Specification A T R State)
                          `(p: prog T) `(rec: prog R)
                          `(rx: T -> prog T')
                          `(spec': Specification A' T' R State)
-                         `(rf: Refinement State),
-    prog_spec spec p rec rf ->
+                         `(abs: Abstraction State),
+    prog_spec spec p rec abs ->
     (forall a' state, pre (spec' a' state) ->
              exists a, pre (spec a state) /\
                   (forall r,
@@ -95,10 +92,10 @@ Theorem prog_spec_rx : forall `(spec: Specification A T R State)
                               recover :=
                                 fun r state'' =>
                                   recover (spec' a' state) r state'' |})
-                        (rx r) rec rf) /\
+                        (rx r) rec abs) /\
                   (forall r state', recover (spec a state) r state' ->
                            recover (spec' a' state) r state')) ->
-    prog_spec spec' (Bind p rx) rec rf.
+    prog_spec spec' (Bind p rx) rec abs.
 Proof.
   unfold prog_spec at 3; intros.
   inv_rexec.
@@ -145,7 +142,7 @@ Qed.
 
 Theorem spec_cases : forall `(spec: Specification A T R State)
                        `(p: prog T) `(rec: prog R)
-                       `(rf: Refinement State),
+                       `(abs: Abstraction State),
     (forall a state0,
         pre (spec a state0) ->
         prog_spec
@@ -155,8 +152,8 @@ Theorem spec_cases : forall `(spec: Specification A T R State)
                   fun r state' => post (spec a state) r state';
                 recover :=
                   fun r state' => recover (spec a state) r state';
-             |}) p rec rf) ->
-    prog_spec spec p rec rf.
+             |}) p rec abs) ->
+    prog_spec spec p rec abs.
 Proof.
   unfold prog_spec at 2; intros.
   apply H in H1.
@@ -201,9 +198,9 @@ Qed.
 
 Definition prog_loopspec `(spec: Specification A unit unit State)
            `(rec': prog unit) `(rec: prog unit)
-           (rf: Refinement State) :=
+           (abs: Abstraction State) :=
   forall a w state,
-    abstraction rf w state ->
+    abstraction abs w state ->
     pre (spec a state) ->
     forall rv rv' w',
       Relation_Operators.clos_refl_trans_1n
@@ -212,7 +209,7 @@ Definition prog_loopspec `(spec: Specification A unit unit State)
       forall rv'' w'',
         exec rec' w' (Finished rv'' w'') ->
         exists state'',
-          abstraction rf w'' state'' /\
+          abstraction abs w'' state'' /\
           post (spec a state) rv'' state''.
 
 Definition idempotent `(spec: Specification A T unit State) :=
@@ -231,10 +228,10 @@ Definition idempotent `(spec: Specification A T unit State) :=
 
 Theorem idempotent_loopspec : forall `(rec: prog unit) `(rec': prog unit)
                                      `(spec: Specification A unit unit State)
-                                     (rf: Refinement State),
-    forall (Hspec: prog_spec spec rec' rec rf),
+                                     (abs: Abstraction State),
+    forall (Hspec: prog_spec spec rec' rec abs),
       idempotent spec ->
-      prog_loopspec spec rec' rec rf.
+      prog_loopspec spec rec' rec abs.
 Proof.
   unfold prog_loopspec; intros.
   apply clos_refl_trans_1n_unit_tuple in H2.
@@ -258,9 +255,9 @@ Theorem compose_recovery : forall `(spec: Specification A'' T unit State)
                              `(rspec: Specification A' unit unit State)
                              `(spec': Specification A T unit State)
                              `(p: prog T) `(rec: prog unit) `(rec': prog unit)
-                             `(rf: Refinement State),
-    forall (Hspec: prog_spec spec p rec rf)
-      (Hrspec: prog_loopspec rspec rec' rec rf)
+                             `(abs: Abstraction State),
+    forall (Hspec: prog_spec spec p rec abs)
+      (Hrspec: prog_loopspec rspec rec' rec abs)
       (Hspec_spec':
          forall (a:A) state, pre (spec' a state) ->
                     exists (a'':A''),
@@ -272,7 +269,7 @@ Theorem compose_recovery : forall `(spec: Specification A'' T unit State)
                                      forall v' state'',
                                        post (rspec a' state') v' state'' ->
                                        recover (spec' a state) v' state'')),
-      prog_spec spec' p (_ <- rec; rec') rf.
+      prog_spec spec' p (_ <- rec; rec') abs.
 Proof.
   intros.
   unfold prog_spec; intros.
@@ -307,35 +304,35 @@ Proof.
     end; simpl in *; safe_intuition (repeat deex; eauto).
 Qed.
 
-Theorem spec_refinement_compose :
+Theorem spec_abstraction_compose :
   forall `(spec: Specification A T R State2)
     `(p: prog T) `(rec: prog R)
-    `(rf2: LRefinement State1 State2)
-    `(rf1: Refinement State1),
+    `(abs2: LayerAbstraction State1 State2)
+    `(abs1: Abstraction State1),
     prog_spec
       (fun '(a, state2) state =>
          {| pre := pre (spec a state2) /\
-                   abstraction rf2 state state2;
+                   abstraction abs2 state state2;
             post :=
               fun v state' =>
                 exists state2',
                   post (spec a state2) v state2' /\
-                  abstraction rf2 state' state2';
+                  abstraction abs2 state' state2';
             recover :=
               fun v state' =>
                 exists state2',
                   recover (spec a state2) v state2' /\
-                  abstraction rf2 state' state2'; |}) p rec rf1 ->
-    prog_spec spec p rec (refinement_compose rf1 rf2).
+                  abstraction abs2 state' state2'; |}) p rec abs1 ->
+    prog_spec spec p rec (abstraction_compose abs1 abs2).
 Proof.
   intros.
-  unfold prog_spec, refinement_compose;
+  unfold prog_spec, abstraction_compose;
     simpl; intros; safe_intuition (repeat deex).
   eapply (H (a, state)) in H2; simpl in *; eauto.
   destruct r; intuition (repeat deex; eauto).
 Qed.
 
-Definition rec_noop `(rec: prog R) `(rf: Refinement State) (wipe: State -> State -> Prop) :=
+Definition rec_noop `(rec: prog R) `(abs: Abstraction State) (wipe: State -> State -> Prop) :=
   forall T (v:T),
     prog_spec
       (fun (_:unit) state =>
@@ -343,21 +340,21 @@ Definition rec_noop `(rec: prog R) `(rf: Refinement State) (wipe: State -> State
             post := fun r state' => r = v /\
                              state' = state;
             recover := fun _ state' => wipe state state'; |})
-      (Ret v) rec rf.
+      (Ret v) rec abs.
 
 (* for recovery proofs about pure programs *)
 
-Theorem ret_spec : forall `(rf: Refinement State)
+Theorem ret_spec : forall `(abs: Abstraction State)
                      (wipe: State -> State -> Prop)
                      `(spec: Specification A T R State)
                      (v:T) (rec: prog R),
-    rec_noop rec rf wipe ->
+    rec_noop rec abs wipe ->
     (forall a state, pre (spec a state) ->
             post (spec a state) v state /\
             (* TODO: is it ok for this to be for all state'? *)
             forall state', wipe state state' ->
                   forall r, recover (spec a state) r state') ->
-    prog_spec spec (Ret v) rec rf.
+    prog_spec spec (Ret v) rec abs.
 Proof.
   intros.
   unfold prog_spec; intros.
@@ -367,46 +364,46 @@ Proof.
 Qed.
 
 (* TODO: this is currently unused; is it necessary? *)
-Record crash_effect_valid `(rf: LRefinement State1 State2)
+Record crash_effect_valid `(abs: LayerAbstraction State1 State2)
        (wipe1: State1 -> State1 -> Prop)
        (wipe2: State2 -> State2 -> Prop) :=
   { wipe_abstraction: forall w state state', wipe1 w state ->
-                                abstraction rf state state' ->
-                                exists w', abstraction rf w w' /\
+                                abstraction abs state state' ->
+                                exists w', abstraction abs w w' /\
                                       wipe2 w' state';
-    wipe_abstraction': forall w w' state', abstraction rf w w' ->
+    wipe_abstraction': forall w w' state', abstraction abs w w' ->
                                   wipe2 w' state' ->
                                   exists state, wipe1 w state /\
-                                       abstraction rf state state';
+                                       abstraction abs state state';
     wipe_trans: forall state state' state'', wipe2 state state' ->
                                 wipe2 state' state'' ->
                                 wipe2 state state''; }.
 
 Definition wipe_valid
-           `(rf: Refinement State)
+           `(abs: Abstraction State)
            (wipe: State -> State -> Prop) :=
-  crash_effect_valid rf (fun w w' => w' = world_crash w) wipe.
+  crash_effect_valid abs (fun w w' => w' = world_crash w) wipe.
 
 Theorem rec_noop_compose : forall `(rec: prog unit) `(rec2: prog unit)
-                             `(rf1: Refinement State1)
+                             `(abs1: Abstraction State1)
                              (wipe1: State1 -> State1 -> Prop)
                              `(spec: Specification A unit unit State1)
-                             `(rf2: LRefinement State1 State2)
+                             `(abs2: LayerAbstraction State1 State2)
                              (wipe2: State2 -> State2 -> Prop),
-    rec_noop rec rf1 wipe1 ->
-    prog_loopspec spec rec2 rec rf1 ->
+    rec_noop rec abs1 wipe1 ->
+    prog_loopspec spec rec2 rec abs1 ->
     forall (Hspec: forall state0 state0' state,
-          abstraction rf2 state0 state0' ->
+          abstraction abs2 state0 state0' ->
           wipe1 state0 state ->
           exists a, pre (spec a state) /\
                forall state' r state'',
                  post (spec a state') r state'' ->
                  exists state2', wipe2 state0' state2' /\
-                            abstraction rf2 state'' state2'),
-    rec_noop (_ <- rec; rec2) (refinement_compose rf1 rf2) wipe2.
+                            abstraction abs2 state'' state2'),
+    rec_noop (_ <- rec; rec2) (abstraction_compose abs1 abs2) wipe2.
 Proof.
   unfold rec_noop; intros.
-  eapply spec_refinement_compose; simpl.
+  eapply spec_abstraction_compose; simpl.
   eapply compose_recovery; eauto.
   simpl; intuition idtac.
   simpl in *.
@@ -418,10 +415,10 @@ Qed.
 
 Theorem spec_exec_equiv : forall `(spec: Specification A T R State)
                             (p p': prog T) `(rec: prog R)
-                            `(rf: Refinement State),
+                            `(abs: Abstraction State),
     exec_equiv p p' ->
-    prog_spec spec p' rec rf ->
-    prog_spec spec p rec rf.
+    prog_spec spec p' rec abs ->
+    prog_spec spec p rec abs.
 Proof.
   unfold prog_spec; intros.
   eapply H0; eauto.

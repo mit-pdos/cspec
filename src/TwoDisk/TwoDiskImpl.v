@@ -22,22 +22,22 @@ Module TD.
        recover_impl := Ret tt;
        init_impl := Ret Initialized; |}.
 
-  Axiom refinement : Refinement TD.State.
+  Axiom abstr : Abstraction TD.State.
 
   Axiom impl_ok :  forall (T : Type) (op : TD.Op T),
       prog_spec (op_spec TD.API op) (op_impl impl T op)
-                (recover_impl impl) refinement.
+                (recover_impl impl) abstr.
 
-  Axiom init_ok : init_invariant (init_impl impl) (recover_impl impl) refinement.
+  Axiom init_ok : init_invariant (init_impl impl) (recover_impl impl) abstr.
 
   Axiom td_wipe_world_abstraction : forall w state,
-      abstraction refinement (world_crash w) state <->
-      abstraction refinement w state.
+      abstraction abstr (world_crash w) state <->
+      abstraction abstr w state.
 
   Hint Resolve -> td_wipe_world_abstraction.
   Hint Resolve <- td_wipe_world_abstraction.
 
-  Theorem td_crash_ok : wipe_valid refinement TD.wipe.
+  Theorem td_crash_ok : wipe_valid abstr TD.wipe.
   Proof.
     constructor; simpl; unfold TD.wipe;
       intros; subst; eauto.
@@ -46,7 +46,7 @@ Module TD.
   Definition td : Interface TD.API.
     unshelve econstructor.
     - exact impl.
-    - exact refinement.
+    - exact abstr.
     - apply impl_ok.
     - unfold rec_noop; simpl; intros.
       unfold prog_spec; simpl; intros.

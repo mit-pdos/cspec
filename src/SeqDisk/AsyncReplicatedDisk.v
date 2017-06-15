@@ -119,7 +119,7 @@ Module RD.
                      wipeHist d d';
              |})
           (Read td a) (_ <- irec td; Recover td)
-          (refinement td).
+          (interface_abs td).
     Proof.
       start.
       rename a0 into d.
@@ -179,7 +179,7 @@ Module RD.
                     wipeHist (diskUpdF d a (buffer b)) d');
              |})
           (Write td a b) (_ <- irec td; Recover td)
-          (refinement td).
+          (interface_abs td).
     Proof.
       start.
       rename a0 into d.
@@ -209,7 +209,7 @@ Module RD.
                    wipeHist d d';
            |})
         (DiskSize td) (_ <- irec td; Recover td)
-        (refinement td).
+        (interface_abs td).
     Proof.
       start.
 
@@ -259,7 +259,7 @@ Module RD.
                  wipeHist d d';
            |})
         (Sync td) (_ <- irec td; Recover td)
-        (refinement td).
+        (interface_abs td).
     Proof.
       start.
 
@@ -322,7 +322,7 @@ Module RD.
     (* The proof will require a refinement; we build one up based on the
     two-disk state. *)
 
-    Definition rd_abstraction (state:TD.State) (d:D.State) :=
+    Definition rd_layer_abstraction (state:TD.State) (d:D.State) :=
       TD.disk0 state |= covered d /\
       TD.disk1 state |= covered d.
 
@@ -376,10 +376,10 @@ Module RD.
       | D.DiskSize => DiskSize td
       end.
 
-    Definition rd_refinement :=
-      refinement_compose
-        (refinement td)
-        {| abstraction := rd_abstraction; |}.
+    Definition rd_abstraction :=
+      abstraction_compose
+        (interface_abs td)
+        {| abstraction := rd_layer_abstraction; |}.
 
     Definition impl : InterfaceImpl D.Op :=
       {| op_impl := d_op_impl;
@@ -485,13 +485,13 @@ Module RD.
     Definition rd : Interface D.API.
       unshelve econstructor.
       - exact impl.
-      - exact rd_refinement.
+      - exact rd_abstraction.
 
       - intros.
         destruct op; unfold op_spec;
-          apply spec_refinement_compose;
+          apply spec_abstraction_compose;
           eapply prog_spec_weaken; eauto;
-            unfold spec_impl, rd_abstraction; simplify.
+            unfold spec_impl, rd_layer_abstraction; simplify.
         + descend; (intuition eauto); simplify.
           descend; intuition eauto using pred_weaken.
         + descend; (intuition eauto); simplify.
@@ -503,7 +503,7 @@ Module RD.
           descend; intuition eauto using pred_weaken.
 
       - eapply rec_noop_compose; eauto; simpl.
-        unfold Recover_spec, rd_abstraction; simplify.
+        unfold Recover_spec, rd_layer_abstraction; simplify.
         unfold TD.wipe in *; subst.
         exists state0', state0'.
         intuition eauto.
@@ -517,7 +517,7 @@ Module RD.
         pose proof (state_some_disks state); simplify.
         descend; intuition eauto.
         destruct v; simplify; finish.
-        unfold rd_abstraction; eauto.
+        unfold rd_layer_abstraction; eauto.
 
         Grab Existential Variables.
         all: auto.

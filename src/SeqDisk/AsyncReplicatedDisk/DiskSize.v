@@ -53,7 +53,7 @@ Section ReplicatedDisk.
            |})
         (DiskSize)
         (irec td)
-        (refinement td).
+        (interface_abs td).
     Proof.
       unfold DiskSize.
 

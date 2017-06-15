@@ -70,7 +70,7 @@ Section ReplicatedDisk.
          |})
       (Sync)
       (irec td)
-      (refinement td).
+      (interface_abs td).
   Proof.
     unfold Sync.
 

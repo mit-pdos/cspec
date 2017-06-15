@@ -59,7 +59,7 @@ Section AsyncReplicatedDisk.
            |})
         (Read a)
         (irec td)
-        (refinement td).
+        (interface_abs td).
   Proof.
     unfold Read.
 
@@ -93,7 +93,7 @@ Section AsyncReplicatedDisk.
            |})
         (Write a b)
         (irec td)
-        (refinement td).
+        (interface_abs td).
   Proof.
     unfold Write.
 

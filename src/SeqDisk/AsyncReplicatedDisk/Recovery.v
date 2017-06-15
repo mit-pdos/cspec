@@ -347,7 +347,7 @@ Section AsyncReplicatedDisk.
              |})
           (fixup a)
           (irec td)
-          (refinement td).
+          (interface_abs td).
     Proof.
       unfold fixup.
       step.
@@ -444,7 +444,7 @@ Section AsyncReplicatedDisk.
              |})
           (recover_at a)
           (irec td)
-          (refinement td).
+          (interface_abs td).
     Proof.
       induction a; simpl.
       - step.
@@ -790,7 +790,7 @@ Section AsyncReplicatedDisk.
         Recover_spec
         (Recover)
         (irec td)
-        (refinement td).
+        (interface_abs td).
     Proof.
       unfold Recover, Recover_spec.
       spec_cases; simpl; intros.
@@ -952,7 +952,7 @@ Section AsyncReplicatedDisk.
         Recover_spec
         (Recover)
         (irec td)
-        (refinement td).
+        (interface_abs td).
     Proof.
       eapply idempotent_loopspec; simpl.
       - eapply Recover_rok.

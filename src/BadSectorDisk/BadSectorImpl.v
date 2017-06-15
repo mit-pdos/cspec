@@ -26,18 +26,18 @@ Module BadSectorDisk.
        recover_impl := Ret tt;
        init_impl := Ret Initialized; |}.
 
-  Axiom refinement : Refinement BadSectorDisk.State.
+  Axiom abstr : Abstraction BadSectorDisk.State.
 
   Axiom impl_ok :  forall (T : Type) (op : BadSectorDisk.Op T),
       prog_spec (op_spec BadSectorDisk.API op) (op_impl impl T op)
-                (recover_impl impl) refinement.
+                (recover_impl impl) abstr.
 
-  Axiom init_ok : init_invariant (init_impl impl) (recover_impl impl) refinement.
+  Axiom init_ok : init_invariant (init_impl impl) (recover_impl impl) abstr.
 
   Definition bs : Interface BadSectorDisk.API.
     unshelve econstructor.
     - exact impl.
-    - exact refinement.
+    - exact abstr.
     - apply impl_ok.
     - unfold rec_noop; simpl; intros.
       unfold prog_spec; simpl; intros.

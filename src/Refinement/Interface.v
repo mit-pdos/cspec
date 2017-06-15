@@ -73,18 +73,18 @@ Record InterfaceImpl opT :=
 
 Definition init_invariant
            (init: prog InitResult) (rec: prog unit)
-           `(rf: Refinement State) :=
+           `(abs: Abstraction State) :=
   prog_spec
     (fun (_:unit) w =>
        {| pre := True;
           post :=
             fun r w' => match r with
-                     | Initialized => exists state, abstraction rf w' state
+                     | Initialized => exists state, abstraction abs w' state
                      | InitFailed => True
                      end;
           recover :=
             fun _ w' => True;
-       |}) init rec (IdRefinement world).
+       |}) init rec (IdAbstraction world).
 
 (* Finally, an Interface ties everything together: the parameter [api] specifies all details of how the implementation behaves, while the fields give an implementation and a refinement proof.
 
@@ -95,18 +95,18 @@ and recovers. This is guaranteed by the [ret_rec_ok] proof.
  *)
 Record Interface opT State (api: InterfaceAPI opT State) :=
   { interface_impl: InterfaceImpl opT;
-    refinement: Refinement State;
+    interface_abs: Abstraction State;
     impl_ok : forall `(op: opT T),
         prog_spec (op_spec api op)
                   (op_impl interface_impl _ op)
                   (recover_impl interface_impl)
-                  refinement;
+                  interface_abs;
     ret_rec_ok:
-      rec_noop (recover_impl interface_impl) refinement (crash_effect api);
+      rec_noop (recover_impl interface_impl) interface_abs (crash_effect api);
     init_ok:
       init_invariant
         (init_impl interface_impl) (recover_impl interface_impl)
-        refinement; }.
+        interface_abs; }.
 
 (* Helper function to get the implementation of a primitive operation from an
 [Interface]. *)
@@ -138,7 +138,7 @@ Theorem prim_spec : forall opT `(api: InterfaceAPI opT State)
                     forall state'',
                       crash_effect api state' state'' ->
                       recover (spec a state) tt state'') ->
-    prog_spec spec (Prim i op) (recover_impl (interface_impl i)) (refinement i).
+    prog_spec spec (Prim i op) (recover_impl (interface_impl i)) (interface_abs i).
 Proof.
   intros.
   eapply prog_spec_weaken.
@@ -154,7 +154,7 @@ Definition irec opT `(api: InterfaceAPI opT State) `(i: Interface api) : prog un
   recover_impl (interface_impl i).
 
 Lemma irec_ret_ok : forall opT `(api: InterfaceAPI opT State) `(i: Interface api),
-    rec_noop (irec i) (refinement i) (crash_effect api).
+    rec_noop (irec i) (interface_abs i) (crash_effect api).
 Proof.
   intros.
   eapply ret_rec_ok.
@@ -176,9 +176,9 @@ Definition then_init (init1 init2: prog InitResult) : prog InitResult :=
 
 Theorem init_invariant_any_rec : forall (init: prog InitResult)
                                    (rec rec': prog unit)
-                                   `(rf: Refinement State),
-    init_invariant init rec rf ->
-    init_invariant init rec' rf.
+                                   `(abs: Abstraction State),
+    init_invariant init rec abs ->
+    init_invariant init rec' abs.
 Proof.
   unfold init_invariant, prog_spec; simpl; intros.
   destruct matches; subst; eauto.
@@ -187,7 +187,7 @@ Proof.
 Qed.
 
 Theorem iInit_init_ok : forall opT `(api: InterfaceAPI opT State) `(i: Interface api),
-    init_invariant (iInit i) (irec i) (refinement i).
+    init_invariant (iInit i) (irec i) (interface_abs i).
 Proof.
   intros.
   eapply init_ok.
@@ -197,20 +197,20 @@ Hint Resolve iInit_init_ok.
 
 Theorem then_init_compose : forall (init1 init2: prog InitResult)
                               (rec rec': prog unit)
-                              `(rf1: Refinement State1)
-                              `(rf2: LRefinement State1 State2),
-    init_invariant init1 rec rf1 ->
+                              `(abs1: Abstraction State1)
+                              `(abs2: LayerAbstraction State1 State2),
+    init_invariant init1 rec abs1 ->
     prog_spec
       (fun (_:unit) state =>
          {| pre := True;
             post :=
               fun r state' => match r with
-                       | Initialized => exists state'', abstraction rf2 state' state''
+                       | Initialized => exists state'', abstraction abs2 state' state''
                        | InitFailed => True
                        end;
             recover :=
-              fun _ state' => True; |}) init2 rec rf1 ->
-    init_invariant (then_init init1 init2) rec' (refinement_compose rf1 rf2).
+              fun _ state' => True; |}) init2 rec abs1 ->
+    init_invariant (then_init init1 init2) rec' (abstraction_compose abs1 abs2).
 Proof.
   intros.
   eapply init_invariant_any_rec with rec.

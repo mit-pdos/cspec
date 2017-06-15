@@ -50,18 +50,18 @@ Module StatDB.
       vars_state Vars.VarCount = Some (length statdb_state) /\
       vars_state Vars.VarSum = Some (fold_right plus 0 statdb_state).
 
-    Definition refinement : Refinement StatDB.State :=
-      refinement_compose
-        (refinement vars)
+    Definition abstr : Abstraction StatDB.State :=
+      abstraction_compose
+        (interface_abs vars)
         {| abstraction := statdb_abstraction |}.
 
     Definition statdb : Interface StatDB.API.
       unshelve econstructor.
       - exact impl.
-      - exact refinement.
+      - exact abstr.
       - intros.
         destruct op; unfold op_spec;
-          apply spec_refinement_compose;
+          apply spec_abstraction_compose;
             unfold spec_impl, statdb_abstraction.
         + unfold prog_spec; intros.
           destruct a; simpl in *; intuition.

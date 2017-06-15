@@ -119,7 +119,7 @@ Section ReplicatedDiskRecovery.
              |})
           (fixup a)
           (irec td)
-          (refinement td).
+          (interface_abs td).
     Proof.
       unfold fixup.
       step.
@@ -182,7 +182,7 @@ Section ReplicatedDiskRecovery.
              |})
           (fixup a)
           (irec td)
-          (refinement td).
+          (interface_abs td).
     Proof.
       unfold fixup; intros.
       step.
@@ -238,7 +238,7 @@ Section ReplicatedDiskRecovery.
              |})
           (fixup a)
           (irec td)
-          (refinement td).
+          (interface_abs td).
     Proof.
       unfold fixup; intros.
       step.
@@ -315,7 +315,7 @@ Section ReplicatedDiskRecovery.
              |})
           (fixup a)
           (irec td)
-          (refinement td).
+          (interface_abs td).
     Proof.
       spec_cases; simplify.
       destruct s; intuition eauto.
@@ -393,7 +393,7 @@ Section ReplicatedDiskRecovery.
              |})
           (recover_at a)
           (irec td)
-          (refinement td).
+          (interface_abs td).
     Proof.
       induction a; simpl; intros.
       - step.
@@ -462,7 +462,7 @@ Section ReplicatedDiskRecovery.
         Recover_spec
         (Recover)
         (irec td)
-        (refinement td).
+        (interface_abs td).
     Proof.
       unfold Recover, Recover_spec; intros.
       step.
@@ -488,7 +488,7 @@ Section ReplicatedDiskRecovery.
         Recover_spec
         (Recover)
         (irec td)
-        (refinement td).
+        (interface_abs td).
     Proof.
       eapply idempotent_loopspec; simpl.
       - eapply Recover_rok.

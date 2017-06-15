@@ -61,7 +61,7 @@ Module RD.
                    TD.disk1 state' |= eq d;
              |})
           (Read td a) (_ <- irec td; Recover td)
-          (refinement td).
+          (interface_abs td).
     Proof.
       start.
       rename a0 into d.
@@ -89,7 +89,7 @@ Module RD.
                     TD.disk1 state' |= eq (diskUpd d a b));
              |})
           (Write td a b) (_ <- irec td; Recover td)
-          (refinement td).
+          (interface_abs td).
     Proof.
       start.
       rename a0 into d.
@@ -116,7 +116,7 @@ Module RD.
                  TD.disk1 state' |= eq d;
            |})
         (Sync td) (_ <- irec td; Recover td)
-        (refinement td).
+        (interface_abs td).
     Proof.
       eapply compose_recovery; simplify.
 
@@ -142,7 +142,7 @@ Module RD.
                  TD.disk1 state' |= eq d;
            |})
         (DiskSize td) (_ <- irec td; Recover td)
-        (refinement td).
+        (interface_abs td).
     Proof.
       eapply compose_recovery; simplify.
 
@@ -214,7 +214,7 @@ Module RD.
       | _ => True
       end.
 
-    Definition rd_abstraction (state:TD.State) (state':D.State) :=
+    Definition rd_layer_abstraction (state:TD.State) (state':D.State) :=
       rd_invariant state /\
       state' = abstraction_f state.
 
@@ -288,10 +288,10 @@ Module RD.
       | D.DiskSize => DiskSize td
       end.
 
-    Definition rd_refinement : Refinement D.State :=
-      refinement_compose
-        (refinement td)
-        {| abstraction := rd_abstraction; |}.
+    Definition rd_abstraction : Abstraction D.State :=
+      abstraction_compose
+        (interface_abs td)
+        {| abstraction := rd_layer_abstraction; |}.
 
     Definition impl : InterfaceImpl D.Op :=
       {| op_impl := d_op_impl;
@@ -311,30 +311,30 @@ Module RD.
     Qed.
 
     Theorem rd_crash_effect_valid :
-      crash_effect_valid {| abstraction := rd_abstraction; |}
+      crash_effect_valid {| abstraction := rd_layer_abstraction; |}
                          TD.wipe (fun (state state':D.State) => state' = state).
     Proof.
       econstructor; unfold TD.wipe; intuition (subst; eauto).
     Qed.
 
-    Theorem rd_abstraction_f : forall state,
+    Theorem rd_layer_abstraction_f : forall state,
         rd_invariant state ->
-        rd_abstraction state (abstraction_f state).
+        rd_layer_abstraction state (abstraction_f state).
     Proof.
-      unfold rd_abstraction; intuition.
+      unfold rd_layer_abstraction; intuition.
     Qed.
 
-    Hint Resolve rd_abstraction_f.
+    Hint Resolve rd_layer_abstraction_f.
 
     Definition rd : Interface D.API.
       unshelve econstructor.
       - exact impl.
-      - exact rd_refinement.
+      - exact rd_abstraction.
       - intros.
         destruct op; unfold op_spec;
-          apply spec_refinement_compose;
+          apply spec_abstraction_compose;
           eapply prog_spec_weaken; eauto;
-            unfold spec_impl, rd_abstraction; simplify.
+            unfold spec_impl, rd_layer_abstraction; simplify.
         + exists (abstraction_f state); (intuition eauto); simplify; finish.
         + exists (abstraction_f state); (intuition eauto); simplify; finish.
           exists (abstraction_f state'); intuition eauto.
@@ -346,7 +346,7 @@ Module RD.
           descend; intuition eauto.
           descend; intuition eauto.
       - eapply rec_noop_compose; eauto; simpl.
-        unfold TD.wipe, rd_abstraction, Recover_spec; simplify.
+        unfold TD.wipe, rd_layer_abstraction, Recover_spec; simplify.
         exists (abstraction_f state0), FullySynced; intuition eauto.
         descend; intuition eauto.
       - eapply then_init_compose; eauto.
