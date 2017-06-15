@@ -24,7 +24,7 @@ CODE += $(wildcard src/SeqDisk/*.v)
 COQRFLAGS := -R build Pocs
 
 .PHONY: default
-default: _CoqProject coq extract
+default: _CoqProject coq extract hs
 
 build/%.v: src/%.v
 	@mkdir -p $(@D)
@@ -46,13 +46,13 @@ build/%.vo: build/%.v
 coq: $(patsubst src/%.v,build/%.vo,$(CODE))
 
 .PHONY: extract
-extract: ExtractReplicatedDisk.v coq replicate-nbd/fiximports.py
-	coqtop -R src Pocs -noglob < $<
+extract: replicate-nbd/ExtractReplicatedDisk.v coq replicate-nbd/fiximports.py
+	coqtop $(COQRFLAGS) -batch -noglob -load-vernac-source $<
 	./scripts/add-preprocess.sh replicate-nbd/src/*.hs
 
 .PHONY: hs
 hs: extract
-	cd replicate-nbd; stack build
+	cd replicate-nbd && stack build
 
 .PHONY: clean
 clean:
