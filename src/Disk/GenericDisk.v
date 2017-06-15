@@ -194,10 +194,13 @@ Section GenericDisks.
     repeat deex; unfold disk_get in *; congruence.
   Qed.
 
-  (* disks are actually equal when their memories are equal; besides being useful
- in practice, this to some extent justifies the diskMem coercion, since disks
- are uniquely determined by their memories, subject to the sized_domain
- proofs. *)
+  (**
+   * disks are actually equal when their memories are equal;
+   * besides being useful in practice, this to some extent
+   * justifies the diskMem coercion, since disks are uniquely
+   * determined by their memories, subject to the sized_domain
+   * proofs.
+   *)
   Theorem diskMem_ext_eq : forall d d',
       diskMem d = diskMem d' ->
       d = d'.

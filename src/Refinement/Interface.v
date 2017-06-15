@@ -4,15 +4,18 @@ Require Import ProgLang.Prog.
 Require Import ProgLang.Hoare.
 Require Import ProgLang.ProgTheorems.
 
-(* Interfaces are groups of methods with a shared level of abstraction.
-
-A complete, usable interface consists of three logical parts:
-- An API, specifying what each operation does (the types implicitly specify what
-  the operations are)
-- An implementation, giving a program for each operation as well as an overall recovery procedure.
-- A refinement proof that shows each operation behaves as the API specifies with
-  atomic behavior on crash after running the recovery procedure. This proof
-  includes giving a refinement to the abstract state used to specify the API.
+(**
+ * Interfaces are groups of methods with a shared level of abstraction.
+ *
+ * A complete, usable interface consists of three logical parts:
+ * - An API, specifying what each operation does (the types implicitly
+ *   specify what the operations are)
+ * - An implementation, giving a program for each operation as well as
+ *   an overall recovery procedure.
+ * - A refinement proof that shows each operation behaves as the API
+ *   specifies with atomic behavior on crash after running the recovery
+ *   procedure. This proof includes giving an abstraction to the abstract
+ *   state used to specify the API.
  *)
 
 (* An InterfaceAPI takes [opT], a family of types for the operations. Think of
@@ -86,12 +89,15 @@ Definition init_invariant
             fun _ w' => True;
        |}) init rec (IdAbstraction world).
 
-(* Finally, an Interface ties everything together: the parameter [api] specifies all details of how the implementation behaves, while the fields give an implementation and a refinement proof.
-
-Of note is that in addition to every method being correct ([impl_ok]), the
-recovery procedure should preserve the behavior of [Ret], namely that nothing
-happens (in terms of abstract states) if the system crashes in a quiescent state
-and recovers. This is guaranteed by the [ret_rec_ok] proof.
+(**
+ * Finally, an Interface ties everything together: the parameter [api] specifies
+ * all details of how the implementation behaves, while the fields give an
+ * implementation and a refinement proof.
+ *
+ * Of note is that in addition to every method being correct ([impl_ok]), the
+ * recovery procedure should preserve the behavior of [Ret], namely that nothing
+ * happens (in terms of abstract states) if the system crashes in a quiescent state
+ * and recovers. This is guaranteed by the [ret_rec_ok] proof.
  *)
 Record Interface opT State (api: InterfaceAPI opT State) :=
   { interface_impl: InterfaceImpl opT;
