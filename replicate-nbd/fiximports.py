@@ -11,7 +11,7 @@ import_modules = {
     ["Bytes"],
 
     "import qualified Replication.TwoDiskOps as TD":
-    ["TwoDiskOps"],
+    ["ExtrTwoDiskImpl"],
 
     "import Replication.TwoDiskEnvironment":
     [
@@ -24,8 +24,7 @@ import_modules = {
         "ReplicatedDisk",
         "Server",
         "Sync",
-        "TwoDiskImpl",
-        "TwoDiskOps",
+        "ExtrTwoDiskImpl",
     ],
 
     "import qualified Data.Word":

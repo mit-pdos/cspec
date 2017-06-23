@@ -6,7 +6,7 @@ import qualified Data.ByteString as BS
 import           Interface (InitResult)
 import           ReplicatedDisk
 import           Replication.TwoDiskEnvironment (TwoDiskProg)
-import           TwoDiskImpl (_TD__td)
+import           ExtrTwoDiskImpl (_TD__td)
 import           Utils.Conversion
 
 -- TODO: use newtype for block things
