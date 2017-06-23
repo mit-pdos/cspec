@@ -66,105 +66,60 @@ Module StatDB.
             unfold spec_impl, statdb_abstraction.
         + unfold prog_spec; intros.
           destruct a; simpl in *; intuition.
-          inv_rexec.
-          * repeat ( match goal with
-            | H: exec (Prim _ _) _ _ |- _ => eapply RExec in H
-            end || inv_exec ).
-            eapply (impl_ok vars) in H9; eauto.
-            deex.
-            eapply (impl_ok vars) in H8; eauto.
-            deex.
-            eapply (impl_ok vars) in H10; eauto.
-            deex.
-            eapply (impl_ok vars) in H11; eauto.
-            deex.
-
-            simpl in *.
-            unfold pre_step in *; repeat deex.
-            repeat Vars.inv_bg.
-            repeat Vars.inv_step.
-
-            eexists; intuition.
-            eauto.
-            eexists; intuition.
-            constructor.
-
-            autorewrite with upd.
-            rewrite H0 in H8. inversion H8; subst. f_equal. simpl. omega.
-
-            autorewrite with upd.
-            rewrite H4 in H10. inversion H10; subst. f_equal. simpl. omega.
-          * cannot_crash.
-        + unfold prog_spec; intros.
-          destruct a; simpl in *; intuition.
-          inv_rexec.
-          * inv_exec.
-            destruct (equiv_dec v0 0).
-           -- repeat ( match goal with
-              | H: exec (Prim _ _) _ _ |- _ => eapply RExec in H
-              end || inv_ret || inv_exec ).
-
-              eapply (impl_ok vars) in H9; eauto.
-              deex.
-
-              simpl in *.
-              unfold pre_step in *; repeat deex.
-              repeat Vars.inv_bg.
-              repeat Vars.inv_step.
-
-              eexists; intuition.
-              eauto.
-
-              destruct s; simpl in *; try congruence.
-              eexists; intuition.
-              constructor.
-              simpl; eauto.
-              simpl; eauto.
-           -- repeat ( match goal with
-              | H: exec (Prim _ _) _ _ |- _ => eapply RExec in H
-              | H: rexec _ _ _ _ |- _ => eapply (impl_ok vars) in H; eauto; deex
-              end || inv_ret || inv_exec ).
-
-              simpl in *.
-              unfold pre_step in *; repeat deex.
-              repeat Vars.inv_bg.
-              repeat Vars.inv_step.
-
-              eexists; intuition.
-              eauto.
-
-              rewrite H0 in H7; inversion H7; subst.
-              rewrite H4 in H9; inversion H9; subst.
-
-              eexists; intuition.
-              constructor; eauto.
-              destruct s; simpl in *; try congruence; try omega.
-              eauto.
-              eauto.
-          * cannot_crash.
-      - cannot_crash.
-      - eapply then_init_compose; eauto.
-        unfold prog_spec; intros.
-        destruct a; simpl in *; intuition.
-        inv_rexec.
-        * repeat ( match goal with
-          | H: exec (Prim _ _) _ _ |- _ => eapply RExec in H
-          | H: rexec _ _ _ _ |- _ => eapply (impl_ok vars) in H; eauto; deex
-          end || inv_ret || inv_exec ).
-
-          simpl in *.
-          unfold pre_step in *; repeat deex.
-          repeat Vars.inv_bg.
-          repeat Vars.inv_step.
+          inv_rexec; try cannot_crash.
+          exec_steps; repeat ( Vars.inv_bg || Vars.inv_step ).
 
           eexists; intuition.
           eauto.
           eexists; intuition.
+          constructor.
 
-          instantiate (1 := nil).
-          unfold statdb_abstraction; intuition.
-          reflexivity.
-        * cannot_crash.
+          autorewrite with upd.
+          rewrite H0 in H8. inversion H8; subst. f_equal. simpl. omega.
+
+          autorewrite with upd.
+          rewrite H4 in H10. inversion H10; subst. f_equal. simpl. omega.
+
+        + unfold prog_spec; intros.
+          destruct a; simpl in *; intuition.
+          inv_rexec; try cannot_crash.
+          exec_steps; repeat ( Vars.inv_bg || Vars.inv_step ).
+
+          * eexists; intuition.
+            eauto.
+
+            destruct s; simpl in *; try congruence.
+            eexists; intuition.
+            constructor.
+            simpl; eauto.
+            simpl; eauto.
+
+          * eexists; intuition.
+            eauto.
+
+            rewrite H0 in H7; inversion H7; subst.
+            rewrite H4 in H9; inversion H9; subst.
+
+            eexists; intuition.
+            constructor; eauto.
+            destruct s; simpl in *; try congruence; try omega.
+            eauto.
+            eauto.
+
+      - cannot_crash.
+      - eapply then_init_compose; eauto.
+        unfold prog_spec; intros.
+        destruct a; simpl in *; intuition.
+        inv_rexec; try cannot_crash.
+        exec_steps; repeat ( Vars.inv_bg || Vars.inv_step ).
+
+        eexists; intuition.
+        eauto.
+        eexists; intuition.
+
+        instantiate (1 := nil).
+        unfold statdb_abstraction; intuition.
+        reflexivity.
 
       Unshelve.
       all: eauto.
