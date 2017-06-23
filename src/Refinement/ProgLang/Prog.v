@@ -47,6 +47,10 @@ Axiom step:forall T, opT T -> Semantics world T.
 process to replace in-memory state with default values. *)
 Axiom world_crash: world -> world.
 
+(* Can crashes happen?  This is effectively a flag that we will use in early
+lab assignments to avoid having to reason about crashes. *)
+Parameter can_crash: Prop.
+
 (** [exec] specifies the execution semantics of complete programs using [step]
   as the small-step semantics of the primitive operations.
 
@@ -57,13 +61,16 @@ Inductive exec : forall T, prog T -> world -> Result T -> Prop :=
     step op w v w' ->
     exec (BaseOp op) w (Finished v w')
 | ExecOpCrashEnd : forall T (op: opT T) w v w',
+    can_crash ->
     step op w v w' ->
     exec (BaseOp op) w (Crashed w')
 | ExecCrashBegin : forall T (p: prog T) w,
+    can_crash ->
     exec p w (Crashed w)
 | ExecRet : forall T (v:T) w,
     exec (Ret v) w (Finished v w)
 | ExecRetCrash : forall T (v:T) w,
+    can_crash ->
     exec (Ret v) w (Crashed w)
 | ExecBindFinished : forall T T' (p: prog T) (p': T -> prog T')
                        w v w' r,
@@ -132,7 +139,7 @@ Lemma exec_ret : forall T (v:T) w r,
     exec (Ret v) w r ->
     match r with
     | Finished v' w' => v = v' /\ w = w'
-    | Crashed w' => w = w'
+    | Crashed w' => w = w' /\ can_crash
     end.
 Proof.
   intros.

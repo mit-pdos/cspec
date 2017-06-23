@@ -4,11 +4,12 @@ Require Import Variables.VariablesAPI.
 Require Import Refinement.Interface.
 Require Import Refinement.ProgLang.Prog.
 Require Import Refinement.ProgLang.Hoare.
-
-Axiom read : Vars.var -> prog nat.
-Axiom write : Vars.var -> nat -> prog unit.
+Require Import Refinement.ProgLang.NoCrashes.
 
 Module Vars.
+
+  Axiom read : Vars.var -> prog nat.
+  Axiom write : Vars.var -> nat -> prog unit.
 
   Definition vars_op_impl T (op: Vars.Op T) : prog T :=
     match op with
@@ -31,31 +32,12 @@ Module Vars.
 
   Axiom init_ok : init_invariant (init_impl impl) (recover_impl impl) abstr Vars.inited.
 
-  Axiom vars_wipe_world_abstraction : forall w state,
-      abstraction abstr (world_crash w) state <->
-      abstraction abstr w state.
-
-  Hint Resolve -> vars_wipe_world_abstraction.
-  Hint Resolve <- vars_wipe_world_abstraction.
-
-  Theorem vars_crash_ok : wipe_valid abstr Vars.wipe.
-  Proof.
-    constructor; simpl; unfold Vars.wipe;
-      intros; subst; eauto.
-  Qed.
-
   Definition vars : Interface Vars.API.
     unshelve econstructor.
     - exact impl.
     - exact abstr.
     - apply impl_ok.
-    - unfold rec_noop; simpl; intros.
-      unfold prog_spec; simpl; intros.
-      inv_rexec; inv_ret; eauto.
-      remember (world_crash w').
-      generalize dependent w'.
-      unfold Vars.wipe.
-      induction H3; intros; inv_exec; eauto.
+    - cannot_crash.
     - apply init_ok.
   Defined.
 

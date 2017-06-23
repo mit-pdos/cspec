@@ -22,11 +22,12 @@ Module StatDB.
       step Mean state (Some r) state.
 
   Definition inited (state: State) := state = nil.
+  Definition crash_relation (state state' : State) := False.
 
   Definition API :=
     {|
       op_sem := @step;
-      crash_effect := fun state state' => state' = state;
+      crash_effect := crash_relation;
       init_sem := inited;
     |}.
 

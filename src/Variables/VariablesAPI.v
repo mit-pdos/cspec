@@ -34,14 +34,14 @@ Module Vars.
   | step_write : forall v val state state',
       op_step (Write v val) state tt (upd state v val).
 
-  Definition wipe state state' := state = state'.
+  Definition crash_relation state state' := False.
   Definition bg_step state state' := state = state'.
   Definition inited state := True.
 
   Definition API : InterfaceAPI Op State :=
     {|
       op_sem := pre_step bg_step (@op_step);
-      crash_effect := wipe;
+      crash_effect := crash_relation;
       init_sem := inited;
     |}.
 

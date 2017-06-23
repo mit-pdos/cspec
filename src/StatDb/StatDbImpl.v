@@ -8,6 +8,7 @@ Require Import Variables.VariablesAPI.
 Require Import Refinement.Interface.
 Require Import Refinement.ProgLang.Prog.
 Require Import Refinement.ProgLang.Hoare.
+Require Import Refinement.ProgLang.NoCrashes.
 
 Module StatDB.
 
@@ -93,7 +94,7 @@ Module StatDB.
 
             autorewrite with upd.
             rewrite H4 in H10. inversion H10; subst. f_equal. simpl. omega.
-          * admit.
+          * cannot_crash.
         + unfold prog_spec; intros.
           destruct a; simpl in *; intuition.
           inv_rexec.
@@ -140,8 +141,8 @@ Module StatDB.
               destruct s; simpl in *; try congruence; try omega.
               eauto.
               eauto.
-          * admit.
-      - admit.
+          * cannot_crash.
+      - cannot_crash.
       - eapply then_init_compose; eauto.
         unfold prog_spec; intros.
         destruct a; simpl in *; intuition.
@@ -160,12 +161,14 @@ Module StatDB.
           eauto.
           eexists; intuition.
 
-          (* XXX why is there no constraint on the initial state?? *)
           instantiate (1 := nil).
           unfold statdb_abstraction; intuition.
           reflexivity.
-        * admit.
-    Admitted.
+        * cannot_crash.
+
+      Unshelve.
+      all: eauto.
+    Defined.
 
   End Implementation.
 
