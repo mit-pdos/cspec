@@ -7,6 +7,7 @@ Require Import BadSectorDisk.BadSectorAPI.
 Require Import Refinement.Interface.
 Require Import Refinement.ProgLang.Prog.
 Require Import Refinement.ProgLang.Hoare.
+Require Import Refinement.ProgLang.NoCrashes.
 
 Module RemappedDisk.
 
@@ -23,12 +24,15 @@ Module RemappedDisk.
         Prim bd (BadSectorDisk.Read a).
 
     Definition write (a : addr) (b : block) : prog unit :=
-      bs <- Prim bd (BadSectorDisk.GetBadSector);
-      if a == bs then
-        len <- Prim bd (BadSectorDisk.DiskSize);
-        Prim bd (BadSectorDisk.Write (len-1) b)
+      len <- Prim bd (BadSectorDisk.DiskSize);
+      if a == (len-1) then
+        Ret tt
       else
-        Prim bd (BadSectorDisk.Write a b).
+        bs <- Prim bd (BadSectorDisk.GetBadSector);
+        if a == bs then
+          Prim bd (BadSectorDisk.Write (len-1) b)
+        else
+          Prim bd (BadSectorDisk.Write a b).
 
     Definition diskSize : prog nat :=
       len <- Prim bd (BadSectorDisk.DiskSize);
@@ -44,163 +48,156 @@ Module RemappedDisk.
     Definition impl : InterfaceImpl RemappedDisk.Op :=
       {| op_impl := rd_op_impl;
          recover_impl := Ret tt;
-         init_impl := Ret Initialized; |}.
+         init_impl := then_init (iInit bd) (Ret Initialized); |}.
 
     Definition remapped_abstraction (bs_state : BadSectorDisk.State) (rd_disk : RemappedDisk.State) :=
       let '(BadSectorDisk.mkState bs_disk bs_addr) := bs_state in
       size bs_disk = size rd_disk + 1 /\
-      bs_disk (size rd_disk) = rd_disk bs_addr /\
-      forall a, a <> bs_addr /\ a <> size rd_disk ->
-      bs_disk a = rd_disk a.
+      (forall a, a <> bs_addr /\ a <> size rd_disk -> bs_disk a = rd_disk a) /\
+      (bs_addr <> size rd_disk -> bs_disk (size rd_disk) = rd_disk bs_addr).
 
-    Definition refinement : Refinement RemappedDisk.State :=
-      refinement_compose
-        (refinement bd)
+    Definition abstr : Abstraction RemappedDisk.State :=
+      abstraction_compose
+        (interface_abs bd)
         {| abstraction := remapped_abstraction |}.
 
     Definition rd : Interface RemappedDisk.API.
       unshelve econstructor.
       - exact impl.
-      - exact refinement.
+      - exact abstr.
       - intros.
         destruct op; unfold op_spec;
-          apply spec_refinement_compose;
+          apply spec_abstraction_compose;
             unfold spec_impl, remapped_abstraction.
         + unfold prog_spec; intros.
           destruct a0; simpl in *; intuition.
           destruct state.
-          inv_rexec.
-          * repeat ( match goal with
-            | H: exec (Prim _ _) _ _ |- _ => eapply RExec in H
-            | H: exec (if ?cond then _ else _) _ _ |- _ => destruct cond
-            | H: rexec _ _ _ _ |- _ => eapply impl_ok in H; eauto; deex
-            end || inv_ret || inv_exec ).
+          inv_rexec; try cannot_crash.
+          exec_steps; repeat ( BadSectorDisk.inv_bg || BadSectorDisk.inv_step ).
 
-           -- simpl in *.
-              unfold pre_step in *; repeat deex.
-              repeat BadSectorDisk.inv_bg.
-              repeat BadSectorDisk.inv_step.
+          * eexists; intuition. eauto. simpl.
+            exists s. intuition.
+            eexists; intuition. reflexivity. constructor.
+            rewrite <- H11. rewrite e0.
+            replace (size s + 1 - 1) with (size s) by omega.
+            destruct (v0 == size s).
+           -- right.
+              apply disk_oob_eq.
+              rewrite e. rewrite e3. omega.
+           -- left.
+              rewrite e2; eauto.
 
-              intuition.
+          * exfalso.
+            eapply disk_inbounds_not_none.
+            2: eauto.
+            omega.
 
-              {
-                eexists; intuition. eauto. simpl.
-                exists s. intuition.
-                eexists; intuition. reflexivity. constructor. left.
-                rewrite <- H1. rewrite e0.
-                replace (size s + 1 - 1) with (size s) by omega.
-                congruence.
-              }
+          * eexists; intuition. eauto. simpl.
+            exists s. intuition.
+            eexists; intuition. reflexivity. constructor. right.
+            apply disk_oob_eq.
+            rewrite e. rewrite e0. omega.
 
-              {
-                exfalso.
-                eapply disk_inbounds_not_none.
-                2: eauto.
-                omega.
-              }
+          * eexists; intuition. eauto. simpl.
+            exists s. intuition.
+            eexists; intuition. reflexivity. constructor.
+            rewrite <- H8.
+            destruct (a == size s).
+           -- right.
+              apply disk_oob_eq.
+              rewrite e2. omega.
+           -- left.
+              rewrite e0; eauto.
 
-              {
-                eexists; intuition. eauto. simpl.
-                exists s. intuition.
-                eexists; intuition. reflexivity. constructor. right.
-                eapply disk_oob_eq. replace a with v0 by congruence.
-                omega.
-              }
+          * eexists; intuition. eauto. simpl.
+            exists s. intuition.
+            eexists; intuition. reflexivity. constructor. right.
+            apply disk_oob_eq.
+            apply disk_none_oob in H8. omega.
 
-           -- simpl in *.
-              unfold pre_step in *; repeat deex.
-              repeat BadSectorDisk.inv_bg.
-              repeat BadSectorDisk.inv_step.
-
-              intuition.
-
-              eexists; intuition. eauto. simpl.
-              exists s. intuition.
-              eexists; intuition. reflexivity. constructor.
-              case_eq (s a); intros.
-              left.
-              rewrite <- H1. rewrite e1; auto. split; eauto.
-              intro; subst.
-              rewrite disk_oob_eq in H4; try congruence. omega.
-              right; eauto.
-
-              eexists; intuition. eauto. simpl.
-              exists s. intuition.
-              eexists; intuition. reflexivity. constructor.
-              right. rewrite <- e1; eauto.
-              split; eauto.
-              intro; subst.
-              apply disk_inbounds_not_none in H4; eauto. omega.
-
-          * admit.
+          * congruence.
 
         + unfold prog_spec; intros.
           destruct a0; simpl in *; intuition.
           destruct state.
-          inv_rexec.
-          * repeat ( match goal with
-            | H: exec (Prim _ _) _ _ |- _ => eapply RExec in H
-            | H: exec (if ?cond then _ else _) _ _ |- _ => destruct cond
-            | H: rexec _ _ _ _ |- _ => eapply impl_ok in H; eauto; deex
-            end || inv_ret || inv_exec ).
+          inv_rexec; try cannot_crash.
+          exec_steps; repeat ( BadSectorDisk.inv_bg || BadSectorDisk.inv_step ).
 
-           -- replace a with v0 in * by congruence.
+          * eexists; intuition. eauto. simpl.
+            exists s. intuition.
+            eexists; intuition. reflexivity.
+            replace s with (diskUpd s a b) at 2. constructor.
+            apply diskUpd_none. apply disk_oob_eq. rewrite e. omega.
 
-              simpl in *.
-              unfold pre_step in *; repeat deex.
-              repeat BadSectorDisk.inv_bg.
-              repeat BadSectorDisk.inv_step.
+          * eexists; intuition. eauto. simpl.
+            exists (diskUpd s a b). intuition.
+            eexists; intuition. reflexivity. constructor.
 
-              intuition.
+           -- repeat rewrite diskUpd_size; omega.
 
-              eexists; intuition. eauto. simpl.
+           -- rewrite diskUpd_size in *. rewrite e2.
+              rewrite e. replace (size s + 1 - 1) with (size s) by omega.
+              repeat rewrite diskUpd_neq by congruence. eauto.
 
-              exists (diskUpd s v0 b).
-              destruct (lt_dec v0 (size s)).
+           -- rewrite e in *. replace (size s + 1 - 1) with (size s) in * by omega.
+              rewrite diskUpd_size. rewrite diskUpd_eq by omega.
+              rewrite e2 in *. rewrite diskUpd_eq; auto.
+              destruct (eq_nat_dec v1 (size s)); try congruence. omega.
 
-              {
-                intuition.
-                eexists; intuition. reflexivity. econstructor. eauto.
+          * eexists; intuition. eauto. simpl.
+            exists (diskUpd s a b). intuition.
+            eexists; intuition. reflexivity. constructor.
 
-                repeat rewrite diskUpd_size. eauto.
+           -- repeat rewrite diskUpd_size; omega.
 
-                rewrite diskUpd_size.
-                rewrite e0.
-                replace (size s + 1 - 1) with (size s) by omega.
-                rewrite diskUpd_eq by omega.
-                rewrite diskUpd_eq; eauto.
+           -- rewrite e in *. replace (size s + 1 - 1) with (size s) in * by omega.
+              destruct (a == a0).
+             ++ rewrite e2 in *.
+                destruct (lt_dec a0 (size d)).
+               ** rewrite diskUpd_eq by auto.
+                  rewrite diskUpd_eq; auto.
+                  destruct (eq_nat_dec a0 (size s)); try congruence. omega.
+               ** rewrite diskUpd_oob_eq by auto.
+                  rewrite diskUpd_oob_eq by omega. auto.
+             ++ repeat rewrite diskUpd_neq by congruence.
+                rewrite diskUpd_size in *. auto.
 
-(* XXX *)
+           -- rewrite e in *. replace (size s + 1 - 1) with (size s) in * by omega.
+              rewrite diskUpd_size in *.
+              repeat rewrite diskUpd_neq by congruence.
+              eauto.
 
+        + unfold prog_spec; intros.
+          destruct a; simpl in *; intuition.
+          destruct state.
+          inv_rexec; try cannot_crash.
+          exec_steps; repeat ( BadSectorDisk.inv_bg || BadSectorDisk.inv_step ).
 
-                rewrite diskUpd_neq with (a := v0) by auto.
-                rewrite <- e2.
-                rewrite diskUpd_neq; auto.
+          eexists; intuition. eauto. simpl.
+          exists s. intuition.
+          eexists; intuition. reflexivity.
 
-              
+          rewrite H3.
+          replace (size s + 1 - 1) with (size s) in * by omega.
+          constructor.
 
-              rewrite H0 in H13. replace (size s + 1 - 1) with (size s) in H13 by omega.
-              congruence.
+      - cannot_crash.
+      - eapply then_init_compose; eauto.
 
-           -- simpl in *.
-              unfold pre_step in *; repeat deex.
-              repeat BadSectorDisk.inv_bg.
-              repeat BadSectorDisk.inv_step.
+        unfold prog_spec; intros.
+        destruct a; simpl in *; intuition.
+        destruct state.
+        inv_rexec; try cannot_crash.
+        exec_steps; repeat ( BadSectorDisk.inv_bg || BadSectorDisk.inv_step ).
 
-              eexists; intuition. eauto. simpl.
-
-              exists s. intuition.
-              eexists; intuition. reflexivity. constructor.
-              rewrite H5 in H10 by assumption. eauto.
-
-
-      - unfold rec_noop; simpl; intros.
-        unfold prog_spec; simpl; intros.
-        inv_rexec; inv_ret; eauto.
+        eexists; intuition. eauto. simpl.
         admit.
-      - apply init_ok.
+
+      Unshelve.
+      all: eauto.
+
     Admitted.
 
   End Implementation.
 
-End BadSectorDisk.
+End RemappedDisk.

@@ -40,6 +40,15 @@ Section GenericDisks.
     unfold disk_get in *; congruence.
   Qed.
 
+  Lemma disk_none_oob : forall a d,
+      d a = None ->
+      ~a < size d.
+  Proof.
+    intros.
+    destruct (lt_dec a (size d)); eauto.
+    exfalso; eapply disk_inbounds_not_none; eauto.
+  Qed.
+
   Definition diskUpd d (a: addr) b : diskOf T.
   Proof.
     destruct (lt_dec a (size d)).

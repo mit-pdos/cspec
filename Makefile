@@ -12,7 +12,7 @@ CODE += $(wildcard src/StatDb/*.v)
 
 ## For bad sector remapping lab
 CODE += $(wildcard src/BadSectorDisk/*.v)
-# CODE += $(wildcard src/RemappedDisk/*.v)
+CODE += $(wildcard src/RemappedDisk/*.v)
 CODE += $(wildcard src/NBD/*.v)
 
 ## For disk mirroring lab

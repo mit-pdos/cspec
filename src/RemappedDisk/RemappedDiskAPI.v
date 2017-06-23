@@ -21,20 +21,20 @@ Module RemappedDisk.
       d a = Some r \/ d a = None ->
       op_step (Read a) d r d
   | step_write : forall a b (d : disk),
-      a < size d ->
       op_step (Write a b) d tt (diskUpd d a b)
-  | step_write_oob : forall a b (d : disk) d',
-      a >= size d ->
-      op_step (Write a b) d tt d'
   | step_size : forall d,
       op_step DiskSize d (size d) d.
 
-  Definition crash state state' := state = state'.
+  Definition crash_relation state state' := False.
   Definition bg_step state state' := state = state'.
+  Definition inited state := True.
 
   Definition API : InterfaceAPI Op State :=
-    {| op_sem := pre_step bg_step (@op_step);
-       crash_effect := crash; |}.
+    {|
+      op_sem := pre_step bg_step (@op_step);
+      crash_effect := crash_relation;
+      init_sem := inited;
+    |}.
 
   Ltac inv_step :=
     match goal with

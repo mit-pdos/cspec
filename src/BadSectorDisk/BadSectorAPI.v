@@ -23,7 +23,13 @@ Module BadSectorDisk.
 
   Inductive op_step : forall `(op: Op T), Semantics State T :=
   | step_read : forall a r (d : disk) bs,
-      d a = Some r \/ d a = None \/ a = bs ->
+      a <> bs -> d a = Some r ->
+      op_step (Read a) (mkState d bs) r (mkState d bs)
+  | step_read_oob : forall a r (d : disk) bs,
+      a <> bs -> d a = None ->
+      op_step (Read a) (mkState d bs) r (mkState d bs)
+  | step_read_bad : forall a r (d : disk) bs,
+      a = bs ->
       op_step (Read a) (mkState d bs) r (mkState d bs)
   | step_write : forall a b (d : disk) bs,
       op_step (Write a b) (mkState d bs) tt (mkState (diskUpd d a b) bs)
@@ -33,14 +39,14 @@ Module BadSectorDisk.
   | step_size : forall d bs,
       op_step DiskSize (mkState d bs) (size d) (mkState d bs).
 
-  Definition crash state state' := state = state'.
+  Definition crash_relation state state' := False.
   Definition bg_step state state' := state = state'.
   Definition inited state := True.
 
   Definition API : InterfaceAPI Op State :=
     {|
       op_sem := pre_step bg_step (@op_step);
-      crash_effect := crash;
+      crash_effect := crash_relation;
       init_sem := inited;
     |}.
 

@@ -11,6 +11,8 @@ Things to clean up:
 - mechanically check assumed facts to make sure students didn't state some axiom (e.g., Axiom False)
   or import NoCrashes when we wanted them to prove crashes.  (use Print Assumptions ...)
 
+- omega and subst struggles with === and =/=.  see the proof in RemappedDiskImpl.
+
 ===
 
 summer school schedule:
