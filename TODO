@@ -5,3 +5,28 @@ Things to clean up:
 
 - have a single Require Import statement that brings in all the useful things, including
   EquivDec and Omega.
+
+===
+
+summer school schedule:
+
+day 1: FSCQ talk
+  in-class refinement: StatDB
+  assign: bad sector lab to understand disks, etc
+
+night 1: work on bad sector lab
+
+day 2: talk about bad sector lab solutions
+  start talking about crash refinement
+  assign: replication lab to understand crashes
+
+night 2: work on replication lab (pre-crash?)
+
+day 3: talk about replication lab, valuset/history, ..
+  CHL paper tidbits but not the full paper
+
+night 3: more replication lab (crashes)
+
+day 4: finish replication / crash story
+  Yggdrasil
+
