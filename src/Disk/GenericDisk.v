@@ -1,4 +1,5 @@
 Require Import Automation.
+Require Import Omega.
 
 Require Export Disk.Sectors.
 Require Export SepLogic.Mem.
@@ -241,6 +242,45 @@ Section GenericDisks.
     unfold diskUpd.
     pose proof (diskMem_domain d a).
     destruct (lt_dec a (size d)); try contradiction; simpl; eauto.
+  Qed.
+
+  (**
+   * Support for shrinking a disk by one address.
+   *)
+  Definition shrink d : diskOf T.
+    case_eq (size d); intros.
+    - exact d.
+    - refine (mkDisk n (delete (diskMem d) n) _).
+      eapply sized_domain_delete_last; eauto.
+      exact (diskMem_domain d).
+  Defined.
+
+  Lemma shrink_size : forall d,
+      size d <> 0 ->
+      size d = size (shrink d) + 1.
+  Proof.
+    intros.
+    case_eq (size d); intros; try congruence.
+    unfold shrink.
+    generalize (diskMem_domain d).
+    rewrite H0.
+    intros; simpl; omega.
+  Qed.
+
+  Lemma shrink_preserves : forall d a,
+      a <> size (shrink d) ->
+      d a = (shrink d) a.
+  Proof.
+    intros.
+    case_eq (size d); intros.
+    - unfold shrink; generalize (diskMem_domain d).
+      rewrite H0; auto.
+    - unfold shrink; generalize (diskMem_domain d).
+      rewrite H0; intros.
+      simpl.
+      rewrite delete_neq; auto.
+      rewrite shrink_size in H0 by omega.
+      omega.
   Qed.
 
 End GenericDisks.

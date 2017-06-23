@@ -41,6 +41,25 @@ Proof.
   destruct matches; repeat deex; eauto.
 Qed.
 
+Theorem sized_domain_delete_last : forall V (m:mem nat V) sz sz',
+    sz = S sz' ->
+    sized_domain m sz ->
+    sized_domain (delete m sz') sz'.
+Proof.
+  unfold sized_domain; intros; subst.
+  destruct matches.
+  - specialize (H0 a).
+    destruct (lt_dec a (S sz')); try omega.
+    deex; eexists.
+    rewrite delete_neq by omega. eauto.
+  - destruct (eq_nat_dec a sz'); subst.
+    + rewrite delete_eq; auto.
+    + rewrite delete_neq by omega.
+      specialize (H0 a).
+      destruct (lt_dec a (S sz')); try omega.
+      auto.
+Qed.
+
 Theorem sized_domain_empty V : sized_domain (empty_mem (V:=V)) 0.
 Proof.
   unfold sized_domain; intros.

@@ -45,16 +45,28 @@ Module RemappedDisk.
       | RemappedDisk.DiskSize => diskSize
       end.
 
+    Definition init : prog InitResult :=
+      len <- Prim bd (BadSectorDisk.DiskSize);
+      if len == 0 then
+        Ret InitFailed
+      else
+        bs <- Prim bd (BadSectorDisk.GetBadSector);
+        if (lt_dec bs len) then
+          Ret Initialized
+        else
+          Ret InitFailed.
+
     Definition impl : InterfaceImpl RemappedDisk.Op :=
       {| op_impl := rd_op_impl;
          recover_impl := Ret tt;
-         init_impl := then_init (iInit bd) (Ret Initialized); |}.
+         init_impl := then_init (iInit bd) init; |}.
 
     Definition remapped_abstraction (bs_state : BadSectorDisk.State) (rd_disk : RemappedDisk.State) :=
       let '(BadSectorDisk.mkState bs_disk bs_addr) := bs_state in
       size bs_disk = size rd_disk + 1 /\
       (forall a, a <> bs_addr /\ a <> size rd_disk -> bs_disk a = rd_disk a) /\
-      (bs_addr <> size rd_disk -> bs_disk (size rd_disk) = rd_disk bs_addr).
+      (bs_addr <> size rd_disk -> bs_disk (size rd_disk) = rd_disk bs_addr) /\
+      bs_addr < size bs_disk.
 
     Definition abstr : Abstraction RemappedDisk.State :=
       abstraction_compose
@@ -144,6 +156,8 @@ Module RemappedDisk.
               rewrite e2 in *. rewrite diskUpd_eq; auto.
               destruct (eq_nat_dec v1 (size s)); try congruence. omega.
 
+           -- rewrite diskUpd_size. eauto.
+
           * eexists; intuition. eauto. simpl.
             exists (diskUpd s a b). intuition.
             eexists; intuition. reflexivity. constructor.
@@ -166,6 +180,8 @@ Module RemappedDisk.
               rewrite diskUpd_size in *.
               repeat rewrite diskUpd_neq by congruence.
               eauto.
+
+           -- rewrite diskUpd_size. eauto.
 
         + unfold prog_spec; intros.
           destruct a; simpl in *; intuition.
@@ -190,13 +206,37 @@ Module RemappedDisk.
         inv_rexec; try cannot_crash.
         exec_steps; repeat ( BadSectorDisk.inv_bg || BadSectorDisk.inv_step ).
 
-        eexists; intuition. eauto. simpl.
-        admit.
+        + eexists; intuition; eauto.
+
+        + eexists; intuition; eauto; simpl.
+          case_eq (d (size d - 1)); intros.
+
+          * exists (diskUpd (shrink d) v1 b).
+            rewrite diskUpd_size in *.
+            intuition.
+
+           -- apply shrink_size. congruence.
+           -- rewrite diskUpd_neq by congruence.
+              apply shrink_preserves. congruence.
+           -- rewrite shrink_size in * by congruence.
+              rewrite diskUpd_eq.
+              replace (size (shrink d) + 1 - 1) with (size (shrink d)) in * by omega.
+              auto.
+
+              (* why is [omega] too weak here? *)
+              inversion l; try omega.
+              exfalso. apply H4.
+              replace (size (shrink d) + 1) with (S (size (shrink d))) in H6 by omega.
+              congruence.
+
+          * apply disk_none_oob in H2. omega.
+
+        + eexists; intuition; eauto.
 
       Unshelve.
       all: eauto.
 
-    Admitted.
+    Defined.
 
   End Implementation.
 

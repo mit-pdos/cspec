@@ -13,6 +13,9 @@ Things to clean up:
 
 - omega and subst struggles with === and =/=.  see the proof in RemappedDiskImpl.
 
+- RemappedDisk: make sure that we can replace the abstraction relation with an abstraction function
+  as defined in the [init] part of the proof at the bottom of RemappedDiskImpl.v.
+
 ===
 
 summer school schedule:

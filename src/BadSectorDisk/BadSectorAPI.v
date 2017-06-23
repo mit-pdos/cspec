@@ -34,7 +34,6 @@ Module BadSectorDisk.
   | step_write : forall a b (d : disk) bs,
       op_step (Write a b) (mkState d bs) tt (mkState (diskUpd d a b) bs)
   | step_get_bs : forall d bs,
-      bs < size d ->
       op_step GetBadSector (mkState d bs) bs (mkState d bs)
   | step_size : forall d bs,
       op_step DiskSize (mkState d bs) (size d) (mkState d bs).
