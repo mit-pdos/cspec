@@ -159,6 +159,8 @@ Module ReplicatedDisk.
         (interface_abs td)
         {| abstraction := rd_layer_abstraction |}.
 
+
+
     Definition rd : Interface ReplicatedDisk.API.
       unshelve econstructor.
       - exact impl.
@@ -167,7 +169,75 @@ Module ReplicatedDisk.
         destruct op; unfold op_spec;
           apply spec_abstraction_compose;
             unfold spec_impl, abstr.
-        + unfold prog_spec; intros.
+        + (* Read *)
+          unfold prog_spec; intros.
+          destruct a0; simpl in *; intuition.
+          inv_rexec.
+          -- inv_exec.
+            (* no recovery *)
+            destruct v0.
+            exec_steps;  repeat ( ReplicatedDisk.inv_bg || ReplicatedDisk.inv_step ).
+            eexists.
+            intuition; eauto.
+            eexists s. split.
+            eexists s.
+            split; eauto.
+            constructor.
+            constructor.
+            TD.inv_step.
+            TD.inv_bg.
+            {
+              unfold rd_layer_abstraction, rd_invariant in H3.
+              intuition. subst.
+              unfold abstraction_f.
+              destruct state'; try congruence.
+              destruct disk0; try congruence. simpl in *.
+              case_eq (d a); intros.
+              - rewrite H3 in H9. inversion H9. left. auto.
+              - right; auto.
+            }
+            {
+              unfold rd_layer_abstraction, rd_invariant in H3.
+              intuition; subst.
+              unfold abstraction_f; simpl in *.
+              inversion H9.
+            }
+            {
+              unfold rd_layer_abstraction, rd_invariant in H3.
+              intuition; subst.
+              unfold abstraction_f; simpl in *.
+              case_eq (d_1 a); intros.
+              - rewrite H1 in H9. inversion H9. left. auto.
+              - right; auto.
+            }
+            {
+              TD.inv_step.
+              TD.inv_bg.
+              auto.
+              unfold rd_layer_abstraction in *; simpl in *.  intuition.
+              congruence.
+              unfold rd_layer_abstraction in *; simpl in *.  intuition.
+            }
+            (* v0 failed, read from disk 1 *)
+            admit.
+          -- (* crashed during recovery *)
+            admit.
+        + (* Write *)
+          unfold prog_spec; intros.
+          destruct a0; simpl in *; intuition.
+          inv_rexec.
+          admit.
+          admit.
+        + (* diskSize *)
+          unfold prog_spec; intros.
+          destruct a; simpl in *; intuition.
+          inv_rexec.
+          admit.
+          admit.
+    - 
+
+
+
 
       Unshelve.
       all: eauto.
