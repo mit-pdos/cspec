@@ -15,6 +15,9 @@ CODE += $(wildcard src/BadSectorDisk/*.v)
 CODE += $(wildcard src/RemappedDisk/*.v)
 CODE += $(wildcard src/NBD/*.v)
 
+## For replicated disk lab
+CODE += $(wildcard src/ReplicatedDisk/*.v)
+
 ## For disk mirroring lab
 CODE += $(wildcard src/TwoDisk/*.v)
 CODE += $(wildcard src/SeqDisk/ReplicatedDisk/*.v)
