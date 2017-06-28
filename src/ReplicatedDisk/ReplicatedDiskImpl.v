@@ -159,7 +159,117 @@ Module ReplicatedDisk.
         (interface_abs td)
         {| abstraction := rd_layer_abstraction |}.
 
+    Lemma td_read_ok: forall state state' state'0 w w' s a v,
+      rd_layer_abstraction state s -> 
+      abstraction (interface_abs td) w state ->
+      abstraction (interface_abs td) w' state' ->
+      TD.bg_failure state state'0 ->
+      TD.op_step (TD.Read d0 a) state'0 (Working v) state' ->
+      (s a = Some v \/ s a = None) /\ rd_layer_abstraction state' s.
+    Proof.
+      intros.
+      TD.inv_step.
+      unfold rd_layer_abstraction, rd_invariant in *.
+      TD.inv_bg; simpl in *.  
+      - intuition. subst.
+        unfold abstraction_f in *.
+        destruct state'; try congruence.
+        destruct disk0; try congruence. simpl in *.
+        case_eq (d a); intros.
+        rewrite H in H8. inversion H8.
+        left; auto.
+        right; auto.
+      - intuition. subst.
+        inversion H8. 
+        subst; auto.
+      - intuition. subst.
+        case_eq (d_1 a); intros.
+        rewrite H in H8. inversion H8.
+        left; auto.
+        right; auto.
+    Qed.
 
+    Lemma td_read1_ok: forall state state' state'0 w w' s a v,
+      rd_layer_abstraction state s -> 
+      abstraction (interface_abs td) w state ->
+      abstraction (interface_abs td) w' state' ->
+      TD.bg_failure state state'0 ->
+      TD.op_step (TD.Read d1 a) state'0 (Working v) state' ->
+      (s a = Some v \/ s a = None) /\ rd_layer_abstraction state' s.
+    Proof.
+      intros.
+      TD.inv_step.
+      unfold rd_layer_abstraction, rd_invariant in *.
+      TD.inv_bg; simpl in *.  
+      - intuition. subst.
+        unfold abstraction_f in *.
+        destruct state'; try congruence.
+        destruct disk0; try congruence. simpl in *.
+    Admitted.
+
+
+    (* read without recovery *)
+    Lemma read_ok: forall a v w w' state s,
+      abstraction (interface_abs td) w state ->
+      rd_layer_abstraction state s -> 
+      exec (read a) w (Finished v w') ->
+      exists state',
+        abstraction (interface_abs td) w' state' /\
+        (exists state2',
+           pre_step ReplicatedDisk.bg_step (@ReplicatedDisk.op_step)
+             (ReplicatedDisk.Read a) s v state2' /\
+           rd_layer_abstraction state' state2').
+    Proof.
+      intros.
+      destruct state.
+      inv_exec.
+      case_eq v0; intros.
+      (* read from disk 0 *)
+      eapply RExec in H7.
+      eapply impl_ok in H7; eauto. deex.
+      exec_steps; repeat ( ReplicatedDisk.inv_bg || ReplicatedDisk.inv_step ).
+      eexists.
+      intuition; eauto.
+      eexists s. split.
+      eexists s.
+      split; eauto.
+      constructor.
+      constructor.
+      eapply td_read_ok in H1 as H1'; eauto.
+      intuition.
+      eapply td_read_ok in H1 as H1'; eauto.
+      intuition.
+      simpl; auto.
+      (* disk 1 failed *)
+      rewrite H1 in H9.
+      eapply RExec in H7.
+      inv_exec.
+      case_eq v1; intros.
+      rewrite H1 in H11.
+      + eapply RExec in H8.
+        eapply impl_ok in H8; eauto. deex.
+        exec_steps; repeat ( ReplicatedDisk.inv_bg || ReplicatedDisk.inv_step ).
+        eexists.
+        intuition; eauto.
+        exists s. split.
+        exists s. split; eauto.
+        constructor.
+        constructor.
+        eapply td_read1_ok in H1 as H1'; eauto.
+        intuition.
+        intuition.
+        inversion H3. subst.
+        admit.
+        admit.
+        simpl; auto.
+      + (* XXX impossible? or r = Failed? change spec of ReplicatedDiskAPI *)
+        rewrite H1 in H11.
+        eapply RExec in H8.
+        eapply impl_ok in H8; eauto. deex.
+        exec_steps; repeat ( ReplicatedDisk.inv_bg || ReplicatedDisk.inv_step ).
+        inversion H3. subst.
+        eexists.    
+    Admitted.
 
     Definition rd : Interface ReplicatedDisk.API.
       unshelve econstructor.
@@ -173,54 +283,9 @@ Module ReplicatedDisk.
           unfold prog_spec; intros.
           destruct a0; simpl in *; intuition.
           inv_rexec.
-          -- inv_exec.
-            (* no recovery *)
-            destruct v0.
-            exec_steps;  repeat ( ReplicatedDisk.inv_bg || ReplicatedDisk.inv_step ).
-            eexists.
-            intuition; eauto.
-            eexists s. split.
-            eexists s.
-            split; eauto.
-            constructor.
-            constructor.
-            TD.inv_step.
-            TD.inv_bg.
-            {
-              unfold rd_layer_abstraction, rd_invariant in H3.
-              intuition. subst.
-              unfold abstraction_f.
-              destruct state'; try congruence.
-              destruct disk0; try congruence. simpl in *.
-              case_eq (d a); intros.
-              - rewrite H3 in H9. inversion H9. left. auto.
-              - right; auto.
-            }
-            {
-              unfold rd_layer_abstraction, rd_invariant in H3.
-              intuition; subst.
-              unfold abstraction_f; simpl in *.
-              inversion H9.
-            }
-            {
-              unfold rd_layer_abstraction, rd_invariant in H3.
-              intuition; subst.
-              unfold abstraction_f; simpl in *.
-              case_eq (d_1 a); intros.
-              - rewrite H1 in H9. inversion H9. left. auto.
-              - right; auto.
-            }
-            {
-              TD.inv_step.
-              TD.inv_bg.
-              auto.
-              unfold rd_layer_abstraction in *; simpl in *.  intuition.
-              congruence.
-              unfold rd_layer_abstraction in *; simpl in *.  intuition.
-            }
-            (* v0 failed, read from disk 1 *)
-            admit.
-          -- (* crashed during recovery *)
+          -- (* no recovery *)
+            eapply read_ok; eauto.
+          -- (* w. recovery *)
             admit.
         + (* Write *)
           unfold prog_spec; intros.
@@ -234,10 +299,8 @@ Module ReplicatedDisk.
           inv_rexec.
           admit.
           admit.
-    - 
-
-
-
+    - admit. 
+    - admit.
 
       Unshelve.
       all: eauto.
