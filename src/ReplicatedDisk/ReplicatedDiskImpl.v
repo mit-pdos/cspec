@@ -159,6 +159,19 @@ Module ReplicatedDisk.
         (interface_abs td)
         {| abstraction := rd_layer_abstraction |}.
 
+    Lemma rd_layer_abstraction_failure: forall s state state',
+      rd_layer_abstraction state s ->
+      TD.bg_failure state state' ->
+      rd_layer_abstraction state' s.
+    Proof.
+      intros.
+      unfold rd_layer_abstraction, rd_invariant in *.
+      unfold abstraction_f in *.
+      TD.inv_bg; simpl in *; eauto.
+      intuition; subst; auto.
+      intuition.
+    Qed.
+
     Lemma td_read0_ok: forall state state' state'0 w w' s a v,
       rd_layer_abstraction state s -> 
       abstraction (interface_abs td) w state ->
@@ -169,24 +182,20 @@ Module ReplicatedDisk.
     Proof.
       intros.
       TD.inv_step.
+      eapply rd_layer_abstraction_failure in H2 as H2'; eauto.
+      split; auto.
       unfold rd_layer_abstraction, rd_invariant in *.
-      TD.inv_bg; simpl in *.  
-      - intuition. subst.
-        unfold abstraction_f in *.
-        destruct state'; try congruence.
-        destruct disk0; try congruence. simpl in *.
-        case_eq (d a); intros.
-        rewrite H in H8. inversion H8.
-        left; auto.
-        right; auto.
-      - intuition. subst.
-        inversion H8. 
-        subst; auto.
-      - intuition. subst.
-        case_eq (d_1 a); intros.
-        rewrite H in H8. inversion H8.
-        left; auto.
-        right; auto.
+      destruct state'; try congruence.
+      destruct disk0; try congruence. simpl in *.
+      destruct disk1; try congruence. simpl in *.
+      case_eq (d a); intros.
+      rewrite H3 in H8. inversion H8.
+      - intuition. subst; auto.
+      - intuition. subst; auto. 
+      - case_eq (d a); intros.
+        rewrite H3 in H8. inversion H8; subst.
+        intuition; subst; auto. 
+        intuition; subst; auto. 
     Qed.
 
     Lemma td_read1_ok: forall state state' state'0 state'1 state'2 w w'0 w' s a v,
@@ -201,9 +210,17 @@ Module ReplicatedDisk.
     Proof.
       intros.
       TD.inv_step.
+      eapply rd_layer_abstraction_failure in H3 as H3'; eauto.
+      TD.inv_bg; simpl in *.
+      TD.inv_bg; simpl in *.
+
+
       unfold rd_layer_abstraction, rd_invariant in *.
+      unfold abstraction_f in *.
       TD.inv_bg; simpl in *.
       TD.inv_bg; simpl in *.
+
+
       (* XXX need to exploit in some states disk0 is None *)
       - intuition. subst.
         unfold abstraction_f in *.
