@@ -172,6 +172,53 @@ Module ReplicatedDisk.
       intuition.
     Qed.
 
+   (** Get a particular disk from a state by id. *)
+    Definition get_disk (i:diskId) (state:TD.State) :=
+      match i with
+      | d0 => TD.disk0 state
+      | d1 => TD.disk1 state
+      end.
+
+    Definition get_value (state: TD.State) id a v :=
+       match (get_disk id state) with
+         | Some d =>
+             match d a with
+             | Some b0 => Working v = Working b0
+             | None => exists b : block, Working v = Working b
+             end
+         | None => Working v = Failed
+         end.
+
+    Lemma rd_layer_abstraction_value: forall state id a v s,
+        rd_layer_abstraction state s ->
+        get_value state id a v ->
+        s a = Some v \/ s a = None.
+    Proof.
+      intros.
+      unfold get_value, get_disk in H0.
+      unfold rd_layer_abstraction, rd_invariant, abstraction_f in H.
+      destruct state; simpl in *.
+      destruct disk0; simpl in *.
+      - intuition; subst.
+        destruct id.
+        + destruct (d a).
+          inversion H0. left; auto.
+          right; auto.
+        + destruct disk1; simpl in *; subst.
+          destruct (d0 a); subst.
+          inversion H0; subst. left. auto.
+          right; auto.
+          inversion H0.
+      - destruct disk1; simpl in *.
+        + intuition; subst.
+          destruct id.
+          inversion H0.
+          destruct (d a).
+          inversion H0. left; auto.
+          right; auto.
+        + intuition; subst.
+    Qed.
+
     Lemma td_read0_ok: forall state state' state'0 w w' s a v,
       rd_layer_abstraction state s -> 
       abstraction (interface_abs td) w state ->
@@ -182,20 +229,10 @@ Module ReplicatedDisk.
     Proof.
       intros.
       TD.inv_step.
+      simpl in *.
       eapply rd_layer_abstraction_failure in H2 as H2'; eauto.
       split; auto.
-      unfold rd_layer_abstraction, rd_invariant in *.
-      destruct state'; try congruence.
-      destruct disk0; try congruence. simpl in *.
-      destruct disk1; try congruence. simpl in *.
-      case_eq (d a); intros.
-      rewrite H3 in H8. inversion H8.
-      - intuition. subst; auto.
-      - intuition. subst; auto. 
-      - case_eq (d a); intros.
-        rewrite H3 in H8. inversion H8; subst.
-        intuition; subst; auto. 
-        intuition; subst; auto. 
+      eapply rd_layer_abstraction_value with (id := d0) in H2'; eauto.
     Qed.
 
     Lemma td_read1_ok: forall state state' state'0 state'1 state'2 w w'0 w' s a v,
@@ -214,8 +251,9 @@ Module ReplicatedDisk.
       TD.inv_step.
       eapply rd_layer_abstraction_failure in H3 as H3'; eauto.
       eapply rd_layer_abstraction_failure in H4 as H4'; eauto.
+      simpl in *.
       split; eauto.
-      case_eq (TD.get_disk d0 state'); intros.
+      case_eq (TD.get_disk d0 state'); intros; simpl in *.
       rewrite H5 in H10; simpl in *.
       - destruct (d a); subst; simpl in *.
         + inversion H10.
