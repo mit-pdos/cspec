@@ -214,45 +214,32 @@ Module ReplicatedDisk.
       TD.inv_step.
       eapply rd_layer_abstraction_failure in H3 as H3'; eauto.
       eapply rd_layer_abstraction_failure in H4 as H4'; eauto.
-      split; auto.
-      unfold rd_layer_abstraction, rd_invariant in *.
-      destruct state'; try congruence. simpl in *.
-      destruct state'1; try congruence. simpl in *.
-      destruct disk0; try congruence. simpl in *.
-      destruct disk1; try congruence. simpl in *.
-      destruct disk2; try congruence. simpl in *.
-      destruct disk3; try congruence. simpl in *.
-      intuition; subst.
-      - destruct ((abstraction_f state) a).
-        inversion H11; auto.
-        right; auto.
-      - destruct disk3; try congruence. simpl in *.
-        intuition; subst.
-        destruct ((abstraction_f state) a).
-        inversion H11; auto.
-        right; auto.
-      - destruct disk3; try congruence. simpl in *.
-        destruct disk2; try congruence. simpl in *.
-        + intuition; subst.
-          destruct ((abstraction_f state) a).
-          inversion H11; auto.
-          right; auto.
-        + intuition; subst.
-          destruct ((abstraction_f state) a).
-          inversion H11; auto.
-          right; auto.
-      - destruct disk3; try congruence. simpl in *.
-        destruct disk2; try congruence. simpl in *.
-        destruct disk1; try congruence. simpl in *.
-        + intuition; subst.
-          destruct ((abstraction_f state) a).
-          inversion H11; auto.
-          right; auto.
-        + intuition; subst.
-        + intuition; subst.
-          destruct ((abstraction_f state) a).
-          inversion H11; auto.
-          right; auto.
+      split; eauto.
+      case_eq (TD.get_disk d0 state'); intros.
+      rewrite H5 in H10; simpl in *.
+      - destruct (d a); subst; simpl in *.
+        + inversion H10.
+        + deex. inversion H6.
+      - case_eq (TD.disk1 state'1); intros.
+        + simpl in H11.
+          unfold rd_layer_abstraction, rd_invariant, abstraction_f in H4'; simpl in *.
+          intuition.
+          destruct state'1; simpl in *.
+          destruct disk0.
+          -- subst. inversion H7; subst.
+           destruct (d a); subst; simpl in *.
+           rewrite H5 in H10. inversion H11; subst. left. auto.
+           right. auto.
+          -- 
+           destruct disk1.
+           ++ subst. inversion H6; subst.
+            destruct (d a); subst; simpl in *.
+            inversion H11. left. auto.
+            right; auto.
+           ++ inversion H6.
+        + simpl in *.
+          rewrite H6 in H11.
+          inversion H11.
     Qed.
 
     (* read without recovery *)
