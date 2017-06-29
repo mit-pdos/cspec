@@ -205,35 +205,55 @@ Module ReplicatedDisk.
       abstraction (interface_abs td) w' state'1 ->
       TD.bg_failure state state'0 ->
       TD.bg_failure state' state'2 ->
+      TD.op_step (TD.Read d0 a) state'0 Failed state' ->
       TD.op_step (TD.Read d1 a) state'2 (Working v) state'1 ->
       (s a = Some v \/ s a = None) /\ rd_layer_abstraction state'1 s.
     Proof.
       intros.
       TD.inv_step.
+      TD.inv_step.
       eapply rd_layer_abstraction_failure in H3 as H3'; eauto.
-      TD.inv_bg; simpl in *.
-      TD.inv_bg; simpl in *.
-
-
+      eapply rd_layer_abstraction_failure in H4 as H4'; eauto.
+      split; auto.
       unfold rd_layer_abstraction, rd_invariant in *.
-      unfold abstraction_f in *.
-      TD.inv_bg; simpl in *.
-      TD.inv_bg; simpl in *.
-
-
-      (* XXX need to exploit in some states disk0 is None *)
-      - intuition. subst.
-        unfold abstraction_f in *.
-        destruct state'0; try congruence.
-        destruct disk0; try congruence. simpl in *.
-        destruct disk1; subst; try congruence. simpl in *.
-        destruct (TD.disk1 state'1); simpl in *.
-        case_eq (d a); intros.
-        rewrite H in H10.
-        inversion H10; subst.
-        left; auto.
-    Admitted.
-
+      destruct state'; try congruence. simpl in *.
+      destruct state'1; try congruence. simpl in *.
+      destruct disk0; try congruence. simpl in *.
+      destruct disk1; try congruence. simpl in *.
+      destruct disk2; try congruence. simpl in *.
+      destruct disk3; try congruence. simpl in *.
+      intuition; subst.
+      - destruct ((abstraction_f state) a).
+        inversion H11; auto.
+        right; auto.
+      - destruct disk3; try congruence. simpl in *.
+        intuition; subst.
+        destruct ((abstraction_f state) a).
+        inversion H11; auto.
+        right; auto.
+      - destruct disk3; try congruence. simpl in *.
+        destruct disk2; try congruence. simpl in *.
+        + intuition; subst.
+          destruct ((abstraction_f state) a).
+          inversion H11; auto.
+          right; auto.
+        + intuition; subst.
+          destruct ((abstraction_f state) a).
+          inversion H11; auto.
+          right; auto.
+      - destruct disk3; try congruence. simpl in *.
+        destruct disk2; try congruence. simpl in *.
+        destruct disk1; try congruence. simpl in *.
+        + intuition; subst.
+          destruct ((abstraction_f state) a).
+          inversion H11; auto.
+          right; auto.
+        + intuition; subst.
+        + intuition; subst.
+          destruct ((abstraction_f state) a).
+          inversion H11; auto.
+          right; auto.
+    Qed.
 
     (* read without recovery *)
     Lemma read_ok: forall a v w w' state s,
