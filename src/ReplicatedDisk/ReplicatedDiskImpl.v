@@ -221,7 +221,6 @@ Module ReplicatedDisk.
            rd_layer_abstraction state' state2').
     Proof.
       intros.
-      destruct state.
       inv_exec.
       case_eq v0; intros.
       (* read from disk 0 *)
@@ -246,7 +245,8 @@ Module ReplicatedDisk.
       inv_exec.
       case_eq v1; intros.
       rewrite H1 in H11.
-      + eapply RExec in H8.
+      + eapply impl_ok in H7; eauto. deex.
+        exec_steps; repeat ( ReplicatedDisk.inv_bg || ReplicatedDisk.inv_step ).
         eapply impl_ok in H8; eauto. deex.
         exec_steps; repeat ( ReplicatedDisk.inv_bg || ReplicatedDisk.inv_step ).
         eexists.
@@ -255,12 +255,13 @@ Module ReplicatedDisk.
         exists s. split; eauto.
         constructor.
         constructor.
-        eapply td_read1_ok in H1 as H1'; eauto.
+        eapply td_read1_ok in H6 as H6'; eauto.
         intuition.
+        admit.
+        eapply td_read1_ok in H6 as H6'; eauto.
         intuition.
-        inversion H3. subst.
         admit.
-        admit.
+        simpl; auto.
         simpl; auto.
       + (* XXX impossible? or r = Failed? change spec of ReplicatedDiskAPI *)
         rewrite H1 in H11.
