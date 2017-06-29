@@ -159,7 +159,7 @@ Module ReplicatedDisk.
         (interface_abs td)
         {| abstraction := rd_layer_abstraction |}.
 
-    Lemma td_read_ok: forall state state' state'0 w w' s a v,
+    Lemma td_read0_ok: forall state state' state'0 w w' s a v,
       rd_layer_abstraction state s -> 
       abstraction (interface_abs td) w state ->
       abstraction (interface_abs td) w' state' ->
@@ -189,22 +189,32 @@ Module ReplicatedDisk.
         right; auto.
     Qed.
 
-    Lemma td_read1_ok: forall state state' state'0 w w' s a v,
+    Lemma td_read1_ok: forall state state' state'0 state'1 state'2 w w'0 w' s a v,
       rd_layer_abstraction state s -> 
       abstraction (interface_abs td) w state ->
-      abstraction (interface_abs td) w' state' ->
+      abstraction (interface_abs td) w'0 state' ->
+      abstraction (interface_abs td) w' state'1 ->
       TD.bg_failure state state'0 ->
-      TD.op_step (TD.Read d1 a) state'0 (Working v) state' ->
-      (s a = Some v \/ s a = None) /\ rd_layer_abstraction state' s.
+      TD.bg_failure state' state'2 ->
+      TD.op_step (TD.Read d1 a) state'2 (Working v) state'1 ->
+      (s a = Some v \/ s a = None) /\ rd_layer_abstraction state'1 s.
     Proof.
       intros.
       TD.inv_step.
       unfold rd_layer_abstraction, rd_invariant in *.
-      TD.inv_bg; simpl in *.  
+      TD.inv_bg; simpl in *.
+      TD.inv_bg; simpl in *.
+      (* XXX need to exploit in some states disk0 is None *)
       - intuition. subst.
         unfold abstraction_f in *.
-        destruct state'; try congruence.
+        destruct state'0; try congruence.
         destruct disk0; try congruence. simpl in *.
+        destruct disk1; subst; try congruence. simpl in *.
+        destruct (TD.disk1 state'1); simpl in *.
+        case_eq (d a); intros.
+        rewrite H in H10.
+        inversion H10; subst.
+        left; auto.
     Admitted.
 
 
@@ -234,9 +244,9 @@ Module ReplicatedDisk.
       split; eauto.
       constructor.
       constructor.
-      eapply td_read_ok in H1 as H1'; eauto.
+      eapply td_read0_ok in H1 as H1'; eauto.
       intuition.
-      eapply td_read_ok in H1 as H1'; eauto.
+      eapply td_read0_ok in H1 as H1'; eauto.
       intuition.
       simpl; auto.
       (* disk 1 failed *)
@@ -255,15 +265,13 @@ Module ReplicatedDisk.
         exists s. split; eauto.
         constructor.
         constructor.
-        eapply td_read1_ok in H6 as H6'; eauto.
+        eapply td_read1_ok with (state' := state') in H6 as H6'; eauto.
         intuition.
-        admit.
-        eapply td_read1_ok in H6 as H6'; eauto.
+        eapply td_read1_ok with (state' := state') in H6 as H6'; eauto.
         intuition.
-        admit.
         simpl; auto.
         simpl; auto.
-      + (* XXX impossible? or r = Failed? change spec of ReplicatedDiskAPI *)
+      + (* XXX  r = Failed. change spec of ReplicatedDiskAPI *)
         rewrite H1 in H11.
         eapply RExec in H8.
         eapply impl_ok in H8; eauto. deex.
