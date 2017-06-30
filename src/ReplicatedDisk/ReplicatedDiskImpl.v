@@ -253,25 +253,20 @@ Module ReplicatedDisk.
         + intuition; subst.
     Qed.
 
-    Lemma td_read0_ok: forall state state' state'0 w w' s a v,
+    Lemma td_read0_ok: forall state state' state'0 s a v,
       rd_abstraction state s -> 
-      abstraction (interface_abs td) w state ->
-      abstraction (interface_abs td) w' state' ->
       TD.bg_failure state state'0 ->
       TD.op_step (TD.Read d0 a) state'0 (Working v) state' ->
       forall b : block, s a = Some b -> v = b.
     Proof.
       intros.
       TD.inv_step.
-      eapply rd_abstraction_failure in H2 as H2'; eauto.
-      eapply rd_abstraction_read with (id := d0) in H2' as H2''; eauto.
+      eapply rd_abstraction_failure in H0 as H0'; eauto.
+      eapply rd_abstraction_read with (id := d0) in H0' as H0''; eauto.
     Qed.
 
-    Lemma td_read1_ok: forall state state' state'0 state'1 state'2 w w'0 w' s a v,
+    Lemma td_read1_ok: forall state state' state'0 state'1 state'2  s a v,
       rd_abstraction state s -> 
-      abstraction (interface_abs td) w state ->
-      abstraction (interface_abs td) w'0 state' ->
-      abstraction (interface_abs td) w' state'1 ->
       TD.bg_failure state state'0 ->
       TD.bg_failure state' state'2 ->
       TD.op_step (TD.Read d0 a) state'0 Failed state' ->
@@ -281,9 +276,9 @@ Module ReplicatedDisk.
       intros.
       TD.inv_step.
       TD.inv_step.
-      eapply rd_abstraction_failure in H4 as H4'; eauto.
-      eapply rd_abstraction_read with (state := state'1) in H4' as H4''; eauto.
-      eapply rd_abstraction_failure in H3 as H3'; eauto.
+      eapply rd_abstraction_failure in H1 as H1'; eauto.
+      eapply rd_abstraction_read with (state := state'1) in H1' as H1''; eauto.
+      eapply rd_abstraction_failure in H0 as H0'; eauto.
     Qed.
 
     Lemma td_read_none_ok: forall s a state' state'0 state'2 state'1,
