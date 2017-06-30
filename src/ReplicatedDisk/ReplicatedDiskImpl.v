@@ -286,11 +286,9 @@ Module ReplicatedDisk.
       eapply rd_abstraction_failure in H3 as H3'; eauto.
     Qed.
 
-    Lemma td_read_none_ok: forall s a state state' state'0 state'2 state'1,
-      rd_abstraction state s ->
-      TD.bg_failure state state'0 ->
+    Lemma td_read_none_ok: forall s a state' state'0 state'2 state'1,
       TD.op_step (TD.Read d0 a) state'0 Failed state' ->
-      TD.bg_failure state' state'2 ->
+      TD.bg_failure state' state'2  ->
       TD.op_step (TD.Read d1 a) state'2 Failed state'1 ->
       forall b : block, s a = Some b -> block0 = b.
     Proof.
@@ -300,23 +298,22 @@ Module ReplicatedDisk.
       simpl in *.
       intros.
       case_eq (TD.disk1 state'1); intros.
-      rewrite H1 in H9.
+      rewrite H in H7.
       - destruct (d a).
-        -- inversion H9.
-        -- deex. inversion H3.
+        -- inversion H7.
+        -- deex. inversion H1.
       - case_eq (TD.disk0 state'); intros.
-        rewrite H3 in H8.
-        -- destruct (d a). inversion H8.
-          deex. inversion H5.
+        rewrite H1 in H6.
+        -- destruct (d a). inversion H6.
+          deex. inversion H3.
         -- 
-          inversion H2; subst; eauto.
+          inversion H0; subst; eauto.
           ++ 
-            apply both_disks_not_missing in H1; auto.
+            apply both_disks_not_missing in H; auto.
             exfalso; auto.
+          ++ simpl in *. inversion H.
           ++ simpl in *. inversion H1.
-          ++ simpl in *. inversion H3.
     Qed.
-
 
     (* read without recovery *)
     Lemma read_ok: forall a v w w' state s,
