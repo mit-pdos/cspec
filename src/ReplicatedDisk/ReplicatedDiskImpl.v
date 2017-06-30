@@ -275,6 +275,38 @@ Module ReplicatedDisk.
       eapply rd_abstraction_failure in H3 as H3'; eauto.
     Qed.
 
+    Lemma td_read_none_ok: forall s a state state' state'0 state'2 state'1,
+      rd_abstraction state s ->
+      TD.bg_failure state state'0 ->
+      TD.op_step (TD.Read d0 a) state'0 Failed state' ->
+      TD.bg_failure state' state'2 ->
+      TD.op_step (TD.Read d1 a) state'2 Failed state'1 ->
+      forall b : block, s a = Some b -> block0 = b.
+    Proof.
+      intros.
+      TD.inv_step.
+      TD.inv_step.
+      simpl in *.
+      intros.
+      case_eq (TD.disk1 state'1); intros.
+      rewrite H1 in H9.
+      - destruct (d a).
+        -- inversion H9.
+        -- deex. inversion H3.
+      - case_eq (TD.disk0 state'); intros.
+        rewrite H3 in H8.
+        -- destruct (d a). inversion H8.
+          deex. inversion H5.
+        -- 
+          inversion H2; subst; eauto.
+          ++ 
+            apply both_disks_not_missing in H1; auto.
+            exfalso; auto.
+          ++ simpl in *. inversion H1.
+          ++ simpl in *. inversion H3.
+    Qed.
+
+
     (* read without recovery *)
     Lemma read_ok: forall a v w w' state s,
       abstraction (interface_abs td) w state ->
@@ -341,33 +373,12 @@ Module ReplicatedDisk.
         exists s. split. eauto.
         constructor.
         constructor.
-        TD.inv_step.
-        TD.inv_step.
-        simpl in *.
-        intros.
-        case_eq (TD.disk1 state'1); intros.
-        rewrite H6 in H11.
-        - destruct (d a).
-          -- inversion H11.
-          -- deex. inversion H7.
-        - case_eq (TD.disk0 state'); intros.
-          rewrite H7 in H10.
-          -- destruct (d a). inversion H10.
-            deex. inversion H8.
-          -- 
-            eapply rd_abstraction_failure in H1 as H1'; eauto. 
-            eapply rd_abstraction_failure in H5 as H5'; eauto. 
-            inversion H5; subst; eauto.
-            ++ 
-              apply both_disks_not_missing in H6; auto.
-              exfalso; auto.
-            ++ simpl in *. inversion H7.
-            ++ simpl in *. inversion H7.
-         - eapply rd_abstraction_failure_op. 2: eassumption.
-           eapply rd_abstraction_failure in H1 as H1'; eauto. 
-           eapply rd_abstraction_failure in H5 as H5'; eauto. 
-           eapply rd_abstraction_failure_op. 2: eassumption.
-          auto.
+        eapply td_read_none_ok; eauto.
+        eapply rd_abstraction_failure_op. 2: eassumption.
+        eapply rd_abstraction_failure in H1 as H1'; eauto. 
+        eapply rd_abstraction_failure in H5 as H5'; eauto. 
+        eapply rd_abstraction_failure_op. 2: eassumption.
+        auto.
       - simpl. auto.
       - simpl. auto.
      Unshelve.
