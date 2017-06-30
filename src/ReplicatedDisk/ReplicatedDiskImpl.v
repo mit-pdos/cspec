@@ -205,6 +205,19 @@ Module ReplicatedDisk.
     Qed.
 
 
+    Ltac rd_trans := 
+      repeat match goal with
+      |  [ H : TD.op_step (TD.Read _ _) ?state (Working _) ?state' |- 
+           rd_abstraction ?state' _ ] => idtac H;
+           eapply rd_abstraction_op; [|apply H]
+      |  [ H : TD.op_step (TD.Read _ _) ?state Failed ?state' |-
+           rd_abstraction ?state' _ ] => 
+         eapply rd_abstraction_failure_op; [|apply H]
+      |  [ H : TD.bg_failure _ ?state' |- rd_abstraction ?state' _ ] =>
+           eapply rd_abstraction_failure; [|apply H]
+      end.
+
+
    (** Get a particular disk from a state by id. *)
     Definition get_disk (i:diskId) (state:TD.State) :=
       match i with
@@ -253,21 +266,18 @@ Module ReplicatedDisk.
         + intuition; subst.
     Qed.
 
-    Lemma td_read0_ok: forall state state' state'0 s a v,
-      rd_abstraction state s -> 
-      TD.bg_failure state state'0 ->
+    Lemma td_read0_ok: forall state' state'0 s a v,
+      rd_abstraction state' s -> 
       TD.op_step (TD.Read d0 a) state'0 (Working v) state' ->
       forall b : block, s a = Some b -> v = b.
     Proof.
       intros.
       TD.inv_step.
-      eapply rd_abstraction_failure in H0 as H0'; eauto.
-      eapply rd_abstraction_read with (id := d0) in H0' as H0''; eauto.
+      eapply rd_abstraction_read with (id := d0); eauto.
     Qed.
 
-    Lemma td_read1_ok: forall state state' state'0 state'1 state'2  s a v,
-      rd_abstraction state s -> 
-      TD.bg_failure state state'0 ->
+    Lemma td_read1_ok: forall state' state'0 state'1 state'2  s a v,
+      rd_abstraction state'1 s ->
       TD.bg_failure state' state'2 ->
       TD.op_step (TD.Read d0 a) state'0 Failed state' ->
       TD.op_step (TD.Read d1 a) state'2 (Working v) state'1 ->
@@ -276,9 +286,7 @@ Module ReplicatedDisk.
       intros.
       TD.inv_step.
       TD.inv_step.
-      eapply rd_abstraction_failure in H1 as H1'; eauto.
-      eapply rd_abstraction_read with (state := state'1) in H1' as H1''; eauto.
-      eapply rd_abstraction_failure in H0 as H0'; eauto.
+      eapply rd_abstraction_read with (id := d1) (state := state'1); eauto.
     Qed.
 
     Lemma td_read_none_ok: forall s a state' state'0 state'2 state'1,
@@ -325,65 +333,59 @@ Module ReplicatedDisk.
       intros.
       inv_exec.
       case_eq v0; intros.
-      (* read from disk 0 *)
-      eapply RExec in H7.
-      eapply impl_ok in H7; eauto. deex.
-      exec_steps; repeat ( ReplicatedDisk.inv_bg || ReplicatedDisk.inv_step ).
-      eexists.
-      intuition; eauto.
-      eexists s. split.
-      eexists s.
-      split; eauto.
-      constructor.
-      constructor.
-      eapply td_read0_ok; eauto.
-      eapply rd_abstraction_op with (state := state'0); eauto.
-      eapply rd_abstraction_failure; eauto.
-      simpl; auto.
-      (* disk 1 failed *)
-      rewrite H1 in H9.
-      eapply RExec in H7.
-      inv_exec.
-      case_eq v1; intros.
-      rewrite H1 in H11.
-      + eapply impl_ok in H7; eauto. deex.
-        exec_steps; repeat ( ReplicatedDisk.inv_bg || ReplicatedDisk.inv_step ).
-        eapply impl_ok in H8; eauto. deex.
-        exec_steps; repeat ( ReplicatedDisk.inv_bg || ReplicatedDisk.inv_step ).
-        eexists.
-        intuition; eauto.
-        exists s. split.
-        exists s. split; eauto.
-        constructor.
-        constructor.
-        eapply td_read1_ok with (state' := state'); eauto.
-        eapply rd_abstraction_op with (state := state'2); eauto.
-        eapply rd_abstraction_failure with (state := state'); eauto.
-        eapply rd_abstraction_failure_op with (state := state'0); eauto.
-        eapply rd_abstraction_failure; eauto.
-        simpl; auto.
-        simpl; auto.
-      + (* no working disk *)
-        rewrite H1 in H11.
+      - (* read from disk 0 *)
+        eapply RExec in H7.
         eapply impl_ok in H7; eauto. deex.
         exec_steps; repeat ( ReplicatedDisk.inv_bg || ReplicatedDisk.inv_step ).
-        eapply impl_ok in H8; eauto. deex.
-        exec_steps; repeat ( ReplicatedDisk.inv_bg || ReplicatedDisk.inv_step ).
         eexists.
         intuition; eauto.
-        exists s. split.
-        exists s. split. eauto.
+        eexists s. split.
+        eexists s.
+        split; eauto.
         constructor.
         constructor.
-        eapply td_read_none_ok; eauto.
-        eapply rd_abstraction_failure_op. 2: eassumption.
-        eapply rd_abstraction_failure in H1 as H1'; eauto. 
-        eapply rd_abstraction_failure in H5 as H5'; eauto. 
-        eapply rd_abstraction_failure_op. 2: eassumption.
-        auto.
-      - simpl. auto.
-      - simpl. auto.
-     Unshelve.
+        eapply td_read0_ok with (state' := state'); eauto.
+        rd_trans; auto.
+        rd_trans; auto.
+        simpl; auto.
+      - (* disk 1 failed *)
+        rewrite H1 in H9.
+        eapply RExec in H7.
+        inv_exec.
+        case_eq v1; intros.
+        rewrite H1 in H11.
+        + eapply impl_ok in H7; eauto. deex.
+          exec_steps; repeat ( ReplicatedDisk.inv_bg || ReplicatedDisk.inv_step ).
+          eapply impl_ok in H8; eauto. deex.
+          exec_steps; repeat ( ReplicatedDisk.inv_bg || ReplicatedDisk.inv_step ).
+          eexists.
+          intuition; eauto.
+          exists s. split.
+          exists s. split; eauto.
+          constructor.
+          constructor.
+          eapply td_read1_ok with (state'1 := state'1); eauto.
+          rd_trans; auto.
+          rd_trans; auto.
+          simpl; auto.
+          simpl; auto.
+        + (* no working disk *)
+          rewrite H1 in H11.
+          eapply impl_ok in H7; eauto. deex.
+          exec_steps; repeat ( ReplicatedDisk.inv_bg || ReplicatedDisk.inv_step ).
+          eapply impl_ok in H8; eauto. deex.
+          exec_steps; repeat ( ReplicatedDisk.inv_bg || ReplicatedDisk.inv_step ).
+          eexists.
+          intuition; eauto.
+          exists s. split.
+          exists s. split. eauto.
+          constructor.
+          constructor.
+          eapply td_read_none_ok; eauto.
+          rd_trans; auto.
+          simpl. auto.
+          simpl. auto.
+      Unshelve.
       all: eauto.
     Qed.
 
