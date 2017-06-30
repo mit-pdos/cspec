@@ -159,6 +159,17 @@ Module ReplicatedDisk.
         (interface_abs td)
         {| abstraction := rd_abstraction |}.
 
+    Lemma both_disks_not_missing : forall (state: TD.State),
+        TD.disk0 state = None ->
+        TD.disk1 state = None ->
+        False.
+    Proof.
+      intros.
+      destruct state; simpl; intros.
+      destruct disk0, disk1; simpl in *; eauto.
+    Qed.
+
+
     Lemma rd_abstraction_failure: forall s state state',
       rd_abstraction state s ->
       TD.bg_failure state state' ->
@@ -171,6 +182,18 @@ Module ReplicatedDisk.
       intuition; subst; auto.
       intuition.
     Qed.
+
+    Lemma rd_abstraction_failure_op: forall s d a state state',
+      rd_abstraction state s ->
+      TD.op_step (TD.Read d a) state Failed state' ->
+      rd_abstraction state' s.
+    Proof.
+      intros.
+      unfold rd_abstraction, rd_invariant in *.
+      unfold abstraction_f in *.
+      TD.inv_step; simpl in *; eauto.
+    Qed.
+
 
    (** Get a particular disk from a state by id. *)
     Definition get_disk (i:diskId) (state:TD.State) :=
@@ -334,31 +357,22 @@ Module ReplicatedDisk.
           -- 
             eapply rd_abstraction_failure in H1 as H1'; eauto. 
             eapply rd_abstraction_failure in H5 as H5'; eauto. 
-            unfold rd_abstraction, rd_invariant, abstraction_f in H1', H5'; simpl.
-            destruct state'.
-            destruct state'1.
-            {
-             case_eq disk0; intros; rewrite H7 in *; simpl in *.
-            + case_eq disk1; intros. 
-              rewrite H8 in *; simpl in *.  
-              case_eq disk2; intros. 
-              - rewrite H9 in *; simpl in *.
-                 subst; simpl in *. inversion H7.
-              - subst; simpl in *. intuition.
-              - subst; simpl in *. inversion H8.
-            +  case_eq disk2; intros; rewrite H8 in *; simpl in *.
-              - case_eq disk1; intros; rewrite H9 in *; simpl in *.
-                subst; simpl in *. intuition; subst.
-                admit.
-                subst; simpl in *.
-                intuition.
-              - subst; simpl in *. intuition.
-            }
-            - 
-            eapply rd_abstraction_failure in H1 as H1'; eauto. 
-            eapply rd_abstraction_failure in H5 as H5'; eauto. 
-
-    Admitted.
+            inversion H5; subst; eauto.
+            ++ 
+              apply both_disks_not_missing in H6; auto.
+              exfalso; auto.
+            ++ simpl in *. inversion H7.
+            ++ simpl in *. inversion H7.
+         - eapply rd_abstraction_failure_op. 2: eassumption.
+           eapply rd_abstraction_failure in H1 as H1'; eauto. 
+           eapply rd_abstraction_failure in H5 as H5'; eauto. 
+           eapply rd_abstraction_failure_op. 2: eassumption.
+          auto.
+      - simpl. auto.
+      - simpl. auto.
+     Unshelve.
+      all: eauto.
+    Qed.
 
     Definition rd : Interface ReplicatedDisk.API.
       unshelve econstructor.
