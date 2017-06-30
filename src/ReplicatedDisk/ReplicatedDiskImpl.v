@@ -169,7 +169,6 @@ Module ReplicatedDisk.
       destruct disk0, disk1; simpl in *; eauto.
     Qed.
 
-
     Lemma rd_abstraction_failure: forall s state state',
       rd_abstraction state s ->
       TD.bg_failure state state' ->
@@ -181,6 +180,17 @@ Module ReplicatedDisk.
       TD.inv_bg; simpl in *; eauto.
       intuition; subst; auto.
       intuition.
+    Qed.
+
+    Lemma rd_abstraction_op: forall s d a v state state',
+      rd_abstraction state s ->
+      TD.op_step (TD.Read d a) state (Working v) state' ->
+      rd_abstraction state' s.
+    Proof.
+      intros.
+      unfold rd_abstraction, rd_invariant in *.
+      unfold abstraction_f in *.
+      TD.inv_step; simpl in *; eauto.
     Qed.
 
     Lemma rd_abstraction_failure_op: forall s d a state state',
@@ -213,9 +223,9 @@ Module ReplicatedDisk.
          end.
 
     Lemma rd_abstraction_read: forall state id a v s,
-        rd_abstraction state s ->
-        read_disk state id a v ->
-        s a = Some v \/ s a = None.
+      rd_abstraction state s ->
+      read_disk state id a v ->
+      forall b : block, s a = Some b -> v = b.
     Proof.
       intros.
       unfold read_disk, get_disk in H0.
@@ -226,19 +236,20 @@ Module ReplicatedDisk.
         destruct id.
         + destruct (d a).
           inversion H0; auto.
-          right; auto.
+          inversion H1. subst. auto.
+          deex. inversion H1.
         + destruct disk1; simpl in *; subst.
           destruct (d0 a); subst.
-          inversion H0; subst. left. auto.
-          right; auto.
+          inversion H0; subst. inversion H1. auto.
+          inversion H1.
           inversion H0.
       - destruct disk1; simpl in *.
         + intuition; subst.
           destruct id.
           inversion H0.
           destruct (d a).
-          inversion H0. left; auto.
-          right; auto.
+          inversion H0. inversion H1; subst. auto.
+          inversion H1.
         + intuition; subst.
     Qed.
 
@@ -248,7 +259,7 @@ Module ReplicatedDisk.
       abstraction (interface_abs td) w' state' ->
       TD.bg_failure state state'0 ->
       TD.op_step (TD.Read d0 a) state'0 (Working v) state' ->
-      (s a = Some v \/ s a = None) /\ rd_abstraction state' s.
+      forall b : block, s a = Some b -> v = b.
     Proof.
       intros.
       TD.inv_step.
@@ -265,7 +276,7 @@ Module ReplicatedDisk.
       TD.bg_failure state' state'2 ->
       TD.op_step (TD.Read d0 a) state'0 Failed state' ->
       TD.op_step (TD.Read d1 a) state'2 (Working v) state'1 ->
-      (s a = Some v \/ s a = None) /\ rd_abstraction state'1 s.
+      forall b : block, s a = Some b -> v = b.
     Proof.
       intros.
       TD.inv_step.
@@ -333,11 +344,9 @@ Module ReplicatedDisk.
       split; eauto.
       constructor.
       constructor.
-      intro.
-      eapply td_read0_ok in H1 as H1'; eauto.
-      intuition; rewrite H4 in H7; inversion H7; auto.
-      eapply td_read0_ok in H1 as H1'; eauto.
-      intuition.
+      eapply td_read0_ok; eauto.
+      eapply rd_abstraction_op with (state := state'0); eauto.
+      eapply rd_abstraction_failure; eauto.
       simpl; auto.
       (* disk 1 failed *)
       rewrite H1 in H9.
@@ -355,10 +364,11 @@ Module ReplicatedDisk.
         exists s. split; eauto.
         constructor.
         constructor.
-        eapply td_read1_ok with (state' := state') in H6 as H6'; eauto.
-        intuition; rewrite H9 in H7; inversion H7; auto.
-        eapply td_read1_ok with (state' := state') in H6 as H6'; eauto.
-        intuition.
+        eapply td_read1_ok with (state' := state'); eauto.
+        eapply rd_abstraction_op with (state := state'2); eauto.
+        eapply rd_abstraction_failure with (state := state'); eauto.
+        eapply rd_abstraction_failure_op with (state := state'0); eauto.
+        eapply rd_abstraction_failure; eauto.
         simpl; auto.
         simpl; auto.
       + (* no working disk *)
