@@ -150,22 +150,22 @@ Module ReplicatedDisk.
       | _ => True
       end.
 
-    Definition rd_layer_abstraction (state:TD.State) (state':ReplicatedDisk.State) :=
+    Definition rd_abstraction (state:TD.State) (state':ReplicatedDisk.State) :=
       rd_invariant state /\
       state' = abstraction_f state.
 
     Definition abstr : Abstraction ReplicatedDisk.State :=
       abstraction_compose
         (interface_abs td)
-        {| abstraction := rd_layer_abstraction |}.
+        {| abstraction := rd_abstraction |}.
 
-    Lemma rd_layer_abstraction_failure: forall s state state',
-      rd_layer_abstraction state s ->
+    Lemma rd_abstraction_failure: forall s state state',
+      rd_abstraction state s ->
       TD.bg_failure state state' ->
-      rd_layer_abstraction state' s.
+      rd_abstraction state' s.
     Proof.
       intros.
-      unfold rd_layer_abstraction, rd_invariant in *.
+      unfold rd_abstraction, rd_invariant in *.
       unfold abstraction_f in *.
       TD.inv_bg; simpl in *; eauto.
       intuition; subst; auto.
@@ -179,7 +179,7 @@ Module ReplicatedDisk.
       | d1 => TD.disk1 state
       end.
 
-    Definition get_value (state: TD.State) id a v :=
+    Definition read_disk (state: TD.State) id a v :=
        match (get_disk id state) with
          | Some d =>
              match d a with
@@ -189,14 +189,14 @@ Module ReplicatedDisk.
          | None => Working v = Failed
          end.
 
-    Lemma rd_layer_abstraction_value: forall state id a v s,
-        rd_layer_abstraction state s ->
-        get_value state id a v ->
+    Lemma rd_abstraction_read: forall state id a v s,
+        rd_abstraction state s ->
+        read_disk state id a v ->
         s a = Some v \/ s a = None.
     Proof.
       intros.
-      unfold get_value, get_disk in H0.
-      unfold rd_layer_abstraction, rd_invariant, abstraction_f in H.
+      unfold read_disk, get_disk in H0.
+      unfold rd_abstraction, rd_invariant, abstraction_f in H.
       destruct state; simpl in *.
       destruct disk0; simpl in *.
       - intuition; subst.
@@ -220,23 +220,21 @@ Module ReplicatedDisk.
     Qed.
 
     Lemma td_read0_ok: forall state state' state'0 w w' s a v,
-      rd_layer_abstraction state s -> 
+      rd_abstraction state s -> 
       abstraction (interface_abs td) w state ->
       abstraction (interface_abs td) w' state' ->
       TD.bg_failure state state'0 ->
       TD.op_step (TD.Read d0 a) state'0 (Working v) state' ->
-      (s a = Some v \/ s a = None) /\ rd_layer_abstraction state' s.
+      (s a = Some v \/ s a = None) /\ rd_abstraction state' s.
     Proof.
       intros.
       TD.inv_step.
-      simpl in *.
-      eapply rd_layer_abstraction_failure in H2 as H2'; eauto.
-      split; auto.
-      eapply rd_layer_abstraction_value with (id := d0) in H2'; eauto.
+      eapply rd_abstraction_failure in H2 as H2'; eauto.
+      eapply rd_abstraction_read with (id := d0) in H2' as H2''; eauto.
     Qed.
 
     Lemma td_read1_ok: forall state state' state'0 state'1 state'2 w w'0 w' s a v,
-      rd_layer_abstraction state s -> 
+      rd_abstraction state s -> 
       abstraction (interface_abs td) w state ->
       abstraction (interface_abs td) w'0 state' ->
       abstraction (interface_abs td) w' state'1 ->
@@ -244,53 +242,27 @@ Module ReplicatedDisk.
       TD.bg_failure state' state'2 ->
       TD.op_step (TD.Read d0 a) state'0 Failed state' ->
       TD.op_step (TD.Read d1 a) state'2 (Working v) state'1 ->
-      (s a = Some v \/ s a = None) /\ rd_layer_abstraction state'1 s.
+      (s a = Some v \/ s a = None) /\ rd_abstraction state'1 s.
     Proof.
       intros.
       TD.inv_step.
       TD.inv_step.
-      eapply rd_layer_abstraction_failure in H3 as H3'; eauto.
-      eapply rd_layer_abstraction_failure in H4 as H4'; eauto.
-      simpl in *.
-      split; eauto.
-      case_eq (TD.get_disk d0 state'); intros; simpl in *.
-      rewrite H5 in H10; simpl in *.
-      - destruct (d a); subst; simpl in *.
-        + inversion H10.
-        + deex. inversion H6.
-      - case_eq (TD.disk1 state'1); intros.
-        + simpl in H11.
-          unfold rd_layer_abstraction, rd_invariant, abstraction_f in H4'; simpl in *.
-          intuition.
-          destruct state'1; simpl in *.
-          destruct disk0.
-          -- subst. inversion H7; subst.
-           destruct (d a); subst; simpl in *.
-           rewrite H5 in H10. inversion H11; subst. left. auto.
-           right. auto.
-          -- 
-           destruct disk1.
-           ++ subst. inversion H6; subst.
-            destruct (d a); subst; simpl in *.
-            inversion H11. left. auto.
-            right; auto.
-           ++ inversion H6.
-        + simpl in *.
-          rewrite H6 in H11.
-          inversion H11.
+      eapply rd_abstraction_failure in H4 as H4'; eauto.
+      eapply rd_abstraction_read with (state := state'1) in H4' as H4''; eauto.
+      eapply rd_abstraction_failure in H3 as H3'; eauto.
     Qed.
 
     (* read without recovery *)
     Lemma read_ok: forall a v w w' state s,
       abstraction (interface_abs td) w state ->
-      rd_layer_abstraction state s -> 
+      rd_abstraction state s -> 
       exec (read a) w (Finished v w') ->
       exists state',
         abstraction (interface_abs td) w' state' /\
         (exists state2',
            pre_step ReplicatedDisk.bg_step (@ReplicatedDisk.op_step)
              (ReplicatedDisk.Read a) s v state2' /\
-           rd_layer_abstraction state' state2').
+           rd_abstraction state' state2').
     Proof.
       intros.
       inv_exec.
