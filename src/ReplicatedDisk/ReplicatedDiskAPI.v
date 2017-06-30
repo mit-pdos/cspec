@@ -17,8 +17,9 @@ Module ReplicatedDisk.
   Implicit Type (state:State).
 
   Inductive op_step : forall `(op: Op T), Semantics State T :=
-  | step_read : forall a r (d : disk),
-      d a = Some r \/ d a = None ->
+  | step_read : forall a r (d : State),
+      (forall b, d a = Some b -> r = b) ->
+      (* d a = Some r \/ d a = None -> *)
       op_step (Read a) d r d
   | step_write : forall a b (d : disk),
       op_step (Write a b) d tt (diskUpd d a b)

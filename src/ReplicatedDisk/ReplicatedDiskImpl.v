@@ -202,7 +202,7 @@ Module ReplicatedDisk.
       - intuition; subst.
         destruct id.
         + destruct (d a).
-          inversion H0. left; auto.
+          inversion H0; auto.
           right; auto.
         + destruct disk1; simpl in *; subst.
           destruct (d0 a); subst.
@@ -278,8 +278,9 @@ Module ReplicatedDisk.
       split; eauto.
       constructor.
       constructor.
+      intro.
       eapply td_read0_ok in H1 as H1'; eauto.
-      intuition.
+      intuition; rewrite H4 in H7; inversion H7; auto.
       eapply td_read0_ok in H1 as H1'; eauto.
       intuition.
       simpl; auto.
@@ -300,18 +301,63 @@ Module ReplicatedDisk.
         constructor.
         constructor.
         eapply td_read1_ok with (state' := state') in H6 as H6'; eauto.
-        intuition.
+        intuition; rewrite H9 in H7; inversion H7; auto.
         eapply td_read1_ok with (state' := state') in H6 as H6'; eauto.
         intuition.
         simpl; auto.
         simpl; auto.
-      + (* XXX  r = Failed. change spec of ReplicatedDiskAPI *)
+      + (* no working disk *)
         rewrite H1 in H11.
-        eapply RExec in H8.
+        eapply impl_ok in H7; eauto. deex.
+        exec_steps; repeat ( ReplicatedDisk.inv_bg || ReplicatedDisk.inv_step ).
         eapply impl_ok in H8; eauto. deex.
         exec_steps; repeat ( ReplicatedDisk.inv_bg || ReplicatedDisk.inv_step ).
-        inversion H3. subst.
-        eexists.    
+        eexists.
+        intuition; eauto.
+        exists s. split.
+        exists s. split. eauto.
+        constructor.
+        constructor.
+        TD.inv_step.
+        TD.inv_step.
+        simpl in *.
+        intros.
+        case_eq (TD.disk1 state'1); intros.
+        rewrite H6 in H11.
+        - destruct (d a).
+          -- inversion H11.
+          -- deex. inversion H7.
+        - case_eq (TD.disk0 state'); intros.
+          rewrite H7 in H10.
+          -- destruct (d a). inversion H10.
+            deex. inversion H8.
+          -- 
+            eapply rd_abstraction_failure in H1 as H1'; eauto. 
+            eapply rd_abstraction_failure in H5 as H5'; eauto. 
+            unfold rd_abstraction, rd_invariant, abstraction_f in H1', H5'; simpl.
+            destruct state'.
+            destruct state'1.
+            {
+             case_eq disk0; intros; rewrite H7 in *; simpl in *.
+            + case_eq disk1; intros. 
+              rewrite H8 in *; simpl in *.  
+              case_eq disk2; intros. 
+              - rewrite H9 in *; simpl in *.
+                 subst; simpl in *. inversion H7.
+              - subst; simpl in *. intuition.
+              - subst; simpl in *. inversion H8.
+            +  case_eq disk2; intros; rewrite H8 in *; simpl in *.
+              - case_eq disk1; intros; rewrite H9 in *; simpl in *.
+                subst; simpl in *. intuition; subst.
+                admit.
+                subst; simpl in *.
+                intuition.
+              - subst; simpl in *. intuition.
+            }
+            - 
+            eapply rd_abstraction_failure in H1 as H1'; eauto. 
+            eapply rd_abstraction_failure in H5 as H5'; eauto. 
+
     Admitted.
 
     Definition rd : Interface ReplicatedDisk.API.
