@@ -225,6 +225,26 @@ Module ReplicatedDisk.
       | d1 => TD.disk1 state
       end.
 
+    Local Lemma d0_is_some {diskT} (d_0: diskT) (d_1: option diskT) :
+      Some d_0 = None -> d_1 = None -> False.
+    Proof.
+      congruence.
+    Qed.
+
+    Local Lemma d1_is_some {diskT} (d_0: option diskT) (d_1: diskT) :
+      d_0 = None -> Some d_1 = None -> False.
+    Proof.
+      congruence.
+    Qed.
+
+    Local Notation proof := (ltac:(first [ apply d0_is_some | apply d1_is_some ])) (only parsing).
+
+    Definition set_disk (i:diskId) (state:TD.State) d :=
+      match i with
+      | d0 => TD.Disks (Some d) (TD.disk1 state) proof
+      | d1 => TD.Disks (TD.disk0 state) (Some d) proof
+      end.
+
     Definition read_disk (state: TD.State) id a v :=
        match (get_disk id state) with
          | Some d =>
@@ -389,6 +409,64 @@ Module ReplicatedDisk.
       all: eauto.
     Qed.
 
+    Lemma td_write0_ok: forall s state state' a b v0,
+      rd_abstraction state s ->
+      TD.op_step (TD.Write d0 a b) state v0 state' ->
+      rd_abstraction state' s.
+    Proof.
+      intros.
+      TD.inv_step; simpl in *.
+    Admitted.
+
+
+    (* write without recovery *)
+    Lemma write_ok: forall a b v w w' state s,
+      abstraction (interface_abs td) w state ->
+      rd_abstraction state s -> 
+      exec (write a b) w (Finished v w') ->
+      exists state', 
+       abstraction (interface_abs td) w' state' /\
+       (exists state2',
+          pre_step ReplicatedDisk.bg_step (@ReplicatedDisk.op_step)
+           (ReplicatedDisk.Write a b) s v state2' /\ rd_abstraction state' state2').
+    Proof.
+      intros.
+      inv_exec.
+      inv_exec.
+      exec_steps.
+      inv_rexec.
+      inv_rexec.
+      eapply RExec in H6.
+      eapply impl_ok in H6; eauto. deex.
+      exec_steps; repeat ( ReplicatedDisk.inv_bg || ReplicatedDisk.inv_step ).
+      eapply rd_abstraction_failure in H2 as H2'; eauto.
+
+      TD.inv_step; simpl in *.
+      intuition.
+      inv_rexec.
+      eapply RExec in H8.
+      eapply impl_ok in H8; eauto. deex.
+      exec_steps; repeat ( ReplicatedDisk.inv_bg || ReplicatedDisk.inv_step ).
+      case_eq (TD.disk0 state'0); intros.
+      rewrite H6 in H11. intuition.
+      + exists state'1.
+        split; eauto.
+        eexists.
+        split.
+        eexists.
+        split.
+        constructor.
+        constructor.
+        TD.inv_step; simpl in *.
+        intuition; subst.
+        case_eq (TD.disk1 state'2); intros.
+        rewrite H5 in H15.
+        - intuition; subst.
+          unfold rd_abstraction, rd_invariant, abstraction_f.
+ 
+    Admitted.
+
+
     Definition rd : Interface ReplicatedDisk.API.
       unshelve econstructor.
       - exact impl.
@@ -409,7 +487,7 @@ Module ReplicatedDisk.
           unfold prog_spec; intros.
           destruct a0; simpl in *; intuition.
           inv_rexec.
-          admit.
+          eapply write_ok; eauto.
           admit.
         + (* diskSize *)
           unfold prog_spec; intros.
