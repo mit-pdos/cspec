@@ -409,14 +409,91 @@ Module ReplicatedDisk.
       all: eauto.
     Qed.
 
-    Lemma td_write0_ok: forall s state state' a b v0,
-      rd_abstraction state s ->
-      TD.op_step (TD.Write d0 a b) state v0 state' ->
-      rd_abstraction state' s.
+    Lemma td_write0_ok: forall state state' a b d v,
+      TD.op_step (TD.Write d0 a b) state v state' ->
+      TD.disk0 state = Some d ->
+      match v with
+         | Working _ => 
+            TD.disk0 state' = Some (diskUpd d a b) /\ 
+            TD.disk1 state' = (TD.disk1 state)
+         | Failed => 
+            TD.disk0 state' = None /\ 
+            TD.disk1 state' = (TD.disk1 state)
+      end.
     Proof.
       intros.
-      TD.inv_step; simpl in *.
-    Admitted.
+      destruct v; subst; simpl in *.
+      - TD.inv_step; simpl in *.
+        destruct (TD.disk0 state); subst; simpl in *.
+        inversion H0; subst. intuition; auto.
+        inversion H; simpl; auto.
+        inversion H; simpl; auto.
+        inversion H0.
+      - TD.inv_step; simpl in *.
+        destruct (TD.disk0 state); try congruence.
+        intuition; try congruence.
+    Qed.
+
+    Lemma td_write1_ok: forall state state' a b d v,
+      TD.op_step (TD.Write d1 a b) state v state' ->
+      TD.disk1 state = Some d ->
+      match v with
+         | Working _ => 
+            TD.disk0 state' = (TD.disk0 state) /\ 
+            TD.disk1 state' = Some (diskUpd d a b)
+         | Failed => 
+            TD.disk0 state' = (TD.disk0 state) /\ 
+            TD.disk1 state' = None
+      end.
+    Proof.
+      intros.
+      destruct v; subst; simpl in *.
+      - TD.inv_step; simpl in *.
+        destruct (TD.disk1 state); subst; simpl in *.
+        inversion H0; subst. intuition; auto.
+        inversion H; simpl; auto.
+        inversion H; simpl; auto.
+        inversion H0.
+      - TD.inv_step; simpl in *.
+        destruct (TD.disk1 state); try congruence.
+        intuition; try congruence.
+    Qed.
+
+    Lemma td_write_ok: forall s state state' state'' a b,
+      rd_abstraction state s ->
+      TD.op_step (TD.Write d0 a b) state (Working tt) state' ->
+      TD.op_step (TD.Write d1 a b) state' (Working tt) state'' ->
+      rd_abstraction state'' (diskUpd s a b).
+    Proof.
+      intros.
+      intuition.
+      case_eq (TD.disk0 state); intros.
+      case_eq (TD.disk1 state); intros.
+      eapply td_write0_ok in H0; eauto.
+      + intuition.
+        rewrite H3 in H5.
+        eapply td_write1_ok in H5; eauto.
+        simpl in *.
+        intuition.
+        unfold rd_abstraction, rd_invariant, abstraction_f in *.
+        subst; simpl in *.
+        destruct state; simpl in *.
+        rewrite H2 in H; simpl in *.
+        rewrite H3 in H; simpl in *.
+        rewrite H4 in H0; simpl in *.
+        intuition; subst; simpl in *.
+        destruct state''; subst; simpl in *; try congruence.
+        destruct disk0; try congruence.
+        destruct disk1; try congruence.
+        destruct state''; subst; simpl in *; try congruence.
+        destruct disk0; try congruence.
+    + eapply td_write0_ok in H0; eauto.
+      intuition. rewrite H3 in H5.
+      TD.inv_step. simpl in *. rewrite H5 in H11.
+      intuition; try congruence.
+    + TD.inv_step. TD.inv_step. simpl in *. rewrite H2 in H8.
+      intuition; try congruence.
+    Qed.
 
 
     (* write without recovery *)
@@ -440,16 +517,36 @@ Module ReplicatedDisk.
       eapply impl_ok in H6; eauto. deex.
       exec_steps; repeat ( ReplicatedDisk.inv_bg || ReplicatedDisk.inv_step ).
       eapply rd_abstraction_failure in H2 as H2'; eauto.
+      inv_rexec.
+      eapply RExec in H9.
+      eapply impl_ok in H9; eauto. deex.
+      exec_steps; repeat ( ReplicatedDisk.inv_bg || ReplicatedDisk.inv_step ).
+      destruct v0.
+      destruct v1.
+
+
+
+    Definition set_disk (i:diskId) (state:TD.State) d :=
+
+Lemma td_write0_ok: forall state state' a b v,
+    TD.op_step (TD.Write d0 a b) state v state' ->
+    match TD.disk0 state with
+       | Some d => TD.disk0 state' = Some (diskUpd d a b)
+       | None => TD.disk0 state' = None 
+    end /\ .
+
 
       TD.inv_step; simpl in *.
       intuition.
-      inv_rexec.
-      eapply RExec in H8.
-      eapply impl_ok in H8; eauto. deex.
-      exec_steps; repeat ( ReplicatedDisk.inv_bg || ReplicatedDisk.inv_step ).
       case_eq (TD.disk0 state'0); intros.
       rewrite H6 in H11. intuition.
-      + exists state'1.
+      + TD.inv_step; simpl in *.
+        intuition; subst.
+        case_eq (TD.disk1 state'2); intros.
+        rewrite H5 in H15.
+
+
+        exists state'1.
         split; eauto.
         eexists.
         split.
