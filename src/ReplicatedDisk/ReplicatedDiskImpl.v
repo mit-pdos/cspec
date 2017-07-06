@@ -182,7 +182,7 @@ Module ReplicatedDisk.
       intuition.
     Qed.
 
-    Lemma rd_abstraction_op: forall s d a v state state',
+    Lemma rd_abstraction_read: forall s d a v state state',
       rd_abstraction state s ->
       TD.op_step (TD.Read d a) state (Working v) state' ->
       rd_abstraction state' s.
@@ -193,7 +193,7 @@ Module ReplicatedDisk.
       TD.inv_step; simpl in *; eauto.
     Qed.
 
-    Lemma rd_abstraction_failure_op: forall s d a state state',
+    Lemma rd_abstraction_read_failure: forall s d a state state',
       rd_abstraction state s ->
       TD.op_step (TD.Read d a) state Failed state' ->
       rd_abstraction state' s.
@@ -204,15 +204,37 @@ Module ReplicatedDisk.
       TD.inv_step; simpl in *; eauto.
     Qed.
 
+    Lemma rd_abstraction_disksize: forall s d v state state',
+      rd_abstraction state s ->
+      TD.op_step (TD.DiskSize d) state (Working v) state' ->
+      rd_abstraction state' s.
+    Proof.
+      intros.
+      unfold rd_abstraction, rd_invariant in *.
+      unfold abstraction_f in *.
+      TD.inv_step; simpl in *; eauto.
+    Qed.
 
+    Lemma rd_abstraction_disksize_failure: forall s d state state',
+      rd_abstraction state s ->
+      TD.op_step (TD.DiskSize d) state Failed state' ->
+      rd_abstraction state' s.
+    Proof.
+      intros.
+      unfold rd_abstraction, rd_invariant in *.
+      unfold abstraction_f in *.
+      TD.inv_step; simpl in *; eauto.
+    Qed.
+
+ 
     Ltac rd_trans := 
       repeat match goal with
       |  [ H : TD.op_step (TD.Read _ _) ?state (Working _) ?state' |- 
            rd_abstraction ?state' _ ] => idtac H;
-           eapply rd_abstraction_op; [|apply H]
+           eapply rd_abstraction_read; [|apply H]
       |  [ H : TD.op_step (TD.Read _ _) ?state Failed ?state' |-
            rd_abstraction ?state' _ ] => 
-         eapply rd_abstraction_failure_op; [|apply H]
+         eapply rd_abstraction_read_failure; [|apply H]
       |  [ H : TD.bg_failure _ ?state' |- rd_abstraction ?state' _ ] =>
            eapply rd_abstraction_failure; [|apply H]
       end.
@@ -227,7 +249,7 @@ Module ReplicatedDisk.
          | None => Working v = Failed
          end.
 
-    Lemma rd_abstraction_read: forall state id a v s,
+    Lemma td_read_ok: forall state id a v s,
       rd_abstraction state s ->
       read_disk state id a v ->
       forall b : block, s a = Some b -> v = b.
@@ -265,7 +287,7 @@ Module ReplicatedDisk.
     Proof.
       intros.
       TD.inv_step.
-      eapply rd_abstraction_read with (id := d0); eauto.
+      eapply td_read_ok with (id := d0); eauto.
     Qed.
 
     Lemma td_read1_ok: forall state' state'0 state'1 state'2  s a v,
@@ -278,7 +300,7 @@ Module ReplicatedDisk.
       intros.
       TD.inv_step.
       TD.inv_step.
-      eapply rd_abstraction_read with (id := d1) (state := state'1); eauto.
+      eapply td_read_ok with (id := d1) (state := state'1); eauto.
     Qed.
 
     Lemma td_read_none_ok: forall s a state' state'0 state'2 state'1,
@@ -670,6 +692,66 @@ Module ReplicatedDisk.
       all: constructor.
     Admitted.
 
+    Definition disk_size (state: TD.State) id v :=
+      match TD.get_disk id state with
+      | Some d => Working v = Working (size d)
+      | None => Working v = Failed
+      end.
+
+    Lemma td_disk_size_ok: forall s state id v,
+      rd_abstraction state s ->
+      disk_size state id v ->
+      v = (@size block s).
+    Proof.
+      intros.
+      unfold disk_size in *; simpl in *.
+      unfold rd_abstraction, rd_invariant, abstraction_f in H.
+      destruct state; simpl in *.
+      destruct disk0; simpl in *.
+     - intuition; subst.
+        destruct id.
+        + simpl in *.
+          inversion H0; auto.
+        + simpl in *.
+          destruct disk1; try congruence.
+     - intuition; simpl in *.
+       destruct id.
+        + simpl in *.
+          inversion H0; auto.
+        + simpl in *.
+          destruct disk1; try congruence.
+    Qed.
+
+    (* disk size without recovery *)
+    Lemma disk_size_ok: forall v w w' state s,
+      abstraction (interface_abs td) w state ->
+      rd_abstraction state s -> 
+      exec diskSize w (Finished v w') ->
+      exists state',
+        abstraction (interface_abs td) w' state' /\
+        (exists state2',
+           pre_step ReplicatedDisk.bg_step (@ReplicatedDisk.op_step)
+             ReplicatedDisk.DiskSize s v state2' /\
+           rd_abstraction state' state2').
+    Proof.
+      intros.
+      inv_exec.
+      case_eq v0; intros.
+      - rewrite H1 in H9.
+        eapply RExec in H7.
+        eapply impl_ok in H7; eauto. deex.
+        exec_steps; repeat ( ReplicatedDisk.inv_bg || ReplicatedDisk.inv_step ).
+        TD.inv_step.
+        eapply td_disk_size_ok with (s := s) in H6.
+        eexists. split; eauto.
+        exists s.
+        split; eauto.
+        eexists.
+        split.
+        constructor.
+        subst.
+        constructor. 
+    Admitted.
 
     Definition rd : Interface ReplicatedDisk.API.
       unshelve econstructor.
@@ -697,8 +779,9 @@ Module ReplicatedDisk.
           unfold prog_spec; intros.
           destruct a; simpl in *; intuition.
           inv_rexec.
-          admit.
-          admit.
+          -- (* wo recovery *)
+            eapply disk_size_ok; eauto.
+          -- admit.
     - admit. 
     - admit.
 
