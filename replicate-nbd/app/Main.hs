@@ -59,7 +59,7 @@ main = execParser opts >>= run
   where
     opts = info (options <**> helper)
       (fullDesc
-       <> progDesc "an nbd server that replicates over two disks"
+       <> progDesc "an nbd server that replicates over two disks; COMMAND is either init or start"
        <> header "replicate-nbd - replicating network block device"
        )
 
