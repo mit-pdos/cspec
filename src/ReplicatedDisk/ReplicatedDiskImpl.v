@@ -230,13 +230,16 @@ Module ReplicatedDisk.
     Ltac rd_trans := 
       repeat match goal with
       |  [ H : TD.op_step (TD.Read _ _) ?state (Working _) ?state' |- 
-           rd_abstraction ?state' _ ] => idtac H;
+           rd_abstraction ?state' _ ] => 
            eapply rd_abstraction_read; [|apply H]
       |  [ H : TD.op_step (TD.Read _ _) ?state Failed ?state' |-
            rd_abstraction ?state' _ ] => 
          eapply rd_abstraction_read_failure; [|apply H]
       |  [ H : TD.bg_failure _ ?state' |- rd_abstraction ?state' _ ] =>
            eapply rd_abstraction_failure; [|apply H]
+      | [ H: TD.op_step (TD.DiskSize _) ?state Failed ?state' |-
+          rd_abstraction ?state' _ ] => idtac H;
+          eapply rd_abstraction_disksize_failure; [|apply H]
       end.
 
     Definition read_disk (state: TD.State) id a v :=
@@ -722,6 +725,29 @@ Module ReplicatedDisk.
           destruct disk1; try congruence.
     Qed.
 
+    Lemma td_disk_size_none_ok: forall s state' state'0 state'2 state'1,
+      TD.op_step (TD.DiskSize d0) state'0 Failed state' ->
+      TD.bg_failure state' state'2  ->
+      TD.op_step (TD.DiskSize d1) state'2 Failed state'1 ->
+      (@size block s) = 0.
+    Proof.
+      intros.
+      TD.inv_step.
+      TD.inv_step.
+      simpl in *.
+      case_eq (TD.disk1 state'1); intros.
+      - rewrite H in H4. inversion H4.
+      - rewrite H in H4.
+        case_eq (TD.disk0 state'); intros.
+        + rewrite H1 in H3. inversion H3.
+        + rewrite H1 in H3.
+          TD.inv_bg.
+          -- apply both_disks_not_missing in H; auto. exfalso. auto.
+          -- simpl in *. subst. destruct pf; auto.
+          -- simpl in *. subst.
+            inversion H1.
+    Qed.
+
     (* disk size without recovery *)
     Lemma disk_size_ok: forall v w w' state s,
       abstraction (interface_abs td) w state ->
@@ -736,21 +762,63 @@ Module ReplicatedDisk.
     Proof.
       intros.
       inv_exec.
-      case_eq v0; intros.
-      - rewrite H1 in H9.
-        eapply RExec in H7.
+      destruct v0.
+      - eapply RExec in H7.
         eapply impl_ok in H7; eauto. deex.
         exec_steps; repeat ( ReplicatedDisk.inv_bg || ReplicatedDisk.inv_step ).
         TD.inv_step.
-        eapply td_disk_size_ok with (s := s) in H6.
-        eexists. split; eauto.
-        exists s.
-        split; eauto.
-        eexists.
-        split.
-        constructor.
-        subst.
-        constructor. 
+        + eapply td_disk_size_ok with (s := s) in H6.
+          eexists. split; eauto.
+          exists s.
+          split; eauto.
+          eexists.
+          split.
+          constructor.
+          subst.
+          constructor.
+          rd_trans. auto.
+          rd_trans. auto.
+        + simpl; auto. 
+      - eapply RExec in H7.
+        eapply impl_ok in H7; eauto. deex.
+        eapply RExec in H9.
+        inv_rexec.
+        inv_exec.
+        destruct v0.
+        + eapply RExec in H9.
+          eapply impl_ok in H9; eauto. deex.
+          exec_steps; repeat ( ReplicatedDisk.inv_bg || ReplicatedDisk.inv_step ).
+          TD.inv_step.
+          eapply td_disk_size_ok with (s := s) in H9.
+          eexists. split; eauto.
+          exists s.
+          split; eauto.
+          eexists.
+          split.
+          constructor.
+          subst.
+          constructor.
+          rd_trans. auto.
+          rd_trans. auto.
+          simpl; auto.
+        + eapply RExec in H9.
+          eapply impl_ok in H9; eauto. deex.
+          exec_steps; repeat ( ReplicatedDisk.inv_bg || ReplicatedDisk.inv_step ).
+          eexists. split; eauto.
+          exists s.
+          split; eauto.
+          eexists.
+          split.
+          constructor.
+          subst.
+          eapply td_disk_size_none_ok with (s := s) in H6 as H6; eauto.
+          rewrite <- H6.
+          constructor.
+          rd_trans. auto.
+          simpl; auto.
+        + simpl; auto.
+      Unshelve.
+      all: eauto; try exact tt; try exact Type.
     Admitted.
 
     Definition rd : Interface ReplicatedDisk.API.
