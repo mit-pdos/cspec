@@ -217,36 +217,8 @@ Module ReplicatedDisk.
            eapply rd_abstraction_failure; [|apply H]
       end.
 
-
-   (** Get a particular disk from a state by id. *)
-    Definition get_disk (i:diskId) (state:TD.State) :=
-      match i with
-      | d0 => TD.disk0 state
-      | d1 => TD.disk1 state
-      end.
-
-    Local Lemma d0_is_some {diskT} (d_0: diskT) (d_1: option diskT) :
-      Some d_0 = None -> d_1 = None -> False.
-    Proof.
-      congruence.
-    Qed.
-
-    Local Lemma d1_is_some {diskT} (d_0: option diskT) (d_1: diskT) :
-      d_0 = None -> Some d_1 = None -> False.
-    Proof.
-      congruence.
-    Qed.
-
-    Local Notation proof := (ltac:(first [ apply d0_is_some | apply d1_is_some ])) (only parsing).
-
-    Definition set_disk (i:diskId) (state:TD.State) d :=
-      match i with
-      | d0 => TD.Disks (Some d) (TD.disk1 state) proof
-      | d1 => TD.Disks (TD.disk0 state) (Some d) proof
-      end.
-
     Definition read_disk (state: TD.State) id a v :=
-       match (get_disk id state) with
+       match (TD.get_disk id state) with
          | Some d =>
              match d a with
              | Some b0 => Working v = Working b0
@@ -261,7 +233,7 @@ Module ReplicatedDisk.
       forall b : block, s a = Some b -> v = b.
     Proof.
       intros.
-      unfold read_disk, get_disk in H0.
+      unfold read_disk, TD.get_disk in H0.
       unfold rd_abstraction, rd_invariant, abstraction_f in H.
       destruct state; simpl in *.
       destruct disk0; simpl in *.
@@ -459,42 +431,169 @@ Module ReplicatedDisk.
         intuition; try congruence.
     Qed.
 
-    Lemma td_write_ok: forall s state state' state'' a b,
+    Lemma td_write_failure: forall d a b state state',
+      TD.op_step (TD.Write d a b) state Failed state' ->
+      state = state' /\ TD.get_disk d state = None.
+    Proof.
+      intros.
+      unfold rd_abstraction, rd_invariant in *.
+      unfold abstraction_f in *.
+      TD.inv_step; simpl in *; eauto.
+      intuition.
+      destruct d; try congruence.
+      simpl in *.
+      case_eq (TD.disk0 state); intros.
+      rewrite H in H6.
+      intuition. inversion H1.
+      rewrite H in H6.
+      intuition; auto.
+      simpl in *.
+      case_eq (TD.disk1 state); intros.
+      rewrite H in H6.
+      intuition. inversion H1.
+      rewrite H in H6.
+      intuition; auto.
+      destruct d; try congruence.
+      simpl in *.
+      case_eq (TD.disk0 state); intros.
+      rewrite H in H6.
+      intuition. inversion H1.
+      rewrite H in H6. auto.
+      simpl in *.
+      case_eq (TD.disk1 state); intros.
+      rewrite H in H6.
+      intuition. inversion H1. auto.
+    Qed.
+
+
+    Lemma td_write_both_ok: forall s state state' state'' state''' a b,
       rd_abstraction state s ->
       TD.op_step (TD.Write d0 a b) state (Working tt) state' ->
-      TD.op_step (TD.Write d1 a b) state' (Working tt) state'' ->
-      rd_abstraction state'' (diskUpd s a b).
+      TD.bg_failure state' state'' ->
+      TD.op_step (TD.Write d1 a b) state'' (Working tt) state''' ->
+      rd_abstraction state''' (diskUpd s a b).
     Proof.
       intros.
       intuition.
       case_eq (TD.disk0 state); intros.
-      case_eq (TD.disk1 state); intros.
-      eapply td_write0_ok in H0; eauto.
-      + intuition.
-        rewrite H3 in H5.
-        eapply td_write1_ok in H5; eauto.
-        simpl in *.
-        intuition.
-        unfold rd_abstraction, rd_invariant, abstraction_f in *.
-        subst; simpl in *.
-        destruct state; simpl in *.
-        rewrite H2 in H; simpl in *.
-        rewrite H3 in H; simpl in *.
-        rewrite H4 in H0; simpl in *.
-        intuition; subst; simpl in *.
-        destruct state''; subst; simpl in *; try congruence.
-        destruct disk0; try congruence.
-        destruct disk1; try congruence.
-        destruct state''; subst; simpl in *; try congruence.
-        destruct disk0; try congruence.
-    + eapply td_write0_ok in H0; eauto.
-      intuition. rewrite H3 in H5.
-      TD.inv_step. simpl in *. rewrite H5 in H11.
-      intuition; try congruence.
-    + TD.inv_step. TD.inv_step. simpl in *. rewrite H2 in H8.
+      + eapply td_write0_ok in H0 as H0'; eauto.
+        TD.inv_bg.
+        - case_eq (TD.disk1 state); intros.
+          -- intuition.
+            rewrite H1 in H5.
+            eapply td_write1_ok in H5; eauto.
+            simpl in *.
+            intuition.
+            rewrite H4 in H6.
+            unfold rd_abstraction, rd_invariant, abstraction_f in *.
+            subst; simpl in *.
+            destruct state; simpl in *.
+            rewrite H3 in H; simpl in *.
+            rewrite H1 in H; simpl in *.
+            intuition; subst; simpl in *.
+            destruct state'''; subst; simpl in *; try congruence.     
+            destruct disk0; try congruence.
+            destruct disk1; try congruence.
+            destruct state'''; subst; simpl in *; try congruence.
+            destruct disk0; try congruence.
+          -- rewrite H1 in H0'.
+            intuition.
+            eapply td_write0_ok in H0; eauto. intuition.
+            TD.inv_step. simpl in *. rewrite H1 in H7.
+            rewrite H7 in H13. intuition. inversion H0.
+        - simpl in *.
+          case_eq (TD.disk1 state); intros.
+          -- intuition. rewrite H1 in H5. inversion H5; subst.
+            eapply td_write1_ok in H2; eauto.
+            simpl in *. intuition.
+            unfold rd_abstraction, rd_invariant, abstraction_f in *.
+            destruct state; simpl in *.
+            rewrite H3 in H; simpl in *.
+            rewrite H1 in H; simpl in *.
+            intuition; subst; simpl in *.
+            destruct state'''; subst; simpl in *; try congruence.     
+            destruct disk0; try congruence.
+            destruct disk1; try congruence; auto.
+            destruct state'''; subst; simpl in *; try congruence.
+            destruct disk0; try congruence.
+            destruct disk1; try congruence.
+          -- intuition. rewrite H1 in H5. inversion H5; try congruence. 
+        - simpl in *. intuition.
+          TD.inv_step. simpl in *. intuition. inversion H2.
+    + TD.inv_step. TD.inv_step. simpl in *. rewrite H3 in H9.
       intuition; try congruence.
     Qed.
 
+    Lemma td_write_d0_ok: forall s state state' state'' state''' a b,
+      rd_abstraction state s ->
+      TD.op_step (TD.Write d0 a b) state (Working tt) state' ->
+      TD.bg_failure state' state'' ->
+      TD.op_step (TD.Write d1 a b) state'' (Failed) state''' ->
+      rd_abstraction state''' (diskUpd s a b).
+    Proof.
+      intros.
+      eapply td_write_failure in H2; subst.
+      intuition. simpl in *.
+      case_eq (TD.disk0 state); intros.
+      + eapply td_write0_ok in H0 as H0'; eauto.
+        intuition.
+        TD.inv_bg.
+        - rewrite H4 in H6.
+          simpl in *. intuition.
+          unfold rd_abstraction, rd_invariant, abstraction_f in *.
+          destruct state'''.  simpl in *.
+          destruct disk0; try congruence. simpl in *.
+          destruct disk1; try congruence. split; auto.
+          intuition.
+          destruct state.  simpl in *.
+          destruct disk0; try congruence. 
+        - simpl in *. inversion H4.
+        - simpl in *. 
+          unfold rd_abstraction, rd_invariant, abstraction_f in *.
+          split; auto. inversion H5. 
+          intuition.
+          destruct state.  simpl in *.
+          destruct disk0; try congruence. 
+      + subst; simpl in *.
+        TD.inv_step.
+        simpl in *.
+        rewrite H2 in H10. intuition. inversion H0.
+    Qed.
+
+    Lemma td_write_d1_ok: forall s state state' state'' state''' a b,
+      rd_abstraction state s ->
+      TD.op_step (TD.Write d0 a b) state (Failed) state' ->
+      TD.bg_failure state' state'' ->
+      TD.op_step (TD.Write d1 a b) state'' (Working tt) state''' ->
+      rd_abstraction state''' (diskUpd s a b).
+    Proof.
+      intros.
+      eapply td_write_failure in H0; subst.
+      intuition. simpl in *.
+      case_eq (TD.disk1 state''); intros.
+      + TD.inv_bg; simpl in *.
+        - eapply td_write1_ok in H0 as H0'; eauto.
+          simpl in *. intuition. rewrite H4 in H1.
+          unfold rd_abstraction, rd_invariant, abstraction_f in *.
+          destruct state'''.  simpl in *.
+          destruct disk0; try congruence. simpl in *.
+          destruct disk1; try congruence. split; auto.
+          inversion H3; auto.
+          intuition.
+          destruct state''.  simpl in *.
+          destruct disk0; try congruence. 
+          destruct disk1; try congruence. 
+        - eapply td_write1_ok in H2 as H2'; eauto.
+          simpl in *. intuition.
+          unfold rd_abstraction, rd_invariant, abstraction_f in *.
+          destruct state'''.  simpl in *.
+          destruct disk0; try congruence.
+        - inversion H0.
+      + TD.inv_step.
+        simpl in *.
+        rewrite H0 in H11. intuition.
+        inversion H2.
+    Qed.
 
     (* write without recovery *)
     Lemma write_ok: forall a b v w w' state s,
@@ -522,45 +621,53 @@ Module ReplicatedDisk.
       eapply impl_ok in H9; eauto. deex.
       exec_steps; repeat ( ReplicatedDisk.inv_bg || ReplicatedDisk.inv_step ).
       destruct v0.
-      destruct v1.
-
-
-
-    Definition set_disk (i:diskId) (state:TD.State) d :=
-
-Lemma td_write0_ok: forall state state' a b v,
-    TD.op_step (TD.Write d0 a b) state v state' ->
-    match TD.disk0 state with
-       | Some d => TD.disk0 state' = Some (diskUpd d a b)
-       | None => TD.disk0 state' = None 
-    end /\ .
-
-
-      TD.inv_step; simpl in *.
-      intuition.
-      case_eq (TD.disk0 state'0); intros.
-      rewrite H6 in H11. intuition.
-      + TD.inv_step; simpl in *.
-        intuition; subst.
-        case_eq (TD.disk1 state'2); intros.
-        rewrite H5 in H15.
-
-
-        exists state'1.
+      - destruct v1.
+        + destruct v.
+          destruct v0.
+          eapply td_write_both_ok with (state := state'0) (state''' := state'1) in H3 as Hrd; eauto.
+          eexists. split; eauto.
+          exists (diskUpd s a b).
+          split; eauto.
+          eexists.
+          split.
+          constructor.
+          constructor.
+        + destruct v.
+          eapply td_write_d0_ok with (state := state'0) (state''' := state'1) in H6; eauto.
+          eexists. split; eauto.
+          exists (diskUpd s a b).
+          split; eauto.
+          eexists.
+          split.
+          constructor.
+          constructor.
+    - destruct v1. destruct v. 
+      eapply td_write_d1_ok with (state''' := state'1) in H3 as H3'; eauto.
+      + eexists. split; eauto.
+        exists (diskUpd s a b).
         split; eauto.
         eexists.
         split.
-        eexists.
-        split.
         constructor.
         constructor.
-        TD.inv_step; simpl in *.
-        intuition; subst.
-        case_eq (TD.disk1 state'2); intros.
-        rewrite H5 in H15.
-        - intuition; subst.
-          unfold rd_abstraction, rd_invariant, abstraction_f.
- 
+      + eapply td_write_failure in H6.
+        eapply td_write_failure in H3.
+        intuition. subst; simpl in *.
+        TD.inv_bg; simpl in *.
+        -- unfold rd_abstraction, rd_invariant, abstraction_f in H2'.
+          destruct state'1; simpl in *.
+          destruct disk0; try congruence.
+          destruct disk1; try congruence. intuition.
+        -- unfold rd_abstraction, rd_invariant, abstraction_f in H2'.
+          intuition.
+        -- unfold rd_abstraction, rd_invariant, abstraction_f in H2'.
+          intuition. subst.
+          destruct pf; auto.
+      - simpl in *; auto.
+      - simpl in *; auto.
+      Unshelve.
+      all: eauto; try exact tt; try exact Type.
+      all: constructor.
     Admitted.
 
 
