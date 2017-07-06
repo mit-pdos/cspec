@@ -1,5 +1,6 @@
 /_CoqProject
 /build
+/bin
 /.lia.cache
 # emacs
 *.aux

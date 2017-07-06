@@ -26,8 +26,10 @@ CODE += $(wildcard src/SeqDisk/*.v)
 
 COQRFLAGS := -R build Pocs
 
+BINS	:= replicate-nbd
+
 .PHONY: default
-default: _CoqProject coq extract hs
+default: _CoqProject $(patsubst %,bin/%,$(BINS))
 
 build/%.v: src/%.v
 	@mkdir -p $(@D)
@@ -48,19 +50,21 @@ build/%.vo: build/%.v
 .PHONY: coq
 coq: $(patsubst src/%.v,build/%.vo,$(CODE))
 
-.PHONY: extract
-extract: replicate-nbd/ExtractReplicatedDisk.v coq replicate-nbd/fiximports.py
+.PHONY: %/extract
+%/extract: %/Extract.v coq %/fiximports.py
 	coqtop $(COQRFLAGS) -batch -noglob -load-vernac-source $<
-	./scripts/add-preprocess.sh replicate-nbd/src/*.hs
+	./scripts/add-preprocess.sh $(patsubst %/extract,%/src/*.hs,$@)
 
-.PHONY: hs
-hs: extract
-	cd replicate-nbd && stack build
+bin/%: %/extract
+	mkdir -p $(@D)
+	cd $(patsubst %/extract,%,$<) && PATH=$(PATH):$(shell pwd)/bin stack build --copy-bins --local-bin-path ../bin
 
 .PHONY: clean
 clean:
 	rm -rf build
-	rm -f replicate-nbd/src/*.hs
+	rm -f $(foreach d,$(BINS),$(d)/src/*.hs)
+	rm -f $(foreach d,$(BINS),$(d)/.stack-work)
+	rm -f $(foreach b,$(BINS),bin/$(b))
 
 _CoqProject: _CoqProject.in
 	cat _CoqProject.in > $@
