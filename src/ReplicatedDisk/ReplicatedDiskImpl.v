@@ -238,7 +238,7 @@ Module ReplicatedDisk.
       |  [ H : TD.bg_failure _ ?state' |- rd_abstraction ?state' _ ] =>
            eapply rd_abstraction_failure; [|apply H]
       | [ H: TD.op_step (TD.DiskSize _) ?state Failed ?state' |-
-          rd_abstraction ?state' _ ] => idtac H;
+          rd_abstraction ?state' _ ] =>
           eapply rd_abstraction_disksize_failure; [|apply H]
       end.
 
@@ -691,7 +691,7 @@ Module ReplicatedDisk.
       - simpl in *; auto.
       - simpl in *; auto.
       Unshelve.
-      all: eauto; try exact tt; try exact Type.
+      all: eauto; try exact tt; try exact unit.
       all: constructor.
     Admitted.
 
@@ -818,7 +818,8 @@ Module ReplicatedDisk.
           simpl; auto.
         + simpl; auto.
       Unshelve.
-      all: eauto; try exact tt; try exact Type.
+      all: eauto; try exact unit. 
+      constructor.
     Admitted.
 
     Definition rd : Interface ReplicatedDisk.API.
