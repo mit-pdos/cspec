@@ -47,13 +47,12 @@ build/%.vo: build/%.v
 	coqc -q $(COQRFLAGS) $<
 .PRECIOUS: build/%.vo
 
-.PHONY: coq
-coq: $(patsubst src/%.v,build/%.vo,$(CODE))
-
 .PHONY: %/extract
-%/extract: %/Extract.v coq %/fiximports.py
+%/extract: %/Extract.v %/fiximports.py build/ExtrBytes.vo build/Refinement/ProgLang/ExtrProg.vo
 	coqtop $(COQRFLAGS) -batch -noglob -load-vernac-source $<
 	./scripts/add-preprocess.sh $(patsubst %/extract,%/src/*.hs,$@)
+
+replicate-nbd/extract: build/NBD/ExtrServer.vo
 
 bin/%: %/extract
 	mkdir -p $(@D)
