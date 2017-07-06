@@ -1,0 +1,23 @@
+name:                statdb-cli
+version:             0.1.0.0
+build-type:          Simple
+cabal-version:       >=1.10
+
+library
+  hs-source-dirs:      src
+  exposed-modules:     StatDbCli, Variables.Env
+  other-modules:       Variables.Ops, CLI.Stubs,
+                       Interface, StatDbAPI, StatDbImpl,
+                       VariablesAPI, ExtrVariables,
+                       Hoare, Datatypes, Def, EquivDec, Prog
+  build-depends:       base >= 4.7 && < 5
+                     , ghc-prim
+                     , mtl
+  default-language:    Haskell2010
+
+executable statdb-cli
+  hs-source-dirs:      app
+  main-is:             Main.hs
+  build-depends:       base
+                     , statdb-cli
+  default-language:    Haskell2010

@@ -26,7 +26,7 @@ CODE += $(wildcard src/SeqDisk/*.v)
 
 COQRFLAGS := -R build Pocs
 
-BINS	:= replicate-nbd
+BINS	:= statdb-cli replicate-nbd
 
 .PHONY: default
 default: _CoqProject $(patsubst %,bin/%,$(BINS))
@@ -53,6 +53,7 @@ build/%.vo: build/%.v
 	./scripts/add-preprocess.sh $(patsubst %/extract,%/src/*.hs,$@)
 
 replicate-nbd/extract: build/NBD/ExtrServer.vo
+statdb-cli/extract: build/StatDb/StatDbCli.vo
 
 bin/%: %/extract
 	mkdir -p $(@D)
@@ -62,7 +63,7 @@ bin/%: %/extract
 clean:
 	rm -rf build
 	rm -f $(foreach d,$(BINS),$(d)/src/*.hs)
-	rm -f $(foreach d,$(BINS),$(d)/.stack-work)
+	rm -rf $(foreach d,$(BINS),$(d)/.stack-work)
 	rm -f $(foreach b,$(BINS),bin/$(b))
 
 _CoqProject: _CoqProject.in
