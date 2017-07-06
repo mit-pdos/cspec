@@ -822,6 +822,25 @@ Module ReplicatedDisk.
       constructor.
     Admitted.
 
+    (* read with recovery *)
+    Lemma read_recover_ok: forall s a w state w' w'' w''',
+      abstraction (interface_abs td) w state ->
+      rd_abstraction state s ->
+      exec (read a) w (Crashed w') -> 
+      exec (irec td) (world_crash w') (Finished tt w'') ->
+      exec Recover w'' (Finished tt w''') ->
+      exists state',
+        abstraction (interface_abs td) w''' state' /\
+        (exists state2', (tt = tt /\ (state2' = s \/
+          (exists state1 v,
+           pre_step ReplicatedDisk.bg_step (@ReplicatedDisk.op_step)
+             (ReplicatedDisk.Read a) s v state1 /\ state2' = state1))) /\
+           rd_abstraction state' state2').
+    Proof.
+      intros.
+    Admitted.
+
+
     Definition rd : Interface ReplicatedDisk.API.
       unshelve econstructor.
       - exact impl.
@@ -837,7 +856,14 @@ Module ReplicatedDisk.
           -- (* no recovery *)
             eapply read_ok; eauto.
           -- (* w. recovery *)
-            admit.
+            destruct H4.
+            ++ (* run recovery once *)
+              inv_exec.
+              destruct v. simpl in *.
+              destruct v0.
+              eapply read_recover_ok; eauto.
+            ++ (* crash during recovery, run recovery again *)
+              admit.
         + (* Write *)
           unfold prog_spec; intros.
           destruct a0; simpl in *; intuition.
