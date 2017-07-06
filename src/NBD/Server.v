@@ -4,7 +4,7 @@ Require Import Refinement.ProgLang.Prog.
 Require Import SeqDisk.ArrayAPI.
 Require Import SeqDisk.ReplicatedDisk.
 Require Import SeqDisk.ReplicatedDisk.Init.
-Require Import TwoDisk.ExtrTwoDiskImpl.
+Require Import TwoDisk.ExtrTwoDisk.
 
 Require Import NBD.NbdData.
 

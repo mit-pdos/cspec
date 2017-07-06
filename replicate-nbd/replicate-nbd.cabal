@@ -46,7 +46,7 @@ library
                      , Sync
                      , TwoDiskAPI
                      , TwoDiskDefs
-                     , ExtrTwoDiskImpl
+                     , ExtrTwoDisk
   build-depends:       base >= 4.7 && < 5
                      , ghc-prim
                      , bytestring
