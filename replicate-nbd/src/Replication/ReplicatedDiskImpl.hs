@@ -5,7 +5,7 @@ import           ArrayAPI
 import qualified Data.ByteString as BS
 import           Interface (InitResult)
 import           ReplicatedDisk
-import           Replication.TwoDiskEnvironment (TwoDiskProg)
+import           Replication.TwoDiskEnvironment (TheProg)
 import           ExtrTwoDisk (_TD__td)
 import           Utils.Conversion
 
@@ -15,7 +15,7 @@ type BlockOffset = Int
 type ByteOffset = Int
 
 -- |wrapper for Array read that checks for invalid parameters and converts types
-readBytes :: ByteOffset -> Int -> TwoDiskProg BS.ByteString
+readBytes :: ByteOffset -> Int -> TheProg BS.ByteString
 readBytes off len =
   if not (off `mod` blocksize == 0 && len `mod` blocksize == 0) then
     error $ "misaligned read at " ++ show off ++ " length " ++ show len
@@ -24,7 +24,7 @@ readBytes off len =
        (fromIntegral len `div` blocksize)
 
 -- |wrapper for Array write that checks for invalid parameters and converts types
-writeBytes :: ByteOffset -> BS.ByteString -> TwoDiskProg ()
+writeBytes :: ByteOffset -> BS.ByteString -> TheProg ()
 writeBytes off dat =
   if not (off `mod` blocksize == 0 && BS.length dat `mod` blocksize == 0) then
     error $ "misaligned write at " ++ show off ++ " length " ++ show (BS.length dat)
@@ -34,9 +34,9 @@ writeBytes off dat =
        dat
 
 -- |wrapper for replicated disk recovery procedure
-recover :: TwoDiskProg ()
+recover :: TheProg ()
 recover = ArrayAPI.recover (_RD__rd _TD__td)
 
 -- |wrapper for replicated disk initialization
-init :: TwoDiskProg InitResult
+init :: TheProg InitResult
 init = ArrayAPI.init (_RD__rd _TD__td)

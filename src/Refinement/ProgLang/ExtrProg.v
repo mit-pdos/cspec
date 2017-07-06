@@ -5,6 +5,6 @@ Extraction Language Haskell.
 Extract Constant opT "a" => "()".
 Extract Constant world => "()".
 
-Extract Inductive prog => "TwoDiskProg"
+Extract Inductive prog => "TheProg"
                            ["prim_error" "return" "(>>=)"]
                            "(\fprim fret fbind -> error 'pattern match on prog')".

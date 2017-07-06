@@ -1,6 +1,6 @@
 module Replication.TwoDiskEnvironment
   (
-    TwoDiskProg
+    TheProg
   , Env
   , disk0
   , disk1
@@ -28,7 +28,7 @@ data Env =
       , requests :: MVar Request
       , responses :: MVar Response }
 
-type TwoDiskProg = ReaderT Env IO
+type TheProg = ReaderT Env IO
 
 getFd :: CachedHandle -> IO (Maybe Fd)
 getFd (_, Nothing) = return Nothing
@@ -59,5 +59,5 @@ newEnv fn0 fn1 = pure Env
                  else ioError e)
 
 
-runTD :: Env -> TwoDiskProg a -> IO a
+runTD :: Env -> TheProg a -> IO a
 runTD e m = runReaderT m e
