@@ -822,6 +822,107 @@ Module ReplicatedDisk.
       constructor.
     Admitted.
 
+    (* fix up for v that isn't out of sync. keep repairing *)
+    Lemma fixup_continue_ok: forall v w w' (state: TD.State) d b d' d'',
+      v < size d ->
+      TD.get_disk d0 state = Some d' ->
+      TD.get_disk d1 state = Some d'' ->
+      d' = diskUpd d v b /\
+      d'' = d' ->
+      exec (fixup v) w (Finished Continue w') ->
+      d' v = d'' v.
+    Proof.
+    Admitted.
+
+    (* fix up for v that is out of sync, repair and be done *)
+    Lemma fixup_repair_ok: forall v w w' (state: TD.State) d b d' d'',
+      v < size d ->
+      TD.get_disk d0 state = Some d' ->
+      TD.get_disk d1 state = Some d'' ->
+      d' = diskUpd d v b ->
+      d'' = d ->
+      exec (fixup v) w (Finished RepairDone w') ->
+      d' v = d'' v.
+    Proof.
+    Admitted.
+
+    (* fix up for v that is out of sync, repair and be done *)
+    Lemma fixup_failed_ok: forall v w w' (state: TD.State) d b d' d'' i,
+      v < size d ->
+      TD.get_disk d0 state = Some d' ->
+      TD.get_disk d1 state = Some d'' ->
+      d' = diskUpd d v b ->
+      d'' = d ->
+      exec (fixup v) w (Finished (DiskFailed i) w') ->
+      d' v = d'' v.
+    Proof.
+    Admitted.
+
+    (* The disk is synchronous so at most one address that is out of sync. *)
+    Definition recovery_pre (state: TD.State) d :=
+      match (TD.get_disk d0 state, TD.get_disk d1 state) with
+      | (Some d', Some d'') =>  
+        (d = d' /\ d = d'') \/
+        (exists a b, a < size d /\
+          ((d = (diskUpd d a b) /\ d = d'') \/
+           (d' = (diskUpd d a b) /\ d'' = diskUpd d a b)))
+      | (Some d', None) => d = d' \/ 
+          (exists a b, a < size d /\ d' = diskUpd d a b)
+      | (None, Some d'') => d = d'' \/ 
+          (exists a b, a < size d /\ d'' = diskUpd d a b)
+      | (_, _) => False  (* one disk must be working *)
+      end.
+
+    Definition recovery_post (state: TD.State) d :=
+      match (TD.get_disk d0 state, TD.get_disk d1 state) with
+      | (Some d', Some d'') =>  d = d' /\ d = d''
+      | (Some d', None) => d = d'
+      | (None, Some d'') => d = d''
+      | (_, _) => False
+      end.
+
+    Lemma recover_at_ok: forall v w w' state d,
+      recovery_pre state d ->
+      abstraction (interface_abs td) w state ->
+      exec (recover_at v) w (Finished RepairDone w') ->
+      exists state',
+        abstraction (interface_abs td) w' state' /\
+        recovery_post state' d.
+    Proof.
+      induction v; intros.
+      - exists state.
+        inv_exec.
+        unfold recovery_pre in H; simpl in *.
+        (* apply Nat.nlt_0_r in H5. exfalso; auto. *)
+        admit.
+      - inv_exec.
+        destruct v0.
+        + exists state.
+          eapply fixup_continue_ok in H7; eauto.
+          all: admit.
+        + eexists. intros.
+          eapply fixup_repair_ok in H7; eauto.
+          all: admit.
+        + 
+          
+    Admitted.
+
+    Lemma recover_finish_ok: forall w w' d state state',
+      abstraction (interface_abs td) w state ->
+      recovery_pre state d ->
+      exec Recover w (Finished tt w') ->
+      abstraction (interface_abs td) w' state' /\
+      recovery_post state' d.
+     Proof.
+      intros.
+      inv_exec.
+      inv_exec.
+      destruct v0.
+      - admit.
+      - eapply recover_at_ok in H6; eauto.
+        deex. split; auto.
+    Admitted.
+
     (* read with recovery *)
     Lemma read_recover_ok: forall s a w state w' w'' w''',
       abstraction (interface_abs td) w state ->
@@ -838,6 +939,7 @@ Module ReplicatedDisk.
            rd_abstraction state' state2').
     Proof.
       intros.
+      
     Admitted.
 
 
