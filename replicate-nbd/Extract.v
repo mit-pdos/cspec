@@ -8,7 +8,7 @@ Require Import TwoDisk.ExtrTwoDisk.
 
 Extraction Language Haskell.
 
-Require Import NBD.Server.
+Require Import SeqDisk.Server.
 
 Separate Extraction diskSizes serverLoop init.
 

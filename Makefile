@@ -57,7 +57,7 @@ coq: $(patsubst src/%.v,build/%.vo,$(CODE))
 
 statdb-cli/extract: build/StatDb/StatDbCli.vo
 remap-nbd/extract: build/RemappedDisk/Server.vo
-replicate-nbd/extract: build/NBD/Server.vo
+replicate-nbd/extract: build/SeqDisk/Server.vo
 
 bin/%: %/extract
 	mkdir -p $(@D)
