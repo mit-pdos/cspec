@@ -22,6 +22,7 @@ import_modules = {
         "ReadWrite",
         "Recovery",
         "ReplicatedDisk",
+        "ExtrServer",
         "Server",
         "Sync",
         "ExtrTwoDisk",
@@ -31,7 +32,7 @@ import_modules = {
     ["NbdData"],
 
     "import Network.ServerOps as Server":
-    ["Server"]
+    ["ExtrServer"]
 }
 
 module_imports = {}

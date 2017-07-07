@@ -1,6 +1,5 @@
 module Variables.Ops where
 
-import Control.Monad (void)
 import Control.Monad.Reader (reader, liftIO)
 import Data.IORef
 import Variables.Env

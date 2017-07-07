@@ -1,7 +1,6 @@
 module Variables.Env
   (
     TheProg
-  , Env
   , varCount
   , varSum
   , newEnv

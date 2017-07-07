@@ -55,8 +55,9 @@ coq: $(patsubst src/%.v,build/%.vo,$(CODE))
 	coqtop $(COQRFLAGS) -batch -noglob -load-vernac-source $<
 	./scripts/add-preprocess.sh $(patsubst %/extract,%/src/*.hs,$@)
 
-replicate-nbd/extract: build/NBD/ExtrServer.vo
 statdb-cli/extract: build/StatDb/StatDbCli.vo
+remap-nbd/extract: build/RemappedDisk/Server.vo
+replicate-nbd/extract: build/SeqDisk/Server.vo
 
 bin/%: %/extract
 	mkdir -p $(@D)

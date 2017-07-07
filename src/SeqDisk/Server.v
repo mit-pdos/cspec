@@ -7,9 +7,7 @@ Require Import SeqDisk.ReplicatedDisk.Init.
 Require Import TwoDisk.ExtrTwoDisk.
 
 Require Import NBD.NbdData.
-
-Axiom getRequest : prog Request.
-Axiom sendResponse : Response -> prog unit.
+Require Import NBD.ExtrServer.
 
 (* TODO: re-use this code for asynchronous implementation *)
 Definition d := RD.rd TD.td.
