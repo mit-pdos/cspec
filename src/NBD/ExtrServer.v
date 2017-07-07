@@ -1,5 +1,8 @@
+Require Import Refinement.ProgLang.Prog.
 Require Import NBD.NbdData.
-Require Import NBD.Server.
+
+Axiom getRequest : prog Request.
+Axiom sendResponse : Response -> prog unit.
 
 Extraction Language Haskell.
 

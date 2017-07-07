@@ -125,13 +125,6 @@ Definition Prim opT `{api: InterfaceAPI opT State}
            {T} (op: opT T) : prog T :=
   op_impl (interface_impl i) _ op.
 
-(* Helper functions to get the implementation of the initialization and recovery
-from an [Interface]. *)
-Definition iInit opT `{api: InterfaceAPI opT State} `(i: Interface api) : prog InitResult :=
-  init_impl (interface_impl i).
-Definition iRecover opT `{api: InterfaceAPI opT State} `(i: Interface api) : prog unit :=
-  recover_impl (interface_impl i).
-
 (* TODO: this coercion works but does not keep T implicit
    see https://coq.inria.fr/bugs/show_bug.cgi?id=5527 *)
 Coercion Prim : Interface >-> Funclass.
@@ -180,6 +173,9 @@ Qed.
 Hint Resolve irec_ret_ok.
 
 (* Helpers for initialization *)
+
+Definition iInit opT `{api: InterfaceAPI opT State} `(i: Interface api) : prog InitResult :=
+  init_impl (interface_impl i).
 
 Definition then_init (init1 init2: prog InitResult) : prog InitResult :=
   r <- init1;
