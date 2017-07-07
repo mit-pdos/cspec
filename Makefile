@@ -56,6 +56,7 @@ coq: $(patsubst src/%.v,build/%.vo,$(CODE))
 	./scripts/add-preprocess.sh $(patsubst %/extract,%/src/*.hs,$@)
 
 statdb-cli/extract: build/StatDb/StatDbCli.vo
+remap-nbd/extract: build/RemappedDisk/Server.vo
 replicate-nbd/extract: build/NBD/Server.vo
 
 bin/%: %/extract
