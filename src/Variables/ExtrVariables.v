@@ -1,7 +1,5 @@
+Require Import POCS.
 Require Import Variables.VariablesAPI.
-Require Import Refinement.ProgLang.Prog.
-Require Import Refinement.ProgLang.Hoare.
-Require Import Refinement.Interface.
 
 Import Vars.
 Module Vars.

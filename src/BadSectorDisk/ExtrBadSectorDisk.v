@@ -1,8 +1,5 @@
-Require Import Disk.SimpleDisk.
+Require Import POCS.
 Require Import BadSectorDisk.BadSectorAPI.
-Require Import Refinement.ProgLang.Prog.
-Require Import Refinement.ProgLang.Hoare.
-Require Import Refinement.Interface.
 
 Import BadSectorDisk.
 Module BadSectorDisk.

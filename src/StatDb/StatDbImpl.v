@@ -1,14 +1,6 @@
-Require Import Automation.
-Require Import EqualDec.
-Require Import List.
-Require Import Omega.
-
+Require Import POCS.
 Require Import StatDb.StatDbAPI.
 Require Import Variables.VariablesAPI.
-Require Import Refinement.Interface.
-Require Import Refinement.ProgLang.Prog.
-Require Import Refinement.ProgLang.Hoare.
-Require Import Refinement.ProgLang.NoCrashes.
 
 Module StatDB.
 

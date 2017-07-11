@@ -1,13 +1,6 @@
-Require Import Automation.
-Require Import Disk.SimpleDisk.
-Require Import Omega.
-
+Require Import POCS.
 Require Import RemappedDisk.RemappedDiskAPI.
 Require Import BadSectorDisk.BadSectorAPI.
-Require Import Refinement.Interface.
-Require Import Refinement.ProgLang.Prog.
-Require Import Refinement.ProgLang.Hoare.
-Require Import Refinement.ProgLang.NoCrashes.
 
 Module RemappedDisk.
 

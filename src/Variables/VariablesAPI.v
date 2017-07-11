@@ -1,8 +1,4 @@
-Require Import Prog.
-Require Import Automation.
-Require Import SepLogic.Mem.
-
-Require Import Refinement.Interface.
+Require Import POCS.
 
 Module Vars.
 

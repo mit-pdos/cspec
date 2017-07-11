@@ -1,5 +1,4 @@
-Require Import Refinement.ProgLang.Prog.
-Require Import Refinement.Interface.
+Require Import POCS.
 Require Import StatDb.StatDbAPI.
 Require Import StatDb.StatDbImpl.
 Require Import Variables.ExtrVariables.

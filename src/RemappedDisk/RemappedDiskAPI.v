@@ -1,8 +1,4 @@
-Require Import Prog.
-Require Import Automation.
-
-Require Import Disk.SimpleDisk.
-Require Import Refinement.Interface.
+Require Import POCS.
 
 Module RemappedDisk.
 
