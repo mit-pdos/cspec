@@ -48,8 +48,8 @@ End BadSectorDisk.
 
 Extraction Language Haskell.
 
-Extract Constant BadSectorDisk.hs_read => "BadSector.read".
-Extract Constant BadSectorDisk.hs_write => "BadSector.write".
-Extract Constant BadSectorDisk.hs_getBadSector => "BadSector.getBadSector".
-Extract Constant BadSectorDisk.hs_diskSize => "BadSector.diskSize".
+Extract Constant BadSectorDisk.hs_read => "BadSectorDisk.Ops.read".
+Extract Constant BadSectorDisk.hs_write => "BadSectorDisk.Ops.write".
+Extract Constant BadSectorDisk.hs_getBadSector => "BadSectorDisk.Ops.getBadSector".
+Extract Constant BadSectorDisk.hs_diskSize => "BadSectorDisk.Ops.diskSize".
 Extract Constant BadSectorDisk.abstr => "Hoare.Build_LayerAbstraction".

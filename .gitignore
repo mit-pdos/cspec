@@ -18,6 +18,9 @@
 *.v.d
 *.glob
 
+# created by remap-nbd
+/disk.img
+
 # created by replicate-nbd
 /disk0.img
 /disk1.img

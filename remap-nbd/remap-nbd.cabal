@@ -1,0 +1,53 @@
+name:                remap-nbd
+version:             0.1.0.0
+build-type:          Simple
+cabal-version:       >=1.10
+
+library
+  hs-source-dirs:      src
+  exposed-modules:     RemappedDiskImpl
+                     , Network.NBD
+  other-modules:       Utils.Conversion
+                     , BadSectorDisk.Ops
+                     , BadSectorDisk.Env
+                     , Network.NBD.Data
+                     , Network.ServerOps
+                     , Bytes
+                     , Datatypes
+                     , Nat
+                     , Def
+                     , SimpleDisk
+                     , EquivDec
+                     , GenericDisk
+                     , Hoare
+                     , Interface
+                     , NbdData
+                     , Prog
+                     , Sectors
+                     , Server
+                     , Specif
+                     , ExtrBadSectorDisk
+                     , BadSectorAPI
+                     , RemappedDiskAPI
+  build-depends:       base >= 4.7 && < 5
+                     , ghc-prim
+                     , bytestring
+                     , conduit-extra
+                     , conduit-combinators
+                     , cereal
+                     , cereal-conduit
+                     , directory
+                     , mtl
+                     , unix
+                     , unix-bytestring
+  default-language:    Haskell2010
+
+executable remap-nbd
+  hs-source-dirs:      app
+  main-is:             Main.hs
+  ghc-options:         -threaded -rtsopts -with-rtsopts=-N
+  build-depends:       base
+                     , remap-nbd
+                     , directory
+                     , optparse-applicative
+  default-language:    Haskell2010

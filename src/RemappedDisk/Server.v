@@ -70,4 +70,7 @@ Definition serverLoop : prog unit :=
   _ <- irec d;
   handle.
 
+Definition diskSize : prog nat :=
+  Prim d (RemappedDisk.DiskSize).
+
 Definition init := iInit d.
