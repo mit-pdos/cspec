@@ -832,7 +832,7 @@ Module ReplicatedDisk.
 
     (* The disk is synchronous so at most one address that is out of sync. *)
     Definition recovery_pre (state: TD.State) s a' :=
-      a' <= size s /\
+      a' <= size s ->
       match (TD.get_disk d0 state, TD.get_disk d1 state) with
       | (Some d', Some d'') =>  
         (d' = s /\ d'' = s) \/
@@ -847,7 +847,7 @@ Module ReplicatedDisk.
       end.
 
     Definition recovery_post (state: TD.State) s a' :=
-      a' < size s /\
+      a' < size s ->
       match (TD.get_disk d0 state, TD.get_disk d1 state) with
       | (Some d', Some d'') =>  forall a, a >= a' /\ (s a) = (d' a) /\ (s a = d'' a)
       | (Some d', None) => s = d'
@@ -855,27 +855,49 @@ Module ReplicatedDisk.
       | (_, _) => False
       end.
 
-    Definition fixup_post (state:TD.State) v s :=
-      match (TD.get_disk d0 state, TD.get_disk d1 state) with
-      | (Some d', Some d'') => (s v) = (d' v) /\ (s v) = (d'' v)
-      | (Some d', None) => (s v) = (d' v)
-      | (None, Some d'') => (s v) = (d'' v)
-      | (None, None) => False
-      end.
-
     (* fix up for v that isn't out of sync. keep repairing *)
     Lemma fixup_continue_ok: forall v w w' (state: TD.State) s,
       recovery_pre state s (S v) ->
       recovery_post state s (S v) ->
-      td_disk_size_post state (size s) ->
       abstraction (interface_abs td) w state ->
       exec (fixup v) w (Finished Continue w') ->
       exists state',
         abstraction (interface_abs td) w' state' /\
         recovery_pre state' s v /\
-        recovery_post state' s v /\
-        td_disk_size_post state' (size s).
+        recovery_post state' s v.
     Proof.
+      intros.
+      inv_exec.
+      destruct v0.
+      - eapply RExec in H8.
+        eapply impl_ok in H8; eauto. deex.
+        inv_exec.
+        destruct v1.
+        + eapply RExec in H9.
+          eapply impl_ok in H9; eauto. deex.
+          destruct (equiv_dec v0 v1).
+          -- inv_exec.
+            exists state'0.
+            admit.
+          -- inv_exec.
+            eapply RExec in H11.
+            eapply impl_ok in H11; eauto. deex.
+            destruct v2. inversion H6. inversion H6.
+            simpl; auto.
+          -- simpl; auto.
+       + eapply RExec in H9.
+         eapply impl_ok in H9; eauto. deex.
+         inv_exec.
+         inversion H6.
+         simpl; auto.
+       + simpl; auto.
+    - eapply RExec in H8.
+      eapply impl_ok in H8; eauto. deex.
+      inv_exec.
+      inversion H4.
+      simpl; auto.
+    Unshelve.
+      all: auto.
     Admitted.
 
 
@@ -883,29 +905,40 @@ Module ReplicatedDisk.
    Lemma fixup_repair_ok: forall v w w' (state: TD.State) s,
       recovery_pre state s (S v) ->
       recovery_post state s (S v) ->
-      td_disk_size_post state (size s) ->
       abstraction (interface_abs td) w state ->
       exec (fixup v) w (Finished RepairDone w') ->
       exists state',
         abstraction (interface_abs td) w' state' /\
-        recovery_pre state' s 0 /\
-        recovery_post state' s 0 /\
-        td_disk_size_post state' (size s).
+        recovery_pre state' s 0 /\    (* XXX maybe v instead of 0 *)
+        recovery_post state' s 0.
     Proof.
-    Admitted.
+      intros.
+      inv_exec.
+      destruct v0.
+      - eapply RExec in H8.
+        eapply impl_ok in H8; eauto. deex.
+        inv_exec.
+        destruct v1.
+        + eapply RExec in H9.
+          eapply impl_ok in H9; eauto. deex.
+          destruct (equiv_dec v0 v1).
+          -- inv_exec.
+            inversion H6.
+          -- inv_exec.
+            eapply RExec in H11.
+            eapply impl_ok in H11; eauto. deex.
+   Admitted.
 
    (* fix up for v that is out of sync, repair and be done *)
    Lemma fixup_repair_failure: forall v w w' (state: TD.State) s i,
       recovery_pre state s (S v) ->
       recovery_post state s (S v) ->
-      td_disk_size_post state (size s) ->
       abstraction (interface_abs td) w state ->
       exec (fixup v) w (Finished (DiskFailed i) w') ->
       exists state',
         abstraction (interface_abs td) w' state' /\
         recovery_pre state' s 0 /\
-        recovery_post state' s 0 /\
-        td_disk_size_post state' (size s).
+        recovery_post state' s 0.
     Proof.
     Admitted.
 
@@ -913,14 +946,12 @@ Module ReplicatedDisk.
     Lemma recover_at_ok: forall v w w' state s,
       recovery_pre state s v ->
       recovery_post state s v ->
-      td_disk_size_post state (size s) ->
       abstraction (interface_abs td) w state ->
       exec (recover_at v) w (Finished RepairDone w') ->
       exists state',
         abstraction (interface_abs td) w' state' /\
         recovery_pre state' s 0 /\
-        recovery_post state' s 0 /\
-        td_disk_size_post state' (size s).
+        recovery_post state' s 0.
     Proof.
       induction v; intros.
       - exists state.
@@ -928,14 +959,15 @@ Module ReplicatedDisk.
         split; auto.
       - inv_exec.
         destruct v0.
-        + eapply fixup_continue_ok with (s := s) in H9 as H9'; eauto.
+        + eapply fixup_continue_ok with (s := s) in H8 as H8'; eauto.
           deex. 
           specialize (IHv w'0 w' state' s).
           edestruct IHv; eauto.
         + inv_exec.
-          eapply fixup_repair_ok with (s := s) in H9 as H9'; eauto.
+          eapply fixup_repair_ok with (s := s) in H8 as H8'; eauto.
+          (* XXX maybe use induction, if v instead of 0 *)
         + inv_exec.
-          eapply fixup_repair_failure with (s := s) in H9 as H9'; eauto.
+          eapply fixup_repair_failure with (s := s) in H8 as H8'; eauto.
     Qed.
 
     Definition td_disk_size_pre (state:TD.State) :=
@@ -945,7 +977,6 @@ Module ReplicatedDisk.
       | (None, Some d'') => True
       | (None, None) => False
       end.
-
 
     Lemma recovery_pre_failure: forall state state' s n,
       recovery_pre state n s ->
@@ -987,11 +1018,9 @@ Module ReplicatedDisk.
       exec diskSize w (Finished v w') ->
       exists state',
         abstraction (interface_abs td) w' state' /\
-        td_disk_size_post state' v /\ 
-        recovery_pre state' s (size s) /\
-        v = size s.
+        td_disk_size_post state' v /\
+        recovery_pre state' s (size s).
     Proof.
-(*
       intros.
       inv_exec.
       destruct v0.
@@ -1014,21 +1043,14 @@ Module ReplicatedDisk.
               intuition; subst; auto.
               repeat deex.
               intuition; subst; auto.
-              rewrite diskUpd_size; auto.
-              rewrite diskUpd_size; auto.
+              destruct H2; intuition; subst; auto.
               repeat deex.
               intuition; subst; auto.
               rewrite diskUpd_size; auto.
-            ++ rewrite H4 in *; simpl.
-              intuition; subst; auto.
-              repeat deex.
-              intuition; subst; auto.
-              rewrite diskUpd_size; auto.
-           -- rewrite H3 in H6; simpl in *.
+          -- rewrite H3 in H6; simpl in *.
             inversion H6; auto.
         + simpl; auto.
-      - 
-        inv_exec.
+      - inv_exec.
         destruct v0.
         + inv_exec.
           eapply RExec in H7.
@@ -1054,7 +1076,6 @@ Module ReplicatedDisk.
               unfold td_disk_size_post. subst; simpl.
               rewrite H6; simpl in *.
               rewrite H5'; simpl; auto.
-              admit.
             ++ 
               eapply bg_failure_disk with (id := d0) in H4 as H4'; simpl in *.
               apply both_disks_not_missing in H6; eauto.
@@ -1081,8 +1102,7 @@ Module ReplicatedDisk.
           -- simpl; auto.
       Unshelve.
       all: eauto; try exact unit.
-*)
-    Admitted.
+    Qed.
 
     Lemma recover_finish_ok: forall w w' s state,
       abstraction (interface_abs td) w state ->
@@ -1098,13 +1118,14 @@ Module ReplicatedDisk.
       destruct v0.
       - admit.
       - eapply disk_size_ok' with (state := state) in H7; eauto.
-        deex. 
+        deex.
         eapply recover_at_ok with (state := state') in H6; eauto.
         deex.
         exists state'0.
-        split; auto.
-        unfold recovery_post.
-
+        split; eauto.
+        (* XXX why is v (size s) omega *) 
+        admit.
+        admit.
       - eapply disk_size_ok' with (state := state) in H7; eauto.
         deex.
         assert (TD.get_disk i state' = None).
