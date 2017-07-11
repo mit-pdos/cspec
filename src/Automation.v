@@ -1,4 +1,5 @@
-Require Import EquivDec.
+Require Import EqualDec.
+Require EquivDec.
 
 (** * Simplify matches when possible. *)
 Ltac simpl_match :=
@@ -266,7 +267,7 @@ Tactic Notation "hide_fn" constr(fn) :=
 (** * Handling == equivalences *)
 
 Ltac is_eq a a' :=
-  destruct (a == a'); unfold equiv, complement in *; subst.
+  destruct (a == a'); subst.
 
 (** * Normalize systems of equality *)
 

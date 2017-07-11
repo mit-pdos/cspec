@@ -17,8 +17,8 @@ Module Vars.
   (** The state the program manipulates as it executes. *)
   Definition State := mem var nat.
 
-  Instance var_dec : EqDec var eq.
-    unfold EqDec; intros.
+  Instance var_dec : EqualDec var.
+    unfold EqualDec; intros.
     destruct x; destruct y;
       try (left; congruence);
       try (right; congruence).

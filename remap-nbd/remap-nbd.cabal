@@ -17,7 +17,7 @@ library
                      , Nat
                      , Def
                      , SimpleDisk
-                     , EquivDec
+                     , EqualDec
                      , GenericDisk
                      , Hoare
                      , Interface
@@ -29,6 +29,7 @@ library
                      , ExtrBadSectorDisk
                      , BadSectorAPI
                      , RemappedDiskAPI
+                     , ExtrServer
   build-depends:       base >= 4.7 && < 5
                      , ghc-prim
                      , bytestring

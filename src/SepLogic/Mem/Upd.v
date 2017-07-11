@@ -1,4 +1,4 @@
-Require Export EquivDec.
+Require Export EqualDec.
 
 Require Import Automation.
 Require Import SepLogic.Mem.Def.
@@ -6,7 +6,7 @@ Require Import SepLogic.Mem.Def.
 Section Upd.
 
   Variable A:Type.
-  Context {AEQ:EqDec A eq}.
+  Context {AEQ:EqualDec A}.
   Variable V:Type.
 
   Implicit Type (m:mem A V).

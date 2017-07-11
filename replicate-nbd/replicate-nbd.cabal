@@ -29,7 +29,7 @@ library
                      , Def
                      , SimpleDisk
                      , DiskSize
-                     , EquivDec
+                     , EqualDec
                      , GenericDisk
                      , Hoare
                      , Init
@@ -47,6 +47,7 @@ library
                      , TwoDiskAPI
                      , TwoDiskDefs
                      , ExtrTwoDisk
+                     , ExtrServer
   build-depends:       base >= 4.7 && < 5
                      , ghc-prim
                      , bytestring

@@ -1,13 +1,13 @@
 (** Bytes is an axiomatic library for byte strings. *)
 
-Require Import EquivDec.
+Require Import EqualDec.
 
 Set Implicit Arguments.
 
 (* bytes n is a byte string with length n. *)
 Parameter bytes : nat -> Type.
 
-Parameter bytes_dec : forall n, EqDec (bytes n) eq.
+Parameter bytes_dec : forall n, EqualDec (bytes n).
 
 Axiom bytes0 : forall n, bytes n.
 

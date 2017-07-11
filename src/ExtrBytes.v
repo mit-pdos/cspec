@@ -1,4 +1,5 @@
 Require Export Bytes.
+Require Extraction.
 
 Extraction Language Haskell.
 

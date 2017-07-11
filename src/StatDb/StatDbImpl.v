@@ -1,5 +1,5 @@
 Require Import Automation.
-Require Import EquivDec.
+Require Import EqualDec.
 Require Import List.
 Require Import Omega.
 
@@ -29,7 +29,7 @@ Module StatDB.
         Ret None
       else
         sum <- Prim vars (Vars.Read Vars.VarSum);
-        Ret (Some (Nat.div sum count)).
+        Ret (Some (sum / count)).
 
     Definition init : prog InitResult :=
       _ <- Prim vars (Vars.Write Vars.VarCount 0);

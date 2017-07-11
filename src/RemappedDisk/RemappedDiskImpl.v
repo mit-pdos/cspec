@@ -92,10 +92,10 @@ Module RemappedDisk.
             eexists; intuition. reflexivity. constructor.
             rewrite <- H11. rewrite e0.
             replace (size s + 1 - 1) with (size s) by omega.
-            destruct (v0 == size s).
+            destruct (v0 == size s); subst.
            -- right.
               apply disk_oob_eq.
-              rewrite e. rewrite e3. omega.
+              omega.
            -- left.
               rewrite e2; eauto.
 
@@ -108,16 +108,16 @@ Module RemappedDisk.
             exists s. intuition.
             eexists; intuition. reflexivity. constructor. right.
             apply disk_oob_eq.
-            rewrite e. rewrite e0. omega.
+            omega.
 
           * eexists; intuition. eauto. simpl.
             exists s. intuition.
             eexists; intuition. reflexivity. constructor.
             rewrite <- H8.
-            destruct (a == size s).
+            destruct (a == size s); subst.
            -- right.
               apply disk_oob_eq.
-              rewrite e2. omega.
+              omega.
            -- left.
               rewrite e0; eauto.
 
@@ -138,22 +138,22 @@ Module RemappedDisk.
           * eexists; intuition. eauto. simpl.
             exists s. intuition.
             eexists; intuition. reflexivity.
-            replace s with (diskUpd s a b) at 2. constructor.
-            apply diskUpd_none. apply disk_oob_eq. rewrite e. omega.
+            replace s with (diskUpd s (size stateDisk - 1) b) at 2. constructor.
+            apply diskUpd_none. apply disk_oob_eq. omega.
 
           * eexists; intuition. eauto. simpl.
-            exists (diskUpd s a b). intuition.
+            exists (diskUpd s v1 b). intuition.
             eexists; intuition. reflexivity. constructor.
 
            -- repeat rewrite diskUpd_size; omega.
 
-           -- rewrite diskUpd_size in *. rewrite e2.
+           -- rewrite diskUpd_size in *.
               rewrite e. replace (size s + 1 - 1) with (size s) by omega.
               repeat rewrite diskUpd_neq by congruence. eauto.
 
            -- rewrite e in *. replace (size s + 1 - 1) with (size s) in * by omega.
               rewrite diskUpd_size. rewrite diskUpd_eq by omega.
-              rewrite e2 in *. rewrite diskUpd_eq; auto.
+              rewrite diskUpd_eq; auto.
               destruct (eq_nat_dec v1 (size s)); try congruence. omega.
 
            -- rewrite diskUpd_size. eauto.
@@ -233,7 +233,7 @@ Module RemappedDisk.
 
         + eexists; intuition; eauto.
 
-      Unshelve.
+      Grab Existential Variables.
       all: eauto.
 
     Defined.
