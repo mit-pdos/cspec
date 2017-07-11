@@ -7,6 +7,7 @@ Things to clean up:
   EquivDec and Omega.
 
 - get rid of preconditions from prog_spec?
+  see commit acdfaf460b8cbe180959192f1da3b8cb03ca4409
 
 - mechanically check assumed facts to make sure students didn't state some axiom (e.g., Axiom False)
   or import NoCrashes when we wanted them to prove crashes.  (use Print Assumptions ...)
