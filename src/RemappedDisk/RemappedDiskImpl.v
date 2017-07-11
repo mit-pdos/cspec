@@ -87,9 +87,9 @@ Module RemappedDisk.
           inv_rexec; try cannot_crash.
           exec_steps; repeat ( BadSectorDisk.inv_bg || BadSectorDisk.inv_step ).
 
-          * eexists; intuition. eauto. simpl.
-            exists s. intuition.
-            eexists; intuition. reflexivity. constructor.
+          * eexists; intuition auto. eauto. simpl.
+            exists s. intuition auto.
+            eexists; intuition auto. reflexivity. constructor.
             rewrite <- H11. rewrite e0.
             replace (size s + 1 - 1) with (size s) by omega.
             destruct (v0 == size s); subst.
@@ -104,15 +104,15 @@ Module RemappedDisk.
             2: eauto.
             omega.
 
-          * eexists; intuition. eauto. simpl.
-            exists s. intuition.
-            eexists; intuition. reflexivity. constructor. right.
+          * eexists; intuition auto. eauto. simpl.
+            exists s. intuition auto.
+            eexists; intuition auto. reflexivity. constructor. right.
             apply disk_oob_eq.
             omega.
 
-          * eexists; intuition. eauto. simpl.
-            exists s. intuition.
-            eexists; intuition. reflexivity. constructor.
+          * eexists; intuition auto. eauto. simpl.
+            exists s. intuition auto.
+            eexists; intuition auto. reflexivity. constructor.
             rewrite <- H8.
             destruct (a == size s); subst.
            -- right.
@@ -121,9 +121,9 @@ Module RemappedDisk.
            -- left.
               rewrite e0; eauto.
 
-          * eexists; intuition. eauto. simpl.
-            exists s. intuition.
-            eexists; intuition. reflexivity. constructor. right.
+          * eexists; intuition auto. eauto. simpl.
+            exists s. intuition auto.
+            eexists; intuition auto. reflexivity. constructor. right.
             apply disk_oob_eq.
             apply disk_none_oob in H8. omega.
 
@@ -135,15 +135,15 @@ Module RemappedDisk.
           inv_rexec; try cannot_crash.
           exec_steps; repeat ( BadSectorDisk.inv_bg || BadSectorDisk.inv_step ).
 
-          * eexists; intuition. eauto. simpl.
-            exists s. intuition.
-            eexists; intuition. reflexivity.
+          * eexists; intuition auto. eauto. simpl.
+            exists s. intuition auto.
+            eexists; intuition auto. reflexivity.
             replace s with (diskUpd s (size stateDisk - 1) b) at 2. constructor.
             apply diskUpd_none. apply disk_oob_eq. omega.
 
-          * eexists; intuition. eauto. simpl.
-            exists (diskUpd s v1 b). intuition.
-            eexists; intuition. reflexivity. constructor.
+          * eexists; intuition auto. eauto. simpl.
+            exists (diskUpd s v1 b). intuition auto.
+            eexists; intuition auto. reflexivity. constructor.
 
            -- repeat rewrite diskUpd_size; omega.
 
@@ -158,9 +158,9 @@ Module RemappedDisk.
 
            -- rewrite diskUpd_size. eauto.
 
-          * eexists; intuition. eauto. simpl.
-            exists (diskUpd s a b). intuition.
-            eexists; intuition. reflexivity. constructor.
+          * eexists; intuition auto. eauto. simpl.
+            exists (diskUpd s a b). intuition auto.
+            eexists; intuition auto. reflexivity. constructor.
 
            -- repeat rewrite diskUpd_size; omega.
 
@@ -189,9 +189,9 @@ Module RemappedDisk.
           inv_rexec; try cannot_crash.
           exec_steps; repeat ( BadSectorDisk.inv_bg || BadSectorDisk.inv_step ).
 
-          eexists; intuition. eauto. simpl.
-          exists s. intuition.
-          eexists; intuition. reflexivity.
+          eexists; intuition auto. eauto. simpl.
+          exists s. intuition auto.
+          eexists; intuition auto. reflexivity.
 
           rewrite H3.
           replace (size s + 1 - 1) with (size s) in * by omega.
@@ -206,14 +206,14 @@ Module RemappedDisk.
         inv_rexec; try cannot_crash.
         exec_steps; repeat ( BadSectorDisk.inv_bg || BadSectorDisk.inv_step ).
 
-        + eexists; intuition; eauto.
+        + eexists; intuition auto; eauto.
 
-        + eexists; intuition; eauto; simpl.
+        + eexists; intuition auto; eauto; simpl.
           case_eq (d (size d - 1)); intros.
 
           * exists (diskUpd (shrink d) v1 b).
             rewrite diskUpd_size in *.
-            intuition.
+            intuition auto.
 
            -- apply shrink_size. congruence.
            -- rewrite diskUpd_neq by congruence.
@@ -231,7 +231,7 @@ Module RemappedDisk.
 
           * apply disk_none_oob in H2. omega.
 
-        + eexists; intuition; eauto.
+        + eexists; intuition auto; eauto.
 
       Grab Existential Variables.
       all: eauto.
