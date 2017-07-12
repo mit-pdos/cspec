@@ -695,6 +695,7 @@ Module ReplicatedDisk.
       all: constructor.
     Admitted.
 
+
     Definition disk_size (state: TD.State) id v :=
       match TD.get_disk id state with
       | Some d => Working v = Working (size d)
@@ -1199,6 +1200,92 @@ Module ReplicatedDisk.
       intros.
     Admitted.
 
+    Lemma rd_abstraction_recovery_pre: forall state s,
+      rd_abstraction state s ->
+      recovery_pre state s (size s).
+    Proof.
+      unfold rd_abstraction, rd_invariant, abstraction_f, recovery_pre in *.
+      intros. simpl in *.
+      case_eq (TD.disk0 state); intros.
+      + case_eq (TD.disk1 state); intros.
+        - destruct state. simpl in *.
+          rewrite H1 in H.
+          rewrite H2 in H.
+          intuition; subst; simpl in *.
+          left. split; auto.
+        - destruct state. simpl in *.
+          rewrite H1 in H.
+          rewrite H2 in H.
+          intuition; subst; simpl in *.
+      + case_eq (TD.disk1 state); intros.
+        - destruct state. simpl in *.
+          rewrite H1 in H.
+          rewrite H2 in H.
+          intuition; subst; simpl in *.
+        - destruct state. simpl in *.
+          rewrite H1 in H.
+          rewrite H2 in H.
+          intuition; subst; simpl in *.
+    Qed.
+
+    (* write with crash *)
+    Lemma write_crash_ok: forall a b w w' state s,
+      abstraction (interface_abs td) w state ->
+      rd_abstraction state s -> 
+      exec (write a b) w (Crashed w') ->
+      exists state',
+       abstraction (interface_abs td) w' state' /\ recovery_pre state' s (size s).
+    Proof.
+      intros.
+      inv_exec.
+      - exists state.
+        split; auto.
+        apply rd_abstraction_recovery_pre; auto.
+      - eapply RExec in H7.
+        eapply impl_ok in H7; eauto. deex.
+        inv_exec.
+        + exec_steps; repeat ( ReplicatedDisk.inv_bg || ReplicatedDisk.inv_step ).
+          admit.
+        + eapply RExec in H8.
+          eapply impl_ok in H8; eauto. deex.
+          exec_steps; repeat ( ReplicatedDisk.inv_bg || ReplicatedDisk.inv_step ).
+          admit.
+          simpl; auto.
+        + admit.
+        + simpl; auto.
+      - admit.
+    Unshelve. all: auto.
+    Admitted.
+
+    Lemma irec_recover_ok: forall w' w'',
+        exec (@irec TD.Op TD.State TD.API td) (world_crash w') (Finished tt w'') ->
+        w' = w''.
+    Proof.
+        intros.
+        destruct td.
+        unfold irec in *. simpl in *.
+        (* XXX probably boils down to TD.wipe, which promises states are equal *)
+        (* XXX maybe need some composable recovery theorem. *)
+    Admitted.
+
+    Lemma write_recover_ok: forall s a b w state w' w'' w''',
+      abstraction (interface_abs td) w state ->
+      rd_abstraction state s ->
+      exec (write a b) w (Crashed w') ->
+      exec (irec td) (world_crash w') (Finished tt w'') ->
+      exec Recover w'' (Finished tt w''') ->
+      exists state' : TD.State,
+       abstraction (interface_abs td) w''' state' /\
+        (exists state2', (tt = tt /\ (state2' = s \/
+            (exists state1 v,
+                op_sem ReplicatedDisk.API (ReplicatedDisk.Write a b) s v state1 /\ 
+                state2' = state1))) /\ rd_abstraction state' state2').
+    Proof.
+      intros.
+      unfold op_sem; simpl.
+      eapply write_crash_ok in H1; eauto. deex.
+      eapply irec_recover_ok in H2; eauto. subst.
+    Admitted.
 
     Definition rd : Interface ReplicatedDisk.API.
       unshelve econstructor.
@@ -1227,8 +1314,14 @@ Module ReplicatedDisk.
           unfold prog_spec; intros.
           destruct a0; simpl in *; intuition.
           inv_rexec.
-          eapply write_ok; eauto.
-          admit.
+          -- eapply write_ok; eauto.
+          -- destruct H4.
+            ++ inv_exec.
+              destruct v. simpl in *.
+              destruct v0.
+              eapply write_recover_ok; eauto.
+            ++ (* crash during recovery, run recovery again *)
+              admit.
         + (* diskSize *)
           unfold prog_spec; intros.
           destruct a; simpl in *; intuition.
