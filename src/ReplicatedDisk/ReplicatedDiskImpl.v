@@ -1268,6 +1268,49 @@ Module ReplicatedDisk.
         (* XXX maybe need some composable recovery theorem. *)
     Admitted.
 
+    Lemma recovery_pre0_rd_abstraction: forall state s,
+      recovery_pre state s 0 ->
+      rd_abstraction state s.
+    Proof.
+      intros.
+      unfold rd_abstraction, rd_invariant, abstraction_f, recovery_pre in *.
+      intros. simpl in *.
+      case_eq (TD.disk0 state); intros.
+      + case_eq (TD.disk1 state); intros.
+        - destruct state. simpl in *.
+          rewrite H1 in *.
+          rewrite H0 in *.
+          assert (0 <= size s) by omega.
+          specialize (H H2).
+          intuition; subst; simpl in *; auto.
+          repeat deex.
+          intuition.
+          repeat deex.
+          intuition.
+        - destruct state. simpl in *.
+          rewrite H1 in *.
+          rewrite H0 in *.
+          intuition; subst; simpl in *.
+          assert (0 <= size s) by omega.
+          specialize (H H0).
+          intuition; subst; simpl in *; auto.
+          repeat deex.
+          intuition.
+       + case_eq (TD.disk1 state); intros.
+        - destruct state. simpl in *.
+          rewrite H1 in *.
+          rewrite H0 in *.
+          assert (0 <= size s) by omega.
+          specialize (H H2).
+          intuition; subst; simpl in *; auto.
+          repeat deex.
+          intuition.
+        - destruct state. simpl in *.
+          rewrite H1 in H.
+          rewrite H0 in H.
+          intuition; subst; simpl in *.
+    Qed.
+
     Lemma write_recover_ok: forall s a b w state w' w'' w''',
       abstraction (interface_abs td) w state ->
       rd_abstraction state s ->
@@ -1285,7 +1328,13 @@ Module ReplicatedDisk.
       unfold op_sem; simpl.
       eapply write_crash_ok in H1; eauto. deex.
       eapply irec_recover_ok in H2; eauto. subst.
-    Admitted.
+      eapply recover_finish_ok in H3; eauto. deex.
+      exists state'0.
+      split; auto.
+      exists s.
+      split; auto.
+      apply recovery_pre0_rd_abstraction in H3; auto.
+    Qed.
 
     Definition rd : Interface ReplicatedDisk.API.
       unshelve econstructor.
