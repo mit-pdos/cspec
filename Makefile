@@ -26,7 +26,7 @@ CODE += $(wildcard src/SeqDisk/*.v)
 
 COQRFLAGS := -R build Pocs
 
-BINS	:= statdb-cli remap-nbd replicate-nbd
+BINS	:= statdb-cli remap-nbd
 
 .PHONY: default
 default: _CoqProject $(patsubst %,bin/%,$(BINS))

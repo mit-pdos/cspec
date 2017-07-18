@@ -1,14 +1,7 @@
-Require Import Automation.
-Require Import Disk.SimpleDisk.
-Require Import Omega.
+Require Import POCS.
 
 Require Import ReplicatedDisk.ReplicatedDiskAPI.
-Require Import ReplicatedDisk.TwoDiskAPI.
-
-Require Import Refinement.Interface.
-Require Import Refinement.ProgLang.Prog.
-Require Import Refinement.ProgLang.Hoare.
-
+Require Import TwoDisk.TwoDiskAPI.
 
 Module ReplicatedDisk.
 
