@@ -1131,7 +1131,7 @@ Module ReplicatedDisk.
 
     Lemma recover_at_ok: forall v w w' state sold snew,
       recovery_pre state sold snew v ->
-      v < size sold ->
+      v <= size sold ->
       abstraction (interface_abs td) w state ->
       exec (recover_at v) w (Finished tt w') ->
       exists state',
@@ -1151,10 +1151,8 @@ Module ReplicatedDisk.
           inv_exec; destruct v0; eauto.
         + inv_exec.
           eapply fixup_repair_ok in H8 as H8'; eauto.
-          omega.
         + inv_exec.
           eapply fixup_repair_failure in H8 as H8'; eauto.
-          omega.
     Qed.
 
     Definition td_disk_size_pre (state:TD.State) :=
@@ -1194,121 +1192,88 @@ Module ReplicatedDisk.
 
 
     (* disk size on post-crash, pre-recovery state *)
-    Lemma disk_size_ok': forall v w w' state s,
+    Lemma disk_size_ok': forall v w w' state sold snew,
       abstraction (interface_abs td) w state ->
-      recovery_pre state s (size s) ->
+      recovery_pre state sold snew (size sold) ->
       exec diskSize w (Finished v w') ->
       exists state',
         abstraction (interface_abs td) w' state' /\
         td_disk_size_post state' v /\
-        recovery_pre state' s (size s).
+        recovery_pre state' sold snew (size sold).
     Proof.
       intros.
-      inv_exec.
-      destruct v0.
-      - eapply RExec in H7.
-        eapply impl_ok in H7; eauto. deex.
-        exec_steps; repeat ( ReplicatedDisk.inv_bg || ReplicatedDisk.inv_step ).
-        TD.inv_step; simpl in *.
-        + eapply recovery_pre_failure in H2; eauto. 
-          exists state'.
-          split; auto.
-          split; auto.
-          case_eq (TD.disk0 state'); intros.
-          -- rewrite H3 in H6; simpl in *.
-            inversion H6.
-            unfold td_disk_size_post.
-            unfold recovery_pre in H2; simpl in *.
-            rewrite H3 in *; simpl in *.
-            case_eq (TD.disk1 state'); intros; auto.
-            ++  rewrite H4 in *; simpl in *.
-              intuition; subst; auto.
-              repeat deex.
-              intuition; subst; auto.
-              destruct H2; intuition; subst; auto.
-              repeat deex.
-              intuition; subst; auto.
-              rewrite diskUpd_size; auto.
-          -- rewrite H3 in H6; simpl in *.
-            inversion H6; auto.
-        + simpl; auto.
-      - inv_exec.
-        destruct v0.
-        + inv_exec.
-          eapply RExec in H7.
-          eapply impl_ok in H7; eauto. deex.
-          eapply RExec in H6.
-          eapply impl_ok in H6; eauto. deex.
-          exec_steps; repeat ( ReplicatedDisk.inv_bg || ReplicatedDisk.inv_step ).
-          TD.inv_step.
-          TD.inv_step.
-          simpl in *.
-          case_eq (TD.disk0 state'); intros.
-          -- rewrite H5 in H8. inversion H8.
-          -- rewrite H5 in H8.
-             case_eq (TD.disk1 state'0); intros.
-             ++ rewrite H6 in H9.
-              inversion H9.
-              eapply bg_failure_disk_none with (id := d0) in H5 as H5'; eauto.
-              exists state'0.
-              split; auto.
-              eapply recovery_pre_failure in H2; eauto.
-              eapply recovery_pre_failure in H4; eauto.
-              split; auto.
-              unfold td_disk_size_post. subst; simpl.
-              rewrite H6; simpl in *.
-              rewrite H5'; simpl; auto.
-            ++ 
-              eapply bg_failure_disk_none with (id := d0) in H4 as H4'; simpl in *.
-              apply both_disks_not_missing in H6; eauto.
-              exfalso; auto. auto.
-         -- simpl; auto.
-         -- simpl; auto.
-        + inv_exec.
-          eapply RExec in H7.
-          eapply impl_ok in H7; eauto. deex.
-          eapply RExec in H6.
-          eapply impl_ok in H6; eauto. deex.
-          exec_steps; repeat ( ReplicatedDisk.inv_bg || ReplicatedDisk.inv_step ).
-          TD.inv_step.
-          TD.inv_step.
-          simpl in *.
-          case_eq (TD.disk1 state'0); intros; rewrite H5 in *.
-          -- inversion H9.
-          -- case_eq (TD.disk0 state'); intros; rewrite H6 in *.
-             ++ inversion H8.
-             ++ eapply bg_failure_disk_none with (id := d0) in H4 as H4'; simpl in *; auto.
-              apply both_disks_not_missing in H5; eauto.
-              exfalso; auto.
-          -- simpl; auto.
-          -- simpl; auto.
-      Unshelve.
-      all: eauto; try exact unit.
+      repeat ( exec_steps || TD.inv_step ).
+
+      all: repeat ( eapply recovery_pre_failure in H0; [ | eassumption ] ).
+      all: eexists; intuition eauto.
+
+      - unfold td_disk_size_post; simpl.
+        unfold recovery_pre in *; simpl in *.
+        destruct (TD.disk0 state'); destruct (TD.disk1 state'); try congruence.
+
+        intuition; subst; try congruence.
+        repeat deex; intuition; subst; try congruence.
+        autorewrite with upd in *. congruence.
+
+      - unfold td_disk_size_post; simpl.
+
+        replace (TD.disk0 state') with (TD.get_disk TwoDiskAPI.d0 state') in * by reflexivity.
+        case_eq (TD.get_disk TwoDiskAPI.d0 state'1); intros.
+
+        repeat match goal with
+        | Hb : TD.bg_failure _ ?state,
+          Hd : TD.get_disk _ ?state = Some _ |- _ =>
+          eapply bg_failure_ok in Hd; [ | exact Hb ];
+          try rewrite Hd in *
+        end.
+        congruence.
+
+        simpl in *.
+        destruct (TD.disk0 state'1); destruct (TD.disk1 state'1); try congruence.
+
+      - case_eq (TD.disk0 state'); [ intros ? He; rewrite He in *; congruence | ].
+        case_eq (TD.disk1 state'1); [ intros ? He; rewrite He in *; congruence | ].
+        intros.
+
+        replace (TD.disk0 state') with (TD.get_disk TwoDiskAPI.d0 state') in * by reflexivity.
+        eapply bg_failure_disk_none in H4; eauto.
+        simpl in *.
+
+        exfalso.
+        eapply both_disks_not_missing; eauto.
+
+    Unshelve.
+      all: eauto.
     Qed.
 
-    Lemma recover_finish_ok: forall w w' s state,
+    Lemma recover_finish_ok: forall w w' sold snew state,
       abstraction (interface_abs td) w state ->
-      recovery_pre state s (size s) ->
+      recovery_pre state sold snew (size sold) ->
       exec Recover w (Finished tt w') ->
       exists state',
         abstraction (interface_abs td) w' state' /\
-        recovery_pre state' s 0.
+        recovery_pre state' sold snew 0.
     Proof.
       intros.
       inv_exec.
       inv_exec.
       destruct v0.
-      - admit.
-      - eapply disk_size_ok' with (state := state) in H7; eauto.
-        deex.
-        eapply recover_at_ok with (state := state') in H6; eauto.
-        (* XXX why is v (size s) omega *) 
-        admit.
-      - eapply disk_size_ok' with (state := state) in H7; eauto.
-        deex.
-        assert (TD.get_disk i state' = None).
-        admit.
-    Admitted.
+
+      eapply disk_size_ok' with (state := state) in H7; eauto.
+      deex.
+
+      cut (v = size sold); intros; subst.
+      eapply recover_at_ok with (state := state') in H6; eauto.
+
+      unfold td_disk_size_post in H3.
+      unfold recovery_pre in H4.
+      simpl in *.
+
+      destruct (TD.disk0 state'); destruct (TD.disk1 state'); intuition; try congruence.
+      all: repeat deex; intuition; try congruence; subst.
+      all: autorewrite with upd in *; eauto.
+    Qed.
+
 
     (* read with recovery *)
     Lemma read_recover_ok: forall s a w state w' w'' w''',
@@ -1330,8 +1295,9 @@ Module ReplicatedDisk.
 
     Lemma rd_abstraction_recovery_pre: forall state s,
       rd_abstraction state s ->
-      recovery_pre state s (size s).
+      recovery_pre state s s (size s).
     Proof.
+(*
       unfold rd_abstraction, rd_invariant, abstraction_f, recovery_pre in *.
       intros. simpl in *.
       case_eq (TD.disk0 state); intros.
@@ -1354,7 +1320,8 @@ Module ReplicatedDisk.
           rewrite H1 in H.
           rewrite H2 in H.
           intuition; subst; simpl in *.
-    Qed.
+*)
+    Admitted.
 
 
     Ltac recovery_pre := repeat match goal with
@@ -1368,6 +1335,7 @@ Module ReplicatedDisk.
         idtac "x"; eapply both_disks_not_missing; eauto
       end.
 
+(*
     Lemma write0_crash_ok: forall a b v state state' s,
       rd_abstraction state s ->
       TD.op_step (TD.Write d0 a b) state v state' ->
@@ -1405,7 +1373,9 @@ Module ReplicatedDisk.
         - eapply td_write_none in H0; eauto; try reflexivity. 
           exfalso. eapply both_disks_not_missing with (state := state'); subst; eauto.
     Admitted.
-          
+*)
+
+(*
     Lemma write_both_crash_ok: forall a b v v0 state state' state'0 state'1 s,
       rd_abstraction state s -> 
       TD.op_step (TD.Write d0 a b) state v state' ->
@@ -1470,30 +1440,106 @@ Module ReplicatedDisk.
         - eapply td_write_none in H0; eauto; try reflexivity. 
           exfalso. eapply both_disks_not_missing with (state := state'); subst; eauto.
     Admitted.
-
+*)
 
     (* write with crash *)
-    Lemma write_crash_ok: forall a b w w' state s,
+    Lemma write_crash_ok: forall a b w w' state sold,
       abstraction (interface_abs td) w state ->
-      rd_abstraction state s -> 
-      exec (write a b) w (Crashed w') ->
+      rd_abstraction state sold -> 
+      rexec (write a b) (irec td) w (Recovered tt w') ->
       exists state',
-       abstraction (interface_abs td) w' state' /\ recovery_pre state' s (size s).
+        abstraction (interface_abs td) w' state' /\
+        recovery_pre state' sold (diskUpd sold a b) (size sold).
     Proof.
       intros.
+
+unfold write in H1.
+
+Search prog_spec Bind.
+
+    Lemma rexec_bind_recovered : forall T T2 R (p1 : prog T) (p2 : T -> prog T2) (rec : prog R) w w' (res : R),
+      rexec (Bind p1 p2) rec w (Recovered res w') ->
+      (rexec p1 rec w (Recovered res w')) \/
+      (exists w'' res'',
+       rexec p1 rec w (RFinished res'' w'') /\
+       rexec (p2 res'') rec w'' (Recovered res w')).
+    Proof.
+      intros.
+      inversion H.
       inv_exec.
+      - left. econstructor; eauto.
+      - right. exists w'1, v. split.
+        econstructor; eauto.
+        econstructor; eauto.
+      - left. econstructor; eauto.
+    Qed.
+
+    Lemma rexec_bind : forall T T2 R (p1 : prog T) (p2 : T -> prog T2) (rec : prog R) w out,
+      rexec (Bind p1 p2) rec w out ->
+      exists out',
+      rexec p1 rec w out' /\
+      ((exists res w',
+        out' = Recovered res w' /\
+        out  = Recovered res w') \/
+       (exists res w',
+        out' = RFinished res w' /\
+        rexec (p2 res) rec w' out)).
+    Proof.
+      
+    Admitted.
+
+      eapply rexec_bind in H1. deex.
+      eapply impl_ok in H1; eauto; unfold pre; simpl; eauto.
+
+      destruct out'; intuition; repeat deex; try congruence.
+
+      - (* p1 finishes *)
+        simpl in *. unfold pre_step in H4. deex. TD.inv_step.
+
+        (* consider p2 ..... *)
+        admit.
+
+      - (* p1 never finishes *)
+        simpl in *. unfold pre_step in H4. intuition; repeat deex.
+        (* p1 crashed before anything.. *)
+        admit.
+
+        (* p1 crashed after the write *)
+        admit.
+
+
+
+Check impl_ok.
+
       - exists state.
         split; auto.
+(*
         apply rd_abstraction_recovery_pre; auto.
-      - eapply RExec in H7.
-        eapply impl_ok in H7; eauto. deex.
-        inv_exec.
-        + exec_steps; repeat ( ReplicatedDisk.inv_bg || ReplicatedDisk.inv_step ).
-          exists state'.
-          split; auto.
-          apply rd_abstraction_failure with (s:=s) in H2; auto.
-          eapply write0_crash_ok with (state := state'0); eauto.
-        + eapply RExec in H8.
+*)
+        admit.
+      - exec_step.
+        exec_step; deex.
+        simpl in *; unfold pre_step in *; repeat deex.
+        TD.inv_step.
+
+        exec_step.
+        + eapply rd_abstraction_failure in H0; eauto.
+          admit.
+
+        + exec_step.
+          exec_step; deex.
+          simpl in *; unfold pre_step in *; repeat deex.
+          TD.inv_step.
+
+          eexists; intuition eauto.
+          admit.
+
+        + eapply RExecCrash in H8.
+          eapply impl_ok in H8; eauto; simpl; eauto.
+
+
+
+ eapply RExec in H8.
           eapply impl_ok in H8; eauto. deex.
           exec_steps; repeat ( ReplicatedDisk.inv_bg || ReplicatedDisk.inv_step ).
           apply rd_abstraction_failure with (s:=s) in H2; auto.
@@ -1560,12 +1606,10 @@ Module ReplicatedDisk.
           intuition; subst; simpl in *.
     Qed.
 
-    Lemma write_recover_ok: forall s a b w state w' w'' w''',
+    Lemma write_recover_ok: forall s a b w state w''',
       abstraction (interface_abs td) w state ->
       rd_abstraction state s ->
-      exec (write a b) w (Crashed w') ->
-      exec (irec td) (world_crash w') (Finished tt w'') ->
-      exec Recover w'' (Finished tt w''') ->
+      rexec (write a b) (_ <- irec td; Recover) w (Recovered tt w''') ->
       exists state' : TD.State,
        abstraction (interface_abs td) w''' state' /\
         (exists state2', (tt = tt /\ (state2' = s \/

@@ -14,6 +14,10 @@ Things to clean up:
 
 - students need to install haskell-stack
 
+- Why [prog_spec] is useful: avoid having to reason about execution of functions twice
+  (once for normal execution -- postcondition, and once for crashes -- recovery condition).
+  That ends up with a quadratic number of subgoals.
+
 ===
 
 summer school schedule:
