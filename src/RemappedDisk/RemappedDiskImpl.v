@@ -78,12 +78,12 @@ Module RemappedDisk.
           destruct a0; simpl in *; intuition.
           destruct state.
           inv_rexec; try cannot_crash.
-          exec_steps; repeat ( BadSectorDisk.inv_bg || BadSectorDisk.inv_step ).
+          repeat ( exec_steps || BadSectorDisk.inv_bg || BadSectorDisk.inv_step ).
 
           * eexists; intuition auto. eauto. simpl.
             exists s. intuition auto.
             eexists; intuition auto. reflexivity. constructor.
-            rewrite <- H11. rewrite e0.
+            rewrite <- H8. rewrite e0.
             replace (size s + 1 - 1) with (size s) by omega.
             destruct (v0 == size s); subst.
            -- right.
@@ -126,7 +126,7 @@ Module RemappedDisk.
           destruct a0; simpl in *; intuition.
           destruct state.
           inv_rexec; try cannot_crash.
-          exec_steps; repeat ( BadSectorDisk.inv_bg || BadSectorDisk.inv_step ).
+          repeat ( exec_steps || BadSectorDisk.inv_bg || BadSectorDisk.inv_step ).
 
           * eexists; intuition auto. eauto. simpl.
             exists s. intuition auto.
@@ -141,10 +141,10 @@ Module RemappedDisk.
            -- repeat rewrite diskUpd_size; omega.
 
            -- rewrite diskUpd_size in *.
-              rewrite e. replace (size s + 1 - 1) with (size s) by omega.
+              rewrite e1. replace (size s + 1 - 1) with (size s) by omega.
               repeat rewrite diskUpd_neq by congruence. eauto.
 
-           -- rewrite e in *. replace (size s + 1 - 1) with (size s) in * by omega.
+           -- rewrite e1 in *. replace (size s + 1 - 1) with (size s) in * by omega.
               rewrite diskUpd_size. rewrite diskUpd_eq by omega.
               rewrite diskUpd_eq; auto.
               destruct (eq_nat_dec v1 (size s)); try congruence. omega.
@@ -157,19 +157,19 @@ Module RemappedDisk.
 
            -- repeat rewrite diskUpd_size; omega.
 
-           -- rewrite e in *. replace (size s + 1 - 1) with (size s) in * by omega.
-              destruct (a == a0).
-             ++ rewrite e2 in *.
-                destruct (lt_dec a0 (size d)).
+           -- rewrite e0 in *. replace (size s + 1 - 1) with (size s) in * by omega.
+              destruct (a == a1).
+             ++ rewrite e in *.
+                destruct (lt_dec a1 (size d)).
                ** rewrite diskUpd_eq by auto.
                   rewrite diskUpd_eq; auto.
-                  destruct (eq_nat_dec a0 (size s)); try congruence. omega.
+                  destruct (eq_nat_dec a1 (size s)); try congruence. omega.
                ** rewrite diskUpd_oob_eq by auto.
                   rewrite diskUpd_oob_eq by omega. auto.
              ++ repeat rewrite diskUpd_neq by congruence.
                 rewrite diskUpd_size in *. auto.
 
-           -- rewrite e in *. replace (size s + 1 - 1) with (size s) in * by omega.
+           -- rewrite e0 in *. replace (size s + 1 - 1) with (size s) in * by omega.
               rewrite diskUpd_size in *.
               repeat rewrite diskUpd_neq by congruence.
               eauto.
@@ -180,7 +180,7 @@ Module RemappedDisk.
           destruct a; simpl in *; intuition.
           destruct state.
           inv_rexec; try cannot_crash.
-          exec_steps; repeat ( BadSectorDisk.inv_bg || BadSectorDisk.inv_step ).
+          repeat ( exec_steps || BadSectorDisk.inv_bg || BadSectorDisk.inv_step ).
 
           eexists; intuition auto. eauto. simpl.
           exists s. intuition auto.
@@ -197,7 +197,7 @@ Module RemappedDisk.
         destruct a; simpl in *; intuition.
         destruct state.
         inv_rexec; try cannot_crash.
-        exec_steps; repeat ( BadSectorDisk.inv_bg || BadSectorDisk.inv_step ).
+        repeat ( exec_steps || BadSectorDisk.inv_bg || BadSectorDisk.inv_step ).
 
         + eexists; intuition auto; eauto.
 
@@ -218,8 +218,8 @@ Module RemappedDisk.
 
               (* why is [omega] too weak here? *)
               inversion l; try omega.
-              exfalso. apply H4.
-              replace (size (shrink d) + 1) with (S (size (shrink d))) in H6 by omega.
+              exfalso. apply H3.
+              replace (size (shrink d) + 1) with (S (size (shrink d))) in * by omega.
               congruence.
 
           * apply disk_none_oob in H2. omega.

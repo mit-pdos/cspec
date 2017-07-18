@@ -11,31 +11,32 @@ Module ReplicatedDisk.
 
     Definition read (a:addr) : prog block :=
       mv0 <- Prim td (TD.Read d0 a);
-        match mv0 with
+      match mv0 with
+      | Working v => Ret v
+      | Failed =>
+        mv2 <- Prim td (TD.Read d1 a);
+        match mv2 with
         | Working v => Ret v
-        | Failed => mv2 <- Prim td (TD.Read d1 a);
-                     match mv2 with
-                     | Working v => Ret v
-                     | Failed => Ret block0
-                     end
-        end.
+        | Failed => Ret block0
+        end
+      end.
 
     Definition write (a:addr) (b:block) : prog unit :=
       _ <- Prim td (TD.Write d0 a b);
-        _ <- Prim td (TD.Write d1 a b);
-        Ret tt.
+      _ <- Prim td (TD.Write d1 a b);
+      Ret tt.
 
     Definition diskSize : prog nat :=
       msz <- Prim td (TD.DiskSize d0);
+      match msz with
+      | Working sz => Ret sz
+      | Failed =>
+        msz <- Prim td (TD.DiskSize d1);
         match msz with
         | Working sz => Ret sz
-        | Failed => msz <- Prim td (TD.DiskSize d1);
-                     match msz with
-                     | Working sz => Ret sz
-                     | Failed => Ret 0
-                     end
-        end.
-
+        | Failed => Ret 0
+        end
+      end.
 
     Definition rd_op_impl T (op: ReplicatedDisk.Op T) : prog T :=
       match op with
@@ -47,35 +48,16 @@ Module ReplicatedDisk.
     Fixpoint init_at (a:nat) : prog unit :=
       match a with
       | 0 => Ret tt
-      | S a => _ <- Prim td (TD.Write d0 a block0);
-                _ <- Prim td (TD.Write d1 a block0);
-                init_at a
+      | S a =>
+        _ <- Prim td (TD.Write d0 a block0);
+        _ <- Prim td (TD.Write d1 a block0);
+        init_at a
       end.
 
-    Definition DiskSizes : prog (nat * nat + nat) :=
-      sz1 <- Prim td (TD.DiskSize d0);
-        match sz1 with
-        | Working sz1 => sz2 <- Prim td (TD.DiskSize d1);
-                          match sz2 with
-                          | Working sz2 => if sz1 == sz2 then
-                                            Ret (inr sz1)
-                                          else Ret (inl (sz1, sz2))
-                          | Failed => Ret (inr sz1)
-                          end
-        | Failed => sz2 <- Prim td (TD.DiskSize d1);
-                     match sz2 with
-                     | Working sz2 => Ret (inr sz2)
-                     | Failed => Ret (inl (0, 0)) (* impossible *)
-                     end
-        end.
-
     Definition Init : prog InitResult :=
-      sizes <- DiskSizes;
-        match sizes with
-        | inr sz => _ <- init_at sz;
-                     Ret Initialized
-        | inl _ => Ret InitFailed
-        end.
+      size <- diskSize;
+      _ <- init_at size;
+      Ret Initialized.
 
    (* Recovery tracks what happens at each step in order to implement control
        flow. *)
@@ -92,32 +74,37 @@ Module ReplicatedDisk.
 
     Definition fixup (a:addr) : prog RecStatus :=
       mv0 <- Prim td (TD.Read d0 a);
-        match mv0 with
-        | Working v => mv2 <- Prim td (TD.Read d1 a);
-                        match mv2 with
-                        | Working v' => if v == v' then
-                                         Ret Continue
-                                       else
-                                         mu <- Prim td (TD.Write d1 a v);
-                                         Ret (match mu with
-                                              | Working _ => RepairDone
-                                              | Failed => DiskFailed d1
-                                              end)
-                        | Failed => Ret (DiskFailed d1)
-                        end
-        | Failed => Ret (DiskFailed d0)
-        end.
+      match mv0 with
+      | Working v =>
+        mv2 <- Prim td (TD.Read d1 a);
+        match mv2 with
+        | Working v' =>
+          if v == v' then
+            Ret Continue
+          else
+            mu <- Prim td (TD.Write d1 a v);
+            Ret (match mu with
+                 | Working _ => RepairDone
+                 | Failed => DiskFailed d1
+                 end)
+        | Failed => Ret (DiskFailed d1)
+        end
+      | Failed => Ret (DiskFailed d0)
+      end.
 
     (* recursively performs recovery at [a-1], [a-2], down to 0 *)
-    Fixpoint recover_at (a:addr) : prog RecStatus :=
+    Fixpoint recover_at (a:addr) : prog unit :=
       match a with
-      | 0 => Ret RepairDone
-      | S n => s <- fixup n;
-                match s with
-                | Continue => recover_at n
-                | RepairDone => Ret RepairDone
-                | DiskFailed i => Ret (DiskFailed i)
-                end
+      | 0 => Ret tt
+      | S n =>
+        s <- fixup n;
+        match s with
+        | Continue =>
+          _ <- recover_at n;
+          Ret tt
+        | RepairDone => Ret tt
+        | DiskFailed i => Ret tt
+        end
       end.
 
     Definition Recover : prog unit :=
@@ -220,7 +207,7 @@ Module ReplicatedDisk.
       TD.inv_step; simpl in *; eauto.
     Qed.
 
- 
+
     Ltac rd_trans := 
       repeat match goal with
       |  [ H : TD.op_step (TD.Read _ _) ?state (Working _) ?state' |- 

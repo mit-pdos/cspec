@@ -248,6 +248,6 @@ Ltac exec_steps :=
   repeat ( match goal with
     | H: exec (Prim _ _) _ _ |- _ => eapply RExec in H
     | H: exec (if ?cond then _ else _) _ _ |- _ => destruct cond
-    | H: rexec _ _ _ _ |- _ => eapply impl_ok in H; eauto; deex
+    | H: rexec _ _ _ _ |- _ => eapply impl_ok in H; [ | eassumption | eauto ]
     end || inv_ret || inv_exec );
   simpl in *; unfold pre_step in *; repeat deex.

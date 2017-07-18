@@ -59,8 +59,7 @@ Module StatDB.
         + unfold prog_spec; intros.
           destruct a; simpl in *; intuition.
           inv_rexec; try cannot_crash.
-          exec_steps; repeat ( Vars.inv_bg || Vars.inv_step ).
-
+          repeat ( exec_steps || Vars.inv_bg || Vars.inv_step ).
           eexists; intuition.
           eauto.
           eexists; intuition.
@@ -70,12 +69,12 @@ Module StatDB.
           rewrite H0 in H8. inversion H8; subst. f_equal. simpl. omega.
 
           autorewrite with upd.
-          rewrite H4 in H10. inversion H10; subst. f_equal. simpl. omega.
+          rewrite H4 in H7. inversion H7; subst. f_equal. simpl. omega.
 
         + unfold prog_spec; intros.
           destruct a; simpl in *; intuition.
           inv_rexec; try cannot_crash.
-          exec_steps; repeat ( Vars.inv_bg || Vars.inv_step ).
+          repeat ( exec_steps || Vars.inv_bg || Vars.inv_step ).
 
           * eexists; intuition.
             eauto.
@@ -89,8 +88,8 @@ Module StatDB.
           * eexists; intuition.
             eauto.
 
-            rewrite H0 in H7; inversion H7; subst.
-            rewrite H4 in H9; inversion H9; subst.
+            rewrite H0 in H6; inversion H6; subst.
+            rewrite H4 in H7; inversion H7; subst.
 
             eexists; intuition.
             constructor; eauto.
@@ -103,7 +102,7 @@ Module StatDB.
         unfold prog_spec; intros.
         destruct a; simpl in *; intuition.
         inv_rexec; try cannot_crash.
-        exec_steps; repeat ( Vars.inv_bg || Vars.inv_step ).
+        repeat ( exec_steps || Vars.inv_bg || Vars.inv_step ).
 
         eexists; intuition.
         eauto.
