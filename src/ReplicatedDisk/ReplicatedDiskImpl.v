@@ -1003,11 +1003,10 @@ Module ReplicatedDisk.
     Proof.
       intros.
       repeat ( exec_steps || TD.inv_step ).
+      all: try congruence.
 
       - eapply fixup_eq_ok in H; eauto.
       - destruct v0; congruence.
-      - congruence.
-      - congruence.
 
     Unshelve.
       all: auto.
@@ -1015,30 +1014,103 @@ Module ReplicatedDisk.
 
 
     (* fix up for v that is out of sync, repair and be done *)
-    Lemma fixup_repair_ok: forall v w w' (state: TD.State) s,
-      recovery_pre state s (S v) ->
+    Lemma fixup_repair_ok: forall v w w' (state: TD.State) sold snew,
+      recovery_pre state sold snew (S v) ->
+      v < size sold ->
       abstraction (interface_abs td) w state ->
       exec (fixup v) w (Finished RepairDone w') ->
       exists state',
         abstraction (interface_abs td) w' state' /\
-        recovery_pre state' s 0. (* XXX maybe v instead of 0 *)
+        recovery_pre state' sold snew 0.
     Proof.
       intros.
-      inv_exec.
-      destruct v0.
-      - eapply RExec in H7.
-        eapply impl_ok in H7; eauto. deex.
-        inv_exec.
-        destruct v1.
-        + eapply RExec in H8.
-          eapply impl_ok in H8; eauto. deex.
-          destruct (equiv_dec v0 v1).
-          -- inv_exec.
-            inversion H5.
-          -- inv_exec.
-            eapply RExec in H10.
-            eapply impl_ok in H10; eauto. deex.
-   Admitted.
+      repeat ( exec_steps || TD.inv_step ).
+      all: try congruence.
+
+      unfold recovery_pre in *; intros.
+
+      destruct v0; try congruence.
+
+      replace (TD.disk0 state') with (TD.get_disk TwoDiskAPI.d0 state') in * by reflexivity.
+      replace (TD.disk1 state'1) with (TD.get_disk TwoDiskAPI.d1 state'1) in * by reflexivity.
+      replace (TD.disk1 state'4) with (TD.get_disk TwoDiskAPI.d1 state'4) in * by reflexivity.
+
+      case_eq (TD.get_disk TwoDiskAPI.d0 state'); [ intros ? He; rewrite He in * | intro He; rewrite He in *; congruence ].
+      case_eq (TD.get_disk TwoDiskAPI.d1 state'1); [ intros ? He2; rewrite He2 in * | intro He2; rewrite He2 in *; congruence ].
+      case_eq (TD.get_disk TwoDiskAPI.d1 state'4); [ intros ? He3; rewrite He3 in * | intro He3; rewrite He3 in *; intuition congruence ].
+
+      repeat match goal with
+      | Hb : TD.bg_failure _ ?state,
+        Hd : TD.get_disk _ ?state = Some _ |- _ =>
+        eapply bg_failure_ok in Hd; [ | exact Hb ];
+        try rewrite Hd in *
+      end.
+
+      eexists. split; eauto.
+
+      replace d1 with d0 in * by congruence.
+      intuition.
+
+      - (* Original disks were the same. Impossible because we found a difference. *)
+        exfalso.
+        subst.
+
+        case_eq (sold v); intros.
+        + rewrite H in *; congruence.
+        + eapply disk_inbounds_not_none; eauto.
+
+      - (* Original disks differed. *)
+        repeat deex.
+        right.
+        do 2 eexists; intuition.
+
+        + (* Both disks were same: again, impossible. *)
+          exfalso.
+          subst.
+
+          case_eq (sold v); intros.
+          * rewrite H in *; congruence.
+          * eapply disk_inbounds_not_none; eauto.
+
+        + (* Disks differed, finally. Is it this address, though? *)
+          destruct (a0 == v); subst.
+          * subst; simpl.
+            autorewrite with upd in *.
+            replace b0 with v1 in * by congruence.
+            replace (TD.disk0 state'4) with (TD.get_disk TwoDiskAPI.d0 state'4) by reflexivity.
+
+            case_eq (TD.get_disk TwoDiskAPI.d0 state'4); intros; eauto.
+            repeat match goal with
+            | Hb : TD.bg_failure _ ?state,
+              Hd : TD.get_disk _ ?state = Some _ |- _ =>
+              eapply bg_failure_ok in Hd; [ | exact Hb ];
+              try rewrite Hd in *
+            end.
+
+            inversion He; subst. eauto.
+
+          * exfalso.
+            autorewrite with upd in *.
+            case_eq (sold v); intros.
+           -- rewrite H in *; congruence.
+           -- eapply disk_inbounds_not_none; eauto.
+
+        + (* Both disks were same: again, impossible. *)
+          exfalso.
+          subst.
+
+          case_eq ((diskUpd sold a0 b0) v); intros.
+          * rewrite H in *; congruence.
+          * destruct (a0 == v); subst.
+            autorewrite with upd in *; congruence.
+            autorewrite with upd in *.
+            case_eq (sold v); intros.
+           -- rewrite H in *; congruence.
+           -- eapply disk_inbounds_not_none; eauto.
+
+    Unshelve.
+      all: eauto.
+    Qed.
 
    (* fix up for v that is out of sync, repair and be done *)
    Lemma fixup_repair_failure: forall v w w' (state: TD.State) s i,
