@@ -10,13 +10,13 @@ Record diskOf T :=
            (* The :> makes [diskMem] a coercion, allowing disks to be used in a
            few contexts where memories are expected (for example, in separation
            logic judgements). *)
-           diskMem :> mem addr T;
+           diskMem :> mem nat T;
            diskMem_domain: sized_domain diskMem size; }.
 
 (* this coercion allows disks to be directly accessed with a function
 application: [d a] will implicitly call [disk_get d a] due to the coercion,
 which is [(diskMem d) a]. *)
-Definition disk_get {T} (d:diskOf T) : addr -> option T := diskMem d.
+Definition disk_get {T} (d:diskOf T) : nat -> option T := diskMem d.
 Coercion disk_get : diskOf >-> Funclass.
 
 Arguments mkDisk {T} size diskMem diskMem_domain.
@@ -51,7 +51,7 @@ Section GenericDisks.
     exfalso; eapply disk_inbounds_not_none; eauto.
   Qed.
 
-  Definition diskUpd d (a: addr) b : diskOf T.
+  Definition diskUpd d (a: nat) b : diskOf T.
   Proof.
     destruct (lt_dec a (size d)).
     - refine (mkDisk (size d) (upd d a b) _).
@@ -141,7 +141,7 @@ Section GenericDisks.
     rewrite diskUpd_neq; auto.
   Qed.
 
-  Definition diskUpdF d (a: addr) (f: T -> T) : diskOf T.
+  Definition diskUpdF d (a: nat) (f: T -> T) : diskOf T.
   Proof.
     destruct (lt_dec a (size d)).
     - destruct (d a).

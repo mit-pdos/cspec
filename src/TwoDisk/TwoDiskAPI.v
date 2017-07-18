@@ -22,8 +22,8 @@ Module TD.
   Arguments Disks {diskT} disk0 disk1 some_disk_works.
 
   Inductive Op : Type -> Type :=
-  | Read (i:diskId) (a:addr) : Op (DiskResult block)
-  | Write (i:diskId) (a:addr) (b:block) : Op (DiskResult unit)
+  | Read (i:diskId) (a:nat) : Op (DiskResult block)
+  | Write (i:diskId) (a:nat) (b:block) : Op (DiskResult unit)
   | Sync (i:diskId) : Op (DiskResult unit)
   (* get disk size in blocks *)
   | DiskSize (i:diskId) : Op (DiskResult nat).

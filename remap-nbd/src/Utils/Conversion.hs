@@ -8,5 +8,5 @@ blocksize = fromIntegral blockbytes
 
 type FileOffset = Integer
 
-addrToOffset :: Coq_addr -> FileOffset
+addrToOffset :: Integer -> FileOffset
 addrToOffset a = a * blockbytes
