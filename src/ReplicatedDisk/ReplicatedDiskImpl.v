@@ -848,20 +848,26 @@ Module ReplicatedDisk.
       end.
 
     (* The disk is synchronous so at most one address that is out of sync. *)
-    Definition recovery_pre (state: TD.State) s a' :=
-      a' <= size s ->
-      match (TD.get_disk d0 state, TD.get_disk d1 state) with
-      | (Some d', Some d'') =>
-        (d' = s /\ d'' = s) \/
-        (exists a b, a < a' /\
-          ((d' = (diskUpd s a b) /\ d'' = s) \/
-           (d' = (diskUpd s a b) /\ d'' = diskUpd s a b)))
-      | (Some d', None) => d' = s \/ 
-          (exists a b, a < a' /\ d' = diskUpd s a b)
-      | (None, Some d'') => d'' = s \/ 
-          (exists a b, a < a' /\ d'' = diskUpd s a b)
-      | (_, _) => False  (* one disk must be working *)
-      end.
+    Definition recovery_pre (state: TD.State) sold snew a' :=
+      ( snew = sold /\
+        match (TD.get_disk d0 state, TD.get_disk d1 state) with
+        | (Some d', Some d'') => d' = sold /\ d'' = sold
+        | (Some d', None) => d' = sold
+        | (None, Some d'') => d'' = sold
+        | (_, _) => False
+        end ) \/
+      ( exists a b, snew = diskUpd sold a b /\
+        match (TD.get_disk d0 state, TD.get_disk d1 state) with
+        | (Some d', Some d'') =>
+          (d' = sold /\ d'' = sold) \/
+          (d' = snew /\ d'' = sold /\ a < a') \/
+          (d' = snew /\ d'' = snew)
+        | (Some d', None) =>
+          d' = sold \/ d' = snew
+        | (None, Some d'') =>
+          d'' = sold \/ d'' = snew
+        | (_, _) => False  (* one disk must be working *)
+        end ).
 
     Lemma bg_failure_ok: forall id d (state:TD.State) state',
       TD.get_disk id state' = Some d ->
@@ -876,65 +882,101 @@ Module ReplicatedDisk.
         + try congruence.
     Qed.
 
-    Lemma fixup_eq_ok: forall state state'2 state'1 state'0 state' s v b,
-      recovery_pre state s (S v) ->
+    Lemma fixup_eq_ok: forall state state'2 state'1 state'0 state' sold snew v b,
+      recovery_pre state sold snew (S v) ->
+      v < size sold ->
       TD.bg_failure state state'2 ->
       TD.op_step (TD.Read d0 v) state'2 (Working b) state' ->
       TD.bg_failure state' state'1 ->
       TD.op_step (TD.Read d1 v) state'1 (Working b) state'0 ->
-      S v < size s ->
-      recovery_pre state'0 s v.
+      recovery_pre state'0 sold snew v.
     Proof.
       intros.
       TD.inv_step.
       TD.inv_step.
-      - unfold recovery_pre in *; intros.
-        case_eq (TD.get_disk d0 state'0); intros.
-        case_eq (TD.get_disk d1 state'0); intros.
-        + rewrite H5 in H9.
-          eapply bg_failure_ok in H5; eauto.
-          eapply bg_failure_ok in H3; eauto.
-          rewrite H3 in H8.
-          eapply bg_failure_ok in H5; eauto.
-          eapply bg_failure_ok in H3; eauto.
-          rewrite H5 in H.
-          rewrite H3 in H.
-          assert (S v <= size s) by omega.
-          specialize (H H6).
-          ++ intuition; auto.
-            repeat deex.
-            destruct (dec_eq_nat a v); subst; simpl in *.
-            -- case_eq (d0 v); intros.
-              case_eq (d v); intros.
-              +++ rewrite H10 in H9; simpl in *.
-                rewrite H11 in H8; simpl in *.
-                inversion H10. inversion H9; subst.
-                intuition; subst; simpl in *.
-                left. split; eauto.
-                apply diskUpd_same.
-                rewrite diskUpd_eq in H11.
-                inversion H11; subst; auto.
-                inversion H8; subst; auto.
-                omega.
-                right. do 2 eexists.
-                inversion H9. inversion H8; subst.
-                rewrite diskUpd_eq in H11.
-                inversion H11; subst; auto.
-                autorewrite with upd in *.
-                (* lost the initial value at s? *)
-                admit.
-                omega.
-              +++ rewrite H11 in H8. deex. 
-                intuition.
-                subst; simpl in *.
-                eapply diskUpd_eq_some with (b := b0) in H10.
-                rewrite H11 in H10. inversion H10.
-                rewrite H10 in H9. inversion H9. inversion H8; subst.
-                rewrite H11 in H10. inversion H10.
-              +++ admit.
-           --
 
-    Admitted.
+      unfold recovery_pre in *; intros.
+
+      case_eq (TD.get_disk TwoDiskAPI.d0 state'); [ intros ? He; rewrite He in * | intro He; rewrite He in *; congruence ].
+      case_eq (TD.get_disk TwoDiskAPI.d1 state'0); [ intros ? He2; rewrite He2 in * | intro He2; rewrite He2 in *; congruence ].
+
+      repeat match goal with
+      | Hb : TD.bg_failure _ ?state,
+        Hd : TD.get_disk _ ?state = Some _ |- _ =>
+        eapply bg_failure_ok in Hd; [ | exact Hb ];
+        try rewrite Hd in *
+      end.
+
+      intuition.
+
+      - (* Both disks the same, from [recovery_pre]. *)
+        left. intuition.
+        case_eq (TD.get_disk TwoDiskAPI.d0 state'0); intuition eauto.
+
+        repeat match goal with
+        | Hb : TD.bg_failure _ ?state,
+          Hd : TD.get_disk _ ?state = Some _ |- _ =>
+          eapply bg_failure_ok in Hd; [ | exact Hb ];
+          try rewrite Hd in *
+        end.
+        congruence.
+
+      - (* Disks differ, from [recovery_pre]. *)
+        repeat deex.
+        right.
+
+        do 2 eexists; intuition.
+
+        + (* Both disks are old. *)
+          case_eq (TD.get_disk TwoDiskAPI.d0 state'0); intuition eauto.
+          repeat match goal with
+          | Hb : TD.bg_failure _ ?state,
+            Hd : TD.get_disk _ ?state = Some _ |- _ =>
+            eapply bg_failure_ok in Hd; [ | exact Hb ];
+            try rewrite Hd in *
+          end.
+
+          left; intuition eauto.
+          congruence.
+
+        + (* Disks differ on some sector. *)
+          case_eq (TD.get_disk TwoDiskAPI.d0 state'0); intuition eauto.
+          repeat match goal with
+          | Hb : TD.bg_failure _ ?state,
+            Hd : TD.get_disk _ ?state = Some _ |- _ =>
+            eapply bg_failure_ok in Hd; [ | exact Hb ];
+            try rewrite Hd in *
+          end.
+
+          inversion He; subst.
+
+          destruct (lt_dec a v).
+
+          * right. left. eauto.
+          * left; intuition.
+            assert (a = v) by omega; subst.
+            autorewrite with upd in *.
+            inversion H8; subst.
+
+            rewrite diskUpd_same; eauto.
+            case_eq (sold v); intros.
+            { rewrite H in *; congruence. }
+
+            exfalso.
+            eapply disk_inbounds_not_none; eauto.
+
+        + (* Both disks are new. *)
+          case_eq (TD.get_disk TwoDiskAPI.d0 state'0); intuition eauto.
+          repeat match goal with
+          | Hb : TD.bg_failure _ ?state,
+            Hd : TD.get_disk _ ?state = Some _ |- _ =>
+            eapply bg_failure_ok in Hd; [ | exact Hb ];
+            try rewrite Hd in *
+          end.
+
+          right; right; intuition eauto.
+          congruence.
+    Qed.
 
 
     (* fix up for v that isn't out of sync. keep repairing *)
