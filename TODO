@@ -12,6 +12,8 @@ Things to clean up:
 - RemappedDisk: make sure that we can replace the abstraction relation with an abstraction function
   as defined in the [init] part of the proof at the bottom of RemappedDiskImpl.v.
 
+- students need to install haskell-stack
+
 ===
 
 summer school schedule:
