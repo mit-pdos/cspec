@@ -1112,25 +1112,31 @@ Module ReplicatedDisk.
       all: eauto.
     Qed.
 
-   (* fix up for v that is out of sync, repair and be done *)
-   Lemma fixup_repair_failure: forall v w w' (state: TD.State) s i,
-      recovery_pre state s (S v) ->
-      abstraction (interface_abs td) w state ->
-      exec (fixup v) w (Finished (DiskFailed i) w') ->
-      exists state',
-        abstraction (interface_abs td) w' state' /\
-        recovery_pre state' s 0.
+    (* fix up for v that is out of sync, repair and be done *)
+    Lemma fixup_repair_failure: forall v w w' (state: TD.State) sold snew i,
+       recovery_pre state sold snew (S v) ->
+       v < size sold ->
+       abstraction (interface_abs td) w state ->
+       exec (fixup v) w (Finished (DiskFailed i) w') ->
+       exists state',
+         abstraction (interface_abs td) w' state' /\
+         recovery_pre state' sold snew 0.
     Proof.
+      intros.
+      repeat ( exec_steps || TD.inv_step ).
+      all: try congruence.
+
     Admitted.
 
 
-    Lemma recover_at_ok: forall v w w' state s,
-      recovery_pre state s v ->
+    Lemma recover_at_ok: forall v w w' state sold snew,
+      recovery_pre state sold snew v ->
+      v < size sold ->
       abstraction (interface_abs td) w state ->
-      exec (recover_at v) w (Finished RepairDone w') ->
+      exec (recover_at v) w (Finished tt w') ->
       exists state',
         abstraction (interface_abs td) w' state' /\
-        recovery_pre state' s 0.
+        recovery_pre state' sold snew 0.
     Proof.
       induction v; intros.
       - exists state.
@@ -1138,15 +1144,17 @@ Module ReplicatedDisk.
         split; auto.
       - inv_exec.
         destruct v0.
-        + eapply fixup_continue_ok with (s := s) in H7 as H7'; eauto.
-          deex. 
-          specialize (IHv w'0 w' state' s).
-          edestruct IHv; eauto.
+        + eapply fixup_continue_ok in H8 as H8'; eauto; try omega.
+          deex.
+          specialize (IHv w'0 w' state' sold snew).
+          edestruct IHv; eauto; try omega.
+          inv_exec; destruct v0; eauto.
         + inv_exec.
-          eapply fixup_repair_ok with (s := s) in H7 as H7'; eauto.
-          (* XXX maybe use induction, if v instead of 0 *)
+          eapply fixup_repair_ok in H8 as H8'; eauto.
+          omega.
         + inv_exec.
-          eapply fixup_repair_failure with (s := s) in H7 as H7'; eauto.
+          eapply fixup_repair_failure in H8 as H8'; eauto.
+          omega.
     Qed.
 
     Definition td_disk_size_pre (state:TD.State) :=
@@ -1157,10 +1165,10 @@ Module ReplicatedDisk.
       | (None, None) => False
       end.
 
-    Lemma recovery_pre_failure: forall state state' s n,
-      recovery_pre state n s ->
+    Lemma recovery_pre_failure: forall state state' sold snew n,
+      recovery_pre state n sold snew ->
       TD.bg_failure state state' ->
-      recovery_pre state' n s.
+      recovery_pre state' n sold snew.
     Proof.
       intros.
       TD.inv_bg.
@@ -1168,14 +1176,20 @@ Module ReplicatedDisk.
       + unfold recovery_pre in *; simpl in *.
         intuition.
         repeat deex.
-        intuition.
-        right. exists a, b. split; auto.
+        intuition; subst.
+
+        * right. do 2 eexists. eauto.
+        * right. do 2 eexists. eauto.
+        * right. do 2 eexists. eauto.
+
       + unfold recovery_pre in *; simpl in *.
         intuition.
         repeat deex.
         intuition.
-        - right. exists a, b. split; auto.
-        - right. exists a, b. split; auto.
+
+        * right. do 2 eexists. eauto.
+        * right. do 2 eexists. eauto.
+        * right. do 2 eexists. eauto.
     Qed.
 
 
