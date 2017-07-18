@@ -882,18 +882,30 @@ Module ReplicatedDisk.
         + try congruence.
     Qed.
 
-    Lemma fixup_eq_ok: forall state state'2 state'1 state'0 state' sold snew v b,
+    Lemma fixup_eq_ok: forall (state state' state'0 : TD.State) sold snew v b,
       recovery_pre state sold snew (S v) ->
       v < size sold ->
-      TD.bg_failure state state'2 ->
-      TD.op_step (TD.Read d0 v) state'2 (Working b) state' ->
-      TD.bg_failure state' state'1 ->
-      TD.op_step (TD.Read d1 v) state'1 (Working b) state'0 ->
+      TD.bg_failure state state' ->
+      match TD.get_disk d0 state' with
+      | Some d =>
+          match d v with
+          | Some b0 => Working b = Working b0
+          | None => exists b0 : block, Working b = Working b0
+          end
+      | None => Working b = Failed
+      end ->
+      TD.bg_failure state' state'0 ->
+      match TD.get_disk d1 state'0 with
+           | Some d =>
+               match d v with
+               | Some b0 => Working b = Working b0
+               | None => exists b0 : block, Working b = Working b0
+               end
+           | None => Working b = Failed
+           end ->
       recovery_pre state'0 sold snew v.
     Proof.
       intros.
-      TD.inv_step.
-      TD.inv_step.
 
       unfold recovery_pre in *; intros.
 
@@ -956,7 +968,7 @@ Module ReplicatedDisk.
           * left; intuition.
             assert (a = v) by omega; subst.
             autorewrite with upd in *.
-            inversion H8; subst.
+            inversion H2; subst.
 
             rewrite diskUpd_same; eauto.
             case_eq (sold v); intros.
@@ -980,48 +992,30 @@ Module ReplicatedDisk.
 
 
     (* fix up for v that isn't out of sync. keep repairing *)
-    Lemma fixup_continue_ok: forall v w w' (state: TD.State) s,
-      recovery_pre state s (S v) ->
+    Lemma fixup_continue_ok: forall v w w' (state: TD.State) sold snew,
+      recovery_pre state sold snew (S v) ->
+      v < size sold ->
       abstraction (interface_abs td) w state ->
       exec (fixup v) w (Finished Continue w') ->
       exists state',
         abstraction (interface_abs td) w' state' /\
-        recovery_pre state' s v.
+        recovery_pre state' sold snew v.
     Proof.
       intros.
-      inv_exec.
-      destruct v0.
-      - eapply RExec in H7.
-        eapply impl_ok in H7; eauto. deex.
-        inv_exec.
-        destruct v1.
-        + eapply RExec in H8.
-          eapply impl_ok in H8; eauto. deex.
-          exec_steps; repeat ( ReplicatedDisk.inv_bg || ReplicatedDisk.inv_step ).
-          -- rewrite e in H7.
-            eapply fixup_eq_ok in H6; eauto.
-            admit.
-         --
-            destruct v2. inversion H5. inversion H5.
-         -- simpl; auto.
-       + eapply RExec in H8.
-         eapply impl_ok in H8; eauto. deex.
-         inv_exec.
-         inversion H5.
-         simpl; auto.
-       +
-         simpl; auto.
-    - eapply RExec in H7.
-      eapply impl_ok in H7; eauto. deex.
-      inv_exec.
-      inversion H3.
+      repeat ( exec_steps || TD.inv_step ).
+
+      - eapply fixup_eq_ok in H; eauto.
+      - destruct v0; congruence.
+      - congruence.
+      - congruence.
+
     Unshelve.
       all: auto.
-    Admitted.
+    Qed.
 
 
-   (* fix up for v that is out of sync, repair and be done *)
-   Lemma fixup_repair_ok: forall v w w' (state: TD.State) s,
+    (* fix up for v that is out of sync, repair and be done *)
+    Lemma fixup_repair_ok: forall v w w' (state: TD.State) s,
       recovery_pre state s (S v) ->
       abstraction (interface_abs td) w state ->
       exec (fixup v) w (Finished RepairDone w') ->
