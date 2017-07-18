@@ -244,10 +244,14 @@ Proof.
     congruence.
 Qed.
 
-Ltac exec_steps :=
-  repeat ( match goal with
+Ltac exec_step :=
+  match goal with
     | H: exec (Prim _ _) _ _ |- _ => eapply RExec in H
     | H: exec (if ?cond then _ else _) _ _ |- _ => destruct cond
-    | H: rexec _ _ _ _ |- _ => eapply impl_ok in H; [ | eassumption | eauto ]
-    end || inv_ret || inv_exec );
+    | H: exec (match ?expr with _ => _ end) _ _ |- _ => case_eq expr; intros; subst; simpl in *
+    | H: rexec _ _ _ _ |- _ => eapply impl_ok in H; [ | eassumption | solve [ simpl; eauto ] ]
+    end || inv_ret || inv_exec.
+
+Ltac exec_steps :=
+  repeat exec_step;
   simpl in *; unfold pre_step in *; repeat deex.

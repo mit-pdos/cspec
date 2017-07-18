@@ -7,8 +7,8 @@ Require Import Refinement.Interface.
 Module ReplicatedDisk.
 
   Inductive Op : Type -> Type :=
-  | Read (a:addr) : Op block
-  | Write (a:addr) (b:block) : Op unit
+  | Read (a:nat) : Op block
+  | Write (a:nat) (b:block) : Op unit
   | DiskSize : Op nat.
 
   Definition State := disk.

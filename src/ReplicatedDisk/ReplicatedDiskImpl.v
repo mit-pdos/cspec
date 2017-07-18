@@ -9,7 +9,7 @@ Module ReplicatedDisk.
 
     Variable (td : Interface TD.API).
 
-    Definition read (a:addr) : prog block :=
+    Definition read (a:nat) : prog block :=
       mv0 <- Prim td (TD.Read d0 a);
       match mv0 with
       | Working v => Ret v
@@ -21,7 +21,7 @@ Module ReplicatedDisk.
         end
       end.
 
-    Definition write (a:addr) (b:block) : prog unit :=
+    Definition write (a:nat) (b:block) : prog unit :=
       _ <- Prim td (TD.Write d0 a b);
       _ <- Prim td (TD.Write d1 a b);
       Ret tt.
@@ -72,7 +72,7 @@ Module ReplicatedDisk.
        invariant is now trivially satisfied *)
     | DiskFailed (i:diskId).
 
-    Definition fixup (a:addr) : prog RecStatus :=
+    Definition fixup (a:nat) : prog RecStatus :=
       mv0 <- Prim td (TD.Read d0 a);
       match mv0 with
       | Working v =>
@@ -93,7 +93,7 @@ Module ReplicatedDisk.
       end.
 
     (* recursively performs recovery at [a-1], [a-2], down to 0 *)
-    Fixpoint recover_at (a:addr) : prog unit :=
+    Fixpoint recover_at (a:nat) : prog unit :=
       match a with
       | 0 => Ret tt
       | S n =>
@@ -352,10 +352,7 @@ Module ReplicatedDisk.
         inv_exec.
         case_eq v1; intros.
         rewrite H1 in H11.
-        + eapply impl_ok in H7; eauto. deex.
-          exec_steps; repeat ( ReplicatedDisk.inv_bg || ReplicatedDisk.inv_step ).
-          eapply impl_ok in H8; eauto. deex.
-          exec_steps; repeat ( ReplicatedDisk.inv_bg || ReplicatedDisk.inv_step ).
+        + repeat ( exec_steps || ReplicatedDisk.inv_bg || ReplicatedDisk.inv_step ).
           eexists.
           intuition; eauto.
           exists s. split.
@@ -365,14 +362,9 @@ Module ReplicatedDisk.
           eapply td_read1_ok with (state'1 := state'1); eauto.
           rd_trans; auto.
           rd_trans; auto.
-          simpl; auto.
-          simpl; auto.
         + (* no working disk *)
           rewrite H1 in H11.
-          eapply impl_ok in H7; eauto. deex.
-          exec_steps; repeat ( ReplicatedDisk.inv_bg || ReplicatedDisk.inv_step ).
-          eapply impl_ok in H8; eauto. deex.
-          exec_steps; repeat ( ReplicatedDisk.inv_bg || ReplicatedDisk.inv_step ).
+          repeat ( exec_steps || ReplicatedDisk.inv_bg || ReplicatedDisk.inv_step ).
           eexists.
           intuition; eauto.
           exists s. split.
@@ -381,8 +373,6 @@ Module ReplicatedDisk.
           constructor.
           eapply td_read_none_ok; eauto.
           rd_trans; auto.
-          simpl. auto.
-          simpl. auto.
       Unshelve.
       all: eauto.
     Qed.
@@ -705,19 +695,8 @@ Module ReplicatedDisk.
            (ReplicatedDisk.Write a b) s v state2' /\ rd_abstraction state' state2').
     Proof.
       intros.
-      inv_exec.
-      inv_exec.
-      exec_steps.
-      inv_rexec.
-      inv_rexec.
-      eapply RExec in H6.
-      eapply impl_ok in H6; eauto. deex.
-      exec_steps; repeat ( ReplicatedDisk.inv_bg || ReplicatedDisk.inv_step ).
-      eapply rd_abstraction_failure in H2 as H2'; eauto.
-      inv_rexec.
-      eapply RExec in H9.
-      eapply impl_ok in H9; eauto. deex.
-      exec_steps; repeat ( ReplicatedDisk.inv_bg || ReplicatedDisk.inv_step ).
+      repeat ( exec_steps || ReplicatedDisk.inv_bg || ReplicatedDisk.inv_step ).
+      eapply rd_abstraction_failure in b0 as b0'; eauto.
       destruct v0.
       - destruct v1.
         + destruct v.
@@ -731,7 +710,7 @@ Module ReplicatedDisk.
           constructor.
           constructor.
         + destruct v.
-          eapply td_write_d0_ok with (state := state'0) (state''' := state'1) in H6; eauto.
+          eapply td_write_d0_ok with (state := state'0) (state''' := state'1) in o; eauto.
           eexists. split; eauto.
           exists (diskUpd s a b).
           split; eauto.
@@ -748,25 +727,22 @@ Module ReplicatedDisk.
         split.
         constructor.
         constructor.
-      + eapply td_write_failure in H6.
+      + eapply td_write_failure in o.
         eapply td_write_failure in H3.
         intuition. subst; simpl in *.
         TD.inv_bg; simpl in *.
-        -- unfold rd_abstraction, rd_invariant, abstraction_f in H2'.
+        -- unfold rd_abstraction, rd_invariant, abstraction_f in b0'.
           destruct state'1; simpl in *.
           destruct disk0; try congruence.
           destruct disk1; try congruence. intuition.
-        -- unfold rd_abstraction, rd_invariant, abstraction_f in H2'.
+        -- unfold rd_abstraction, rd_invariant, abstraction_f in b0'.
           intuition.
-        -- unfold rd_abstraction, rd_invariant, abstraction_f in H2'.
+        -- unfold rd_abstraction, rd_invariant, abstraction_f in b0'.
           intuition. subst.
           destruct pf; auto.
-      - simpl in *; auto.
-      - simpl in *; auto.
       Unshelve.
-      all: eauto; try exact tt; try exact unit.
-      all: constructor.
-    Admitted.
+      all: eauto.
+    Qed.
 
 
     Definition disk_size (state: TD.State) id v :=
@@ -799,27 +775,26 @@ Module ReplicatedDisk.
           destruct disk1; try congruence.
     Qed.
 
-    Lemma td_disk_size_none_ok: forall s state' state'0 state'2 state'1,
-      TD.op_step (TD.DiskSize d0) state'0 Failed state' ->
+    Definition disk_size_failed (state: TD.State) id :=
+      match TD.get_disk id state with
+      | Some d => Failed = Working (size d)
+      | None => @Failed nat = Failed
+      end.
+
+    Lemma td_disk_size_none_ok: forall state' state'2,
+      disk_size_failed state' d0 ->
       TD.bg_failure state' state'2  ->
-      TD.op_step (TD.DiskSize d1) state'2 Failed state'1 ->
-      (@size block s) = 0.
+      disk_size_failed state'2 d1 ->
+      False.
     Proof.
-      intros.
-      TD.inv_step.
-      TD.inv_step.
-      simpl in *.
-      case_eq (TD.disk1 state'1); intros.
-      - rewrite H in H4. inversion H4.
-      - rewrite H in H4.
-        case_eq (TD.disk0 state'); intros.
-        + rewrite H1 in H3. inversion H3.
-        + rewrite H1 in H3.
-          TD.inv_bg.
-          -- apply both_disks_not_missing in H; auto. exfalso. auto.
-          -- simpl in *. subst. destruct pf; auto.
-          -- simpl in *. subst.
-            inversion H1.
+      unfold disk_size_failed; simpl; intros.
+      case_eq (TD.disk1 state'2); intros.
+      - rewrite H2 in H1. inversion H1.
+      - case_eq (TD.disk0 state'); intros.
+        + rewrite H3 in H. inversion H.
+        + rewrite H3 in H.
+          TD.inv_bg; simpl in *; try congruence.
+          apply both_disks_not_missing in H2; auto.
     Qed.
 
     (* disk size without recovery *)
@@ -835,66 +810,34 @@ Module ReplicatedDisk.
            rd_abstraction state' state2').
     Proof.
       intros.
-      inv_exec.
-      destruct v0.
-      - eapply RExec in H7.
-        eapply impl_ok in H7; eauto. deex.
-        exec_steps; repeat ( ReplicatedDisk.inv_bg || ReplicatedDisk.inv_step ).
-        TD.inv_step.
-        + eapply td_disk_size_ok with (s := s) in H6.
-          eexists. split; eauto.
-          exists s.
-          split; eauto.
-          eexists.
-          split.
-          constructor.
-          subst.
-          constructor.
-          rd_trans. auto.
-          rd_trans. auto.
-        + simpl; auto. 
-      - eapply RExec in H7.
-        eapply impl_ok in H7; eauto. deex.
-        eapply RExec in H9.
-        inv_rexec.
-        inv_exec.
-        destruct v0.
-        + eapply RExec in H9.
-          eapply impl_ok in H9; eauto. deex.
-          exec_steps; repeat ( ReplicatedDisk.inv_bg || ReplicatedDisk.inv_step ).
-          TD.inv_step.
-          eapply td_disk_size_ok with (s := s) in H9.
-          eexists. split; eauto.
-          exists s.
-          split; eauto.
-          eexists.
-          split.
-          constructor.
-          subst.
-          constructor.
-          rd_trans. auto.
-          rd_trans. auto.
-          simpl; auto.
-        + eapply RExec in H9.
-          eapply impl_ok in H9; eauto. deex.
-          exec_steps; repeat ( ReplicatedDisk.inv_bg || ReplicatedDisk.inv_step ).
-          eexists. split; eauto.
-          exists s.
-          split; eauto.
-          eexists.
-          split.
-          constructor.
-          subst.
-          eapply td_disk_size_none_ok with (s := s) in H6 as H6; eauto.
-          rewrite <- H6.
-          constructor.
-          rd_trans. auto.
-          simpl; auto.
-        + simpl; auto.
-      Unshelve.
-      all: eauto; try exact unit. 
-      constructor.
-    Admitted.
+      repeat ( exec_steps || TD.inv_step ).
+      - eapply td_disk_size_ok with (s := s) (id := d0) in H6.
+        eexists. split; eauto.
+        exists s.
+        split; eauto.
+        eexists.
+        split.
+        constructor.
+        subst.
+        constructor.
+        rd_trans. auto.
+        rd_trans. auto.
+      - eapply td_disk_size_ok with (s := s) (id := d1) in H6.
+        eexists. split; eauto.
+        exists s.
+        split; eauto.
+        eexists.
+        split.
+        constructor.
+        subst.
+        constructor.
+        rd_trans. auto.
+        rd_trans. auto.
+      - exfalso.
+        eapply td_disk_size_none_ok; eauto.
+    Unshelve.
+      all: eauto.
+    Qed.
 
     Definition td_disk_size_post (state:TD.State) v :=
       match (TD.get_disk d0 state, TD.get_disk d1 state) with
@@ -908,7 +851,7 @@ Module ReplicatedDisk.
     Definition recovery_pre (state: TD.State) s a' :=
       a' <= size s ->
       match (TD.get_disk d0 state, TD.get_disk d1 state) with
-      | (Some d', Some d'') =>  
+      | (Some d', Some d'') =>
         (d' = s /\ d'' = s) \/
         (exists a b, a < a' /\
           ((d' = (diskUpd s a b) /\ d'' = s) \/
@@ -973,10 +916,11 @@ Module ReplicatedDisk.
                 inversion H11; subst; auto.
                 inversion H8; subst; auto.
                 omega.
-                left.
+                right. do 2 eexists.
                 inversion H9. inversion H8; subst.
                 rewrite diskUpd_eq in H11.
                 inversion H11; subst; auto.
+                autorewrite with upd in *.
                 (* lost the initial value at s? *)
                 admit.
                 omega.
