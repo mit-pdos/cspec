@@ -215,12 +215,7 @@ Module RemappedDisk.
               rewrite diskUpd_eq.
               replace (size (shrink d) + 1 - 1) with (size (shrink d)) in * by omega.
               auto.
-
-              (* why is [omega] too weak here? *)
-              inversion l; try omega.
-              exfalso. apply H3.
-              replace (size (shrink d) + 1) with (S (size (shrink d))) in * by omega.
-              congruence.
+              omega.
 
           * apply disk_none_oob in H2. omega.
 
