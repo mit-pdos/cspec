@@ -178,12 +178,9 @@ forkNbdServer e doLog =
       name <- negotiateNewstyle
       liftIO $ when (name /= "") $
         putStrLn $ "ignoring non-default export name " ++ show name
-      msz <- liftIO . runTD e $ Server.diskSizes
-      case msz of
-        Left (sz0, sz1) -> throwM $ SizeMismatchException sz0 sz1
-        Right sz ->
-          -- start transmission phase
-          sendExportInformation (fromIntegral sz * blocksize)
+      sz <- liftIO . runTD e $ Server.diskSize
+      -- start transmission phase
+      sendExportInformation (fromIntegral sz * blocksize)
       liftIO $ putStrLn "negotiated with client"
       -- infinite loop parsing commands and putting them on the queue
       handleCommands doLog e

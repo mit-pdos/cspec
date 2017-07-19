@@ -20,7 +20,7 @@ CODE += $(wildcard src/ReplicatedDisk/*.v)
 
 COQRFLAGS := -R build Pocs
 
-BINS	:= statdb-cli remap-nbd
+BINS	:= statdb-cli remap-nbd replicate-nbd
 
 .PHONY: default
 default: _CoqProject $(patsubst %,bin/%,$(BINS))
@@ -51,7 +51,7 @@ coq: $(patsubst src/%.v,build/%.vo,$(CODE))
 
 statdb-cli/extract: build/StatDb/StatDbCli.vo
 remap-nbd/extract: build/RemappedDisk/Server.vo
-replicate-nbd/extract: build/SeqDisk/Server.vo
+replicate-nbd/extract: build/ReplicatedDisk/Server.vo
 
 bin/%: %/extract
 	mkdir -p $(@D)

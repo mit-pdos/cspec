@@ -8,7 +8,7 @@ import os, sys
 
 import_modules = {
     "import qualified Data.ByteString as BS":
-    ["Bytes"],
+    ["Helpers"],
 
     "import qualified Replication.TwoDiskOps as TD":
     ["ExtrTwoDisk"],
@@ -21,10 +21,9 @@ import_modules = {
         "Interface",
         "ReadWrite",
         "Recovery",
-        "ReplicatedDisk",
+        "ReplicatedDiskImpl",
         "ExtrServer",
         "Server",
-        "Sync",
         "ExtrTwoDisk",
     ],
 

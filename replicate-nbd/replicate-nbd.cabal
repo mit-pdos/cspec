@@ -15,37 +15,28 @@ cabal-version:       >=1.10
 
 library
   hs-source-dirs:      src
-  exposed-modules:     ReplicatedDisk
+  exposed-modules:     ReplicatedDiskImpl
                      , Network.NBD
   other-modules:       Utils.Conversion
-                     , Replication.ReplicatedDiskImpl
+                     , ReplicatedDiskAPI
                      , Replication.TwoDiskOps
                      , Replication.TwoDiskEnvironment
                      , Network.NBD.Data
                      , Network.ServerOps
-                     , ArrayAPI
-                     , Bytes
+                     , Helpers
+                     , Logic
                      , Datatypes
                      , Def
                      , SimpleDisk
-                     , DiskSize
-                     , EqualDec
                      , GenericDisk
                      , Hoare
-                     , Init
                      , Interface
                      , NbdData
                      , Prog
-                     , ReadWrite
-                     , Recovery
                      , Sectors
-                     , SeqDiskAPI
-                     , SeqDiskDefs
                      , Server
                      , Specif
-                     , Sync
                      , TwoDiskAPI
-                     , TwoDiskDefs
                      , ExtrTwoDisk
                      , ExtrServer
   build-depends:       base >= 4.7 && < 5

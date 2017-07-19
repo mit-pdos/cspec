@@ -10,7 +10,7 @@ import                   System.IO (SeekMode(..))
 import "unix-bytestring" System.Posix.IO.ByteString
 import                   System.Posix.Types (Fd)
 import                   System.Posix.Unistd (fileSynchronise)
-import                   TwoDiskDefs
+import                   TwoDiskAPI
 import                   Utils.Conversion
 
 getDisk :: Coq_diskId -> TheProg (Maybe Fd)
