@@ -12,12 +12,11 @@ library
                      , BadSectorDisk.Env
                      , Network.NBD.Data
                      , Network.ServerOps
-                     , Bytes
+                     , Helpers
                      , Datatypes
                      , Nat
                      , Def
                      , SimpleDisk
-                     , EqualDec
                      , GenericDisk
                      , Hoare
                      , Interface

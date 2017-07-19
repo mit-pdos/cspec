@@ -4,7 +4,6 @@ Require Import RemappedDisk.RemappedDiskAPI.
 Require Import RemappedDisk.RemappedDiskImpl.
 Require Import BadSectorDisk.ExtrBadSectorDisk.
 
-Require Import Bytes.
 Require Import NBD.NbdData.
 Require Import NBD.ExtrServer.
 

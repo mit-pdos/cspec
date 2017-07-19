@@ -1,6 +1,5 @@
 Require Import Arith.
 Require Import Bool.
-Require Extraction.
 
 Set Implicit Arguments.
 
@@ -32,15 +31,6 @@ Axiom bappend : forall n1 n2, bytes n1 -> bytes n2 -> bytes (n1+n2).
 Axiom bsplit : forall n1 n2, bytes (n1+n2) -> bytes n1 * bytes n2.
 
 Arguments bsplit {n1 n2} bs.
-
-Extraction Language Haskell.
-
-Extract Constant bytes => "BS.ByteString".
-Extract Constant bytes_dec => "(\n b1 b2 -> b1 Prelude.== b2)".
-Extract Constant bytes0 => "(\n -> BS.replicate (Prelude.fromIntegral n) 0)".
-
-Extract Constant bappend => "(\_ _ bs1 bs2 -> BS.append bs1 bs2)".
-Extract Constant bsplit => "(\n1 _ bs -> BS.splitAt (Prelude.fromIntegral n1) bs)".
 
 
 (** Definition of [maybe_holds], stating a predicate holds over an optional

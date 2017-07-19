@@ -2,7 +2,7 @@ Cd "replicate-nbd/src/".
 
 Require Import ExtrHaskellNatInteger.
 Require Import ExtrHaskellBasic.
-Require Import Helpers.
+Require Import ExtrBytes.
 Require Import Refinement.ProgLang.ExtrProg.
 Require Import TwoDisk.ExtrTwoDisk.
 

@@ -22,7 +22,7 @@ mkdir -p $CD
 cp $SD/Makefile $CD/Makefile
 (cd $CD/ && git add Makefile 2> /dev/null )
 
-cp $SD/README.md $CD/Makefile
+cp $SD/README.md $CD/README.md
 (cd $CD/ && git add README.md 2> /dev/null )
 
 cp $SD/.gitignore $CD/.gitignore
