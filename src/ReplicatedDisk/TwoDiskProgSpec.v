@@ -21,11 +21,11 @@ below.
 Implicit Type (state:TD.State).
 
 Theorem maybe_holds_stable : forall state state' F0 F1,
-    TD.disk0 state |= F0 ->
-    TD.disk1 state |= F1 ->
+    TD.disk0 state ?|= F0 ->
+    TD.disk1 state ?|= F1 ->
     TD.bg_failure state state' ->
-    TD.disk0 state' |= F0 /\
-    TD.disk1 state' |= F1.
+    TD.disk0 state' ?|= F0 /\
+    TD.disk1 state' ?|= F1.
 Proof.
   intros.
   TD.inv_bg; simpl in *; eauto.
@@ -40,7 +40,7 @@ Ltac cleanup :=
          | [ H: TD.bg_failure _ _ |- _ ] =>
            eapply maybe_holds_stable in H;
            [ | solve [ eauto ] | solve [ eauto ] ]; destruct_ands
-         | [ H: _ |= eq _, H': _ = Some _ |- _ ] =>
+         | [ H: _ ?|= eq _, H': _ = Some _ |- _ ] =>
                   pose proof (holds_some_inv_eq _ H' H); clear H
          | _ => deex
          | _ => destruct_tuple
@@ -66,20 +66,20 @@ Theorem TDRead0_ok : forall (i: Interface TD.API) a,
     prog_spec
       (fun '(d_0, F) state =>
          {|
-           pre := TD.disk0 state |= eq d_0 /\
-                  TD.disk1 state |= F;
+           pre := TD.disk0 state ?|= eq d_0 /\
+                  TD.disk1 state ?|= F;
            post :=
              fun r state' =>
                match r with
-               | Working v => TD.disk0 state' |= eq d_0 /\
-                             TD.disk1 state' |= F /\
-                             d_0 a |= eq v
-               | Failed => TD.disk0 state' |= missing /\
-                          TD.disk1 state' |= F
+               | Working v => TD.disk0 state' ?|= eq d_0 /\
+                             TD.disk1 state' ?|= F /\
+                             d_0 a ?|= eq v
+               | Failed => TD.disk0 state' ?|= missing /\
+                          TD.disk1 state' ?|= F
                end;
            recover :=
-             fun _ state' => TD.disk0 state' |= eq d_0 /\
-                      TD.disk1 state' |= F;
+             fun _ state' => TD.disk0 state' ?|= eq d_0 /\
+                      TD.disk1 state' ?|= F;
          |})
       (Prim i (TD.Read d0 a))
       (irec i)
@@ -92,20 +92,20 @@ Theorem TDRead1_ok : forall (i: Interface TD.API) a,
     prog_spec
       (fun '(F, d_1) state =>
          {|
-           pre := TD.disk0 state |= F /\
-                  TD.disk1 state |= eq d_1;
+           pre := TD.disk0 state ?|= F /\
+                  TD.disk1 state ?|= eq d_1;
            post :=
              fun r state' =>
                match r with
-               | Working v => TD.disk0 state' |= F /\
-                             TD.disk1 state' |= eq d_1 /\
-                             d_1 a |= eq v
-               | Failed => TD.disk0 state' |= F /\
-                          TD.disk1 state' |= missing
+               | Working v => TD.disk0 state' ?|= F /\
+                             TD.disk1 state' ?|= eq d_1 /\
+                             d_1 a ?|= eq v
+               | Failed => TD.disk0 state' ?|= F /\
+                          TD.disk1 state' ?|= missing
                end;
            recover :=
-             fun _ state' => TD.disk0 state' |= F /\
-                      TD.disk1 state' |= eq d_1;
+             fun _ state' => TD.disk0 state' ?|= F /\
+                      TD.disk1 state' ?|= eq d_1;
          |})
       (Prim i (TD.Read d1 a))
       (irec i)
@@ -118,21 +118,21 @@ Theorem TDWrite0_ok : forall (i: Interface TD.API) a b,
     prog_spec
       (fun '(d_0, F) state =>
          {|
-           pre := TD.disk0 state |= eq d_0 /\
-                  TD.disk1 state |= F;
+           pre := TD.disk0 state ?|= eq d_0 /\
+                  TD.disk1 state ?|= F;
            post :=
              fun r state' =>
                match r with
-               | Working _ => TD.disk0 state' |= eq (diskUpd d_0 a b) /\
-                              TD.disk1 state' |= F
-               | Failed => TD.disk0 state' |= missing /\
-                           TD.disk1 state' |= F
+               | Working _ => TD.disk0 state' ?|= eq (diskUpd d_0 a b) /\
+                              TD.disk1 state' ?|= F
+               | Failed => TD.disk0 state' ?|= missing /\
+                           TD.disk1 state' ?|= F
                end;
            recover :=
              fun _ state' =>
-               (TD.disk0 state' |= eq d_0 \/
-                a < size d_0 /\ TD.disk0 state' |= eq (diskUpd d_0 a b)) /\
-               TD.disk1 state' |= F;
+               (TD.disk0 state' ?|= eq d_0 \/
+                a < size d_0 /\ TD.disk0 state' ?|= eq (diskUpd d_0 a b)) /\
+               TD.disk1 state' ?|= F;
          |})
       (Prim i (TD.Write d0 a b))
       (irec i)
@@ -150,21 +150,21 @@ Theorem TDWrite1_ok : forall (i: Interface TD.API) a b,
     prog_spec
       (fun '(F, d_1) state =>
          {|
-           pre := TD.disk0 state |= F /\
-                  TD.disk1 state |= eq d_1;
+           pre := TD.disk0 state ?|= F /\
+                  TD.disk1 state ?|= eq d_1;
            post :=
              fun r state' =>
                match r with
-               | Working _ => TD.disk0 state' |= F /\
-                             TD.disk1 state' |= eq (diskUpd d_1 a b)
-               | Failed => TD.disk0 state' |= F /\
-                          TD.disk1 state' |= missing
+               | Working _ => TD.disk0 state' ?|= F /\
+                             TD.disk1 state' ?|= eq (diskUpd d_1 a b)
+               | Failed => TD.disk0 state' ?|= F /\
+                          TD.disk1 state' ?|= missing
                end;
            recover :=
              fun _ state' =>
-               TD.disk0 state' |= F /\
-               (TD.disk1 state' |= eq d_1 \/
-                a < size d_1 /\ TD.disk1 state' |= eq (diskUpd d_1 a b));
+               TD.disk0 state' ?|= F /\
+               (TD.disk1 state' ?|= eq d_1 \/
+                a < size d_1 /\ TD.disk1 state' ?|= eq (diskUpd d_1 a b));
          |})
       (Prim i (TD.Write d1 a b))
       (irec i)
@@ -182,21 +182,21 @@ Theorem TDDiskSize0_ok : forall (i: Interface TD.API),
     prog_spec
       (fun '(d_0, F) state =>
          {|
-           pre := TD.disk0 state |= eq d_0 /\
-                  TD.disk1 state |= F;
+           pre := TD.disk0 state ?|= eq d_0 /\
+                  TD.disk1 state ?|= F;
            post :=
              fun r state' =>
                match r with
                | Working n => n = size d_0 /\
-                             TD.disk0 state' |= eq d_0 /\
-                             TD.disk1 state' |= F
-               | Failed => TD.disk0 state' |= missing /\
-                          TD.disk1 state' |= F
+                             TD.disk0 state' ?|= eq d_0 /\
+                             TD.disk1 state' ?|= F
+               | Failed => TD.disk0 state' ?|= missing /\
+                          TD.disk1 state' ?|= F
                end;
            recover :=
              fun _ state' =>
-               TD.disk0 state' |= eq d_0 /\
-               TD.disk1 state' |= F;
+               TD.disk0 state' ?|= eq d_0 /\
+               TD.disk1 state' ?|= F;
          |})
       (Prim i (TD.DiskSize d0))
       (irec i)
@@ -209,21 +209,21 @@ Theorem TDDiskSize1_ok : forall (i: Interface TD.API),
     prog_spec
       (fun '(F, d_1) state =>
          {|
-           pre := TD.disk0 state |= F /\
-                  TD.disk1 state |= eq d_1;
+           pre := TD.disk0 state ?|= F /\
+                  TD.disk1 state ?|= eq d_1;
            post :=
              fun r state' =>
                match r with
                | Working n => n = size d_1 /\
-                             TD.disk0 state' |= F /\
-                             TD.disk1 state' |= eq d_1
-               | Failed => TD.disk0 state' |= F /\
-                          TD.disk1 state' |= missing
+                             TD.disk0 state' ?|= F /\
+                             TD.disk1 state' ?|= eq d_1
+               | Failed => TD.disk0 state' ?|= F /\
+                          TD.disk1 state' ?|= missing
                end;
            recover :=
              fun _ state' =>
-               TD.disk0 state' |= F /\
-               TD.disk1 state' |= eq d_1;
+               TD.disk0 state' ?|= F /\
+               TD.disk1 state' ?|= eq d_1;
          |})
       (Prim i (TD.DiskSize d1))
       (irec i)

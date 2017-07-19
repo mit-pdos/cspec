@@ -1,17 +1,18 @@
 Require Import Automation.
+Require Import Helpers.
 
 Require Import SepLogic.Mem.Def.
 Require Import SepLogic.Mem.Upd.
 Require Import SepLogic.Pred.Def.
 
-Definition pred_except `(F: pred A V) {AEQ: EqDec A eq} a v : pred A V :=
+Definition pred_except `(F: pred A V) {AEQ: EqualDec A} a v : pred A V :=
   mkPred (fun m => upd m a v |= F).
 
-Definition mem_except `(m: mem A V) {AEQ: EqDec A eq} a : mem A V :=
+Definition mem_except `(m: mem A V) {AEQ: EqualDec A} a : mem A V :=
   fun a' => if a == a' then None
          else m a'.
 
-Theorem pred_except_ptsto : forall `(F: pred A V) {AEQ: EqDec A eq} a v,
+Theorem pred_except_ptsto : forall `(F: pred A V) {AEQ: EqualDec A} a v,
     pred_except F a v * a |-> v ===> F.
 Proof.
   intros.

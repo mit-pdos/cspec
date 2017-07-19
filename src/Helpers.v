@@ -37,10 +37,10 @@ Arguments bsplit {n1 n2} bs.
 value if the value is present.
 
     To reflect the expected usage of this primitive, we also define two notations:
-    - [mv |= p] states that p holds on mv, if mv is present (the notation
+    - [mv ?|= p] states that p holds on mv, if mv is present (the notation
     desugars to [maybe_holds p mv])
     - to state that an optional value is definitely missing, we provide a
-      predicate [missing], so that [mv |= missing] implies that mv is None.
+      predicate [missing], so that [mv ?|= missing] implies that mv is None.
 *)
 
 Definition maybe_holds T (p:T -> Prop) : option T -> Prop :=
@@ -103,4 +103,4 @@ Qed.
 
 Delimit Scope pred_scope with pred.
 
-Notation "m |= F" := (maybe_holds F%pred m) (at level 20, F at level 50).
+Notation "m ?|= F" := (maybe_holds F%pred m) (at level 20, F at level 50).

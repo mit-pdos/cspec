@@ -143,8 +143,8 @@ Module RD.
       end.
 
     Lemma both_disks_not_missing : forall (state: TD.State),
-        TD.disk0 state |= missing ->
-        TD.disk1 state |= missing ->
+        TD.disk0 state ?|= missing ->
+        TD.disk1 state ?|= missing ->
         False.
     Proof.
       destruct state; simpl; intros.
@@ -211,17 +211,17 @@ Module RD.
         prog_spec
           (fun d state =>
              {|
-               pre := TD.disk0 state |= eq d /\
-                      TD.disk1 state |= eq d;
+               pre := TD.disk0 state ?|= eq d /\
+                      TD.disk1 state ?|= eq d;
                post :=
                  fun r state' =>
-                   d a |= eq r /\
-                   TD.disk0 state' |= eq d /\
-                   TD.disk1 state' |= eq d;
+                   d a ?|= eq r /\
+                   TD.disk0 state' ?|= eq d /\
+                   TD.disk1 state' ?|= eq d;
                recover :=
                  fun _ state' =>
-                   TD.disk0 state' |= eq d /\
-                   TD.disk1 state' |= eq d;
+                   TD.disk0 state' ?|= eq d /\
+                   TD.disk1 state' ?|= eq d;
              |})
           (Read a)
           (irec td)
@@ -242,22 +242,22 @@ Module RD.
           (fun d state =>
              {|
                pre :=
-                 TD.disk0 state |= eq d /\
-                 TD.disk1 state |= eq d;
+                 TD.disk0 state ?|= eq d /\
+                 TD.disk1 state ?|= eq d;
                post :=
                  fun r state' =>
                    r = tt /\
-                   TD.disk0 state' |= eq (diskUpd d a b) /\
-                   TD.disk1 state' |= eq (diskUpd d a b);
+                   TD.disk0 state' ?|= eq (diskUpd d a b) /\
+                   TD.disk1 state' ?|= eq (diskUpd d a b);
                recover :=
                  fun _ state' =>
-                   (TD.disk0 state' |= eq d /\
-                    TD.disk1 state' |= eq d) \/
+                   (TD.disk0 state' ?|= eq d /\
+                    TD.disk1 state' ?|= eq d) \/
                    (a < size d /\
-                    TD.disk0 state' |= eq (diskUpd d a b) /\
-                    TD.disk1 state' |= eq d) \/
-                   (TD.disk0 state' |= eq (diskUpd d a b) /\
-                    TD.disk1 state' |= eq (diskUpd d a b));
+                    TD.disk0 state' ?|= eq (diskUpd d a b) /\
+                    TD.disk1 state' ?|= eq d) \/
+                   (TD.disk0 state' ?|= eq (diskUpd d a b) /\
+                    TD.disk1 state' ?|= eq (diskUpd d a b));
              |})
           (Write a b)
           (irec td)
@@ -285,19 +285,19 @@ Module RD.
         (fun '(d_0, d_1) state =>
            {|
              pre :=
-               TD.disk0 state |= eq d_0 /\
-               TD.disk1 state |= eq d_1 /\
+               TD.disk0 state ?|= eq d_0 /\
+               TD.disk1 state ?|= eq d_1 /\
                size d_0 = size d_1;
              post :=
                fun r state' =>
                  r = size d_0 /\
                  r = size d_1 /\
-                 TD.disk0 state' |= eq d_0 /\
-                 TD.disk1 state' |= eq d_1;
+                 TD.disk0 state' ?|= eq d_0 /\
+                 TD.disk1 state' ?|= eq d_1;
              recover :=
                fun _ state' =>
-                 TD.disk0 state' |= eq d_0 /\
-                 TD.disk1 state' |= eq d_1;
+                 TD.disk0 state' ?|= eq d_0 /\
+                 TD.disk1 state' ?|= eq d_1;
            |})
         (DiskSize)
         (irec td)
@@ -317,14 +317,14 @@ Module RD.
         prog_spec
           (fun '(d_0, d_1) state =>
              {| pre :=
-                  TD.disk0 state |= eq d_0 /\
-                  TD.disk1 state |= eq d_1 /\
+                  TD.disk0 state ?|= eq d_0 /\
+                  TD.disk1 state ?|= eq d_1 /\
                   equal_after a d_0 d_1;
                 post :=
                   fun _ state' =>
                     exists d_0' d_1',
-                      TD.disk0 state' |= eq d_0' /\
-                      TD.disk1 state' |= eq d_1' /\
+                      TD.disk0 state' ?|= eq d_0' /\
+                      TD.disk1 state' ?|= eq d_1' /\
                       equal_after 0 d_0' d_1';
                 recover :=
                   fun _ state' => True;
@@ -358,13 +358,13 @@ Module RD.
         prog_spec
           (fun '(d_0, d_1) state =>
              {| pre :=
-                  TD.disk0 state |= eq d_0 /\
-                  TD.disk1 state |= eq d_1;
+                  TD.disk0 state ?|= eq d_0 /\
+                  TD.disk1 state ?|= eq d_1;
                 post :=
                   fun r state' =>
                     exists d_0' d_1',
-                      TD.disk0 state' |= eq d_0' /\
-                      TD.disk1 state' |= eq d_1' /\
+                      TD.disk0 state' ?|= eq d_0' /\
+                      TD.disk1 state' ?|= eq d_1' /\
                       match r with
                       | Some sz => size d_0' = sz /\ size d_1' = sz
                       | None => True
@@ -391,15 +391,15 @@ Module RD.
         prog_spec
           (fun '(d_0, d_1) state =>
              {| pre :=
-                  TD.disk0 state |= eq d_0 /\
-                  TD.disk1 state |= eq d_1;
+                  TD.disk0 state ?|= eq d_0 /\
+                  TD.disk1 state ?|= eq d_1;
                 post :=
                   fun r state' =>
                     match r with
                     | Initialized =>
                       exists d_0' d_1',
-                      TD.disk0 state' |= eq d_0' /\
-                      TD.disk1 state' |= eq d_1' /\
+                      TD.disk0 state' ?|= eq d_0' /\
+                      TD.disk1 state' ?|= eq d_1' /\
                       d_0' = d_1'
                     | InitFailed =>
                       True
@@ -484,8 +484,8 @@ Module RD.
 
     Lemma disks_eq_inbounds : forall T (d: diskOf T) a v v',
         a < size d ->
-        d a |= eq v ->
-        d a |= eq v' ->
+        d a ?|= eq v ->
+        d a ?|= eq v' ->
         v = v'.
     Proof.
       unfold disk_get; intros.
@@ -506,23 +506,23 @@ Module RD.
                     if a is out-of-bounds fixup just might uselessly write to
                     disk and not do anything *)
                  a < size d /\
-                 TD.disk0 state |= eq d /\
-                 TD.disk1 state |= eq d;
+                 TD.disk0 state ?|= eq d /\
+                 TD.disk1 state ?|= eq d;
                post :=
                  fun r state' =>
                    match r with
                    | Continue =>
-                     TD.disk0 state' |= eq d /\
-                     TD.disk1 state' |= eq d
+                     TD.disk0 state' ?|= eq d /\
+                     TD.disk1 state' ?|= eq d
                    | RepairDone => False
                    | DiskFailed i =>
-                     TD.disk0 state' |= eq d /\
-                     TD.disk1 state' |= eq d
+                     TD.disk0 state' ?|= eq d /\
+                     TD.disk1 state' ?|= eq d
                    end;
                recover :=
                  fun _ state' =>
-                   TD.disk0 state' |= eq d /\
-                   TD.disk1 state' |= eq d;
+                   TD.disk0 state' ?|= eq d /\
+                   TD.disk1 state' ?|= eq d;
              |})
           (fixup a)
           (irec td)
@@ -540,7 +540,7 @@ Module RD.
     Qed.
 
     Lemma diskUpd_maybe_same : forall (d:disk) a b,
-        d a |= eq b ->
+        d a ?|= eq b ->
         diskUpd d a b = d.
     Proof.
       intros.
@@ -558,34 +558,34 @@ Module RD.
              {|
                pre :=
                  a < size d /\
-                 TD.disk0 state |= eq (diskUpd d a b) /\
-                 TD.disk1 state |= eq d;
+                 TD.disk0 state ?|= eq (diskUpd d a b) /\
+                 TD.disk1 state ?|= eq d;
                post :=
                  fun r state' =>
                    match r with
                    | Continue =>
                      (* could happen if b already happened to be value *)
-                     TD.disk0 state' |= eq (diskUpd d a b) /\
-                     TD.disk1 state' |= eq (diskUpd d a b)
+                     TD.disk0 state' ?|= eq (diskUpd d a b) /\
+                     TD.disk1 state' ?|= eq (diskUpd d a b)
                    | RepairDone =>
-                     TD.disk0 state' |= eq (diskUpd d a b) /\
-                     TD.disk1 state' |= eq (diskUpd d a b)
+                     TD.disk0 state' ?|= eq (diskUpd d a b) /\
+                     TD.disk1 state' ?|= eq (diskUpd d a b)
                    | DiskFailed i =>
                      match i with
-                     | d0 => TD.disk0 state' |= eq d /\
-                            TD.disk1 state' |= eq d
-                     | d1 => TD.disk0 state' |= eq (diskUpd d a b) /\
-                            TD.disk1 state' |= eq (diskUpd d a b)
+                     | d0 => TD.disk0 state' ?|= eq d /\
+                            TD.disk1 state' ?|= eq d
+                     | d1 => TD.disk0 state' ?|= eq (diskUpd d a b) /\
+                            TD.disk1 state' ?|= eq (diskUpd d a b)
                      end
                    end;
                recover :=
                  fun _ state' =>
-                   (TD.disk0 state' |= eq (diskUpd d a b) /\
-                    TD.disk1 state' |= eq (diskUpd d a b)) \/
-                   (TD.disk0 state' |= eq (diskUpd d a b) /\
-                    TD.disk1 state' |= eq d) \/
-                   (TD.disk0 state' |= eq d /\
-                    TD.disk1 state' |= eq d);
+                   (TD.disk0 state' ?|= eq (diskUpd d a b) /\
+                    TD.disk1 state' ?|= eq (diskUpd d a b)) \/
+                   (TD.disk0 state' ?|= eq (diskUpd d a b) /\
+                    TD.disk1 state' ?|= eq d) \/
+                   (TD.disk0 state' ?|= eq d /\
+                    TD.disk1 state' ?|= eq d);
              |})
           (fixup a)
           (irec td)
@@ -616,32 +616,32 @@ Module RD.
                  (* recovery, working from end of disk, has not yet reached the
                     correct address *)
                  a' < a /\
-                 TD.disk0 state |= eq (diskUpd d a' b) /\
-                 TD.disk1 state |= eq d;
+                 TD.disk0 state ?|= eq (diskUpd d a' b) /\
+                 TD.disk1 state ?|= eq d;
                post :=
                  fun r state' =>
                    match r with
                    | Continue =>
-                     TD.disk0 state' |= eq (diskUpd d a' b) /\
-                     TD.disk1 state' |= eq d
+                     TD.disk0 state' ?|= eq (diskUpd d a' b) /\
+                     TD.disk1 state' ?|= eq d
                    | RepairDone =>
                      (* since the address is wrong, the only way we finish is if
                         a disk fails, which we explicitly report *)
                      False
                    | DiskFailed i =>
                      match i with
-                     | d0 => TD.disk0 state' |= eq d /\
-                            TD.disk1 state' |= eq d
-                     | d1 => TD.disk0 state' |= eq (diskUpd d a' b) /\
-                            TD.disk1 state' |= eq (diskUpd d a' b)
+                     | d0 => TD.disk0 state' ?|= eq d /\
+                            TD.disk1 state' ?|= eq d
+                     | d1 => TD.disk0 state' ?|= eq (diskUpd d a' b) /\
+                            TD.disk1 state' ?|= eq (diskUpd d a' b)
                      end
                    end;
                recover :=
                  fun _ state' =>
-                   (TD.disk0 state' |= eq (diskUpd d a' b) /\
-                    TD.disk1 state' |= eq d) \/
-                   (TD.disk0 state' |= eq d /\
-                    TD.disk1 state' |= eq d);
+                   (TD.disk0 state' ?|= eq (diskUpd d a' b) /\
+                    TD.disk1 state' ?|= eq d) \/
+                   (TD.disk0 state' ?|= eq d /\
+                    TD.disk1 state' ?|= eq d);
              |})
           (fixup a)
           (irec td)
@@ -670,54 +670,54 @@ Module RD.
                pre :=
                  a < size d /\
                  match s with
-                 | FullySynced => TD.disk0 state |= eq d /\
-                                 TD.disk1 state |= eq d
+                 | FullySynced => TD.disk0 state ?|= eq d /\
+                                 TD.disk1 state ?|= eq d
                  | OutOfSync a' b => a' <= a /\
-                                    TD.disk0 state |= eq (diskUpd d a' b) /\
-                                    TD.disk1 state |= eq d
+                                    TD.disk0 state ?|= eq (diskUpd d a' b) /\
+                                    TD.disk1 state ?|= eq d
                  end;
                post :=
                  fun r state' =>
                    match s with
-                   | FullySynced => TD.disk0 state' |= eq d /\
-                                   TD.disk1 state' |= eq d /\
+                   | FullySynced => TD.disk0 state' ?|= eq d /\
+                                   TD.disk1 state' ?|= eq d /\
                                    (* not actually useful *)
                                    r <> RepairDone
                    | OutOfSync a' b =>
                      match r with
                      | Continue =>
                        (a' < a /\
-                        TD.disk0 state' |= eq (diskUpd d a' b) /\
-                        TD.disk1 state' |= eq d) \/
-                       (TD.disk0 state' |= eq (diskUpd d a' b) /\
-                        TD.disk1 state' |= eq (diskUpd d a' b))
+                        TD.disk0 state' ?|= eq (diskUpd d a' b) /\
+                        TD.disk1 state' ?|= eq d) \/
+                       (TD.disk0 state' ?|= eq (diskUpd d a' b) /\
+                        TD.disk1 state' ?|= eq (diskUpd d a' b))
                      | RepairDone =>
-                       (TD.disk0 state' |= eq d /\
-                        TD.disk1 state' |= eq d) \/
+                       (TD.disk0 state' ?|= eq d /\
+                        TD.disk1 state' ?|= eq d) \/
                        (a = a' /\ (* not necessary, but nice to document *)
-                        TD.disk0 state' |= eq (diskUpd d a' b) /\
-                        TD.disk1 state' |= eq (diskUpd d a' b))
+                        TD.disk0 state' ?|= eq (diskUpd d a' b) /\
+                        TD.disk1 state' ?|= eq (diskUpd d a' b))
                      | DiskFailed i =>
                        match i with
-                       | d0 => TD.disk0 state' |= eq d /\
-                              TD.disk1 state' |= eq d
-                       | d1 => TD.disk0 state' |= eq (diskUpd d a' b) /\
-                              TD.disk1 state' |= eq (diskUpd d a' b)
+                       | d0 => TD.disk0 state' ?|= eq d /\
+                              TD.disk1 state' ?|= eq d
+                       | d1 => TD.disk0 state' ?|= eq (diskUpd d a' b) /\
+                              TD.disk1 state' ?|= eq (diskUpd d a' b)
                        end
                      end
                    end;
                recover :=
                  fun _ state' =>
                    match s with
-                   | FullySynced => TD.disk0 state' |= eq d /\
-                                   TD.disk1 state' |= eq d
+                   | FullySynced => TD.disk0 state' ?|= eq d /\
+                                   TD.disk1 state' ?|= eq d
                    | OutOfSync a' b =>
-                     (TD.disk0 state' |= eq (diskUpd d a' b) /\
-                      TD.disk1 state' |= eq (diskUpd d a' b)) \/
-                     (TD.disk0 state' |= eq (diskUpd d a' b) /\
-                      TD.disk1 state' |= eq d) \/
-                     (TD.disk0 state' |= eq d /\
-                      TD.disk1 state' |= eq d)
+                     (TD.disk0 state' ?|= eq (diskUpd d a' b) /\
+                      TD.disk1 state' ?|= eq (diskUpd d a' b)) \/
+                     (TD.disk0 state' ?|= eq (diskUpd d a' b) /\
+                      TD.disk1 state' ?|= eq d) \/
+                     (TD.disk0 state' ?|= eq d /\
+                      TD.disk1 state' ?|= eq d)
                    end;
              |})
           (fixup a)
@@ -753,36 +753,36 @@ Module RD.
                pre :=
                  a <= size d /\
                  match s with
-                 | FullySynced => TD.disk0 state |= eq d /\
-                                 TD.disk1 state |= eq d
+                 | FullySynced => TD.disk0 state ?|= eq d /\
+                                 TD.disk1 state ?|= eq d
                  | OutOfSync a' b => a' < a /\
-                                    TD.disk0 state |= eq (diskUpd d a' b) /\
-                                    TD.disk1 state |= eq d
+                                    TD.disk0 state ?|= eq (diskUpd d a' b) /\
+                                    TD.disk1 state ?|= eq d
                  end;
                post :=
                  fun r state' =>
                    match s with
                    | FullySynced =>
-                     TD.disk0 state' |= eq d /\
-                     TD.disk1 state' |= eq d
+                     TD.disk0 state' ?|= eq d /\
+                     TD.disk1 state' ?|= eq d
                    | OutOfSync a' b =>
-                     (TD.disk0 state' |= eq d /\
-                      TD.disk1 state' |= eq d) \/
-                     (TD.disk0 state' |= eq (diskUpd d a' b) /\
-                      TD.disk1 state' |= eq (diskUpd d a' b))
+                     (TD.disk0 state' ?|= eq d /\
+                      TD.disk1 state' ?|= eq d) \/
+                     (TD.disk0 state' ?|= eq (diskUpd d a' b) /\
+                      TD.disk1 state' ?|= eq (diskUpd d a' b))
                    end;
                recover :=
                  fun _ state' =>
                    match s with
-                   | FullySynced => TD.disk0 state' |= eq d /\
-                                   TD.disk1 state' |= eq d
+                   | FullySynced => TD.disk0 state' ?|= eq d /\
+                                   TD.disk1 state' ?|= eq d
                    | OutOfSync a' b =>
-                     (TD.disk0 state' |= eq d /\
-                      TD.disk1 state' |= eq d) \/
-                     (TD.disk0 state' |= eq (diskUpd d a' b) /\
-                      TD.disk1 state' |= eq d) \/
-                     (TD.disk0 state' |= eq (diskUpd d a' b) /\
-                      TD.disk1 state' |= eq (diskUpd d a' b))
+                     (TD.disk0 state' ?|= eq d /\
+                      TD.disk1 state' ?|= eq d) \/
+                     (TD.disk0 state' ?|= eq (diskUpd d a' b) /\
+                      TD.disk1 state' ?|= eq d) \/
+                     (TD.disk0 state' ?|= eq (diskUpd d a' b) /\
+                      TD.disk1 state' ?|= eq (diskUpd d a' b))
                    end;
              |})
           (recover_at a)
@@ -816,35 +816,35 @@ Module RD.
          {|
            pre :=
              match s with
-             | FullySynced => TD.disk0 state |= eq d /\
-                             TD.disk1 state |= eq d
+             | FullySynced => TD.disk0 state ?|= eq d /\
+                             TD.disk1 state ?|= eq d
              | OutOfSync a b => a < size d /\
-                               TD.disk0 state |= eq (diskUpd d a b) /\
-                               TD.disk1 state |= eq d
+                               TD.disk0 state ?|= eq (diskUpd d a b) /\
+                               TD.disk1 state ?|= eq d
              end;
            post :=
              fun (_:unit) state' =>
                match s with
-               | FullySynced => TD.disk0 state' |= eq d /\
-                               TD.disk1 state' |= eq d
+               | FullySynced => TD.disk0 state' ?|= eq d /\
+                               TD.disk1 state' ?|= eq d
                | OutOfSync a b =>
-                 (TD.disk0 state' |= eq d /\
-                  TD.disk1 state' |= eq d) \/
-                 (TD.disk0 state' |= eq (diskUpd d a b) /\
-                  TD.disk1 state' |= eq (diskUpd d a b))
+                 (TD.disk0 state' ?|= eq d /\
+                  TD.disk1 state' ?|= eq d) \/
+                 (TD.disk0 state' ?|= eq (diskUpd d a b) /\
+                  TD.disk1 state' ?|= eq (diskUpd d a b))
                end;
            recover :=
              fun (_:unit) state' =>
                match s with
-               | FullySynced => TD.disk0 state' |= eq d /\
-                               TD.disk1 state' |= eq d
+               | FullySynced => TD.disk0 state' ?|= eq d /\
+                               TD.disk1 state' ?|= eq d
                | OutOfSync a b =>
-                 (TD.disk0 state' |= eq d /\
-                  TD.disk1 state' |= eq d) \/
-                 (TD.disk0 state' |= eq (diskUpd d a b) /\
-                  TD.disk1 state' |= eq d) \/
-                 (TD.disk0 state' |= eq (diskUpd d a b) /\
-                  TD.disk1 state' |= eq (diskUpd d a b))
+                 (TD.disk0 state' ?|= eq d /\
+                  TD.disk1 state' ?|= eq d) \/
+                 (TD.disk0 state' ?|= eq (diskUpd d a b) /\
+                  TD.disk1 state' ?|= eq d) \/
+                 (TD.disk0 state' ?|= eq (diskUpd d a b) /\
+                  TD.disk1 state' ?|= eq (diskUpd d a b))
                end;
          |}).
 
@@ -897,17 +897,17 @@ Module RD.
         prog_spec
           (fun d state =>
              {|
-               pre := TD.disk0 state |= eq d /\
-                      TD.disk1 state |= eq d;
+               pre := TD.disk0 state ?|= eq d /\
+                      TD.disk1 state ?|= eq d;
                post :=
                  fun r state' =>
-                   d a |= eq r /\
-                   TD.disk0 state' |= eq d /\
-                   TD.disk1 state' |= eq d;
+                   d a ?|= eq r /\
+                   TD.disk0 state' ?|= eq d /\
+                   TD.disk1 state' ?|= eq d;
                recover :=
                  fun _ state' =>
-                   TD.disk0 state' |= eq d /\
-                   TD.disk1 state' |= eq d;
+                   TD.disk0 state' ?|= eq d /\
+                   TD.disk1 state' ?|= eq d;
              |})
           (Read a) (_ <- irec td; Recover)
           (interface_abs td).
@@ -923,19 +923,19 @@ Module RD.
           (fun d state =>
              {|
                pre :=
-                 TD.disk0 state |= eq d /\
-                 TD.disk1 state |= eq d;
+                 TD.disk0 state ?|= eq d /\
+                 TD.disk1 state ?|= eq d;
                post :=
                  fun r state' =>
                    r = tt /\
-                   TD.disk0 state' |= eq (diskUpd d a b) /\
-                   TD.disk1 state' |= eq (diskUpd d a b);
+                   TD.disk0 state' ?|= eq (diskUpd d a b) /\
+                   TD.disk1 state' ?|= eq (diskUpd d a b);
                recover :=
                  fun _ state' =>
-                   (TD.disk0 state' |= eq d /\
-                    TD.disk1 state' |= eq d) \/
-                   (TD.disk0 state' |= eq (diskUpd d a b) /\
-                    TD.disk1 state' |= eq (diskUpd d a b));
+                   (TD.disk0 state' ?|= eq d /\
+                    TD.disk1 state' ?|= eq d) \/
+                   (TD.disk0 state' ?|= eq (diskUpd d a b) /\
+                    TD.disk1 state' ?|= eq (diskUpd d a b));
              |})
           (Write a b) (_ <- irec td; Recover)
           (interface_abs td).
@@ -952,17 +952,17 @@ Module RD.
       prog_spec
         (fun d state =>
            {|
-             pre := TD.disk0 state |= eq d /\
-                    TD.disk1 state |= eq d;
+             pre := TD.disk0 state ?|= eq d /\
+                    TD.disk1 state ?|= eq d;
              post :=
                fun r state' =>
                  r = size d /\
-                 TD.disk0 state' |= eq d /\
-                 TD.disk1 state' |= eq d;
+                 TD.disk0 state' ?|= eq d /\
+                 TD.disk1 state' ?|= eq d;
              recover :=
                fun _ state' =>
-                 TD.disk0 state' |= eq d /\
-                 TD.disk1 state' |= eq d;
+                 TD.disk0 state' ?|= eq d /\
+                 TD.disk1 state' ?|= eq d;
            |})
         (DiskSize) (_ <- irec td; Recover)
         (interface_abs td).
@@ -980,7 +980,7 @@ Module RD.
     convenient terms (in some cases, just for the sake of the automation). *)
 
     Lemma read_step : forall a (state state':RD.State) b,
-        state a |= eq b ->
+        state a ?|= eq b ->
         state' = state ->
         RD.step (RD.Read a) state b state'.
     Proof.
@@ -1033,7 +1033,7 @@ Module RD.
       state' = abstraction_f state.
 
     (* We re-express the abstraction and invariant's behavior in terms of the
-       maybe holds (m |= F) statements in all of our specifications. *)
+       maybe holds (m ?|= F) statements in all of our specifications. *)
 
     Ltac crush :=
       intros; repeat match goal with
@@ -1045,29 +1045,29 @@ Module RD.
 
     Lemma invariant_to_disks_eq0 : forall state,
         rd_invariant state ->
-        TD.disk0 state |= eq (abstraction_f state).
+        TD.disk0 state ?|= eq (abstraction_f state).
     Proof.
       crush.
     Qed.
 
     Lemma invariant_to_disks_eq1 : forall state,
         rd_invariant state ->
-        TD.disk1 state |= eq (abstraction_f state).
+        TD.disk1 state ?|= eq (abstraction_f state).
     Proof.
       crush.
     Qed.
 
     Lemma disks_eq_to_invariant : forall state d,
-        TD.disk0 state |= eq d ->
-        TD.disk1 state |= eq d ->
+        TD.disk0 state ?|= eq d ->
+        TD.disk1 state ?|= eq d ->
         rd_invariant state.
     Proof.
       crush.
     Qed.
 
     Lemma disks_eq_to_abstraction : forall state d,
-        TD.disk0 state |= eq d ->
-        TD.disk1 state |= eq d ->
+        TD.disk0 state ?|= eq d ->
+        TD.disk1 state ?|= eq d ->
         d = abstraction_f state.
     Proof.
       crush.
@@ -1075,8 +1075,8 @@ Module RD.
     Qed.
 
     Lemma disks_eq_to_abstraction' : forall state d,
-        TD.disk0 state |= eq d ->
-        TD.disk1 state |= eq d ->
+        TD.disk0 state ?|= eq d ->
+        TD.disk1 state ?|= eq d ->
         abstraction_f state = d.
     Proof.
       intros.
@@ -1115,8 +1115,8 @@ Module RD.
 
     Theorem state_some_disks : forall state,
         exists d_0 d_1,
-          TD.disk0 state |= eq d_0 /\
-          TD.disk1 state |= eq d_1.
+          TD.disk0 state ?|= eq d_0 /\
+          TD.disk1 state ?|= eq d_1.
     Proof.
       destruct state.
       destruct disk0, disk1; simpl; eauto.

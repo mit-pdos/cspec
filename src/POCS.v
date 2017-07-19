@@ -5,6 +5,7 @@ Require Export Automation.
 Require Export Helpers.
 
 Require Export SepLogic.Mem.
+Require Export SepLogic.Pred.
 
 Require Export Disk.SimpleDisk.
 Require Export Disk.Sectors.

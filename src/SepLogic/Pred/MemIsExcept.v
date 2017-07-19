@@ -1,4 +1,5 @@
 Require Import Automation.
+Require Import Helpers.
 
 Require Import SepLogic.Mem.Def.
 Require Import SepLogic.Mem.Upd.
@@ -7,7 +8,7 @@ Require Import SepLogic.Pred.MemIs.
 Require Import SepLogic.Pred.Ptsto.
 Require Import SepLogic.Pred.Except.
 
-Theorem mem_is_except : forall `(m: mem A V) {AEQ:EqDec A eq} a v,
+Theorem mem_is_except : forall `(m: mem A V) {AEQ:EqualDec A} a v,
     m a = Some v ->
     m |= pred_except (mem_is m) a v * a |-> v.
 Proof.
@@ -28,7 +29,7 @@ Proof.
   is_eq a a'; eauto.
 Qed.
 
-Theorem mem_is_upd : forall `(m: mem A V) {AEQ:EqDec A eq} a v v',
+Theorem mem_is_upd : forall `(m: mem A V) {AEQ:EqualDec A} a v v',
     pred_except (mem_is m) a v ===>
                 pred_except (mem_is (upd m a v')) a v'.
 Proof.
