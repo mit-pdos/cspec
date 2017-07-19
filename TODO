@@ -27,6 +27,8 @@ summer school schedule:
 * Tuesday (day 1): goals & refinement
    ** 15 min: goals
      - Goal: reasoning with failures (disk stop working working)
+       databases, file systems, flash drives must handle crashes
+         setup: computer (volatile storage) and disks (persistent storage)
        dealing with failures is hard; why?
          persistent state becomes inconsistent
          storage runs concurrently with program
