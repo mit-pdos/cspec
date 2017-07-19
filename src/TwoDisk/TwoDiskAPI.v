@@ -24,7 +24,6 @@ Module TD.
   Inductive Op : Type -> Type :=
   | Read (i:diskId) (a:addr) : Op (DiskResult block)
   | Write (i:diskId) (a:addr) (b:block) : Op (DiskResult unit)
-  | Sync (i:diskId) : Op (DiskResult unit)
   (* get disk size in blocks *)
   | DiskSize (i:diskId) : Op (DiskResult nat).
 
@@ -78,12 +77,6 @@ Module TD.
       | None => r = Failed /\ state' = state
       end ->
       op_step (Write i a b) state r state'
-  | step_sync : forall i state r state',
-      match get_disk i state with
-      | Some d => state' = state /\ r = Working tt
-      | None => r = Failed /\ state' = state
-      end ->
-      op_step (Sync i) state r state'
   | step_size : forall i state r,
       match get_disk i state with
       | Some d => r = Working (size d)
