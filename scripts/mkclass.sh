@@ -13,7 +13,6 @@ CLASSREPO=git@github.com:/mit-pdos/deepspec-pocs
 # include only these src/ directories 
 SRCS="src/Helpers src/Disk src/Refinement src/NBD \
       src/SepLogic/Mem src/SepLogic/Pred \
-      src/Refinement/ProgLang 
       src/Variables src/StatDb"
 
 # files to copy
