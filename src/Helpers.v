@@ -1,4 +1,47 @@
+Require Import Arith.
+Require Import Bool.
+Require Extraction.
+
 Set Implicit Arguments.
+
+
+(* Decidable equality. *)
+
+Class EqualDec A :=
+  equal_dec : forall x y : A, { x = y } + { x <> y }.
+
+Notation " x == y " := (equal_dec (x :>) (y :>)) (no associativity, at level 70).
+
+Instance nat_equal_dec : EqualDec nat := eq_nat_dec.
+Instance bool_equal_dec : EqualDec bool := bool_dec.
+
+
+(* Bytes. *)
+
+(* bytes n is a byte string with length n. *)
+Parameter bytes : nat -> Type.
+
+Parameter bytes_dec : forall n, EqualDec (bytes n).
+
+Axiom bytes0 : forall n, bytes n.
+
+Definition bnull : bytes 0 := bytes0 0.
+
+Axiom bappend : forall n1 n2, bytes n1 -> bytes n2 -> bytes (n1+n2).
+
+Axiom bsplit : forall n1 n2, bytes (n1+n2) -> bytes n1 * bytes n2.
+
+Arguments bsplit {n1 n2} bs.
+
+Extraction Language Haskell.
+
+Extract Constant bytes => "BS.ByteString".
+Extract Constant bytes_dec => "(\n b1 b2 -> b1 Prelude.== b2)".
+Extract Constant bytes0 => "(\n -> BS.replicate (Prelude.fromIntegral n) 0)".
+
+Extract Constant bappend => "(\_ _ bs1 bs2 -> BS.append bs1 bs2)".
+Extract Constant bsplit => "(\n1 _ bs -> BS.splitAt (Prelude.fromIntegral n1) bs)".
+
 
 (** Definition of [maybe_holds], stating a predicate holds over an optional
 value if the value is present.

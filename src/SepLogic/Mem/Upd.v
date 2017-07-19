@@ -1,5 +1,4 @@
-Require Export EqualDec.
-
+Require Import Helpers.
 Require Import Automation.
 Require Import SepLogic.Mem.Def.
 

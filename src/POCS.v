@@ -2,7 +2,7 @@ Require Export List.
 Require Export Omega.
 
 Require Export Automation.
-Require Import EqualDec.
+Require Export Helpers.
 
 Require Export SepLogic.Mem.
 
