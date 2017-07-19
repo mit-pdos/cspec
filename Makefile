@@ -3,7 +3,6 @@ CODE += $(wildcard src/Helpers/*.v)
 CODE += $(wildcard src/SepLogic/Pred/*.v)
 CODE += $(wildcard src/SepLogic/Mem/*.v)
 CODE += $(wildcard src/Refinement/*.v)
-CODE += $(wildcard src/Refinement/ProgLang/*.v)
 CODE += $(wildcard src/Disk/*.v)
 
 ## For StatDB lab
@@ -46,7 +45,7 @@ build/%.vo: build/%.v
 coq: $(patsubst src/%.v,build/%.vo,$(CODE))
 
 .PHONY: %/extract
-%/extract: %/Extract.v %/fiximports.py build/Helpers/ExtrBytes.vo build/Refinement/ProgLang/ExtrProg.vo
+%/extract: %/Extract.v %/fiximports.py build/Helpers/ExtrBytes.vo build/Refinement/ExtrProg.vo
 	coqtop $(COQRFLAGS) -batch -noglob -load-vernac-source $<
 	./scripts/add-preprocess.sh $(patsubst %/extract,%/src/*.hs,$@)
 

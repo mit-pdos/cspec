@@ -1,4 +1,4 @@
-Require Import Refinement.ProgLang.Prog.
+Require Import Refinement.Prog.
 
 Extraction Language Haskell.
 

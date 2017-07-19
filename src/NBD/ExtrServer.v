@@ -1,4 +1,4 @@
-Require Import Refinement.ProgLang.Prog.
+Require Import Refinement.Prog.
 Require Import NBD.NbdData.
 
 Axiom getRequest : prog Request.

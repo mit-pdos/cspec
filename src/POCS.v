@@ -19,6 +19,6 @@ Require Export Disk.SimpleDisk.
 Require Export Disk.Sectors.
 
 Require Export Refinement.Interface.
-Require Export Refinement.ProgLang.Prog.
-Require Export Refinement.ProgLang.Hoare.
-Require Export Refinement.ProgLang.NoCrashes.
+Require Export Refinement.Prog.
+Require Export Refinement.Hoare.
+Require Export Refinement.NoCrashes.

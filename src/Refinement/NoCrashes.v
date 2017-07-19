@@ -1,5 +1,5 @@
-Require Import ProgLang.Prog.
-Require Import ProgLang.Hoare.
+Require Import Refinement.Prog.
+Require Import Refinement.Hoare.
 
 Axiom cannot_crash : can_crash = False.
 
