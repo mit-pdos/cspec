@@ -16,12 +16,15 @@ Module StatDB.
       Ret tt.
 
     Definition mean : prog (option nat) :=
+      (* Your solutions here *)
+(* SOL *)
       count <- Prim vars (Vars.Read Vars.VarCount);
       if count == 0 then
         Ret None
       else
         sum <- Prim vars (Vars.Read Vars.VarSum);
         Ret (Some (sum / count)).
+(* END *)
 
     Definition init : prog InitResult :=
       _ <- Prim vars (Vars.Write Vars.VarCount 0);
@@ -40,8 +43,11 @@ Module StatDB.
          init_impl := then_init (iInit vars) init; |}.
 
     Definition statdb_abstraction (vars_state : Vars.State) (statdb_state : StatDB.State) :=
+      (* Write the abstraction function *)
+      (* SOL *)
       vars_state Vars.VarCount = Some (length statdb_state) /\
       vars_state Vars.VarSum = Some (fold_right plus 0 statdb_state).
+      (* END *)
 
     Definition abstr : Abstraction StatDB.State :=
       abstraction_compose
@@ -71,7 +77,10 @@ Module StatDB.
           autorewrite with upd.
           rewrite H4 in H7. inversion H7; subst. f_equal. simpl. omega.
 
-        + unfold prog_spec; intros.
+        + 
+          (* Prove that your implementation of [mean] refines StatDbAPI.man *)
+          (* SOL *)
+          unfold prog_spec; intros.
           destruct a; simpl in *; intuition.
           inv_rexec; try cannot_crash.
           repeat ( exec_steps || Vars.inv_bg || Vars.inv_step ).
@@ -97,6 +106,7 @@ Module StatDB.
             eauto.
             eauto.
 
+           (* END *)
       - cannot_crash.
       - eapply then_init_compose; eauto.
         unfold prog_spec; intros.
