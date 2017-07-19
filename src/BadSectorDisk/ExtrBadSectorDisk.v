@@ -4,9 +4,9 @@ Require Import BadSectorDisk.BadSectorAPI.
 Import BadSectorDisk.
 Module BadSectorDisk.
 
-  Axiom hs_read : nat -> prog block.
-  Axiom hs_write : nat -> block -> prog unit.
-  Axiom hs_getBadSector : prog nat.
+  Axiom hs_read : addr -> prog block.
+  Axiom hs_write : addr -> block -> prog unit.
+  Axiom hs_getBadSector : prog addr.
   Axiom hs_diskSize : prog nat.
 
   Definition badsector_op_impl T (op: Op T) : prog T :=

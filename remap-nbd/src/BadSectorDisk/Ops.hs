@@ -13,7 +13,7 @@ import                   System.Posix.Types (Fd)
 import                   System.Posix.Unistd (fileSynchronise)
 import                   Utils.Conversion
 
-read :: Integer -> TheProg BS.ByteString
+read :: Coq_addr -> TheProg BS.ByteString
 read a = do
   fd <- reader diskHandle
   bs <- reader badSector
@@ -22,7 +22,7 @@ read a = do
   else
     liftIO $ fdPread fd blocksize (fromIntegral $ addrToOffset a)
 
-write :: Integer -> BS.ByteString -> TheProg ()
+write :: Coq_addr -> BS.ByteString -> TheProg ()
 write a b = do
   fd <- reader diskHandle
   liftIO $ fdPwrite fd b (fromIntegral $ addrToOffset a)

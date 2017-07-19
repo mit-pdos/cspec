@@ -8,7 +8,7 @@ Module RemappedDisk.
 
     Variable (bd : Interface BadSectorDisk.API).
 
-    Definition read (a : nat) : prog block :=
+    Definition read (a : addr) : prog block :=
       bs <- Prim bd (BadSectorDisk.GetBadSector);
       if a == bs then
         len <- Prim bd (BadSectorDisk.DiskSize);
@@ -16,7 +16,7 @@ Module RemappedDisk.
       else
         Prim bd (BadSectorDisk.Read a).
 
-    Definition write (a : nat) (b : block) : prog unit :=
+    Definition write (a : addr) (b : block) : prog unit :=
       len <- Prim bd (BadSectorDisk.DiskSize);
       if a == (len-1) then
         Ret tt
@@ -215,7 +215,12 @@ Module RemappedDisk.
               rewrite diskUpd_eq.
               replace (size (shrink d) + 1 - 1) with (size (shrink d)) in * by omega.
               auto.
-              omega.
+
+              (* why is [omega] too weak here? *)
+              inversion l; try omega.
+              exfalso. apply H3.
+              replace (size (shrink d) + 1) with (S (size (shrink d))) in * by omega.
+              congruence.
 
           * apply disk_none_oob in H2. omega.
 

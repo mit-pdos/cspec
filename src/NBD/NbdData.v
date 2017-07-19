@@ -4,8 +4,8 @@ Require Import Bytes.
 Parameter Handle:Type.
 
 Inductive Request :=
-| Read (h:Handle) (off:nat) (blocks:nat)
-| Write (h:Handle) (off:nat) (len:nat) (dat:bytes (len*blockbytes))
+| Read (h:Handle) (off:addr) (blocks:nat)
+| Write (h:Handle) (off:addr) (len:nat) (dat:bytes (len*blockbytes))
 | Flush (h:Handle)
 | Disconnect
 | UnknownOp (h:Handle).

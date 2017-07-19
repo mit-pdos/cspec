@@ -3,15 +3,15 @@ Require Import POCS.
 Module BadSectorDisk.
 
   Inductive Op : Type -> Type :=
-  | Read (a:nat) : Op block
-  | Write (a:nat) (b:block) : Op unit
-  | GetBadSector : Op nat
+  | Read (a:addr) : Op block
+  | Write (a:addr) (b:block) : Op unit
+  | GetBadSector : Op addr
   | DiskSize : Op nat.
 
   Record State :=
     mkState {
       stateDisk : disk;
-      stateBadSector : nat;
+      stateBadSector : addr;
     }.
 
   (* help out type inference *)
