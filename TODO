@@ -18,27 +18,58 @@ Things to clean up:
   (once for normal execution -- postcondition, and once for crashes -- recovery condition).
   That ends up with a quadratic number of subgoals.
 
+- lab for POCS: 1 disk, but update two sectors atomically
+
 ===
 
 summer school schedule:
 
-day 1: FSCQ talk
-  in-class refinement: StatDB
-  assign: bad sector lab to understand disks, etc
+* Tuesday (day 1): goals & refinement
+   ** 15 min: goals
+     - Goal: reasoning with failures (disk stop working working)
+       dealing with failures is hard; why?
+         persistent state becomes inconsistent
+         storage runs concurrently with program
+       Study of Linux FS
+       Flash drives
+     - Sequence of programming assignment
+     - Schedule
+   ** proof style: refinement
+     - butler's notes
+     - illustrate w. our refinement theorems
+   ** lab infrastructure
+     - Programs and exec relation
+     - Extraction 
+     - Example: in-class refinement: StatDB
+     - Install software
+   ** HW: bad sector lab
+      - exercise in abstraction function
+      - understand disks
 
-night 1: work on bad sector lab
+* Wednesday (day 2): crashes
+  ** solution of bad-sector lab
+     focus on abstraction function
+  ** crashes
+    power failure, etc.
+  ** modeling disk crashes
+    exec, rexec
+    progspec
+    proof & implement read, disk size
+  ** HW: implement & proof write for replicated disk
+  
+* Thursday (day 3): recovery
+  ** Solution of read/write
+  ** Crash condition
+  ** Recovery
+  ** Idempotence
+  ** HW: implement and proof fixup?
 
-day 2: talk about bad sector lab solutions
-  start talking about crash refinement
-  assign: replication lab to understand crashes
-
-night 2: work on replication lab (pre-crash?)
-
-day 3: talk about replication lab, valuset/history, ..
-  CHL paper tidbits but not the full paper
-
-night 3: more replication lab (crashes)
-
-day 4: finish replication / crash story
-  Yggdrasil
-
+* Friday (day 4): logging
+  ** Solution of HW
+  ** Crashes during multiple step operations
+    Logging
+  ** FSCQ (labs inspired by FSCQ)
+    Show code
+  ** Yggdrasil
+    Very different approach
+    Show code
