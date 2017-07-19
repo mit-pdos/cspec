@@ -13,20 +13,19 @@ CLASSREPO=git@github.com:/mit-pdos/deepspec-pocs
 # include only these src/ directories 
 SRCS="src/Disk src/NBD src/Refinement src/Variables src/StatDb"
 
+# files to copy
+TOPLEVELS="Makefile README.md _CoqProject.in .gitignore"
+
 SD=$(cd $(dirname $0)/.. && /bin/pwd)
 CD=/tmp/pocs.$$
 git clone $CLASSREPO $CD || exit 1
 
 mkdir -p $CD
 
-cp $SD/Makefile $CD/Makefile
-(cd $CD/ && git add Makefile 2> /dev/null )
-
-cp $SD/README.md $CD/README.md
-(cd $CD/ && git add README.md 2> /dev/null )
-
-cp $SD/.gitignore $CD/.gitignore
-(cd $CD/ && git add .gitignore 2> /dev/null )
+for F in $TOPLEVELS; do
+  cp $SD/$F $CD/$F
+  (cd $CD/ && git add $F 2> /dev/null )
+done
 
 for D in `echo $SRCS`
 do
