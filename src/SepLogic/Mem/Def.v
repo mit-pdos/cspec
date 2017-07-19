@@ -1,6 +1,6 @@
 Require Export FunctionalExtensionality.
 
-Require Import Automation.
+Require Import Helpers.Automation.
 
 Global Set Implicit Arguments.
 

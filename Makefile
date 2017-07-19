@@ -1,5 +1,5 @@
-CODE := $(wildcard src/*.v)
-CODE += $(wildcard src/SepLogic/*.v)
+CODE := $(wildcard src/POCS.v)
+CODE += $(wildcard src/Helpers/*.v)
 CODE += $(wildcard src/SepLogic/Pred/*.v)
 CODE += $(wildcard src/SepLogic/Mem/*.v)
 CODE += $(wildcard src/Refinement/*.v)
@@ -15,14 +15,9 @@ CODE += $(wildcard src/BadSectorDisk/*.v)
 CODE += $(wildcard src/RemappedDisk/*.v)
 CODE += $(wildcard src/NBD/*.v)
 
-## For replicated disk lab
-CODE += $(wildcard src/ReplicatedDisk/*.v)
-
 ## For disk mirroring lab
 CODE += $(wildcard src/TwoDisk/*.v)
-CODE += $(wildcard src/SeqDisk/ReplicatedDisk/*.v)
-CODE += $(wildcard src/SeqDisk/AsyncReplicatedDisk/*.v)
-CODE += $(wildcard src/SeqDisk/*.v)
+CODE += $(wildcard src/ReplicatedDisk/*.v)
 
 COQRFLAGS := -R build Pocs
 
@@ -51,7 +46,7 @@ build/%.vo: build/%.v
 coq: $(patsubst src/%.v,build/%.vo,$(CODE))
 
 .PHONY: %/extract
-%/extract: %/Extract.v %/fiximports.py build/ExtrBytes.vo build/Refinement/ProgLang/ExtrProg.vo
+%/extract: %/Extract.v %/fiximports.py build/Helpers/ExtrBytes.vo build/Refinement/ProgLang/ExtrProg.vo
 	coqtop $(COQRFLAGS) -batch -noglob -load-vernac-source $<
 	./scripts/add-preprocess.sh $(patsubst %/extract,%/src/*.hs,$@)
 

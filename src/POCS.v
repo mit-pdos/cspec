@@ -1,8 +1,8 @@
 Require Export List.
 Require Export Omega.
 
-Require Export Automation.
-Require Export Helpers.
+Require Export Helpers.Automation.
+Require Export Helpers.Helpers.
 
 Require Export SepLogic.Mem.Def.
 Require Export SepLogic.Mem.Upd.

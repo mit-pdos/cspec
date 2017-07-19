@@ -1,4 +1,4 @@
-Require Import Helpers.
+Require Import Helpers.Helpers.
 Require EquivDec.
 
 (** * Simplify matches when possible. *)

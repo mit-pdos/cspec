@@ -2,7 +2,7 @@ Cd "remap-nbd/src/".
 
 Require Import ExtrHaskellBasic.
 Require Import ExtrHaskellNatInteger.
-Require Import ExtrBytes.
+Require Import Helpers.ExtrBytes.
 Require Import Refinement.ProgLang.ExtrProg.
 Require Import BadSectorDisk.ExtrBadSectorDisk.
 
