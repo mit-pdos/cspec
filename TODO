@@ -1,8 +1,5 @@
 Things to clean up:
 
-- move Hoare specs of an API (such as src/TwoDisk/TwoDiskTheorems.v) into the next level up,
-  because they are simply helpers for the next layer.
-
 - get rid of preconditions from prog_spec?
   see commit acdfaf460b8cbe180959192f1da3b8cb03ca4409
 
