@@ -229,3 +229,5 @@ Module RemappedDisk.
   End Implementation.
 
 End RemappedDisk.
+
+Print Assumptions RemappedDisk.rd.

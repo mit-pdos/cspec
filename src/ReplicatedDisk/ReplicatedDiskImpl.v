@@ -1173,3 +1173,5 @@ Module RD.
   End ReplicatedDisk.
 
 End RD.
+
+Print Assumptions RD.rd.

@@ -3,9 +3,6 @@ Things to clean up:
 - get rid of preconditions from prog_spec?
   see commit acdfaf460b8cbe180959192f1da3b8cb03ca4409
 
-- mechanically check assumed facts to make sure students didn't state some axiom (e.g., Axiom False)
-  or import NoCrashes when we wanted them to prove crashes.  (use Print Assumptions ...)
-
 - RemappedDisk: make sure that we can replace the abstraction relation with an abstraction function
   as defined in the [init] part of the proof at the bottom of RemappedDiskImpl.v.
 
