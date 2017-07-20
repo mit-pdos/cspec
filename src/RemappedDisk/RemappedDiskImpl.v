@@ -17,6 +17,8 @@ Module RemappedDisk.
         Prim bd (BadSectorDisk.Read a).
 
     Definition write (a : addr) (b : block) : prog unit :=
+      (* Fill in your implementation here. *)
+      (* SOL *)
       len <- Prim bd (BadSectorDisk.DiskSize);
       if a == (len-1) then
         Ret tt
@@ -26,6 +28,10 @@ Module RemappedDisk.
           Prim bd (BadSectorDisk.Write (len-1) b)
         else
           Prim bd (BadSectorDisk.Write a b).
+
+    Definition write_stub (a : addr) (b : block) : prog unit :=
+      (* END *)
+      Ret tt.
 
     Definition diskSize : prog nat :=
       len <- Prim bd (BadSectorDisk.DiskSize);
@@ -54,12 +60,22 @@ Module RemappedDisk.
          recover_impl := Ret tt;
          init_impl := then_init (iInit bd) init; |}.
 
-    Definition remapped_abstraction (bs_state : BadSectorDisk.State) (rd_disk : RemappedDisk.State) :=
+    Definition remapped_abstraction (bs_state : BadSectorDisk.State) (rd_disk : RemappedDisk.State) : Prop :=
       let '(BadSectorDisk.mkState bs_disk bs_addr) := bs_state in
       size bs_disk = size rd_disk + 1 /\
+      (* Fill in the rest of your abstraction here. *)
+      (* Hint 1: What should be true about the non-bad sectors? *)
+      (* Hint 2: What should be true about the bad sector? *)
+      (* Hint 3: What if the bad sector address is the last address? *)
+      (* Hint 4: What if the bad sector address is past the end of the disk? *)
+      (* SOL *)
       (forall a, a <> bs_addr /\ a <> size rd_disk -> bs_disk a = rd_disk a) /\
       (bs_addr <> size rd_disk -> bs_disk (size rd_disk) = rd_disk bs_addr) /\
       bs_addr < size bs_disk.
+
+    Definition remapped_abstraction_stub (bs_state : BadSectorDisk.State) (rd_disk : RemappedDisk.State) : Prop :=
+      (* END *)
+      True.
 
     Definition abstr : Abstraction RemappedDisk.State :=
       abstraction_compose
