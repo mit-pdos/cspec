@@ -46,14 +46,8 @@ Module StatDB.
          init_impl := then_init (iInit vars) init; |}.
 
     Definition statdb_abstraction (vars_state : Vars.State) (statdb_state : StatDB.State) : Prop :=
-      (* Write the abstraction function *)
-      (* SOL *)
       vars_state Vars.VarCount = Some (length statdb_state) /\
       vars_state Vars.VarSum = Some (fold_right plus 0 statdb_state).
-
-    Definition statdb_abstraction_stub (vars_state : Vars.State) (statdb_state : StatDB.State) : Prop :=
-      (* END *)
-      True.
 
     Definition abstr : Abstraction StatDB.State :=
       abstraction_compose
@@ -77,15 +71,11 @@ Module StatDB.
           eexists; intuition.
           constructor.
 
-          (* Prove that our implementation of [add] satisfies your abstraction *)
-          (* SOL *)
           autorewrite with upd.
           rewrite H0 in H8. inversion H8; subst. f_equal. simpl. omega.
 
           autorewrite with upd.
           rewrite H4 in H7. inversion H7; subst. f_equal. simpl. omega.
-          (* END *)
-          (* STUB: all: pocs_admit. *)
 
         + (* Prove that your implementation of [mean] refines StatDbAPI.man *)
           (* SOL *)
