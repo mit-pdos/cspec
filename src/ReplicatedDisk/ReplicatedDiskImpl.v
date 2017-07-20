@@ -451,10 +451,9 @@ Module RD.
     (* some address has been repaired (or the recovery has exhausted the
        addresses) - only one address can be out of sync and thus only it must be
        recovered. *)
-    | RepairDone
-    (* one of the disks has failed, so don't bother continuing recovery since the
-       invariant is now trivially satisfied *)
-    | DiskFailed (i:diskId).
+    (* OR, one of the disks has failed, so don't bother continuing recovery since
+       the invariant is now trivially satisfied *)
+    | RepairDoneOrFailed.
 
     Definition fixup (a:addr) : prog RecStatus :=
       mv0 <- Prim td (TD.Read d0 a);
@@ -468,12 +467,12 @@ Module RD.
           else
             mu <- Prim td (TD.Write d1 a v);
             Ret (match mu with
-                 | Working _ => RepairDone
-                 | Failed => DiskFailed d1
+                 | Working _ => RepairDoneOrFailed
+                 | Failed => RepairDoneOrFailed
                  end)
-        | Failed => Ret (DiskFailed d1)
+        | Failed => Ret RepairDoneOrFailed
         end
-      | Failed => Ret (DiskFailed d0)
+      | Failed => Ret RepairDoneOrFailed
       end.
 
     (* recursively performs recovery at [a-1], [a-2], down to 0 *)
@@ -484,8 +483,7 @@ Module RD.
         s <- fixup n;
         match s with
         | Continue => recover_at n
-        | RepairDone => Ret tt
-        | DiskFailed i => Ret tt
+        | RepairDoneOrFailed => Ret tt
         end
       end.
 
@@ -540,8 +538,7 @@ Module RD.
                    | Continue =>
                      TD.disk0 state' ?|= eq d /\
                      TD.disk1 state' ?|= eq d
-                   | RepairDone => False
-                   | DiskFailed i =>
+                   | RepairDoneOrFailed =>
                      TD.disk0 state' ?|= eq d /\
                      TD.disk1 state' ?|= eq d
                    end;
@@ -593,16 +590,11 @@ Module RD.
                      (* could happen if b already happened to be value *)
                      TD.disk0 state' ?|= eq (diskUpd d a b) /\
                      TD.disk1 state' ?|= eq (diskUpd d a b)
-                   | RepairDone =>
+                   | RepairDoneOrFailed =>
                      TD.disk0 state' ?|= eq (diskUpd d a b) /\
-                     TD.disk1 state' ?|= eq (diskUpd d a b)
-                   | DiskFailed i =>
-                     match i with
-                     | d0 => TD.disk0 state' ?|= eq d /\
-                            TD.disk1 state' ?|= eq d
-                     | d1 => TD.disk0 state' ?|= eq (diskUpd d a b) /\
-                            TD.disk1 state' ?|= eq (diskUpd d a b)
-                     end
+                     TD.disk1 state' ?|= eq (diskUpd d a b) \/
+                     TD.disk0 state' ?|= eq d /\
+                     TD.disk1 state' ?|= eq d
                    end;
                recover :=
                  fun _ state' =>
@@ -650,17 +642,11 @@ Module RD.
                    | Continue =>
                      TD.disk0 state' ?|= eq (diskUpd d a' b) /\
                      TD.disk1 state' ?|= eq d
-                   | RepairDone =>
-                     (* since the address is wrong, the only way we finish is if
-                        a disk fails, which we explicitly report *)
-                     False
-                   | DiskFailed i =>
-                     match i with
-                     | d0 => TD.disk0 state' ?|= eq d /\
-                            TD.disk1 state' ?|= eq d
-                     | d1 => TD.disk0 state' ?|= eq (diskUpd d a' b) /\
-                            TD.disk1 state' ?|= eq (diskUpd d a' b)
-                     end
+                   | RepairDoneOrFailed =>
+                     TD.disk0 state' ?|= eq d /\
+                     TD.disk1 state' ?|= eq d \/
+                     TD.disk0 state' ?|= eq (diskUpd d a' b) /\
+                     TD.disk1 state' ?|= eq (diskUpd d a' b)
                    end;
                recover :=
                  fun _ state' =>
@@ -706,9 +692,7 @@ Module RD.
                  fun r state' =>
                    match s with
                    | FullySynced => TD.disk0 state' ?|= eq d /\
-                                   TD.disk1 state' ?|= eq d /\
-                                   (* not actually useful *)
-                                   r <> RepairDone
+                                   TD.disk1 state' ?|= eq d
                    | OutOfSync a' b =>
                      match r with
                      | Continue =>
@@ -720,16 +704,8 @@ Module RD.
                      | RepairDone =>
                        (TD.disk0 state' ?|= eq d /\
                         TD.disk1 state' ?|= eq d) \/
-                       (a = a' /\ (* not necessary, but nice to document *)
-                        TD.disk0 state' ?|= eq (diskUpd d a' b) /\
+                       (TD.disk0 state' ?|= eq (diskUpd d a' b) /\
                         TD.disk1 state' ?|= eq (diskUpd d a' b))
-                     | DiskFailed i =>
-                       match i with
-                       | d0 => TD.disk0 state' ?|= eq d /\
-                              TD.disk1 state' ?|= eq d
-                       | d1 => TD.disk0 state' ?|= eq (diskUpd d a' b) /\
-                              TD.disk1 state' ?|= eq (diskUpd d a' b)
-                       end
                      end
                    end;
                recover :=
@@ -832,7 +808,6 @@ Module RD.
         exists d, (OutOfSync a0 b); intuition eauto.
         exists (diskUpd d a0 b), FullySynced; intuition eauto.
         simplify; finish.
-        destruct i; intuition (subst; eauto).
     Qed.
 
     Hint Resolve recover_at_ok.
