@@ -45,13 +45,36 @@ L0: Intro reasoning about crashes and failures
   demo of replicated disk
     pull out a disk
 
-* Verification approach: refinement
+* Verification approach: state machine and simulation
   standard 2-layer diagram
-    See chapter 4 and 6 of [http://bwlampson.site/48-POCScourse/48-POCS2006.pdf]
-  proofs: back-ward simulation
+    See chapter 6 and 8 of [http://bwlampson.site/48-POCScourse/48-POCS2006.pdf]
+    modules as state machines
+    state machine: state + transitions
+    two state machines:
+      spec state machine (the spec)
+      code state machine (the implementation)
+    abstraction function
+    initial state
+    proofs: back-ward simulation
 
-* Example: StatDB (chapter 4)
+* Example: StatDB (chapter 8)
   StatDB
+  spec state machine:
+    state:
+      db: multiset of all values (ints) written to data db
+    transistions:
+      add: adds value
+      size: size of set
+      mean: add all value and divide by size
+  code state machine:
+    state:
+     sum: sum of values added so far
+     count: number of values
+    transitions: add, size, and mean
+  proof: backward simulation
+    from implementation to spec:
+      initial states line up
+      for each transition of implementation, there exists a corresponding spec transition
 
 * StatDB in Coq
   Refinement
