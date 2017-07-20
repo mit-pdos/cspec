@@ -17,7 +17,7 @@ SRCS="src/Helpers src/Disk src/Refinement src/NBD \
       src/BadSectorDisk src/RemappedDisk"
 
 # files/directories to copy
-TOPLEVELS="Makefile README.md _CoqProject .gitignore scripts/add-preprocess.sh src/POCS.v statdb-cli"
+TOPLEVELS="Makefile README.md _CoqProject .gitignore scripts/add-preprocess.sh src/POCS.v statdb-cli remap-nbd"
 
 SD=$(cd $(dirname $0)/.. && /bin/pwd)
 CD=/tmp/pocs.$$

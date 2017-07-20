@@ -1,8 +1,5 @@
 Things to clean up:
 
-- get rid of preconditions from prog_spec?
-  see commit acdfaf460b8cbe180959192f1da3b8cb03ca4409
-
 - RemappedDisk: make sure that we can replace the abstraction relation with an abstraction function
   as defined in the [init] part of the proof at the bottom of RemappedDiskImpl.v.
 
@@ -14,5 +11,4 @@ Things to clean up:
 
 - lab for POCS: 1 disk, but update two sectors atomically
 
-===
-
+- minimal NBD client that reads/writes sectors, to test/demo remap-nbd with broken write
