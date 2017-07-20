@@ -13,10 +13,11 @@ CLASSREPO=git@github.com:/mit-pdos/deepspec-pocs
 # include only these src/ directories 
 SRCS="src/Helpers src/Disk src/Refinement src/NBD \
       src/SepLogic/Mem src/SepLogic/Pred \
-      src/Variables src/StatDb"
+      src/Variables src/StatDb \
+      src/BadSectorDisk src/RemappedDisk"
 
 # files/directories to copy
-TOPLEVELS="Makefile README.md _CoqProject.in .gitignore scripts/add-preprocess.sh src/POCS.v statdb-cli"
+TOPLEVELS="Makefile README.md _CoqProject .gitignore scripts/add-preprocess.sh src/POCS.v statdb-cli"
 
 SD=$(cd $(dirname $0)/.. && /bin/pwd)
 CD=/tmp/pocs.$$

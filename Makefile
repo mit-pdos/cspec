@@ -23,7 +23,7 @@ COQRFLAGS := -R build Pocs
 BINS	:= statdb-cli remap-nbd replicate-nbd
 
 .PHONY: default
-default: _CoqProject $(patsubst %,bin/%,$(BINS))
+default: $(patsubst %,bin/%,$(BINS))
 
 build/%.v: src/%.v
 	@mkdir -p $(@D)
@@ -63,6 +63,3 @@ clean:
 	rm -f $(foreach d,$(BINS),$(d)/src/*.hs)
 	rm -rf $(foreach d,$(BINS),$(d)/.stack-work)
 	rm -f $(foreach b,$(BINS),bin/$(b))
-
-_CoqProject: _CoqProject.in
-	cat _CoqProject.in > $@
