@@ -84,6 +84,9 @@ L0: Intro reasoning about crashes and failures
 * Implement and proof [add]
 
 * Exercise: implement and proof [mean]
+  Install stack & build
+  Implement mean and run
+  Prove mean
 
 * Homework: remapping disk
   Disks instead of Variables
