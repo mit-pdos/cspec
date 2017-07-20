@@ -77,11 +77,15 @@ Module StatDB.
           eexists; intuition.
           constructor.
 
+          (* Prove that our implementation of [add] satisfies your abstraction *)
+          (* SOL *)
           autorewrite with upd.
           rewrite H0 in H8. inversion H8; subst. f_equal. simpl. omega.
 
           autorewrite with upd.
           rewrite H4 in H7. inversion H7; subst. f_equal. simpl. omega.
+          (* END *)
+          (* STUB: all: pocs_admit. *)
 
         + (* Prove that your implementation of [mean] refines StatDbAPI.man *)
           (* SOL *)
@@ -112,6 +116,7 @@ Module StatDB.
             eauto.
 
           (* END *)
+          (* STUB: pocs_admit. *)
 
       - cannot_crash.
       - eapply then_init_compose; eauto.

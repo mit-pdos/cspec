@@ -49,6 +49,7 @@ sub onefile {
         } elsif(/END/){
             die "malformed END";
         } elsif($omit == 0){
+            s/\(\* STUB: (.*) \*\)/$1/;
             $out .= $_;
         }
     }
