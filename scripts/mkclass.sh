@@ -14,7 +14,8 @@ CLASSREPO=git@github.com:/mit-pdos/deepspec-pocs
 SRCS="src/Helpers src/Disk src/Refinement src/NBD \
       src/SepLogic/Mem src/SepLogic/Pred \
       src/Variables src/StatDb \
-      src/BadSectorDisk src/RemappedDisk"
+      src/BadSectorDisk src/RemappedDisk \
+      src/TwoDisk src/ReplicatedDisk"
 
 # files/directories to copy
 TOPLEVELS="Makefile README.md _CoqProject .gitignore scripts/add-preprocess.sh src/POCS.v statdb-cli remap-nbd"

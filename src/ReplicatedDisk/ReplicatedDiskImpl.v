@@ -30,8 +30,14 @@ Module RD.
       end.
 
     Definition Write (a:addr) (b:block) : prog unit :=
+      (* Fill in your implementation here. *)
+      (* SOL *)
       _ <- Prim td (TD.Write d0 a b);
       _ <- Prim td (TD.Write d1 a b);
+      Ret tt.
+
+    Definition Write_stub (a:addr) (b:block) : prog unit :=
+      (* END *)
       Ret tt.
 
     Definition DiskSize : prog nat :=
@@ -44,15 +50,6 @@ Module RD.
         | Working sz => Ret sz
         | Failed => Ret 0
         end
-      end.
-
-    Fixpoint init_at (a:nat) : prog unit :=
-      match a with
-      | 0 => Ret tt
-      | S a =>
-        _ <- Prim td (TD.Write d0 a block0);
-        _ <- Prim td (TD.Write d1 a block0);
-        init_at a
       end.
 
     Definition DiskSizeInit : prog (option nat) :=
@@ -70,6 +67,15 @@ Module RD.
         | Working sz2 => Ret (Some sz2)
         | Failed => Ret None
         end
+      end.
+
+    Fixpoint init_at (a:nat) : prog unit :=
+      match a with
+      | 0 => Ret tt
+      | S a =>
+        _ <- Prim td (TD.Write d0 a block0);
+        _ <- Prim td (TD.Write d1 a block0);
+        init_at a
       end.
 
     Definition Init : prog InitResult :=
