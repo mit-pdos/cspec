@@ -40,6 +40,11 @@ Module RD.
       (* END *)
       Ret tt.
 
+    Definition write_read_check (a : addr) (b : block) : prog block :=
+      _ <- Write a b;
+      b' <- Read a;
+      Ret b'.
+
     Definition DiskSize : prog nat :=
       msz <- Prim td (TD.DiskSize d0);
       match msz with
@@ -218,10 +223,16 @@ Module RD.
                post :=
                  fun r state' =>
                    r = tt /\
+                   (* Fill in your postcondition here *)
+                   (* SOL *)
                    TD.disk0 state' ?|= eq (diskUpd d a b) /\
                    TD.disk1 state' ?|= eq (diskUpd d a b);
+                   (* END *)
+                   (* STUB: True; *)
                recover :=
                  fun _ state' =>
+                   (* Fill in your recovery condition here *)
+                   (* SOL *)
                    (TD.disk0 state' ?|= eq d /\
                     TD.disk1 state' ?|= eq d) \/
                    (a < size d /\
@@ -229,6 +240,8 @@ Module RD.
                     TD.disk1 state' ?|= eq d) \/
                    (TD.disk0 state' ?|= eq (diskUpd d a b) /\
                     TD.disk1 state' ?|= eq (diskUpd d a b));
+                   (* END *)
+                   (* STUB: True; *)
              |})
           (Write a b)
           (irec td)
@@ -237,6 +250,9 @@ Module RD.
       unfold Write.
 
       step.
+
+      (* Prove your write implementation meets your postcondition and recovery condition. *)
+      (* SOL *)
       destruct r; step.
       descend; intuition eauto.
 
@@ -247,9 +263,42 @@ Module RD.
       autorewrite with upd in *; eauto.
 
       destruct r; step.
+      (* END *)
     Qed.
 
     Hint Resolve Write_ok.
+
+
+    Theorem write_read_check_ok : forall a b,
+        prog_spec
+          (fun d state =>
+             {|
+               pre :=
+                 a < size d /\
+                 TD.disk0 state ?|= eq d /\
+                 TD.disk1 state ?|= eq d;
+               post :=
+                 fun r state' =>
+                   r = b /\
+                   TD.disk0 state' ?|= eq (diskUpd d a b) /\
+                   TD.disk1 state' ?|= eq (diskUpd d a b);
+               recover :=
+                 fun _ state' =>
+                   True;
+             |})
+          (write_read_check a b)
+          (irec td)
+          (interface_abs td).
+    Proof.
+      unfold write_read_check.
+      step.
+      step.
+      step.
+      autorewrite with upd in *.
+      congruence.
+    Qed.
+
+    Hint Resolve write_read_check_ok.
 
 
     Theorem DiskSize_ok :
@@ -284,7 +333,6 @@ Module RD.
     Qed.
 
     Hint Resolve DiskSize_ok.
-
 
 
     Definition equal_after a (d_0 d_1: disk) :=
@@ -938,24 +986,39 @@ Module RD.
                post :=
                  fun r state' =>
                    r = tt /\
+                   (* Fill in the postcondition for write; just a copy
+                    * of [Write_ok]'s postcondition *)
+                   (* SOL *)
                    TD.disk0 state' ?|= eq (diskUpd d a b) /\
                    TD.disk1 state' ?|= eq (diskUpd d a b);
+                   (* END *)
+                   (* STUB: True; *)
                recover :=
                  fun _ state' =>
+                   (* Fill in the recovery condition for write AFTER our recovery.
+                    *)
+                   (* SOL *)
                    (TD.disk0 state' ?|= eq d /\
                     TD.disk1 state' ?|= eq d) \/
                    (TD.disk0 state' ?|= eq (diskUpd d a b) /\
                     TD.disk1 state' ?|= eq (diskUpd d a b));
+                   (* END *)
+                   (* STUB: True; *)
              |})
           (Write a b) (_ <- irec td; Recover)
           (interface_abs td).
     Proof.
       start.
       rename a0 into d.
+
+      (* Fill in your proof here. *)
+      (* SOL *)
       descend; (intuition eauto); simplify.
       - exists d, FullySynced; intuition eauto.
       - exists d, (OutOfSync a b); intuition eauto.
       - exists (diskUpd d a b), FullySynced; intuition eauto.
+      (* END *)
+      (* STUB: pocs_admit. *)
     Qed.
 
     Theorem DiskSize_rok :
