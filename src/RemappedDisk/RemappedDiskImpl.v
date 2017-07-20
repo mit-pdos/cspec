@@ -102,11 +102,16 @@ Module RemappedDisk.
             rewrite <- H8. rewrite e0.
             replace (size s + 1 - 1) with (size s) by omega.
             destruct (v0 == size s); subst.
+            (* SOL *)
            -- right.
               apply disk_oob_eq.
               omega.
            -- left.
               rewrite e2; eauto.
+            (* END *)
+            (* Prove that the read returns the correct result, by relying on facts
+             * from your abstraction. *)
+            (* STUB: all: pocs_admit. *)
 
           * exfalso.
             eapply disk_inbounds_not_none.
@@ -124,11 +129,16 @@ Module RemappedDisk.
             eexists; intuition auto. reflexivity. constructor.
             rewrite <- H8.
             destruct (a == size s); subst.
+            (* SOL *)
            -- right.
               apply disk_oob_eq.
               omega.
            -- left.
               rewrite e0; eauto.
+            (* END *)
+            (* Prove that the read returns the correct result, by relying on facts
+             * from your abstraction. *)
+            (* STUB: all: pocs_admit. *)
 
           * eexists; intuition auto. eauto. simpl.
             exists s. intuition auto.
@@ -144,6 +154,7 @@ Module RemappedDisk.
           inv_rexec; try cannot_crash.
           repeat ( exec_steps || BadSectorDisk.inv_bg || BadSectorDisk.inv_step ).
 
+          (* SOL *)
           * eexists; intuition auto. eauto. simpl.
             exists s. intuition auto.
             eexists; intuition auto. reflexivity.
@@ -191,6 +202,12 @@ Module RemappedDisk.
               eauto.
 
            -- rewrite diskUpd_size. eauto.
+          (* END *)
+
+          (* Prove that your implementation of write creates a state in which your
+           * abstraction holds.
+           *)
+          (* STUB: all: pocs_admit. *)
 
         + unfold prog_spec; intros.
           destruct a; simpl in *; intuition.
@@ -220,6 +237,7 @@ Module RemappedDisk.
         + eexists; intuition auto; eauto; simpl.
           case_eq (d (size d - 1)); intros.
 
+          (* SOL *)
           * exists (diskUpd (shrink d) v1 b).
             rewrite diskUpd_size in *.
             intuition auto.
@@ -234,6 +252,10 @@ Module RemappedDisk.
               omega.
 
           * apply disk_none_oob in H2. omega.
+          (* END *)
+          (* Prove that the init function establishes the abstraction.
+           *)
+          (* STUB: all: pocs_admit. *)
 
         + eexists; intuition auto; eauto.
 
