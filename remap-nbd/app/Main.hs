@@ -53,7 +53,7 @@ options = hsubparser
                              (progDesc "start server"
                              <> footer diskDefaultMessage))
             <> command "init" (info (Init <$> initOptions)
-                               (progDesc "initialize replicated disks"
+                               (progDesc "initialize disk"
                                <> footer diskDefaultMessage))
           )
 
@@ -62,8 +62,8 @@ main = execParser opts >>= run
   where
     opts = info (options <**> helper)
       (fullDesc
-       <> progDesc "an nbd server that replicates over two disks; COMMAND is either init or start"
-       <> header "replicate-nbd - replicating network block device"
+       <> progDesc "an nbd server that remaps bad block; COMMAND is either init or start"
+       <> header "remap-nbd - remapping network block device"
        )
 
 run :: Options -> IO ()
