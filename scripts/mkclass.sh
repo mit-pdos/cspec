@@ -15,8 +15,8 @@ SRCS="src/Helpers src/Disk src/Refinement src/NBD \
       src/SepLogic/Mem src/SepLogic/Pred \
       src/Variables src/StatDb"
 
-# files to copy
-TOPLEVELS="Makefile README.md _CoqProject.in .gitignore src/POCS.v"
+# files/directories to copy
+TOPLEVELS="Makefile README.md _CoqProject.in .gitignore scripts/add-preprocess.sh src/POCS.v statdb-cli"
 
 SD=$(cd $(dirname $0)/.. && /bin/pwd)
 CD=/tmp/pocs.$$
@@ -24,9 +24,13 @@ git clone $CLASSREPO $CD || exit 1
 
 mkdir -p $CD
 mkdir -p $CD/src
+mkdir -p $CD/scripts
+
+## Run "make clean" to clear out crud from the extraction directory (like statdb-cli)
+( cd $SD && make clean )
 
 for F in $TOPLEVELS; do
-  cp $SD/$F $CD/$F
+  cp -r $SD/$F $CD/$F
   (cd $CD/ && git add $F 2> /dev/null )
 done
 

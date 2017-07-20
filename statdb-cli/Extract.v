@@ -13,4 +13,10 @@ Extract Inlined Constant PeanoNat.Nat.div => "(\n m -> if m Prelude.== 0 then 0 
 
 Separate Extraction cli.
 
+(* Force extraction of the [Helpers] library since the initial student
+ * code does not use it, but the students may need to use it, and the
+ * build file (statdb-cli.cabal) lists it as a dependency.
+ *)
+Recursive Extraction Library Helpers.
+
 Cd "../../".
