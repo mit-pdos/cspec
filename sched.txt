@@ -5,7 +5,7 @@ SUMMER SCHOOL SCHEDULE
      - Goal: reasoning with failures (disk stop working working)
        databases, file systems, flash drives must handle crashes
          setup: computer (volatile storage) and disks (persistent storage)
-       fscq demo
+       fscq demo or replicated disk demo?
        dealing with failures is hard; why?
          persistent state becomes inconsistent
          storage runs concurrently with program

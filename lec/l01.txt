@@ -1,0 +1,72 @@
+L0: Intro reasoning about crashes and failures
+
+* Goal: verify systems that have persistent state but may fail
+  Examples:
+    file systems, databases,
+    internal software on storage controlers (e.g., SSD)
+  Two kinds of failures:
+    crashes (e.g., power failures)
+    devices stops working (e.g., dead disk, dead sector)
+  Assumption: fail-stop
+    after failure, computer systems stops immediately
+    on crash, computer reboots and one can run repair
+
+* Motivation: dealing with failures is difficult
+  Persistent state becomes inconsistent
+    E.g., failure during a two-step operation (e.g., updating free list and file)
+    -> Block is marked allocated, but isn't in use
+    -> Block is part of a file, but not marked allocated
+  Storage runs concurrent with program
+    While operation is in progress storage fails
+    E.g., update on disk, but fail to update second disk
+  Storage devices are slower than main memory
+    Many complex optimizations to avoid disks writes
+    Complexity leads to more opportunities for problems
+
+* Examples:
+  Linux file system study [http://pages.cs.wisc.edu/~ll/papers/fsstudy.pdf]
+    FSCQ slides [https://pdos.csail.mit.edu/papers/fscq:sosp15-slides.pdf]
+  SSD study [https://www.usenix.org/system/files/conference/fast13/fast13-final80.pdf]
+  Promising area for verification
+    Bugs can have bad consequences
+    Complex systems, easy to have bugs
+
+* Active area of research
+  Many bug-finding tools
+  Model checking
+  Some verification
+    This and next 3 lectures explore verification approach
+    
+* 2 labs to illustrate issues
+  verified remapping disk
+    deals with one bad sector
+  verified replicated disks
+    deals with device failures
+  demo of replicated disk
+    pull out a disk
+
+* Verification approach: refinement
+  standard 2-layer diagram
+    See chapter 4 and 6 of [http://bwlampson.site/48-POCScourse/48-POCS2006.pdf]
+  proofs: back-ward simulation
+
+* Example: StatDB (chapter 4)
+  StatDB
+
+* StatDB in Coq
+  Refinement
+  Exec
+  Variables
+
+* Implement and proof [add]
+
+* Exercise: implement and proof [mean]
+
+* Homework: remapping disk
+  Disks instead of Variables
+  Your goal: abstraction function and proof ...
+  
+  
+
+
+    
