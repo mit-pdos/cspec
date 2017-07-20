@@ -157,67 +157,6 @@ Module RD.
                     eapply compose_recovery; eauto; simplify
                   end.
 
-
-    Lemma both_disks_not_missing : forall (state: TD.State),
-        TD.disk0 state ?|= missing ->
-        TD.disk1 state ?|= missing ->
-        False.
-    Proof.
-      destruct state; simpl; intros.
-      destruct disk0, disk1; simpl in *; eauto.
-    Qed.
-
-    Lemma le_eq_or_S_le : forall n m,
-        n <= m ->
-        n = m \/
-        S n <= m /\ n <> m.
-    Proof.
-      intros.
-      omega.
-    Qed.
-
-    Definition equal_after a (d_0 d_1: disk) :=
-      size d_0 = size d_1 /\
-      forall a', a <= a' -> d_0 a' = d_1 a'.
-
-    Lemma equal_after_diskUpd : forall a d_0 d_1 b,
-        equal_after (S a) d_0 d_1 ->
-        equal_after a (diskUpd d_0 a b) (diskUpd d_1 a b).
-    Proof.
-      unfold equal_after; intuition.
-      autorewrite with upd; eauto.
-      apply le_eq_or_S_le in H; intuition subst.
-      destruct (lt_dec a' (size d_0)); autorewrite with upd.
-      assert (a' < size d_1) by congruence; autorewrite with upd; auto.
-      assert (~a' < size d_1) by congruence; autorewrite with upd; auto.
-      autorewrite with upd; eauto.
-    Qed.
-
-    Lemma equal_after_0_to_eq : forall d_0 d_1,
-        equal_after 0 d_0 d_1 ->
-        d_0 = d_1.
-    Proof.
-      unfold equal_after; intuition.
-      eapply diskMem_ext_eq.
-      extensionality a'.
-      eapply H1; omega.
-    Qed.
-
-    Lemma equal_after_size : forall d_0 d_1,
-        size d_0 = size d_1 ->
-        equal_after (size d_0) d_0 d_1.
-    Proof.
-      unfold equal_after; intuition.
-      assert (~a' < size d_0) by omega.
-      assert (~a' < size d_1) by congruence.
-      autorewrite with upd; eauto.
-    Qed.
-
-    Hint Resolve equal_after_size.
-    Hint Resolve equal_after_0_to_eq.
-    Hint Resolve pred_missing.
-    Hint Resolve equal_after_diskUpd.
-    Hint Resolve both_disks_not_missing : false.
     Hint Unfold TD.wipe : rd.
 
     Implicit Type (state:TD.State).
@@ -227,6 +166,16 @@ Module RD.
      * Specifications and proofs about our implementation of the replicated disk API,
      * without considering our recovery.
      *)
+
+    Lemma both_disks_not_missing : forall (state: TD.State),
+        TD.disk0 state ?|= missing ->
+        TD.disk1 state ?|= missing ->
+        False.
+    Proof.
+      destruct state; simpl; intros.
+      destruct disk0, disk1; simpl in *; eauto.
+    Qed.
+    Hint Resolve both_disks_not_missing : false.
 
     Theorem Read_ok : forall a,
         prog_spec
@@ -337,6 +286,34 @@ Module RD.
     Hint Resolve DiskSize_ok.
 
 
+
+    Definition equal_after a (d_0 d_1: disk) :=
+      size d_0 = size d_1 /\
+      forall a', a <= a' -> d_0 a' = d_1 a'.
+
+    Lemma le_eq_or_S_le : forall n m,
+        n <= m ->
+        n = m \/
+        S n <= m /\ n <> m.
+    Proof.
+      intros.
+      omega.
+    Qed.
+
+    Lemma equal_after_diskUpd : forall a d_0 d_1 b,
+        equal_after (S a) d_0 d_1 ->
+        equal_after a (diskUpd d_0 a b) (diskUpd d_1 a b).
+    Proof.
+      unfold equal_after; intuition.
+      autorewrite with upd; eauto.
+      apply le_eq_or_S_le in H; intuition subst.
+      destruct (lt_dec a' (size d_0)); autorewrite with upd.
+      assert (a' < size d_1) by congruence; autorewrite with upd; auto.
+      assert (~a' < size d_1) by congruence; autorewrite with upd; auto.
+      autorewrite with upd; eauto.
+    Qed.
+    Hint Resolve equal_after_diskUpd.
+
     Theorem init_at_ok : forall a,
         prog_spec
           (fun '(d_0, d_1) state =>
@@ -412,6 +389,29 @@ Module RD.
 
     Hint Resolve DiskSizeInit_ok.
 
+
+    Lemma equal_after_0_to_eq : forall d_0 d_1,
+        equal_after 0 d_0 d_1 ->
+        d_0 = d_1.
+    Proof.
+      unfold equal_after; intuition.
+      eapply diskMem_ext_eq.
+      extensionality a'.
+      eapply H1; omega.
+    Qed.
+
+    Lemma equal_after_size : forall d_0 d_1,
+        size d_0 = size d_1 ->
+        equal_after (size d_0) d_0 d_1.
+    Proof.
+      unfold equal_after; intuition.
+      assert (~a' < size d_0) by omega.
+      assert (~a' < size d_1) by congruence.
+      autorewrite with upd; eauto.
+    Qed.
+
+    Hint Resolve equal_after_size.
+    Hint Resolve equal_after_0_to_eq.
 
     Theorem Init_ok :
         prog_spec
