@@ -50,3 +50,32 @@ Your job is to fill in several other parts of that file:
   abstraction, (2) proving your `write` implementation with your abstraction,
   and (3) proving that the existing `init` implementation establishes
   your abstraction in the initial state.
+  
+## Exercise 3: replicated disk without recovery
+
+`src/ReplicatedDisk` contains a partial implementation of a replicated disk.
+remapping.  The idea is to use two physical disks so that if one fails, the
+application can continue with the remaining one.  If a fails and is replaced
+with a new one, the implementation should fix up the new disk to reflect all the
+writes the non-failed disk has seen.  We assume that both disks won't fail at
+the same time.
+
+We provide an implementation of `read` in `src/ReplicatedDisk/ReplicatedDiskImpl.v`.
+Your job is to fill in several other parts of that file:
+
+- Implement `write`.
+
+- Complete the spec for `write_ok` and prove it.  Using the `step` ltac this
+  proof is straightforward.
+
+- To get some confidence that your `write_ok` spec is correct, also prove
+  `write_read_check_ok`, which verifies that a read after a write observes the
+  effect of the write.  Using the `step` ltac this proof is straightforward.
+
+- Complete the spec for `init_ok` and prove it. This is a bit challenging since
+  `Init` calls `init_at` to initialize each block recursively.  So, you will
+  also have to write the spec for and prove `init_ok`. Your proof of `init_ok`
+  will use induction.
+
+
+

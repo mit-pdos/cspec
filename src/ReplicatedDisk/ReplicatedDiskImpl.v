@@ -74,6 +74,7 @@ Module RD.
         end
       end.
 
+    (* Initialize block a *)
     Fixpoint init_at (a:nat) : prog unit :=
       match a with
       | 0 => Ret tt
@@ -83,6 +84,7 @@ Module RD.
         init_at a
       end.
 
+    (* Recursively initialize every disk block *)
     Definition Init : prog InitResult :=
       size <- DiskSizeInit;
       match size with
@@ -292,10 +294,14 @@ Module RD.
     Proof.
       unfold write_read_check.
       step.
+      (* Prove your write implementation meets your postcondition and recovery condition. *)
+      (* SOL *)
+      (* STUB: all: pocs_admit. *)
       step.
       step.
       autorewrite with upd in *.
       congruence.
+      (* END *)
     Qed.
 
     Hint Resolve write_read_check_ok.
@@ -366,15 +372,24 @@ Module RD.
         prog_spec
           (fun '(d_0, d_1) state =>
              {| pre :=
+                  (* Fill in your precondition here *)
+                   (* SOL *)
                   TD.disk0 state ?|= eq d_0 /\
                   TD.disk1 state ?|= eq d_1 /\
                   equal_after a d_0 d_1;
+                 (* END *)
+                   (* STUB: True; *)
                 post :=
                   fun _ state' =>
+                 (* Fill in your postcondition here *)
+                   (* SOL *)
                     exists d_0' d_1',
                       TD.disk0 state' ?|= eq d_0' /\
                       TD.disk1 state' ?|= eq d_1' /\
                       equal_after 0 d_0' d_1';
+                 (* END *)
+                   (* STUB: True; *)
+
                 recover :=
                   fun _ state' => True;
              |})
@@ -382,6 +397,9 @@ Module RD.
           (irec td)
           (interface_abs td).
     Proof.
+      (* Prove your init implementation meets your postcondition *)
+      (* SOL *)
+      (* STUB: all: pocs_admit. *)
       induction a; simpl; intros.
       - step.
       - step.
@@ -399,6 +417,7 @@ Module RD.
 
           Grab Existential Variables.
           exact block0.
+      (* END *)
     Qed.
 
     Hint Resolve init_at_ok.
@@ -411,7 +430,7 @@ Module RD.
                   TD.disk0 state ?|= eq d_0 /\
                   TD.disk1 state ?|= eq d_1;
                 post :=
-                  fun r state' =>
+                   fun r state' =>
                     exists d_0' d_1',
                       TD.disk0 state' ?|= eq d_0' /\
                       TD.disk1 state' ?|= eq d_1' /\
@@ -469,6 +488,9 @@ Module RD.
                   TD.disk1 state ?|= eq d_1;
                 post :=
                   fun r state' =>
+                 (* Fill in your postcondition here *)
+                   (* SOL *)
+
                     match r with
                     | Initialized =>
                       exists d_0' d_1',
@@ -478,6 +500,9 @@ Module RD.
                     | InitFailed =>
                       True
                     end;
+                  (* END *)
+                   (* STUB: True; *)
+
                 recover :=
                   fun _ state' => True;
              |})
@@ -485,11 +510,15 @@ Module RD.
           (irec td)
           (interface_abs td).
     Proof.
+      (* Prove your init implementation meets your postcondition *)
+      (* SOL *)
+      (* STUB: all: pocs_admit. *)
       unfold Init.
       step.
       descend; intuition eauto.
       destruct r; step.
       step.
+      (* END *)
     Qed.
 
     Hint Resolve Init_ok.
