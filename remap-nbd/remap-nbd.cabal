@@ -24,6 +24,7 @@ library
                      , Prog
                      , Sectors
                      , Server
+                     , Sized
                      , Specif
                      , ExtrBadSectorDisk
                      , BadSectorAPI
