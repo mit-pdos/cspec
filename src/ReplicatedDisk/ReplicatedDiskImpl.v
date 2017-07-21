@@ -255,6 +255,7 @@ Module RD.
 
       (* Prove your write implementation meets your postcondition and recovery condition. *)
       (* SOL *)
+      (* STUB: all: pocs_admit. *)
       destruct r; step.
       descend; intuition eauto.
 
@@ -294,9 +295,9 @@ Module RD.
     Proof.
       unfold write_read_check.
       step.
-      (* Prove your write implementation meets your postcondition and recovery condition. *)
-      (* SOL *)
+      (* Prove that write_read_check meets its postcondition  *)
       (* STUB: all: pocs_admit. *)
+      (* SOL *)
       step.
       step.
       autorewrite with upd in *.
@@ -397,9 +398,9 @@ Module RD.
           (irec td)
           (interface_abs td).
     Proof.
-      (* Prove your init implementation meets your postcondition *)
-      (* SOL *)
+      (* Prove your init_at implementation meets your postcondition *)
       (* STUB: all: pocs_admit. *)
+      (* SOL *)
       induction a; simpl; intros.
       - step.
       - step.
@@ -511,8 +512,8 @@ Module RD.
           (interface_abs td).
     Proof.
       (* Prove your init implementation meets your postcondition *)
-      (* SOL *)
       (* STUB: all: pocs_admit. *)
+      (* SOL *)
       unfold Init.
       step.
       descend; intuition eauto.
