@@ -373,18 +373,14 @@ Module RD.
         prog_spec
           (fun '(d_0, d_1) state =>
              {| pre :=
-                  (* Fill in your precondition here *)
-                   (* SOL *)
                   TD.disk0 state ?|= eq d_0 /\
                   TD.disk1 state ?|= eq d_1 /\
                   equal_after a d_0 d_1;
-                 (* END *)
-                   (* STUB: True; *)
                 post :=
                   fun _ state' =>
                  (* Fill in your postcondition here *)
+                    exists d_0' d_1': disk,
                    (* SOL *)
-                    exists d_0' d_1',
                       TD.disk0 state' ?|= eq d_0' /\
                       TD.disk1 state' ?|= eq d_1' /\
                       equal_after 0 d_0' d_1';
@@ -1255,8 +1251,11 @@ Module RD.
             unfold spec_impl, rd_layer_abstraction; simplify.
         + exists (abstraction_f state); (intuition eauto); simplify; finish.
         + exists (abstraction_f state); (intuition eauto); simplify; finish.
+          (* SOL *)
           exists (abstraction_f state'); intuition eauto.
           right; descend; intuition eauto.
+          (* END *)
+          (* STUB: all: pocs_admit. *)
         + exists (abstraction_f state); (intuition eauto); simplify.
           descend; intuition eauto.
           descend; intuition eauto.
@@ -1267,12 +1266,15 @@ Module RD.
       - eapply then_init_compose; eauto.
         eapply prog_spec_weaken; unfold spec_impl; simplify.
         eauto.
+        (* SOL *)
         pose proof (state_some_disks state); simplify.
         descend; intuition eauto.
         destruct v; simplify; finish.
 
         Grab Existential Variables.
         all: auto.
+        (* END *)
+        (* STUB: all: pocs_admit. *)
     Defined.
 
   End ReplicatedDisk.
