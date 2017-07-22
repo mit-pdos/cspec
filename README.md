@@ -74,7 +74,7 @@ Your job is to fill in several other parts of that file:
 
 - Complete the spec for `init_ok` and prove it. This is a bit challenging since
   `Init` calls `init_at` to initialize each block recursively.  So, you will
-  also have to write the spec for and prove `init_ok`. Your proof of `init_ok`
+  also have to write the spec for and prove `init_at_ok`. Your proof of `init_at_ok`
   will use induction.
 
 
