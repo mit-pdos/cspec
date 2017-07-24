@@ -2,6 +2,8 @@ Require Import POCS.
 Require Import StatDb.StatDbAPI.
 Require Import Variables.VariablesAPI.
 
+Import Vars.
+
 Module StatDB.
 
   Section Implementation.
@@ -9,20 +11,20 @@ Module StatDB.
     Variable (vars : Interface Vars.API).
 
     Definition add (v : nat) : prog unit :=
-      sum <- Prim vars (Vars.Read Vars.VarSum);
-      count <- Prim vars (Vars.Read Vars.VarCount);
-      _ <- Prim vars (Vars.Write Vars.VarSum (sum + v));
-      _ <- Prim vars (Vars.Write Vars.VarCount (count + 1));
+      sum <- Prim vars (Read VarSum);
+      count <- Prim vars (Read VarCount);
+      _ <- Prim vars (Write VarSum (sum + v));
+      _ <- Prim vars (Write VarCount (count + 1));
       Ret tt.
 
     Definition mean : prog (option nat) :=
       (* Your solutions here *)
       (* SOL *)
-      count <- Prim vars (Vars.Read Vars.VarCount);
+      count <- Prim vars (Read VarCount);
       if count == 0 then
         Ret None
       else
-        sum <- Prim vars (Vars.Read Vars.VarSum);
+        sum <- Prim vars (Read VarSum);
         Ret (Some (sum / count)).
 
     Definition mean_stub : prog (option nat) :=
@@ -30,8 +32,8 @@ Module StatDB.
       Ret (Some 0).
 
     Definition init : prog InitResult :=
-      _ <- Prim vars (Vars.Write Vars.VarCount 0);
-      _ <- Prim vars (Vars.Write Vars.VarSum 0);
+      _ <- Prim vars (Write VarCount 0);
+      _ <- Prim vars (Write VarSum 0);
       Ret Initialized.
 
     Definition statdb_op_impl T (op: StatDB.Op T) : prog T :=
@@ -46,8 +48,8 @@ Module StatDB.
          init_impl := then_init (iInit vars) init; |}.
 
     Definition statdb_abstraction (vars_state : Vars.State) (statdb_state : StatDB.State) : Prop :=
-      vars_state Vars.VarCount = Some (length statdb_state) /\
-      vars_state Vars.VarSum = Some (fold_right plus 0 statdb_state).
+      vars_state VarCount = Some (length statdb_state) /\
+      vars_state VarSum = Some (fold_right plus 0 statdb_state).
 
     Definition abstr : Abstraction StatDB.State :=
       abstraction_compose
@@ -65,7 +67,7 @@ Module StatDB.
         + unfold prog_spec; intros.
           destruct a; simpl in *; intuition.
           inv_rexec; try cannot_crash.
-          repeat ( exec_steps || Vars.inv_bg || Vars.inv_step ).
+          repeat ( exec_steps || inv_bg || inv_step ).
           eexists; intuition.
           eauto.
           eexists; intuition.
@@ -82,7 +84,7 @@ Module StatDB.
           unfold prog_spec; intros.
           destruct a; simpl in *; intuition.
           inv_rexec; try cannot_crash.
-          repeat ( exec_steps || Vars.inv_bg || Vars.inv_step ).
+          repeat ( exec_steps || inv_bg || inv_step ).
 
           * eexists; intuition.
             eauto.
@@ -113,7 +115,7 @@ Module StatDB.
         unfold prog_spec; intros.
         destruct a; simpl in *; intuition.
         inv_rexec; try cannot_crash.
-        repeat ( exec_steps || Vars.inv_bg || Vars.inv_step ).
+        repeat ( exec_steps || inv_bg || inv_step ).
 
         eexists; intuition.
         eauto.
