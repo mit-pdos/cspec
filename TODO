@@ -1,5 +1,16 @@
 Things to clean up:
 
+- Tej's issues with bad sector remapping:
+
+  * It took a while to understand the connection between the goals and
+    my implementation.
+  * Small changes to the abstraction and implementation required
+    mechanical changes to the proof.
+  * Simplifying and manipulating the goals was incredibly painful;
+    I avoided any automation or lemmas, but still used the fancy tricks
+    I know or had implemented (there are plenty of comments to see what
+    I did - I left all of the searches I did in).
+
 - RemappedDisk: make sure that we can replace the abstraction relation with an abstraction function
   as defined in the [init] part of the proof at the bottom of RemappedDiskImpl.v.
 
