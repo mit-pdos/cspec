@@ -11,7 +11,10 @@ Module Vars.
   | Write (v : var) (val : nat) : Op unit.
 
   (** The state the program manipulates as it executes. *)
-  Definition State := mem var nat.
+  Record State := mkState {
+    StateCount : nat;
+    StateSum : nat;
+  }.
 
   Instance var_dec : EqualDec var.
     unfold EqualDec; intros.
@@ -24,11 +27,16 @@ Module Vars.
   Implicit Type (state:State).
 
   Inductive op_step : forall `(op: Op T), Semantics State T :=
-  | step_read : forall v r state,
-      state v = Some r ->
-      op_step (Read v) state r state
-  | step_write : forall v val state state',
-      op_step (Write v val) state tt (upd state v val).
+  | step_read_count : forall r state,
+      StateCount state = r ->
+      op_step (Read VarCount) state r state
+  | step_read_sum : forall r state,
+      StateSum state = r ->
+      op_step (Read VarSum) state r state
+  | step_write_count : forall val state,
+      op_step (Write VarCount val) state tt (mkState val (StateSum state))
+  | step_write_sum : forall val state,
+      op_step (Write VarSum val) state tt (mkState (StateCount state) val).
 
   Definition crash_relation state state' := False.
   Definition bg_step state state' := state = state'.
