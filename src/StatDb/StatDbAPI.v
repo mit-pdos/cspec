@@ -12,8 +12,9 @@ Module StatDB.
   Inductive step : forall `(op: Op T), Semantics State T :=
   | step_add : forall v (state : State),
       step (Add v) state tt (v :: state)
-  | step_mean_empty :
-      step Mean nil None nil
+  | step_mean_empty : forall (state : State),
+      state = nil ->
+      step Mean state None state
   | step_mean_nonempty : forall r (state : State),
       length state > 0 ->
       r = Nat.div (fold_right plus 0 state) (length state) ->

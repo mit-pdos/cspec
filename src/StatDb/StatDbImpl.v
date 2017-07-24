@@ -60,63 +60,41 @@ Module StatDB.
       unshelve econstructor.
       - exact impl.
       - exact abstr.
-      - intros.
-        destruct op; unfold op_spec;
-          apply spec_abstraction_compose;
-            unfold spec_impl, statdb_abstraction; simpl.
-        + unfold prog_spec; intros.
-          destruct a; simpl in *; intuition.
-          inv_rexec; try cannot_crash.
-          repeat ( exec_steps || inv_bg || inv_step ).
-          eexists; intuition.
-          eauto.
-          eexists; intuition.
-          constructor.
+      - destruct op.
 
-          simpl. omega.
-          simpl. omega.
+        + lift_world.
+          prog_spec_symbolic_execute inv_bg inv_step.
+          solve_final_state.
+
+          unfold statdb_abstraction in *.
+          simpl in *.
+          intuition.
 
         + (* Prove that your implementation of [mean] refines StatDbAPI.man *)
           (* SOL *)
-          unfold prog_spec; intros.
-          destruct a; simpl in *; intuition.
-          inv_rexec; try cannot_crash.
-          repeat ( exec_steps || inv_bg || inv_step ).
+          lift_world.
+          prog_spec_symbolic_execute inv_bg inv_step.
+          * solve_final_state.
 
-          * eexists; intuition.
-            eauto.
-
+            unfold statdb_abstraction in *; intuition.
             destruct s; simpl in *; try congruence.
-            eexists; intuition.
-            constructor.
-            simpl; eauto.
-            simpl; eauto.
 
-          * eexists; intuition.
-            eauto.
+          * solve_final_state.
 
-            eexists; intuition.
-            constructor; eauto.
-            destruct s; simpl in *; try congruence; try omega.
-            eauto.
-            eauto.
-
+            unfold statdb_abstraction in *; intuition.
+            unfold statdb_abstraction in *; intuition.
           (* END *)
           (* STUB: pocs_admit. *)
 
       - cannot_crash.
       - eapply then_init_compose; eauto.
-        unfold prog_spec; intros.
-        destruct a; simpl in *; intuition.
-        inv_rexec; try cannot_crash.
-        repeat ( exec_steps || inv_bg || inv_step ).
+        prog_spec_symbolic_execute inv_bg inv_step.
 
-        eexists; intuition.
-        eauto.
-        eexists; intuition.
+        solve_final_state.
 
         instantiate (1 := nil).
-        unfold statdb_abstraction; intuition.
+        simpl; auto.
+        simpl; auto.
         reflexivity.
 
       Unshelve.
