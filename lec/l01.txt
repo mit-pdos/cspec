@@ -18,7 +18,7 @@ L0: Intro reasoning about crashes and failures
     -> Block is part of a file, but not marked allocated
   Storage runs concurrent with program
     While operation is in progress storage fails
-    E.g., update on disk, but fail to update second disk
+    E.g., update one disk, but fail to update second disk
   Storage devices are slower than main memory
     Many complex optimizations to avoid disks writes
     Complexity leads to more opportunities for problems
@@ -42,7 +42,8 @@ L0: Intro reasoning about crashes and failures
     deals with one bad sector
   verified replicated disks
     deals with device failures
-  demo of replicated disk
+    
+* demo of replicated disk
     pull out a disk
 
 * Verification approach: state machine and simulation

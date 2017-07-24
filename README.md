@@ -78,4 +78,6 @@ Your job is to fill in several other parts of that file:
   will use induction.
 
 
+## Exercise 4: replicated disk with recovery
 
+TBD
