@@ -9,7 +9,11 @@ getNewItem = do
   liftIO $ putStr "Enter a number to add: "
   liftIO $ hFlush stdout
   x <- liftIO $ getLine
-  return $ read x
+  if read x < 0 then do
+    liftIO $ putStrLn "Negative numbers not supported"
+    getNewItem
+  else
+    return $ read x
 
 reportMean :: Maybe Integer -> TheProg ()
 reportMean m = do
