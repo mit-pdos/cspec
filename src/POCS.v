@@ -37,8 +37,23 @@ Ltac prog_spec_to_rexec :=
 Ltac rexec_to_exec_finished :=
   inv_rexec; try cannot_crash.
 
-Ltac exec_symex inv_step :=
-  repeat ( exec_steps || inv_step ).
+Ltac case_destruct cond :=
+  destruct cond eqn:?; subst; simpl in *.
+
+Ltac symbolic_exec_one :=
+  match goal with
+    | H: exec (Prim _ _) _ _ |- _ => eapply RExec in H
+    | H: exec (if ?cond then _ else _) _ _ |- _ => case_destruct cond
+    | H: exec (match ?expr with _ => _ end) _ _ |- _ => case_destruct expr
+    | H: rexec _ _ _ _ |- _ => eapply impl_ok in H; [ | eassumption | solve [ simpl; eauto ] ]
+    end || inv_ret || inv_exec.
+
+Ltac symbolic_exec_many :=
+  repeat symbolic_exec_one;
+  simpl in *; unfold pre_step in *; repeat deex.
+
+Ltac symbolic_exec inv_step :=
+  repeat ( symbolic_exec_many || inv_step ).
 
 Ltac match_abstraction_for_step :=
   match goal with
@@ -59,7 +74,7 @@ Ltac lift_world :=
 Ltac prog_spec_symbolic_execute inv_step :=
   prog_spec_to_rexec;
   rexec_to_exec_finished;
-  exec_symex inv_step.
+  symbolic_exec inv_step.
 
 Ltac solve_final_state :=
   match_abstraction_for_step;

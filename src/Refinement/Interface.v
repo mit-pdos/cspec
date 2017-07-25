@@ -243,18 +243,3 @@ Proof.
     inv_rexec; inv_exec.
     congruence.
 Qed.
-
-Ltac case_destruct cond :=
-  destruct cond eqn:?; subst; simpl in *.
-
-Ltac exec_step :=
-  match goal with
-    | H: exec (Prim _ _) _ _ |- _ => eapply RExec in H
-    | H: exec (if ?cond then _ else _) _ _ |- _ => case_destruct cond
-    | H: exec (match ?expr with _ => _ end) _ _ |- _ => case_destruct expr
-    | H: rexec _ _ _ _ |- _ => eapply impl_ok in H; [ | eassumption | solve [ simpl; eauto ] ]
-    end || inv_ret || inv_exec.
-
-Ltac exec_steps :=
-  repeat exec_step;
-  simpl in *; unfold pre_step in *; repeat deex.
