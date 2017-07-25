@@ -42,11 +42,17 @@ Ltac case_destruct cond :=
 
 Ltac symbolic_exec_one :=
   match goal with
-    | H: exec (Prim _ _) _ _ |- _ => eapply RExec in H
-    | H: exec (if ?cond then _ else _) _ _ |- _ => case_destruct cond
-    | H: exec (match ?expr with _ => _ end) _ _ |- _ => case_destruct expr
-    | H: rexec _ _ _ _ |- _ => eapply impl_ok in H; [ | eassumption | solve [ simpl; eauto ] ]
-    end || inv_ret || inv_exec.
+  | H: exec ?p _ _ |- _ =>
+    match p with
+    | context[if ?expr then _ else _] => case_destruct expr
+    | context[match ?expr with _ => _ end] => case_destruct expr
+    end
+  | H: exec (Prim _ _) _ _ |- _ => eapply RExec in H
+  | H: exec (Ret _) _ _ |- _ => apply exec_ret in H; safe_intuition; subst
+  | H: exec (Bind _ _) _ _ |- _ => inv_exec' H
+  | H: exec _ _ _ |- _ => inv_exec' H
+  | H: rexec _ _ _ _ |- _ => eapply impl_ok in H; [ | eassumption | solve [ simpl; eauto ] ]
+  end.
 
 Ltac symbolic_exec_many :=
   repeat symbolic_exec_one;

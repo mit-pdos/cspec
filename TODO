@@ -47,3 +47,19 @@ So, on a mac
 (3) Run “stack config set system-ghc --global true” then “stack setup”. Then you can run make on the repository successfully.
 ￼
 If you have already installed GHC via homebrew, step (3) is sufficient to run make.
+
+===
+
+to keep track of the kinds of symbolic execution cases we need to handle:
+
+  [if] statements where conditions are [sumor]s, like [if (a == b) then foo else bar]
+
+  [if] statements where conditions are [bool]s, like [if (a =? b) then foo else bar]
+
+  [match] statements that do some kind of case analysis
+
+  [if] statements at the top level of the program, like
+    [if foo then Ret 1 else Ret 2]
+
+  [if] statements inside a program, like
+    Ret (if foo then 1 else 2)

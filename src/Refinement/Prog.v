@@ -132,7 +132,7 @@ Global Generalizable Variables T R State step.
 
 (** * Automation for inverting execution behavior. *)
 
-Local Ltac inv_exec' H :=
+Ltac inv_exec' H :=
   inversion H; subst; clear H; repeat sigT_eq.
 
 Lemma exec_ret : forall T (v:T) w r,
