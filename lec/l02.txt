@@ -1,62 +1,66 @@
 L2: Sector and disk failures
 
-=== Remapped disk
+=== Solution discussion of bad-sector exercise
 
-Solution of bad-sector exercise
-  draw refinement diagram
-    RemappedDiskAPI  (the spec, given)
-    RemappedDiskImpl (the code)
-    BadSectorAPI  (given)
-      One bad sector
-      Implemented in Haskell
-      No proof
+draw refinement diagram
+  RemappedDiskAPI  (the spec, given)
+  RemappedDiskImpl (the code)
+  BadSectorAPI  (given)
+    One bad sector
+    Implemented in Haskell
+    No proof
 
-  Abstraction function
-    draw picture of abstract disk and concrete disk
-      concrete disk has one more block
-    What should be true about the non-bad sectors?
-      value should be equal
-    What should be true about the bad sector?
-      its value is equal to the last disk's sector
-    What if the bad sector address is the last address?
-      bad luck, disallow
-    What if the bad sector address is past the end of the disk?
-      undefined, disallow
+Abstraction function
+  draw picture of abstract disk and concrete disk
+    concrete disk has one more block
+  What should be true about the non-bad sectors?
+    value should be equal
+  What should be true about the bad sector?
+    its value is equal to the last disk's sector
+  What if the bad sector address is the last address?
+    bad luck, disallow
+  What if the bad sector address is past the end of the disk?
+    undefined, disallow
 
-   Prove read
-     symbolic execution results in 6 states :(
-       d is real disk
-       v0 is bad sector
-       s is spec disk
-       for each prove abstract function holds
-       branch 1: address is the bad sector
+Prove read
+  symbolic execution results in 6 states :(
+    d is real disk
+    v0 is bad sector
+    s is spec disk
+    for each prove abstract function holds
+      branch 1: address is the bad sector
        	case 1: valid bad sector read
 	case 2: oob out of read
 	case 3: read bad sector
-       branch 2: address is not a bad sector
+      branch 2: address is not a bad sector
         ...
 
-   Write implementation
-     writing to the last sector is undefined
-     find out what the bad sector is
-     if address is the bad sector address, then read last address
-     else read address
+Write implementation
+  writing to the last sector is undefined
+  find out what the bad sector is
+  if address is the bad sector address, then read last address
+  else read address
 
-   Prove write
-     symbolic execution results in 3 states
+Prove write
+  symbolic execution results in 3 states
 
-   Prove init
-     implementation: only initialize when abstraction holds
+Prove init
+  implementation: only initialize when abstraction holds
 
-   What have proven now?
-     the code only start when the initial state is valid (abstraction holds)
-     for each possible code execution, there is a spec step
-   
+What have proven now?
+  the code only start when the initial state is valid (abstraction holds)
+  for each possible code execution, there is a spec step
+
+== Code generation
+
+remap-nbd/src
+  Server.hs
+
 
 === Replicated disk (no recovery)
 
 Modeling disk failures
-  exec, reexec
+  bg_failure
   progspec
   maybe holds
 
