@@ -1,4 +1,4 @@
-L0: Intro reasoning about crashes and failures
+L1: Intro reasoning about crashes and failures
 
 * Goal: verify systems that have persistent state but may fail
   Examples:
