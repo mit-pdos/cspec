@@ -141,9 +141,13 @@ Proof.
   prim.
 
   destruct matches in *; cleanup.
-  destruct (lt_dec a (size d_0));
-    autorewrite with upd in *;
-    eauto.
+
+  match goal with
+  | |- context[diskUpd ?d_0 _ _] =>
+    destruct (lt_dec a (size d_0));
+      autorewrite with upd in *;
+      eauto
+  end.
 Qed.
 
 Theorem TDWrite1_ok : forall (i: Interface TD.API) a b,
@@ -173,9 +177,12 @@ Proof.
   prim.
 
   destruct matches in *; cleanup.
-  destruct (lt_dec a (size d_1));
-    autorewrite with upd in *;
-    eauto.
+  match goal with
+  | |- context[diskUpd ?d_1 _ _] =>
+    destruct (lt_dec a (size d_1));
+      autorewrite with upd in *;
+      eauto
+  end.
 Qed.
 
 Theorem TDDiskSize0_ok : forall (i: Interface TD.API),

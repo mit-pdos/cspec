@@ -153,12 +153,12 @@ End DestructMatchesTests.
 Ltac destruct_tuple :=
   match goal with
   | [ H: context[let '(a, b) := ?p in _] |- _ ] =>
-    let a := fresh a in
-    let b := fresh b in
+    let a := fresh in
+    let b := fresh in
     destruct p as [a b]
   | [ |- context[let '(a, b) := ?p in _] ] =>
-    let a := fresh a in
-    let b := fresh b in
+    let a := fresh in
+    let b := fresh in
     destruct p as [a b]
   end.
 

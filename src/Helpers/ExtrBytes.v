@@ -1,5 +1,4 @@
 Require Import POCS.
-Require Extraction.
 
 Extraction Language Haskell.
 
