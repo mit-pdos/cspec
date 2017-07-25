@@ -97,23 +97,37 @@ Example: StatDB (chapter 8)
     state:
       sum: sum of values added so far
       count: number of values
-    transitions: add, mean
+    transitions: read and write variables
     initial state: zero sum and count
   abstraction: relate sum and count variables to the spec multiset
   proof: backward simulation, from implementation to spec
     initial states line up
     for each transition of implementation, there exists a corresponding spec transition
 
-StatDB in Coq
-  Refinement
-  Exec
-  Variables
+[ do the code walk-through and subsequent [add] example using the
+  student-facing deepspec-pocs repo ]
 
+StatDB in Coq
+  src/StatDb/StatDbAPI.v
   src/Variables/VariablesAPI.v
 
-Implement and prove [add]
-  do the example using the student-facing deepspec-pocs repo
+  worlds: src/Refinement/Prog.v
 
+  shallow embedding
+    uses Gallina for most of the programming language
+    also splits the state into two parts: shared state and "per-invocation" state
+    per-invocation state is implicit in [prog]'s execution and arguments being passed
+
+  reasoning about executions:
+    src/Refinement/Hoare.v, [prog_spec]
+
+  refinement
+    src/Refinement/Interface.v
+    look at definiton of [Interface], [impl_ok] inside it, and [op_spec]
+
+  src/StatDb/StatDbImpl.v
+
+Implement and prove [add]
   add:
       sum <- Prim vars (Read VarSum);
       count <- Prim vars (Read VarCount);
