@@ -109,7 +109,11 @@ StatDB in Coq
   Exec
   Variables
 
+  src/Variables/VariablesAPI.v
+
 Implement and prove [add]
+  do the example using the student-facing deepspec-pocs repo
+
   add:
       sum <- Prim vars (Read VarSum);
       count <- Prim vars (Read VarCount);
@@ -134,7 +138,19 @@ Exercise: implement and prove [mean]
   Implement mean and run ./bin/statdb-cli
   Prove mean
 
-* Homework: remapping disk
+Homework: remapping disk
   Disks instead of Variables
+    src/BadSectorAPI/BadSectorAPI.v
   Your goal: abstraction function and proof ...
+    src/RemappedDisk/RemappedDiskImpl.v
   Do demo of not working
+    ./bin/remap-nbd init
+    ./bin/remap-nbd start
+    nbd-client localhost /dev/nbd0
+    dd if=/dev/urandom of=/dev/nbd0
+    nbd-client -d /dev/nbd0
+
+    ./bin/remap-nbd start
+    nbd-client localhost /dev/nbd0
+    hexdump /dev/nbd0 | less
+    nbd-client -d /dev/nbd0

@@ -34,7 +34,7 @@ Module RemappedDisk.
 
     Definition write_stub (a : addr) (b : block) : prog unit :=
       (* END *)
-      Ret tt.
+      Prim bd (BadWrite a b).
 
     Definition diskSize : prog nat :=
       len <- Prim bd (BadDiskSize);
