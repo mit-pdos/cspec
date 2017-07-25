@@ -32,6 +32,10 @@ Things to clean up:
 
 - see notes below from Perry Metzger about how to run stack on a Mac
 
+- use coqdoc more
+
+- point to where various pieces are defined (e.g., Interface, API, etc)
+
 ===
 
 So, on a mac
