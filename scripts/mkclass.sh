@@ -24,6 +24,8 @@ SD=$(cd $(dirname $0)/.. && /bin/pwd)
 CD=/tmp/pocs.$$
 git clone $CLASSREPO $CD || exit 1
 
+cd $CD && sh -c 'rm -r *'
+
 mkdir -p $CD
 mkdir -p $CD/src
 mkdir -p $CD/scripts
