@@ -706,7 +706,10 @@ Module RD.
       destruct r; try step.
 
       destruct r; try step.
-      is_eq b v; try step.
+      match goal with
+      | |- context[diskUpd _ _ ?b] =>
+        is_eq b v; try step
+      end.
 
       step.
       destruct r; (intuition eauto); simplify; finish.
@@ -818,6 +821,7 @@ Module RD.
           (interface_abs td).
     Proof.
       spec_cases; simplify.
+      match goal with | x : DiskStatus |- _ => rename x into s end.
       destruct s; intuition eauto.
       - spec_case fixup_equal_ok; simplify; finish.
         descend; (intuition eauto); destruct matches in *;
@@ -884,14 +888,18 @@ Module RD.
     Proof.
       induction a; simpl; intros.
       - step.
+        rename_by_type DiskStatus s.
         destruct s; intuition (subst; eauto).
         omega.
       - step.
+        rename_by_type DiskStatus s.
         destruct s; intuition (subst; eauto).
+        rename_by_type (diskOf block) d.
         exists d, FullySynced; intuition eauto.
         destruct r; step.
 
         exists d, FullySynced; intuition eauto.
+        rename_by_type (diskOf block) d.
         exists d, (OutOfSync a0 b); intuition eauto.
 
         destruct r; step.
@@ -949,13 +957,16 @@ Module RD.
     Proof.
       unfold Recover, Recover_spec; intros.
       step.
+      rename_by_type DiskStatus s.
       destruct s; simplify.
-      + exists d, d; intuition eauto.
+      + rename_by_type disk d.
+        exists d, d; intuition eauto.
         step.
         exists d, FullySynced; intuition eauto.
 
         step.
-      + exists (diskUpd d a b), d; (intuition eauto); simplify.
+      + rename_by_type disk d.
+        exists (diskUpd d a b), d; (intuition eauto); simplify.
         step.
 
         exists d, (OutOfSync a b); intuition eauto.

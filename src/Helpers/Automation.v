@@ -294,3 +294,6 @@ Ltac especialize H :=
     specialize (H x);
     subst x
   end.
+
+Ltac rename_by_type type name :=
+  match goal with | x : type |- _ => rename x into name end.
