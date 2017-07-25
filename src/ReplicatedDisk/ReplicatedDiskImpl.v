@@ -394,10 +394,10 @@ Module RD.
           (irec td)
           (interface_abs td).
     Proof.
+      induction a; simpl; intros.
       (* Prove your init_at implementation meets your postcondition *)
       (* STUB: all: pocs_admit. *)
       (* SOL *)
-      induction a; simpl; intros.
       - step.
       - step.
 

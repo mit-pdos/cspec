@@ -18,9 +18,9 @@ Abstraction function
   What should be true about the bad sector?
     its value is equal to the last disk's sector
   What if the bad sector address is the last address?
-    bad luck, disallow
+    no remapping necessary
   What if the bad sector address is past the end of the disk?
-    undefined, disallow
+    disallow, and check during initialization
 
 Prove read
   symbolic execution results in 6 states :(
@@ -34,37 +34,84 @@ Prove read
 	case 3: read bad sector
       branch 2: address is not a bad sector
         ...
+    forward pointer: [prog_spec] and Hoare logic will make this cleaner
 
 Write implementation
-  writing to the last sector is undefined
+  do not allow writing to the last sector
+    semantics define OOB writes as noops
+    stray OOB write from the file system would modify the remapped sector
   find out what the bad sector is
-  if address is the bad sector address, then read last address
-  else read address
+  if address is the bad sector address, then write last address
+  else write address
+
+  no need for explicit OOB check: lines up on its own
 
 Prove write
   symbolic execution results in 3 states
 
 Prove init
-  implementation: only initialize when abstraction holds
+  implementation: returns Initialized only if it made the abstraction hold
+  can always decide to return InitFailed
+  our impl fails when the bad sector is out of bounds
+  .. or when disk is zero-sized!
 
-What have proven now?
+What have we proven now?
   the code only start when the initial state is valid (abstraction holds)
   for each possible code execution, there is a spec step
+  [rd] is of type [Interface StatDB.API]
+  look at src/Refinement/Interface.v, definition of [Interface], [op_spec], ..
 
 == Code generation
 
-remap-nbd/src
-  Server.hs
+draw diagram of NBD server, Linux kernel as NBD client,
+  queues of requests/responses, calling the Coq code,
+  bad sector API implementation, ..
 
+src/RemappedDisk/Server.v
+src/BadSectorDisk/ExtrBadSectorDisk.v
+remap-nbd/src/BadSectorDisk/Ops.hs
+
+generated code:
+  remap-nbd/src/RemappedDiskImpl.hs
+  remap-nbd/src/Server.hs
+  remap-nbd/app/Main.hs: call runServer
+  remap-nbd/src/Network/NBD.hs: runServer, calls Server.serverLoop
+  remap-nbd/src/Network/ServerOps.hs: getRequestFromQueue, sendResponseOnQueue
 
 === Replicated disk (no recovery)
 
-Modeling disk failures
-  bg_failure
-  progspec
-  maybe holds
+diagram: two disks
+  at least one disk remains live
+  disks do not come back from a failure
+  failure model: disk can stop working at any point
 
-Proof & implement read, disk size
+how to write the abstraction relations?
+  several cases to consider
+    first disk live, second disk live, both are live and equal..
+    slightly annoying to consider 3x everything
+    maybe_holds intuition
 
+Coq formalization
+  [bg_failure]
+  [prog_spec] to simplify specs, proofs
+    will let us talk about possible ways the system can crash
+    avoids the 6 cases we saw above in RemappedDisk
+  [maybe_holds] to make the predicates succinct
+    re-stating execution semantics
+    src/ReplicatedDisk/TwoDiskProgSpec.v
+    [maybe_holds_stable]
+  [prog_spec] ghost state for the disk
 
+work through implementation of Read, DiskSize, DiskSizeInit,
+  init_at, Init
 
+walk through the proofs for each of them, interleaved with code
+
+pay attention to [descend] in DiskSizeInit: instantiate existential quantifiers
+  will need it for the [Write_ok] proof
+
+assignment:
+  implement Write
+  prove Write_ok
+  prove the sanity-checker: write_read_ok
+  optionally prove init_at_ok and Init_ok
