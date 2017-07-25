@@ -3,6 +3,7 @@ Require Import StatDb.StatDbAPI.
 Require Import Variables.VariablesAPI.
 
 Import Vars.
+Import StatDB.
 
 Module StatDB.
 
@@ -38,8 +39,8 @@ Module StatDB.
 
     Definition statdb_op_impl T (op: StatDB.Op T) : prog T :=
       match op with
-      | StatDB.Add v => add v
-      | StatDB.Mean => mean
+      | Add v => add v
+      | Mean => mean
       end.
 
     Definition impl : InterfaceImpl StatDB.Op :=

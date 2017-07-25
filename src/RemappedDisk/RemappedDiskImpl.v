@@ -2,6 +2,9 @@ Require Import POCS.
 Require Import RemappedDisk.RemappedDiskAPI.
 Require Import BadSectorDisk.BadSectorAPI.
 
+Import BadSectorDisk.
+Import RemappedDisk.
+
 Module RemappedDisk.
 
   Section Implementation.
@@ -9,47 +12,47 @@ Module RemappedDisk.
     Variable (bd : Interface BadSectorDisk.API).
 
     Definition read (a : addr) : prog block :=
-      bs <- Prim bd (BadSectorDisk.GetBadSector);
+      bs <- Prim bd (GetBadSector);
       if a == bs then
-        len <- Prim bd (BadSectorDisk.DiskSize);
-        Prim bd (BadSectorDisk.Read (len-1))
+        len <- Prim bd (BadDiskSize);
+        Prim bd (BadRead (len-1))
       else
-        Prim bd (BadSectorDisk.Read a).
+        Prim bd (BadRead a).
 
     Definition write (a : addr) (b : block) : prog unit :=
       (* Fill in your implementation here. *)
       (* SOL *)
-      len <- Prim bd (BadSectorDisk.DiskSize);
+      len <- Prim bd (BadDiskSize);
       if a == (len-1) then
         Ret tt
       else
-        bs <- Prim bd (BadSectorDisk.GetBadSector);
+        bs <- Prim bd (GetBadSector);
         if a == bs then
-          Prim bd (BadSectorDisk.Write (len-1) b)
+          Prim bd (BadWrite (len-1) b)
         else
-          Prim bd (BadSectorDisk.Write a b).
+          Prim bd (BadWrite a b).
 
     Definition write_stub (a : addr) (b : block) : prog unit :=
       (* END *)
       Ret tt.
 
     Definition diskSize : prog nat :=
-      len <- Prim bd (BadSectorDisk.DiskSize);
+      len <- Prim bd (BadDiskSize);
       Ret (len - 1).
 
     Definition rd_op_impl T (op: RemappedDisk.Op T) : prog T :=
       match op with
-      | RemappedDisk.Read a => read a
-      | RemappedDisk.Write a b => write a b
-      | RemappedDisk.DiskSize => diskSize
+      | Read a => read a
+      | Write a b => write a b
+      | DiskSize => diskSize
       end.
 
     Definition init : prog InitResult :=
-      len <- Prim bd (BadSectorDisk.DiskSize);
+      len <- Prim bd (BadDiskSize);
       if len == 0 then
         Ret InitFailed
       else
-        bs <- Prim bd (BadSectorDisk.GetBadSector);
+        bs <- Prim bd (GetBadSector);
         if (lt_dec bs len) then
           Ret Initialized
         else
@@ -94,7 +97,7 @@ Module RemappedDisk.
           destruct a0; simpl in *; intuition.
           destruct state.
           inv_rexec; try cannot_crash.
-          repeat ( exec_steps || BadSectorDisk.inv_bg || BadSectorDisk.inv_step ).
+          repeat ( exec_steps || inv_bg || inv_step ).
 
           * eexists; intuition auto. eauto. simpl.
             exists s. intuition auto.
@@ -152,7 +155,7 @@ Module RemappedDisk.
           destruct a0; simpl in *; intuition.
           destruct state.
           inv_rexec; try cannot_crash.
-          repeat ( exec_steps || BadSectorDisk.inv_bg || BadSectorDisk.inv_step ).
+          repeat ( exec_steps || inv_bg || inv_step ).
 
           (* SOL *)
           * eexists; intuition auto. eauto. simpl.
@@ -213,7 +216,7 @@ Module RemappedDisk.
           destruct a; simpl in *; intuition.
           destruct state.
           inv_rexec; try cannot_crash.
-          repeat ( exec_steps || BadSectorDisk.inv_bg || BadSectorDisk.inv_step ).
+          repeat ( exec_steps || inv_bg || inv_step ).
 
           eexists; intuition auto. eauto. simpl.
           exists s. intuition auto.
@@ -230,7 +233,7 @@ Module RemappedDisk.
         destruct a; simpl in *; intuition.
         destruct state.
         inv_rexec; try cannot_crash.
-        repeat ( exec_steps || BadSectorDisk.inv_bg || BadSectorDisk.inv_step ).
+        repeat ( exec_steps || inv_bg || inv_step ).
 
         + eexists; intuition auto; eauto.
 
