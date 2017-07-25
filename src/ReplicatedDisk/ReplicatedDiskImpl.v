@@ -525,6 +525,8 @@ Module RD.
      * Recovery implementation.
      *)
 
+    (* SOL *)
+
     Inductive RecStatus :=
     (* continue working, nothing interesting has happened *)
     | Continue
@@ -567,10 +569,19 @@ Module RD.
         end
       end.
 
+    (* END *)
+
     Definition Recover : prog unit :=
+    (* SOL *)
       sz <- DiskSize;
       _ <- recover_at sz;
       Ret tt.
+
+    Definition Recover_stub : prog unit :=
+      (* END *)
+      Ret tt.
+
+    (* SOL *)
 
 
     (**
@@ -1072,6 +1083,10 @@ Module RD.
       exists d, FullySynced; intuition eauto.
     Qed.
 
+    Hint Resolve Read_rok Write_rok DiskSize_rok Recover_rok.
+
+    (* END *) 
+
     (* Now we gather up the implementation and all the correctness proofs,
      * expressing them in terms of the high-level API in D.API. *)
 
@@ -1108,6 +1123,8 @@ Module RD.
     Qed.
 
     Hint Resolve read_step write_step disk_size_step.
+
+
 
 
     (**
@@ -1212,8 +1229,6 @@ Module RD.
          recover_impl := _ <- irec td; Recover;
       init_impl := then_init (iInit td) (Init) |}.
 
-    Hint Resolve Read_rok Write_rok DiskSize_rok Recover_rok.
-
     Theorem state_some_disks : forall state,
         exists d_0 d_1,
           TD.disk0 state ?|= eq d_0 /\
@@ -1259,10 +1274,14 @@ Module RD.
         + exists (abstraction_f state); (intuition eauto); simplify.
           descend; intuition eauto.
           descend; intuition eauto.
-      - eapply rec_noop_compose; eauto; simpl.
+      - (* SOL *)
+        eapply rec_noop_compose; eauto; simpl.
         unfold TD.wipe, rd_layer_abstraction, Recover_spec; simplify.
         exists (abstraction_f state0), FullySynced; intuition eauto.
         descend; intuition eauto.
+        (* END *)
+        (* STUB: all: pocs_admit. *)
+
       - eapply then_init_compose; eauto.
         eapply prog_spec_weaken; unfold spec_impl; simplify.
         eauto.
