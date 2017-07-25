@@ -4,6 +4,9 @@ Things to clean up:
   created based on the if statements that led to it.  an easy way to do this
   would be to introduce a "Label" opcode to the language.
 
+  empirically, though, we didn't run into confusion about which branch is where
+  during DSSS.
+
 - RemappedDisk: make sure that we can replace the abstraction relation with an abstraction function
   as defined in the [init] part of the proof at the bottom of RemappedDiskImpl.v.
 
