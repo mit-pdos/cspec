@@ -258,7 +258,7 @@ Section GenericDisks.
 
   Lemma shrink_size : forall d,
       size d <> 0 ->
-      size d = size (shrink d) + 1.
+      size (shrink d) = size d - 1.
   Proof.
     intros.
     case_eq (size d); intros; try congruence.
@@ -270,7 +270,7 @@ Section GenericDisks.
 
   Lemma shrink_preserves : forall d a,
       a <> size (shrink d) ->
-      d a = (shrink d) a.
+      (shrink d) a = d a.
   Proof.
     intros.
     case_eq (size d); intros.
@@ -280,7 +280,7 @@ Section GenericDisks.
       rewrite H0; intros.
       simpl.
       rewrite delete_neq; auto.
-      rewrite shrink_size in H0 by omega.
+      rewrite shrink_size in H by omega.
       omega.
   Qed.
 
@@ -300,6 +300,9 @@ Hint Rewrite diskUpdF_neq using (solve [ auto ]) : upd.
 
 Hint Rewrite diskUpd_same using (solve [ auto ]) : upd.
 Hint Rewrite diskUpd_oob_noop using (solve [ auto ]) : upd.
+
+Hint Rewrite shrink_size using (solve [ auto ]) : upd.
+Hint Rewrite shrink_preserves using (solve [ auto ]) : upd.
 
 Lemma same_size_disks_not_different : forall T T' (d: diskOf T) (d': diskOf T') a v,
     size d = size d' ->

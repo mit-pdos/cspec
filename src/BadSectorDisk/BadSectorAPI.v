@@ -46,6 +46,7 @@ Module BadSectorDisk.
     |}.
 
   Ltac inv_step :=
+    idtac;  (* Ltac evaluation order issue when passing tactics *)
     match goal with
     | [ H: op_step _ _ _ _ |- _ ] =>
       inversion H; subst; clear H;
@@ -54,6 +55,7 @@ Module BadSectorDisk.
     end.
 
   Ltac inv_bg :=
+    idtac;  (* Ltac evaluation order issue when passing tactics *)
     match goal with
     | [ H: bg_step _ _ |- _ ] =>
       inversion H; subst; clear H

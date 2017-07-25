@@ -48,7 +48,7 @@ Ltac match_abstraction_for_step :=
   | w : world |- _ => clear w
   end.
 
-Ltac step_high_level_semantics := 
+Ltac step_high_level_semantics :=
   eexists; split; [ constructor | ].
 
 Ltac lift_world :=
@@ -60,5 +60,4 @@ Ltac prog_spec_symbolic_execute inv_bg inv_step :=
 
 Ltac solve_final_state :=
   match_abstraction_for_step;
-  step_high_level_semantics;
-  try assumption.
+  exact I || ( step_high_level_semantics; try assumption ).

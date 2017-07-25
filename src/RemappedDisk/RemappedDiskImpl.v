@@ -63,18 +63,22 @@ Module RemappedDisk.
          recover_impl := Ret tt;
          init_impl := then_init (iInit bd) init; |}.
 
-    Definition remapped_abstraction (bs_state : BadSectorDisk.State) (rd_disk : RemappedDisk.State) : Prop :=
-      let '(BadSectorDisk.mkState bs_disk bs_addr) := bs_state in
-      size bs_disk = size rd_disk + 1 /\
-      (* Fill in the rest of your abstraction here. *)
-      (* Hint 1: What should be true about the non-bad sectors? *)
-      (* Hint 2: What should be true about the bad sector? *)
-      (* Hint 3: What if the bad sector address is the last address? *)
-      (* Hint 4: What if the bad sector address is past the end of the disk? *)
-      (* SOL *)
-      (forall a, a <> bs_addr /\ a <> size rd_disk -> bs_disk a = rd_disk a) /\
-      (bs_addr <> size rd_disk -> bs_disk (size rd_disk) = rd_disk bs_addr) /\
-      bs_addr < size bs_disk.
+    Inductive remapped_abstraction (bs_state : BadSectorDisk.State) (rd_disk : RemappedDisk.State) : Prop :=
+      | RemappedAbstraction :
+        let bs_disk := stateDisk bs_state in
+        let bs_addr := stateBadSector bs_state in
+        forall
+          (Hsize : size bs_disk = size rd_disk + 1)
+          (* Fill in the rest of your abstraction here. *)
+          (* Hint 1: What should be true about the non-bad sectors? *)
+          (* Hint 2: What should be true about the bad sector? *)
+          (* Hint 3: What if the bad sector address is the last address? *)
+          (* Hint 4: What if the bad sector address is past the end of the disk? *)
+          (* SOL *)
+          (Hgoodsec : forall a, a <> bs_addr /\ a <> size rd_disk -> bs_disk a = rd_disk a)
+          (Hremap : bs_addr <> size rd_disk -> bs_disk (size rd_disk) = rd_disk bs_addr)
+          (Hbsok : bs_addr < size bs_disk),
+        remapped_abstraction bs_state rd_disk.
 
     Definition remapped_abstraction_stub (bs_state : BadSectorDisk.State) (rd_disk : RemappedDisk.State) : Prop :=
       (* END *)
@@ -85,126 +89,132 @@ Module RemappedDisk.
         (interface_abs bd)
         {| abstraction := remapped_abstraction |}.
 
+    Ltac invert_abstraction :=
+      match goal with
+      | H : remapped_abstraction _ _ |- _ => inversion H; clear H; subst_var; simpl in *
+      end.
+
     Definition rd : Interface RemappedDisk.API.
       unshelve econstructor.
       - exact impl.
       - exact abstr.
-      - intros.
-        destruct op; unfold op_spec;
-          apply spec_abstraction_compose;
-            unfold spec_impl, remapped_abstraction.
-        + unfold prog_spec; intros.
-          destruct a0; simpl in *; intuition.
-          destruct state.
-          inv_rexec; try cannot_crash.
-          repeat ( exec_steps || inv_bg || inv_step ).
+      - destruct op.
 
-          * eexists; intuition auto. eauto. simpl.
-            exists s. intuition auto.
-            eexists; intuition auto. reflexivity. constructor.
-            rewrite <- H8. rewrite e0.
-            replace (size s + 1 - 1) with (size s) by omega.
-            destruct (v0 == size s); subst.
+        + lift_world.
+          prog_spec_symbolic_execute inv_bg inv_step.
+
+          * solve_final_state.
+            invert_abstraction.
+
             (* SOL *)
-           -- right.
-              apply disk_oob_eq.
-              omega.
-           -- left.
-              rewrite e2; eauto.
+            rewrite Hsize in *.
+            replace (size s + 1 - 1) with (size s) in * by omega.
+
+            destruct (v0 == size s).
+            {
+              right. apply disk_oob_eq. omega.
+            }
+            {
+              left. rewrite <- Hremap; auto.
+            }
             (* END *)
             (* Prove that the read returns the correct result, by relying on facts
              * from your abstraction. *)
             (* STUB: all: pocs_admit. *)
 
-          * exfalso.
-            eapply disk_inbounds_not_none.
-            2: eauto.
+          * solve_final_state.
+            invert_abstraction.
+            exfalso.
+            apply disk_inbounds_not_none with (d := d) (a := size d - 1).
             omega.
+            auto.
 
-          * eexists; intuition auto. eauto. simpl.
-            exists s. intuition auto.
-            eexists; intuition auto. reflexivity. constructor. right.
+          * solve_final_state.
+            invert_abstraction.
+            right.
             apply disk_oob_eq.
             omega.
 
-          * eexists; intuition auto. eauto. simpl.
-            exists s. intuition auto.
-            eexists; intuition auto. reflexivity. constructor.
-            rewrite <- H8.
+          * solve_final_state.
+            invert_abstraction.
+
+            (* SOL *)
             destruct (a == size s); subst.
-            (* SOL *)
-           -- right.
-              apply disk_oob_eq.
-              omega.
-           -- left.
-              rewrite e0; eauto.
+            {
+              right. apply disk_oob_eq. omega.
+            }
+            {
+              left. rewrite <- Hgoodsec; auto.
+            }
             (* END *)
             (* Prove that the read returns the correct result, by relying on facts
              * from your abstraction. *)
             (* STUB: all: pocs_admit. *)
 
-          * eexists; intuition auto. eauto. simpl.
-            exists s. intuition auto.
-            eexists; intuition auto. reflexivity. constructor. right.
+          * solve_final_state.
+            invert_abstraction.
+            right.
             apply disk_oob_eq.
-            apply disk_none_oob in H8. omega.
+            apply disk_none_oob in H7. omega.
 
-          * congruence.
+          * solve_final_state.
+            exfalso.
+            congruence.
 
-        + unfold prog_spec; intros.
-          destruct a0; simpl in *; intuition.
-          destruct state.
-          inv_rexec; try cannot_crash.
-          repeat ( exec_steps || inv_bg || inv_step ).
+        + (* SOL *)
+          lift_world.
+          prog_spec_symbolic_execute inv_bg inv_step.
 
-          (* SOL *)
-          * eexists; intuition auto. eauto. simpl.
-            exists s. intuition auto.
-            eexists; intuition auto. reflexivity.
-            replace s with (diskUpd s (size stateDisk - 1) b) at 2. constructor.
-            apply diskUpd_none. apply disk_oob_eq. omega.
+          * solve_final_state.
+            rewrite diskUpd_none; auto.
 
-          * eexists; intuition auto. eauto. simpl.
-            exists (diskUpd s v1 b). intuition auto.
-            eexists; intuition auto. reflexivity. constructor.
+            invert_abstraction.
+            apply disk_oob_eq. omega.
 
-           -- repeat rewrite diskUpd_size; omega.
+          * solve_final_state.
+            invert_abstraction.
 
-           -- rewrite diskUpd_size in *.
-              rewrite e1. replace (size s + 1 - 1) with (size s) by omega.
-              repeat rewrite diskUpd_neq by congruence. eauto.
+            rewrite Hsize in *.
+            replace (size s + 1 - 1) with (size s) in * by omega.
 
-           -- rewrite e1 in *. replace (size s + 1 - 1) with (size s) in * by omega.
-              rewrite diskUpd_size. rewrite diskUpd_eq by omega.
-              rewrite diskUpd_eq; auto.
-              destruct (eq_nat_dec v1 (size s)); try congruence. omega.
+            constructor; simpl; autorewrite with upd; auto; intros; destruct_ands.
 
-           -- rewrite diskUpd_size. eauto.
+            {
+              repeat rewrite diskUpd_neq by congruence. auto.
+            }
+            {
+              repeat rewrite diskUpd_eq; auto; omega.
+            }
+            {
+              omega.
+            }
 
-          * eexists; intuition auto. eauto. simpl.
-            exists (diskUpd s a b). intuition auto.
-            eexists; intuition auto. reflexivity. constructor.
+          * solve_final_state.
+            invert_abstraction.
 
-           -- repeat rewrite diskUpd_size; omega.
-
-           -- rewrite e0 in *. replace (size s + 1 - 1) with (size s) in * by omega.
-              destruct (a == a1).
-             ++ rewrite e in *.
-                destruct (lt_dec a1 (size d)).
-               ** rewrite diskUpd_eq by auto.
-                  rewrite diskUpd_eq; auto.
-                  destruct (eq_nat_dec a1 (size s)); try congruence. omega.
-               ** rewrite diskUpd_oob_eq by auto.
-                  rewrite diskUpd_oob_eq by omega. auto.
-             ++ repeat rewrite diskUpd_neq by congruence.
-                rewrite diskUpd_size in *. auto.
-
-           -- rewrite e0 in *. replace (size s + 1 - 1) with (size s) in * by omega.
-              rewrite diskUpd_size in *.
-              repeat rewrite diskUpd_neq by congruence.
-              eauto.
-
-           -- rewrite diskUpd_size. eauto.
+            constructor; simpl; autorewrite with upd; auto; intros; destruct_ands.
+            {
+              destruct (a == a0); subst.
+              {
+                destruct (lt_dec a0 (size d)).
+                {
+                  repeat rewrite diskUpd_eq by omega.
+                  auto.
+                }
+                {
+                  repeat rewrite diskUpd_oob_eq by omega.
+                  auto.
+                }
+              }
+              {
+                repeat rewrite diskUpd_neq by omega.
+                auto.
+              }
+            }
+            {
+              repeat rewrite diskUpd_neq by omega.
+              auto.
+            }
           (* END *)
 
           (* Prove that your implementation of write creates a state in which your
@@ -212,53 +222,36 @@ Module RemappedDisk.
            *)
           (* STUB: all: pocs_admit. *)
 
-        + unfold prog_spec; intros.
-          destruct a; simpl in *; intuition.
-          destruct state.
-          inv_rexec; try cannot_crash.
-          repeat ( exec_steps || inv_bg || inv_step ).
-
-          eexists; intuition auto. eauto. simpl.
-          exists s. intuition auto.
-          eexists; intuition auto. reflexivity.
-
-          rewrite H3.
-          replace (size s + 1 - 1) with (size s) in * by omega.
-          constructor.
+        + lift_world.
+          prog_spec_symbolic_execute inv_bg inv_step.
+          solve_final_state.
+          invert_abstraction.
+          omega.
 
       - cannot_crash.
       - eapply then_init_compose; eauto.
+        prog_spec_symbolic_execute inv_bg inv_step.
 
-        unfold prog_spec; intros.
-        destruct a; simpl in *; intuition.
-        destruct state.
-        inv_rexec; try cannot_crash.
-        repeat ( exec_steps || inv_bg || inv_step ).
-
-        + eexists; intuition auto; eauto.
-
-        + eexists; intuition auto; eauto; simpl.
+        + solve_final_state.
+        + match_abstraction_for_step.
           case_eq (d (size d - 1)); intros.
+          * exists (diskUpd (shrink d) v1 b); split; [ | constructor ].
 
-          (* SOL *)
-          * exists (diskUpd (shrink d) v1 b).
-            rewrite diskUpd_size in *.
-            intuition auto.
+            constructor; simpl; autorewrite with upd; auto; intros; destruct_ands.
 
-           -- apply shrink_size. congruence.
-           -- rewrite diskUpd_neq by congruence.
-              apply shrink_preserves. congruence.
-           -- rewrite shrink_size in * by congruence.
-              rewrite diskUpd_eq.
-              replace (size (shrink d) + 1 - 1) with (size (shrink d)) in * by omega.
-              auto.
-              omega.
+            (* SOL *)
+            { omega. }
+            { autorewrite with upd.
+              rewrite shrink_preserves; auto.
+              autorewrite with upd. omega. }
+            { rewrite diskUpd_eq; auto.
+              autorewrite with upd. omega. }
+            (* END *)
+            (* Prove that the init function establishes the abstraction.
+             *)
+            (* STUB: all: pocs_admit. *)
 
-          * apply disk_none_oob in H2. omega.
-          (* END *)
-          (* Prove that the init function establishes the abstraction.
-           *)
-          (* STUB: all: pocs_admit. *)
+          * apply disk_none_oob in H. omega.
 
         + eexists; intuition auto; eauto.
 
