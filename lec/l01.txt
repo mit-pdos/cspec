@@ -4,9 +4,9 @@ L0: Intro reasoning about crashes and failures
   Examples:
     file systems, databases,
     internal software on storage controlers (e.g., SSD)
-  Two kinds of failures:
+  Two kinds:
     crashes (e.g., power failures)
-    devices stops working (e.g., dead disk, dead sector)
+    failures, that is devices stops working (e.g., dead disk, dead sector)
   Assumption: fail-stop
     after failure, computer systems stops immediately
     on crash, computer reboots and one can run repair
