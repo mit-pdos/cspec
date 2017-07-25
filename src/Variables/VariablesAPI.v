@@ -39,12 +39,11 @@ Module Vars.
       op_step (Write VarSum val) state tt (mkState (StateCount state) val).
 
   Definition crash_relation state state' := False.
-  Definition bg_step state state' := state = state'.
   Definition inited state := True.
 
   Definition API : InterfaceAPI Op State :=
     {|
-      op_sem := pre_step bg_step (@op_step);
+      op_sem := @op_step;
       crash_effect := crash_relation;
       init_sem := inited;
     |}.
@@ -56,13 +55,6 @@ Module Vars.
       inversion H; subst; clear H;
       repeat sigT_eq;
       safe_intuition
-    end.
-
-  Ltac inv_bg :=
-    idtac;  (* Ltac evaluation order issue when passing tactics *)
-    match goal with
-    | [ H: bg_step _ _ |- _ ] =>
-      inversion H; subst; clear H
     end.
 
 End Vars.

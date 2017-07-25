@@ -37,8 +37,8 @@ Ltac prog_spec_to_rexec :=
 Ltac rexec_to_exec_finished :=
   inv_rexec; try cannot_crash.
 
-Ltac exec_symex inv_bg inv_step :=
-  repeat ( exec_steps || inv_bg || inv_step ).
+Ltac exec_symex inv_step :=
+  repeat ( exec_steps || inv_step ).
 
 Ltac match_abstraction_for_step :=
   match goal with
@@ -56,10 +56,10 @@ Ltac step_high_level_semantics :=
 Ltac lift_world :=
   apply spec_abstraction_compose.
 
-Ltac prog_spec_symbolic_execute inv_bg inv_step :=
+Ltac prog_spec_symbolic_execute inv_step :=
   prog_spec_to_rexec;
   rexec_to_exec_finished;
-  exec_symex inv_bg inv_step.
+  exec_symex inv_step.
 
 Ltac solve_final_state :=
   match_abstraction_for_step;

@@ -137,7 +137,7 @@ Implement and prove [add]
 
   proof:
       lift_world.
-      prog_spec_symbolic_execute inv_bg inv_step.
+      prog_spec_symbolic_execute inv_step.
       solve_final_state.
 
       unfold statdb_abstraction in *.
