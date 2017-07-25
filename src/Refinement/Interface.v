@@ -244,11 +244,14 @@ Proof.
     congruence.
 Qed.
 
+Ltac case_destruct cond :=
+  destruct cond eqn:?; subst; simpl in *.
+
 Ltac exec_step :=
   match goal with
     | H: exec (Prim _ _) _ _ |- _ => eapply RExec in H
-    | H: exec (if ?cond then _ else _) _ _ |- _ => destruct cond
-    | H: exec (match ?expr with _ => _ end) _ _ |- _ => case_eq expr; intros; subst; simpl in *
+    | H: exec (if ?cond then _ else _) _ _ |- _ => case_destruct cond
+    | H: exec (match ?expr with _ => _ end) _ _ |- _ => case_destruct expr
     | H: rexec _ _ _ _ |- _ => eapply impl_ok in H; [ | eassumption | solve [ simpl; eauto ] ]
     end || inv_ret || inv_exec.
 
