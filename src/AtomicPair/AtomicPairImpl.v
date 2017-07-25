@@ -107,7 +107,11 @@ Module AtomicPair.
                      rewrite diskUpd_neq by congruence ).
             intuition auto.
 
-      - cannot_crash.
+      - unfold rec_noop; intros.
+        lift_world.
+        prog_spec_symbolic_execute inv_step.
+        solve_final_state; intuition eauto.
+
       - eapply then_init_compose; eauto.
         prog_spec_symbolic_execute inv_step.
 
