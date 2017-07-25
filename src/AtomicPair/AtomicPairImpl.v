@@ -51,7 +51,7 @@ Module AtomicPair.
 
     Definition impl : InterfaceImpl AtomicPair.Op :=
       {| op_impl := ap_op_impl;
-         recover_impl := Ret tt;
+         recover_impl := irec d;
          init_impl := then_init (iInit d) init; |}.
 
     Definition atomic_pair_abstraction (ds : OneDisk.State) (ps : AtomicPair.State) : Prop :=
@@ -71,6 +71,47 @@ Module AtomicPair.
       - destruct op.
 
         + lift_world.
+
+          (* first read of the pointer *)
+          eapply prog_spec_rx; [ apply impl_ok | ].
+          intro x; destruct x; simpl; intros.
+
+          exists tt; intuition auto.
+
+          2: unfold crash_relation, OneDisk.crash_relation in *; subst; repeat deex; repeat inv_step; eexists; intuition auto.
+          2: unfold crash_relation, OneDisk.crash_relation in *; subst; repeat deex; repeat inv_step; eexists; intuition auto.
+
+          (* branch on the if statement *)
+          destruct (r == block0); subst.
+
+          (* first read on the block0 branch *)
+          eapply prog_spec_rx; [ apply impl_ok | ].
+          simpl; intros.
+
+          exists tt; intuition auto.
+
+          2: unfold crash_relation, OneDisk.crash_relation in *; subst; repeat deex; repeat inv_step; eexists; intuition auto.
+          2: unfold crash_relation, OneDisk.crash_relation in *; subst; repeat deex; repeat inv_step; eexists; intuition auto.
+
+          (* second read on the block0 branch *)
+          eapply prog_spec_rx; [ apply impl_ok | ].
+          simpl; intros.
+
+          exists tt; intuition auto.
+
+          2: unfold crash_relation, OneDisk.crash_relation in *; subst; repeat deex; repeat inv_step; eexists; intuition auto.
+          2: unfold crash_relation, OneDisk.crash_relation in *; subst; repeat deex; repeat inv_step; eexists; intuition auto.
+
+          (* return on the block0 branch *)
+          eapply ret_spec.
+          eapply ret_rec_ok.
+          simpl; intros; intuition auto.
+
+          eexists; split; [ constructor | ].
+
+          (* doable but messy... *)
+
+
           prog_spec_symbolic_execute inv_step.
 
           all: pose block0_block1_differ.
