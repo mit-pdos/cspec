@@ -11,8 +11,8 @@ draw refinement diagram
     No proof
 
 Abstraction function
-  draw picture of abstract disk and concrete disk
-    concrete disk has one more block
+  draw picture of spec disk and code disk
+    code disk has one more block
   What should be true about the non-bad sectors?
     value should be equal
   What should be true about the bad sector?
