@@ -36,6 +36,10 @@ Things to clean up:
 
 - point to where various pieces are defined (e.g., Interface, API, etc)
 
+- remapped disk lab:
+  + explain what's with None vs Some x: in-bounds vs out-of-bounds.
+  + what happens to the bad sector?  it's (Some x) for a garbage value x.
+
 ===
 
 So, on a mac

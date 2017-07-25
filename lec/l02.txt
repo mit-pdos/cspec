@@ -22,6 +22,11 @@ Abstraction function
   What if the bad sector address is past the end of the disk?
     disallow, and check during initialization
 
+  Explain what's with None vs Some x
+    in-bounds vs out-of-bounds
+  What happens to the bad sector?
+    It's (Some x) for a garbage value x.
+
 Prove read
   symbolic execution results in 6 states :(
     d is real disk
