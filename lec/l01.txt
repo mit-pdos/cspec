@@ -48,7 +48,7 @@ L0: Intro reasoning about crashes and failures
 demo of replicated disk
   [ run everything as root ]
   ./bin/replicate-nbd init
-  ./bin/replicate-nbd start
+  ./bin/replicate-nbd start &
 
   modprobe nbd
   nbd-client localhost /dev/nbd0
