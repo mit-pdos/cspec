@@ -158,7 +158,10 @@ Module RemappedDisk.
             exfalso.
             congruence.
 
-        + (* SOL *)
+        + (* Prove that your implementation of write creates a state in which your
+           * abstraction holds.
+           *)
+          (* SOL *)
           lift_world.
           prog_spec_symbolic_execute inv_bg inv_step.
 
@@ -213,10 +216,6 @@ Module RemappedDisk.
               auto.
             }
           (* END *)
-
-          (* Prove that your implementation of write creates a state in which your
-           * abstraction holds.
-           *)
           (* STUB: all: pocs_admit. *)
 
         + lift_world.

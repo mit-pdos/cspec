@@ -11,10 +11,10 @@ Module BadSectorDisk.
 
   Definition badsector_op_impl T (op: Op T) : prog T :=
     match op with
-    | Read a => hs_read a
-    | Write a b => hs_write a b
+    | BadRead a => hs_read a
+    | BadWrite a b => hs_write a b
     | GetBadSector => hs_getBadSector
-    | DiskSize => hs_diskSize
+    | BadDiskSize => hs_diskSize
     end.
 
   Definition impl : InterfaceImpl Op :=
