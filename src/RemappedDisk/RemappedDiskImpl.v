@@ -68,7 +68,6 @@ Module RemappedDisk.
         let bs_disk := stateDisk bs_state in
         let bs_addr := stateBadSector bs_state in
         forall
-          (Hsize : size bs_disk = size rd_disk + 1)
           (* Fill in the rest of your abstraction here. *)
           (* Hint 1: What should be true about the non-bad sectors? *)
           (* Hint 2: What should be true about the bad sector? *)
@@ -77,12 +76,10 @@ Module RemappedDisk.
           (* SOL *)
           (Hgoodsec : forall a, a <> bs_addr /\ a <> size rd_disk -> bs_disk a = rd_disk a)
           (Hremap : bs_addr <> size rd_disk -> bs_disk (size rd_disk) = rd_disk bs_addr)
-          (Hbsok : bs_addr < size bs_disk),
+          (Hbsok : bs_addr < size bs_disk)
+          (* END *)
+          (Hsize : size bs_disk = size rd_disk + 1),
         remapped_abstraction bs_state rd_disk.
-
-    Definition remapped_abstraction_stub (bs_state : BadSectorDisk.State) (rd_disk : RemappedDisk.State) : Prop :=
-      (* END *)
-      True.
 
     Definition abstr : Abstraction RemappedDisk.State :=
       abstraction_compose
@@ -237,10 +234,9 @@ Module RemappedDisk.
           case_eq (d (size d - 1)); intros.
           * exists (diskUpd (shrink d) v1 b); split; [ | constructor ].
 
-            constructor; simpl; autorewrite with upd; auto; intros; destruct_ands.
+            constructor; simpl; autorewrite with upd; auto; intros; destruct_ands; try omega.
 
             (* SOL *)
-            { omega. }
             { autorewrite with upd.
               rewrite shrink_preserves; auto.
               autorewrite with upd. omega. }
