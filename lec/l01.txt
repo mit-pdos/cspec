@@ -17,8 +17,8 @@ L0: Intro reasoning about crashes and failures
     -> Block is marked allocated, but isn't in use
     -> Block is part of a file, but not marked allocated
   Storage runs concurrent with program
-    While operation is in progress storage fails
-    E.g., update one disk, but fail to update second disk
+    Programs sends several disk request to disk, disk works on them
+    After disk failure, which requests have been processed?
   Storage devices are slower than main memory
     Many complex optimizations to avoid disks writes
     Complexity leads to more opportunities for problems
