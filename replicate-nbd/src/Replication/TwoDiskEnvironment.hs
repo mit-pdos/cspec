@@ -36,7 +36,7 @@ getFd (fn, Just fd) = do
   exists <- doesFileExist fn
   if exists
     then return (Just fd)
-    else closeFd fd >> return Nothing
+    else return Nothing
 
 disk0 :: Env -> IO (Maybe Fd)
 disk0 = getFd . disk0Handle
