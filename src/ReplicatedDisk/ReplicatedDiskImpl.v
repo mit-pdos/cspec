@@ -1023,40 +1023,25 @@ Module RD.
                post :=
                  fun r state' =>
                    r = tt /\
-                   (* Fill in the postcondition for write; just a copy
-                    * of [Write_ok]'s postcondition *)
-                   (* SOL *)
                    TD.disk0 state' ?|= eq (diskUpd d a b) /\
                    TD.disk1 state' ?|= eq (diskUpd d a b);
-                   (* END *)
-                   (* STUB: True; *)
                recover :=
                  fun _ state' =>
-                   (* Fill in the recovery condition for write AFTER our recovery.
-                    *)
-                   (* SOL *)
-                   (TD.disk0 state' ?|= eq d /\
+                    (TD.disk0 state' ?|= eq d /\
                     TD.disk1 state' ?|= eq d) \/
                    (TD.disk0 state' ?|= eq (diskUpd d a b) /\
                     TD.disk1 state' ?|= eq (diskUpd d a b));
-                   (* END *)
-                   (* STUB: True; *)
-             |})
+              |})
           (Write a b) (_ <- irec td; Recover)
           (interface_abs td).
     Proof.
       start.
       rename a0 into d.
-
-      (* Fill in your proof here. *)
-      (* SOL *)
       descend; (intuition eauto); simplify.
       - exists d, FullySynced; intuition eauto.
       - exists d, (OutOfSync a b); intuition eauto.
       - exists (diskUpd d a b), FullySynced; intuition eauto.
-      (* END *)
-      (* STUB: pocs_admit. *)
-    Qed.
+     Qed.
 
     Theorem DiskSize_rok :
       prog_spec
