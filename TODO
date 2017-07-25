@@ -19,3 +19,27 @@ Things to clean up:
 - lab for POCS: 1 disk, but update two sectors atomically
 
 - minimal NBD client that reads/writes sectors, to test/demo remap-nbd with broken write
+
+- explain haskell extraction more, how the pieces fit together
+
+- explain correspondence of tactics to commutative diagram:
+  symbolic execution goes across
+  prove_final_state goes up to the spec layer
+
+- explain how symbolic execution works
+
+- better story for what's going on with the [world] business
+
+- see notes below from Perry Metzger about how to run stack on a Mac
+
+===
+
+So, on a mac
+ 
+(1) you must have Xcode installed from the app store to get the haskell bits working. (If you don’t have XCode already installed, you’ll need Sierra (10.12) to get it.)
+
+(2) Download ghc 8.0.2 “core” from https://www.haskell.org/platform/mac.html
+
+(3) Run “stack config set system-ghc --global true” then “stack setup”. Then you can run make on the repository successfully.
+￼
+If you have already installed GHC via homebrew, step (3) is sufficient to run make.
