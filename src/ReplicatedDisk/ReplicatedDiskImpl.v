@@ -1070,7 +1070,7 @@ Module RD.
 
     Hint Resolve Read_rok Write_rok DiskSize_rok Recover_rok.
 
-    (* END *) 
+    (* END *)
 
     (* Now we gather up the implementation and all the correctness proofs,
      * expressing them in terms of the high-level API in D.API. *)
@@ -1245,39 +1245,43 @@ Module RD.
       - exact impl.
       - exact rd_abstraction.
       - intros.
+       (* SOL *)
         destruct op; unfold op_spec;
           apply spec_abstraction_compose;
           eapply prog_spec_weaken; eauto;
             unfold spec_impl, rd_layer_abstraction; simplify.
         + exists (abstraction_f state); (intuition eauto); simplify; finish.
         + exists (abstraction_f state); (intuition eauto); simplify; finish.
-          (* SOL *)
           exists (abstraction_f state'); intuition eauto.
           right; descend; intuition eauto.
-          (* END *)
-          (* STUB: all: pocs_admit. *)
         + exists (abstraction_f state); (intuition eauto); simplify.
           descend; intuition eauto.
           descend; intuition eauto.
-      - (* SOL *)
+        (* END *)
+        (* STUB: all: pocs_admit. *)
+      - 
+        (* SOL *)
         eapply rec_noop_compose; eauto; simpl.
         unfold TD.wipe, rd_layer_abstraction, Recover_spec; simplify.
         exists (abstraction_f state0), FullySynced; intuition eauto.
         descend; intuition eauto.
         (* END *)
         (* STUB: all: pocs_admit. *)
-
-      - eapply then_init_compose; eauto.
+      - 
+        (* SOL *)
+        eapply then_init_compose; eauto.
         eapply prog_spec_weaken; unfold spec_impl; simplify.
         eauto.
-        (* SOL *)
         pose proof (state_some_disks state); simplify.
         descend; intuition eauto.
         destruct v; simplify; finish.
+        (* END *)
+        (* STUB: all: pocs_admit. *)
 
         Grab Existential Variables.
         all: auto.
-        (* END *)
+
+
         (* STUB: all: pocs_admit. *)
     Defined.
 
