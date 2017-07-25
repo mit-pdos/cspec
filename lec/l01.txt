@@ -75,51 +75,66 @@ Verification approach: state machine and simulation
   standard 2-layer diagram
   See chapter 6 and 8 of [http://bwlampson.site/48-POCScourse/48-POCS2006.pdf]
 
-    state machine: state + transitions
-    two state machines:
-      spec state machine (the spec)
-      code state machine (the implementation)
-    abstraction function
-    initial state
-    proofs: back-ward simulation
+  state machine: state + transitions + initial states
+  refinement: two state machines
+    spec state machine (the spec)
+    code state machine (the code / implementation)
+  abstraction function / relation
+  proof: backward simulation
+    every execution in the implementation (code) corresponds to
+      an allowed execution in the spec
+    and initial states line up
 
-* Example: StatDB (chapter 8)
-  StatDB
-  spec state machine:
+Example: StatDB (chapter 8)
+  specification
     state:
       db: multiset of all values (ints) written to data db
     transistions:
-      add: adds value
-      size: size of set
-      mean: add all value and divide by size
+      add: adds a new value to the multiset
+      mean: return the average of all values in the multiset
+    initial state: empty multiset
   code state machine:
     state:
-     sum: sum of values added so far
-     count: number of values
-    transitions: add, size, and mean
-  proof: backward simulation
-    from implementation to spec:
-      initial states line up
-      for each transition of implementation, there exists a corresponding spec transition
+      sum: sum of values added so far
+      count: number of values
+    transitions: add, mean
+    initial state: zero sum and count
+  abstraction: relate sum and count variables to the spec multiset
+  proof: backward simulation, from implementation to spec
+    initial states line up
+    for each transition of implementation, there exists a corresponding spec transition
 
-* StatDB in Coq
+StatDB in Coq
   Refinement
   Exec
   Variables
 
-* Implement and proof [add]
+Implement and prove [add]
+  add:
+      sum <- Prim vars (Read VarSum);
+      count <- Prim vars (Read VarCount);
+      _ <- Prim vars (Write VarSum (sum + v));
+      _ <- Prim vars (Write VarCount (count + 1));
+      Ret tt.
 
-* Exercise: implement and proof [mean]
+  proof:
+      lift_world.
+      prog_spec_symbolic_execute inv_bg inv_step.
+      solve_final_state.
+
+      unfold statdb_abstraction in *.
+      simpl in *.
+      intuition auto.
+      omega.
+      omega.
+
+Exercise: implement and prove [mean]
+  git clone https://github.com/mit-pdos/deepspec-pocs
   Install stack & build
-  Implement mean and run
+  Implement mean and run ./bin/statdb-cli
   Prove mean
 
 * Homework: remapping disk
   Disks instead of Variables
   Your goal: abstraction function and proof ...
   Do demo of not working
-  
-  
-
-
-    
