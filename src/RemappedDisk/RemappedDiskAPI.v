@@ -23,7 +23,6 @@ Module RemappedDisk.
       step DiskSize d r d.
 
   Definition crash_relation state state' := False.
-  Definition bg_step state state' := state = state'.
   Definition inited state := True.
 
   Definition API : InterfaceAPI Op State :=
