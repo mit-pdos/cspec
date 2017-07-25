@@ -14,6 +14,10 @@ CODE += $(wildcard src/BadSectorDisk/*.v)
 CODE += $(wildcard src/RemappedDisk/*.v)
 CODE += $(wildcard src/NBD/*.v)
 
+## For atomic pair lab
+CODE += $(wildcard src/OneDisk/*.v)
+CODE += $(wildcard src/AtomicPair/*.v)
+
 ## For disk mirroring lab
 CODE += $(wildcard src/TwoDisk/*.v)
 CODE += $(wildcard src/ReplicatedDisk/*.v)

@@ -23,6 +23,8 @@ Parameter bytes : nat -> Type.
 Parameter bytes_dec : forall n, EqualDec (bytes n).
 
 Axiom bytes0 : forall n, bytes n.
+Axiom bytes1 : forall n, bytes (S n).
+Axiom bytes_differ : forall n, bytes0 (S n) <> bytes1 n.
 
 Definition bnull : bytes 0 := bytes0 0.
 

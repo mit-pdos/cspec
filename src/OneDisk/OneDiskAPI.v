@@ -34,4 +34,13 @@ Module OneDisk.
       init_sem := inited;
     |}.
 
+  Ltac inv_step :=
+    idtac;  (* Ltac evaluation order issue when passing tactics *)
+    match goal with
+    | [ H: op_step _ _ _ _ |- _ ] =>
+      inversion H; subst; clear H;
+      repeat sigT_eq;
+      safe_intuition
+    end.
+
 End OneDisk.
