@@ -42,6 +42,8 @@ L0: Intro reasoning about crashes and failures
     deals with one bad sector
   verified replicated disks
     deals with device failures
+
+===
     
 * demo of replicated disk
     pull out a disk
