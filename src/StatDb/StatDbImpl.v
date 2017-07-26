@@ -41,15 +41,27 @@ Module StatDB.
       {| abstraction := statdb_abstraction |}.
 
 
-  Theorem add_ok : forall v,
-    prog_spec
+  Definition add_spec v : Specification unit unit unit State :=
       (fun (_ : unit) state => {|
         pre := True;
         post := fun r state' =>
           r = tt /\ state' = v :: state;
         recover := fun _ _ => False
-      |})
-      (add v) statdb_recover abstr.
+      |}).
+
+  Definition mean_spec : Specification unit (option nat) unit State :=
+      (fun (_ : unit) state => {|
+        pre := True;
+        post := fun r state' =>
+          state' = state /\
+          (state = nil /\ r = None \/
+           state <> nil /\ r = Some (fold_right plus 0 state / length state));
+        recover := fun _ _ => False
+      |}).
+
+
+  Theorem add_ok : forall v,
+    prog_spec (add_spec v) (add v) statdb_recover abstr.
   Proof.
     unfold add.
     intros.
@@ -82,16 +94,7 @@ Module StatDB.
   Qed.
 
   Theorem mean_ok :
-    prog_spec
-      (fun (_ : unit) state => {|
-        pre := True;
-        post := fun r state' =>
-          state' = state /\
-          (state = nil /\ r = None \/
-           state <> nil /\ r = Some (fold_right plus 0 state / length state));
-        recover := fun _ _ => False
-      |})
-      mean statdb_recover abstr.
+    prog_spec mean_spec mean statdb_recover abstr.
   Proof.
     unfold mean.
     intros.
@@ -111,7 +114,7 @@ Module StatDB.
       2: unfold wipe in *; intuition.
 
       unfold statdb_abstraction in *.
-      destruct l; intuition; simpl in *; try congruence.
+      destruct s; intuition; simpl in *; try congruence.
       exists nil; intuition auto.
 
     - step_prog; intros.
@@ -124,7 +127,7 @@ Module StatDB.
       2: unfold wipe in *; intuition.
 
       unfold statdb_abstraction in *.
-      destruct l; intuition.
+      destruct s; intuition.
 
       eexists; intuition auto.
       right.
