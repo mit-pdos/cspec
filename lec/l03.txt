@@ -6,26 +6,27 @@ L3: Recovery
 
 Crashes & recovery
 
-  What happens when a computer crashes
+  What happens when a computer crashes?
     Stops
     Reboot
     Runs recovery
     Start serving request again
 
-  What do we need recovery?
+  Why do we need recovery?
     Consider replicated disk without recovery
     Consider write
-      if we crash between two disk updates,
-      the disks are out of sync.
-    Consider two back-to-back reads of out-of-sync block
+      if computer crashes between two disk updates, the disks are out of sync
+    Now consider two back-to-back reads of out-of-sync block
       first read returns value of first disk
       first disk fails
       second read returns different value
       --> Not allowed by spec
+      --> Recovery provides a way to repair disks so that we can serve requests
+        that obey spec
 
    Computer may crash during recovery
      Recovery function must be idempotent
-     That is, we can run it over and over
+     That is, it must be ok to run it over and over
  
 How do we model this?
   Draw state diagram
@@ -37,10 +38,11 @@ How do we model this?
     Crashes during recovery
       Every state can invoke recovery again!
 
-   Result: infinite many executions
+   Result: infinite many code paths
      Need: a loop invariant
      Observation: exploit idempotence of recovery procedure
        Its crash condition must imply its precondition
+       Collapses many code paths
 
 Example: replicated disk
    What is the crash condition?
