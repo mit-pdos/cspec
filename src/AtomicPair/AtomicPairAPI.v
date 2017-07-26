@@ -1,31 +1,40 @@
 Require Import POCS.
 
-Module AtomicPair.
 
-  Inductive Op : Type -> Type :=
-  | Get : Op (block*block)
-  | Put (p : block*block) : Op unit.
+Definition State : Type := block*block.
 
-  Definition State : Type := block*block.
+Definition get_spec : Specification unit (block*block) unit State :=
+  fun (_ : unit) state => {|
+    pre := True;
+    post := fun r state' => r = state;
+    recover := fun _ _ => False
+  |}.
 
-  (* help out type inference *)
-  Implicit Type (state:State).
+Definition put_spec v : Specification unit unit unit State :=
+  fun (_ : unit) state => {|
+    pre := True;
+    post := fun r state' => r = tt /\ state' = v;
+    recover := fun _ _ => False
+  |}.
 
-  Inductive step : forall `(op: Op T), Semantics State T :=
-  | step_get : forall s r,
-      s = r ->
-      step (Get) s r s
-  | step_put : forall s v,
-      step (Put v) s tt v.
+Definition wipe (state state' : State) := False.
 
-  Definition crash_relation state state' := state' = state.
-  Definition inited state := True.
 
-  Definition API : InterfaceAPI Op State :=
-    {|
-      op_sem := @step;
-      crash_effect := crash_relation;
-      init_sem := inited;
-    |}.
+Module Type AtomicPairAPI.
 
-End AtomicPair.
+  Parameter init : prog InitResult.
+  Parameter get : prog (block*block).
+  Parameter put : block*block -> prog unit.
+  Parameter recover : prog unit.
+
+  Parameter abstr : Abstraction State.
+
+  Axiom get_ok : prog_spec get_spec get recover abstr.
+  Axiom put_ok : forall v, prog_spec (put_spec v) (put v) recover abstr.
+  Axiom recover_noop : rec_noop recover abstr wipe.
+
+  Hint Resolve get_ok.
+  Hint Resolve put_ok.
+  Hint Resolve recover_noop.
+
+End AtomicPairAPI.

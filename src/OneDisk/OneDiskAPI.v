@@ -31,7 +31,7 @@ Definition diskSize_spec : Specification _ nat unit State :=
 Definition wipe (state state' : State) := False.
 
 
-Module Type RemappedDiskAPI.
+Module Type OneDiskAPI.
 
   Parameter init : prog InitResult.
   Parameter read : addr -> prog block.
@@ -51,4 +51,4 @@ Module Type RemappedDiskAPI.
   Hint Resolve diskSize_ok.
   Hint Resolve recover_noop.
 
-End RemappedDiskAPI.
+End OneDiskAPI.

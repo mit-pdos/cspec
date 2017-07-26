@@ -2,182 +2,172 @@ Require Import POCS.
 Require Import AtomicPair.AtomicPairAPI.
 Require Import OneDisk.OneDiskAPI.
 
-Import OneDisk.
-Import AtomicPair.
 
-Module AtomicPair.
+Module AtomicPair (d : OneDiskAPI) <: AtomicPairAPI.
 
-  Section Implementation.
+  Definition get : prog (block*block) :=
+    ptr <- d.read 0;
+    if ptr == block0 then
+      a <- d.read 1;
+      b <- d.read 2;
+      Ret (a, b)
+    else
+      a <- d.read 3;
+      b <- d.read 4;
+      Ret (a, b).
 
-    Variable (d : Interface OneDisk.API).
+  Definition put (p : block*block) : prog unit :=
+    ptr <- d.read 0;
+    if ptr == block0 then
+      _ <- d.write 3 (fst p);
+      _ <- d.write 4 (snd p);
+      _ <- d.write 0 block1;
+      Ret tt
+    else
+      _ <- d.write 1 (fst p);
+      _ <- d.write 2 (snd p);
+      _ <- d.write 0 block0;
+      Ret tt.
 
-    Definition get : prog (block*block) :=
-      ptr <- Prim d (Read 0);
-      if ptr == block0 then
-        a <- Prim d (Read 1);
-        b <- Prim d (Read 2);
-        Ret (a, b)
-      else
-        a <- Prim d (Read 3);
-        b <- Prim d (Read 4);
-        Ret (a, b).
+  Definition init : prog InitResult :=
+    len <- d.diskSize;
+    if len == 5 then
+      _ <- d.write 0 block0;
+      Ret Initialized
+    else
+      Ret InitFailed.
 
-    Definition put (p : block*block) : prog unit :=
-      ptr <- Prim d (Read 0);
-      if ptr == block0 then
-        _ <- Prim d (Write 3 (fst p));
-        _ <- Prim d (Write 4 (snd p));
-        _ <- Prim d (Write 0 block1);
-        Ret tt
-      else
-        _ <- Prim d (Write 1 (fst p));
-        _ <- Prim d (Write 2 (snd p));
-        _ <- Prim d (Write 0 block0);
-        Ret tt.
-
-    Definition ap_op_impl T (op: AtomicPair.Op T) : prog T :=
-      match op with
-      | Get => get
-      | Put p => put p
-      end.
-
-    Definition init : prog InitResult :=
-      len <- Prim d (DiskSize);
-      if len == 5 then
-        _ <- Prim d (Write 0 block0);
-        Ret Initialized
-      else
-        Ret InitFailed.
-
-    Definition impl : InterfaceImpl AtomicPair.Op :=
-      {| op_impl := ap_op_impl;
-         recover_impl := irec d;
-         init_impl := then_init (iInit d) init; |}.
-
-    Definition atomic_pair_abstraction (ds : OneDisk.State) (ps : AtomicPair.State) : Prop :=
-      size ds = 5 /\
-      (ds 0 = Some block0 /\ ds 1 = Some (fst ps) /\ ds 2 = Some (snd ps) \/
-       ds 0 = Some block1 /\ ds 3 = Some (fst ps) /\ ds 4 = Some (snd ps)).
-
-    Definition abstr : Abstraction AtomicPair.State :=
-      abstraction_compose
-        (interface_abs d)
-        {| abstraction := atomic_pair_abstraction |}.
-
-    Definition ap : Interface AtomicPair.API.
-      unshelve econstructor.
-      - exact impl.
-      - exact abstr.
-      - destruct op.
-
-        + lift_world.
-
-          (* first read of the pointer *)
-          eapply prog_spec_rx; [ apply impl_ok | ].
-          intro x; destruct x; simpl; intros.
-
-          exists tt; intuition auto.
-
-          2: unfold crash_relation, OneDisk.crash_relation in *; subst; repeat deex; repeat inv_step; eexists; intuition auto.
-          2: unfold crash_relation, OneDisk.crash_relation in *; subst; repeat deex; repeat inv_step; eexists; intuition auto.
-
-          (* branch on the if statement *)
-          destruct (r == block0); subst.
-
-          (* first read on the block0 branch *)
-          eapply prog_spec_rx; [ apply impl_ok | ].
-          simpl; intros.
-
-          exists tt; intuition auto.
-
-          2: unfold crash_relation, OneDisk.crash_relation in *; subst; repeat deex; repeat inv_step; eexists; intuition auto.
-          2: unfold crash_relation, OneDisk.crash_relation in *; subst; repeat deex; repeat inv_step; eexists; intuition auto.
-
-          (* second read on the block0 branch *)
-          eapply prog_spec_rx; [ apply impl_ok | ].
-          simpl; intros.
-
-          exists tt; intuition auto.
-
-          2: unfold crash_relation, OneDisk.crash_relation in *; subst; repeat deex; repeat inv_step; eexists; intuition auto.
-          2: unfold crash_relation, OneDisk.crash_relation in *; subst; repeat deex; repeat inv_step; eexists; intuition auto.
-
-          (* return on the block0 branch *)
-          eapply ret_spec.
-          eapply ret_rec_ok.
-          simpl; intros; intuition auto.
-
-          eexists; split; [ constructor | ].
-
-          (* doable but messy... *)
+  Definition recover : prog unit :=
+    d.recover.
 
 
-          prog_spec_symbolic_execute inv_step.
+  Definition atomic_pair_abstraction (ds : OneDiskAPI.State) (ps : AtomicPairAPI.State) : Prop :=
+    size ds = 5 /\
+    (ds 0 = Some block0 /\ ds 1 = Some (fst ps) /\ ds 2 = Some (snd ps) \/
+     ds 0 = Some block1 /\ ds 3 = Some (fst ps) /\ ds 4 = Some (snd ps)).
 
-          all: pose block0_block1_differ.
-          all: unfold atomic_pair_abstraction in *; intuition auto.
-          all: try solve [ exfalso; eapply disk_inbounds_not_none; eauto; omega ].
-          all: try congruence.
+  Definition abstr : Abstraction AtomicPairAPI.State :=
+    abstraction_compose d.abstr {| abstraction := atomic_pair_abstraction |}.
 
-          * solve_final_state.
+  Ltac invert_abstraction :=
+    match goal with
+    | H : atomic_pair_abstraction _ _ |- _ => inversion H; clear H; subst_var; simpl in *
+    end.
 
-            destruct s; simpl in *; congruence.
-            intuition congruence.
 
-          * solve_final_state.
+  Theorem get_ok : prog_spec get_spec get recover abstr.
+  Proof.
+    unfold get.
+    intros.
 
-            destruct s; simpl in *; congruence.
-            intuition congruence.
+    apply spec_abstraction_compose; simpl.
 
-        + lift_world.
-          prog_spec_symbolic_execute inv_step.
+    step_prog; intros.
+    destruct a'; simpl in *; intuition idtac.
+    exists tt; simpl; intuition idtac.
 
-          all: pose block0_block1_differ.
-          all: unfold atomic_pair_abstraction in *; intuition auto.
-          all: try congruence.
+    destruct (r == block0).
+    - step_prog; intros.
+      exists tt; simpl; intuition idtac.
 
-          * solve_final_state.
-            repeat autorewrite with upd.
-            repeat ( ( rewrite diskUpd_eq by ( repeat rewrite diskUpd_size; omega ) ) ||
-                     rewrite diskUpd_neq by congruence ).
-            intuition auto.
+      step_prog; intros.
+      exists tt; simpl; intuition idtac.
 
-          * solve_final_state.
-            repeat autorewrite with upd.
-            repeat ( ( rewrite diskUpd_eq by ( repeat rewrite diskUpd_size; omega ) ) ||
-                     rewrite diskUpd_neq by congruence ).
-            intuition auto.
+      step_prog; intros.
+      eauto.
 
-      - unfold rec_noop; intros.
-        lift_world.
-        prog_spec_symbolic_execute inv_step.
-        solve_final_state; intuition eauto.
+      simpl in *; intuition subst.
+      2: unfold wipe in *; intuition.
+      eexists. split; eauto. destruct s.
 
-      - eapply then_init_compose; eauto.
-        prog_spec_symbolic_execute inv_step.
+      invert_abstraction; intuition.
+      rewrite H1 in *. rewrite H4 in *. simpl in *; congruence.
+      rewrite H2 in *. simpl in *. pose block0_block1_differ. congruence.
 
-        + case_eq (state' 1); intros; [ | exfalso ].
-          case_eq (state' 2); intros; [ | exfalso ].
+    - step_prog; intros.
+      exists tt; simpl; intuition idtac.
 
-          solve_final_state.
-          autorewrite with upd; auto.
-          repeat ( ( rewrite diskUpd_eq by ( repeat rewrite diskUpd_size; omega ) ) ||
-                   rewrite diskUpd_neq by congruence ).
-          instantiate (1 := (b, b0)).
-          intuition auto.
+      step_prog; intros.
+      exists tt; simpl; intuition idtac.
 
-          eapply disk_inbounds_not_none; eauto; omega.
-          eapply disk_inbounds_not_none; eauto; omega.
+      step_prog; intros.
+      eauto.
 
-        + match_abstraction_for_step; auto.
+      simpl in *; intuition subst.
+      2: unfold wipe in *; intuition.
+      eexists. split; eauto. destruct s.
 
-      Grab Existential Variables.
-      all: eauto.
+      invert_abstraction; intuition.
+      rewrite H2 in *. simpl in *. pose block0_block1_differ. congruence.
+      rewrite H1 in *. rewrite H4 in *. simpl in *; congruence.
+  Qed.
 
-    Defined.
+  Theorem put_ok : forall v, prog_spec (put_spec v) (put v) recover abstr.
+  Proof.
+    unfold put.
+    intros.
 
-  End Implementation.
+    apply spec_abstraction_compose; simpl.
+
+    step_prog; intros.
+    destruct a'; simpl in *; intuition idtac.
+    exists tt; simpl; intuition idtac.
+
+    destruct (r == block0).
+    - step_prog; intros.
+      exists tt; simpl; intuition idtac.
+
+      step_prog; intros.
+      exists tt; simpl; intuition idtac.
+
+      step_prog; intros.
+      exists tt; simpl; intuition idtac.
+
+      step_prog; intros.
+      eauto.
+
+      simpl in *; intuition subst.
+      2: unfold wipe in *; intuition.
+      eexists. split; eauto.
+
+      invert_abstraction; intuition.
+      unfold atomic_pair_abstraction.
+      autorewrite with upd.
+      repeat ( ( rewrite diskUpd_eq by ( repeat rewrite diskUpd_size; omega ) ) ||
+               rewrite diskUpd_neq by congruence ).
+      intuition eauto.
+
+      rewrite H2 in *. simpl in *. pose block0_block1_differ. congruence.
+
+    - step_prog; intros.
+      exists tt; simpl; intuition idtac.
+
+      step_prog; intros.
+      exists tt; simpl; intuition idtac.
+
+      step_prog; intros.
+      exists tt; simpl; intuition idtac.
+
+      step_prog; intros.
+      eauto.
+
+      simpl in *; intuition subst.
+      2: unfold wipe in *; intuition.
+      eexists. split; eauto.
+
+      invert_abstraction; intuition.
+      rewrite H2 in *. simpl in *. pose block0_block1_differ. congruence.
+
+      unfold atomic_pair_abstraction.
+      autorewrite with upd.
+      repeat ( ( rewrite diskUpd_eq by ( repeat rewrite diskUpd_size; omega ) ) ||
+               rewrite diskUpd_neq by congruence ).
+      intuition eauto.
+  Qed.
+
+  Theorem recover_noop : rec_noop recover abstr AtomicPairAPI.wipe.
+  Proof.
+    pocs_admit.
+  Qed.
 
 End AtomicPair.
-
-Print Assumptions AtomicPair.ap.
