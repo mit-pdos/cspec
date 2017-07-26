@@ -2,6 +2,25 @@ L3: Recovery
 
 === Solution of exercise 3
 
+src/ReplicatedDisk/ReplicatedDiskImpl.v
+  work through implementations of Read, DiskSize, DiskSizeInit, init_at, Init
+    what if we didn't initialize?
+    of course our abstraction wouldn't hold, but so what?
+    could someone observe an incorrect behavior at the spec level?
+  walk through the proof of Read_ok
+  discuss Write_ok and write_read_ok specs
+  walk through the proof of DiskSize_ok: same as Read_ok, basically
+  discuss init_at_ok: induction because of fixpoint loop
+  walk through the proof of DiskSizeInit_ok
+    if we do two [step]s in a row, we get an [exists] subgoal
+    automation couldn't figure out how to instantiate the evars for precondition
+    reason: it depends on [r], the result of the first [DiskSize] call
+    [destruct r] first, now [step] can keep going through
+
+Write solution
+
+Write_ok proof
+
 === Recovery
 
 Crashes & recovery
