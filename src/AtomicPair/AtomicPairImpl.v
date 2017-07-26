@@ -270,3 +270,10 @@ Module AtomicPair (d : OneDiskAPI) <: AtomicPairAPI.
   Qed.
 
 End AtomicPair.
+
+
+Require Import BadSectorDisk.BadSectorImpl.
+Require Import RemappedDisk.RemappedDiskImpl.
+Module x := RemappedDisk BadSectorDisk.
+Module y := AtomicPair x.
+Print Assumptions y.put_ok.
