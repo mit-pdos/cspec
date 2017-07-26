@@ -1,67 +1,45 @@
 Require Import POCS.
 Require Import Variables.VariablesAPI.
+Require Import StatDb.StatDbAPI.
 
-Import Vars.
 
-Module StatDB.
+Module StatDB (v : VarsAPI) <: StatDbAPI.
 
   Definition add (v : nat) : prog unit :=
-    sum <- read VarSum;
-    count <- read VarCount;
-    _ <- write VarSum (sum + v);
-    _ <- write VarCount (count + 1);
+    sum <- v.read VarSum;
+    count <- v.read VarCount;
+    _ <- v.write VarSum (sum + v);
+    _ <- v.write VarCount (count + 1);
     Ret tt.
 
   Definition mean : prog (option nat) :=
-    count <- read VarCount;
+    count <- v.read VarCount;
     if count == 0 then
       Ret None
     else
-      sum <- read VarSum;
+      sum <- v.read VarSum;
       Ret (Some (sum / count)).
 
   Definition init : prog InitResult :=
-    _ <- write VarCount 0;
-    _ <- write VarSum 0;
+    _ <- v.write VarCount 0;
+    _ <- v.write VarSum 0;
     Ret Initialized.
 
-  Definition statdb_recover : prog unit :=
-    var_recover.
+  Definition recover : prog unit :=
+    v.recover.
 
 
-  Definition State := list nat.
-
-  Definition statdb_abstraction (vars_state : Vars.State) (statdb_state : StatDB.State) : Prop :=
+  Definition statdb_abstraction (vars_state : VariablesAPI.State) (statdb_state : StatDbAPI.State) : Prop :=
     StateCount vars_state = length statdb_state /\
     StateSum vars_state = fold_right plus 0 statdb_state.
 
-  Definition abstr : Abstraction StatDB.State :=
+  Definition abstr : Abstraction StatDbAPI.State :=
     abstraction_compose
-      Vars.abstr
+      v.abstr
       {| abstraction := statdb_abstraction |}.
 
 
-  Definition add_spec v : Specification unit unit unit State :=
-      (fun (_ : unit) state => {|
-        pre := True;
-        post := fun r state' =>
-          r = tt /\ state' = v :: state;
-        recover := fun _ _ => False
-      |}).
-
-  Definition mean_spec : Specification unit (option nat) unit State :=
-      (fun (_ : unit) state => {|
-        pre := True;
-        post := fun r state' =>
-          state' = state /\
-          (state = nil /\ r = None \/
-           state <> nil /\ r = Some (fold_right plus 0 state / length state));
-        recover := fun _ _ => False
-      |}).
-
-
-  Theorem add_ok : forall v,
-    prog_spec (add_spec v) (add v) statdb_recover abstr.
+  Theorem add_ok : forall v, prog_spec (add_spec v) (add v) recover abstr.
   Proof.
     unfold add.
     intros.
@@ -93,8 +71,7 @@ Module StatDB.
     unfold wipe in *; intuition.
   Qed.
 
-  Theorem mean_ok :
-    prog_spec mean_spec mean statdb_recover abstr.
+  Theorem mean_ok : prog_spec mean_spec mean recover abstr.
   Proof.
     unfold mean.
     intros.
@@ -134,6 +111,16 @@ Module StatDB.
       intuition ( try congruence ).
   Qed.
 
+  Theorem recover_noop : rec_noop recover abstr wipe.
+  Proof.
+    pocs_admit.
+
+    (* XXX something involving [rec_noop_compose] *)
+  Qed.
+
 End StatDB.
 
-Print Assumptions StatDB.add_ok.
+
+Require Import VariablesImpl.
+Module x := StatDB Vars.
+Print Assumptions x.add_ok.
