@@ -65,19 +65,22 @@ Module AtomicPair (d : OneDiskAPI) <: AtomicPairAPI.
     step_prog; intros.
     destruct a'; simpl in *; intuition idtac.
     exists tt; simpl; intuition idtac.
+    2: unfold wipe in *; simpl in *; intuition subst; eauto.
 
     destruct (r == block0).
     - step_prog; intros.
       exists tt; simpl; intuition idtac.
+      2: unfold wipe in *; simpl in *; intuition subst; eauto.
 
       step_prog; intros.
       exists tt; simpl; intuition idtac.
+      2: unfold wipe in *; simpl in *; intuition subst; eauto.
 
       step_prog; intros.
       eauto.
 
       simpl in *; intuition subst.
-      2: unfold wipe in *; intuition.
+      2: unfold wipe in *; simpl in *; intuition subst; eauto.
       eexists. split; eauto. destruct s.
 
       invert_abstraction; intuition.
@@ -86,21 +89,100 @@ Module AtomicPair (d : OneDiskAPI) <: AtomicPairAPI.
 
     - step_prog; intros.
       exists tt; simpl; intuition idtac.
+      2: unfold wipe in *; simpl in *; intuition subst; eauto.
 
       step_prog; intros.
       exists tt; simpl; intuition idtac.
+      2: unfold wipe in *; simpl in *; intuition subst; eauto.
 
       step_prog; intros.
       eauto.
 
       simpl in *; intuition subst.
-      2: unfold wipe in *; intuition.
+      2: unfold wipe in *; simpl in *; intuition subst; eauto.
       eexists. split; eauto. destruct s.
 
       invert_abstraction; intuition.
       rewrite H2 in *. simpl in *. pose block0_block1_differ. congruence.
       rewrite H1 in *. rewrite H4 in *. simpl in *; congruence.
   Qed.
+
+
+  Lemma atomic_pair_abstraction_diskUpd12 : forall state s a v,
+    (a = 1 \/ a = 2) ->
+    atomic_pair_abstraction state s ->
+    state 0 ?|= eq block1 ->
+    atomic_pair_abstraction (diskUpd state a v) s.
+  Proof.
+    unfold atomic_pair_abstraction; intros.
+    repeat rewrite diskUpd_neq by ((intuition congruence) || (intuition omega)).
+    repeat rewrite diskUpd_eq by ( intuition omega ).
+    repeat rewrite diskUpd_neq by congruence.
+    autorewrite with upd.
+    pose block0_block1_differ.
+    intuition auto.
+    rewrite H3 in *; congruence.
+    2: rewrite H3 in *; congruence.
+    right. repeat rewrite diskUpd_neq by omega. auto.
+    right. repeat rewrite diskUpd_neq by omega. auto.
+  Qed.
+
+  Lemma atomic_pair_abstraction_diskUpd34 : forall state s a v,
+    (a = 3 \/ a = 4) ->
+    atomic_pair_abstraction state s ->
+    state 0 ?|= eq block0 ->
+    atomic_pair_abstraction (diskUpd state a v) s.
+  Proof.
+    unfold atomic_pair_abstraction; intros.
+    autorewrite with upd.
+    intuition auto;
+      repeat rewrite diskUpd_neq by congruence.
+    intuition auto.
+    pose block0_block1_differ.
+    rewrite H3 in *; congruence.
+    intuition auto.
+    pose block0_block1_differ.
+    rewrite H3 in *; congruence.
+  Qed.
+
+  Lemma atomic_pair_abstraction_state0 : forall (state : State) F a v,
+    a <> 0 ->
+    state 0 ?|= F ->
+    (diskUpd state a v) 0 ?|= F.
+  Proof.
+    intros.
+    rewrite diskUpd_neq; auto.
+  Qed.
+
+  Lemma atomic_pair_abstraction_diskUpd340 : forall state v0 v,
+    atomic_pair_abstraction state v0 ->
+    atomic_pair_abstraction
+      (diskUpd (diskUpd (diskUpd state 3 (fst v)) 4 (snd v)) 0 block1) v.
+  Proof.
+    unfold atomic_pair_abstraction; intros.
+    autorewrite with upd.
+    repeat ( (rewrite diskUpd_eq by (autorewrite with upd; omega)) ||
+             (rewrite diskUpd_neq by (autorewrite with upd; omega)) ).
+    intuition auto.
+  Qed.
+
+  Lemma atomic_pair_abstraction_diskUpd120 : forall state v0 v,
+    atomic_pair_abstraction state v0 ->
+    atomic_pair_abstraction
+      (diskUpd (diskUpd (diskUpd state 1 (fst v)) 2 (snd v)) 0 block0) v.
+  Proof.
+    unfold atomic_pair_abstraction; intros.
+    autorewrite with upd.
+    repeat ( (rewrite diskUpd_eq by (autorewrite with upd; omega)) ||
+             (rewrite diskUpd_neq by (autorewrite with upd; omega)) ).
+    intuition auto.
+  Qed.
+
+  Hint Resolve atomic_pair_abstraction_diskUpd12.
+  Hint Resolve atomic_pair_abstraction_diskUpd34.
+  Hint Resolve atomic_pair_abstraction_state0.
+  Hint Resolve atomic_pair_abstraction_diskUpd340.
+  Hint Resolve atomic_pair_abstraction_diskUpd120.
 
   Theorem put_ok : forall v, prog_spec (put_spec v) (put v) recover abstr.
   Proof.
@@ -111,58 +193,66 @@ Module AtomicPair (d : OneDiskAPI) <: AtomicPairAPI.
 
     step_prog; intros.
     destruct a'; simpl in *; intuition idtac.
-    exists tt; simpl; intuition idtac.
+    exists tt; simpl; intuition.
+    2: unfold wipe in *; simpl in *; intuition subst; eauto 10.
 
     destruct (r == block0).
     - step_prog; intros.
       exists tt; simpl; intuition idtac.
+      2: unfold wipe in *; simpl in *; intuition subst; eauto 10.
+      2: unfold wipe in *; simpl in *; intuition subst; eauto 10.
 
       step_prog; intros.
       exists tt; simpl; intuition idtac.
+      2: unfold wipe in *; simpl in *; intuition subst; eauto 10.
+      2: unfold wipe in *; simpl in *; intuition subst; eauto 10.
 
       step_prog; intros.
       exists tt; simpl; intuition idtac.
+      2: unfold wipe in *; simpl in *; intuition subst; eauto 10.
+      2: unfold wipe in *; simpl in *; intuition subst; eauto 10.
 
       step_prog; intros.
       eauto.
 
       simpl in *; intuition subst.
-      2: unfold wipe in *; intuition.
-      eexists. split; eauto.
-
-      invert_abstraction; intuition.
-      unfold atomic_pair_abstraction.
-      autorewrite with upd.
-      repeat ( ( rewrite diskUpd_eq by ( repeat rewrite diskUpd_size; omega ) ) ||
-               rewrite diskUpd_neq by congruence ).
-      intuition eauto.
-
-      rewrite H2 in *. simpl in *. pose block0_block1_differ. congruence.
+      unfold wipe in *; simpl in *; intuition subst; eauto 10.
+      unfold wipe in *; simpl in *; intuition subst; eauto 10.
 
     - step_prog; intros.
       exists tt; simpl; intuition idtac.
+      2: unfold wipe in *; simpl in *; intuition subst; eauto 10.
+      2: unfold wipe in *; simpl in *; intuition subst; eauto 10.
+
+      2: assert (r = block1); subst.
+      2: pose block0_block1_differ.
+      2: unfold atomic_pair_abstraction in *; simpl in *; intuition auto.
+      2: rewrite H2 in *; simpl in *; subst; congruence.
+      2: rewrite H2 in *; simpl in *; subst; congruence.
+      2: unfold wipe in *; simpl in *; intuition subst; eauto 10.
+
+      assert (r = block1); subst.
+      pose block0_block1_differ.
+      unfold atomic_pair_abstraction in *; simpl in *; intuition auto.
+      rewrite H3 in *; simpl in *; subst; congruence.
+      rewrite H3 in *; simpl in *; subst; congruence.
 
       step_prog; intros.
       exists tt; simpl; intuition idtac.
+      2: unfold wipe in *; simpl in *; intuition subst; eauto 10.
+      2: unfold wipe in *; simpl in *; intuition subst; eauto 10.
 
       step_prog; intros.
       exists tt; simpl; intuition idtac.
+      2: unfold wipe in *; simpl in *; intuition subst; eauto 10.
+      2: unfold wipe in *; simpl in *; intuition subst; eauto 10.
 
       step_prog; intros.
       eauto.
 
       simpl in *; intuition subst.
-      2: unfold wipe in *; intuition.
-      eexists. split; eauto.
-
-      invert_abstraction; intuition.
-      rewrite H2 in *. simpl in *. pose block0_block1_differ. congruence.
-
-      unfold atomic_pair_abstraction.
-      autorewrite with upd.
-      repeat ( ( rewrite diskUpd_eq by ( repeat rewrite diskUpd_size; omega ) ) ||
-               rewrite diskUpd_neq by congruence ).
-      intuition eauto.
+      unfold wipe in *; simpl in *; intuition subst; eauto 10.
+      unfold wipe in *; simpl in *; intuition subst; eauto 10.
   Qed.
 
   Theorem recover_noop : rec_noop recover abstr AtomicPairAPI.wipe.
