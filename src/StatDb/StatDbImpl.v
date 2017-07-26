@@ -1,109 +1,136 @@
 Require Import POCS.
-Require Import StatDb.StatDbAPI.
 Require Import Variables.VariablesAPI.
 
 Import Vars.
-Import StatDB.
 
 Module StatDB.
 
-  Section Implementation.
+  Definition add (v : nat) : prog unit :=
+    sum <- read VarSum;
+    count <- read VarCount;
+    _ <- write VarSum (sum + v);
+    _ <- write VarCount (count + 1);
+    Ret tt.
 
-    Variable (vars : Interface Vars.API).
+  Definition mean : prog (option nat) :=
+    count <- read VarCount;
+    if count == 0 then
+      Ret None
+    else
+      sum <- read VarSum;
+      Ret (Some (sum / count)).
 
-    Definition add (v : nat) : prog unit :=
-      sum <- Prim vars (Read VarSum);
-      count <- Prim vars (Read VarCount);
-      _ <- Prim vars (Write VarSum (sum + v));
-      _ <- Prim vars (Write VarCount (count + 1));
-      Ret tt.
+  Definition init : prog InitResult :=
+    _ <- write VarCount 0;
+    _ <- write VarSum 0;
+    Ret Initialized.
 
-    Definition mean : prog (option nat) :=
-      (* Your solutions here *)
-      (* SOL *)
-      count <- Prim vars (Read VarCount);
-      if count == 0 then
-        Ret None
-      else
-        sum <- Prim vars (Read VarSum);
-        Ret (Some (sum / count)).
+  Definition statdb_recover : prog unit :=
+    var_recover.
 
-    Definition mean_stub : prog (option nat) :=
-      (* END *)
-      Ret (Some 0).
 
-    Definition init : prog InitResult :=
-      _ <- Prim vars (Write VarCount 0);
-      _ <- Prim vars (Write VarSum 0);
-      Ret Initialized.
+  Definition State := list nat.
 
-    Definition statdb_op_impl T (op: StatDB.Op T) : prog T :=
-      match op with
-      | Add v => add v
-      | Mean => mean
-      end.
+  Definition statdb_abstraction (vars_state : Vars.State) (statdb_state : StatDB.State) : Prop :=
+    StateCount vars_state = length statdb_state /\
+    StateSum vars_state = fold_right plus 0 statdb_state.
 
-    Definition impl : InterfaceImpl StatDB.Op :=
-      {| op_impl := statdb_op_impl;
-         recover_impl := Ret tt;
-         init_impl := then_init (iInit vars) init; |}.
+  Definition abstr : Abstraction StatDB.State :=
+    abstraction_compose
+      Vars.abstr
+      {| abstraction := statdb_abstraction |}.
 
-    Definition statdb_abstraction (vars_state : Vars.State) (statdb_state : StatDB.State) : Prop :=
-      StateCount vars_state = length statdb_state /\
-      StateSum vars_state = fold_right plus 0 statdb_state.
 
-    Definition abstr : Abstraction StatDB.State :=
-      abstraction_compose
-        (interface_abs vars)
-        {| abstraction := statdb_abstraction |}.
+  Theorem add_ok : forall v,
+    prog_spec
+      (fun (_ : unit) state => {|
+        pre := True;
+        post := fun r state' =>
+          r = tt /\ state' = v :: state;
+        recover := fun _ _ => False
+      |})
+      (add v) statdb_recover abstr.
+  Proof.
+    unfold add.
+    intros.
 
-    Definition statdb : Interface StatDB.API.
-      unshelve econstructor.
-      - exact impl.
-      - exact abstr.
-      - destruct op.
+    apply spec_abstraction_compose; simpl.
 
-        + lift_world.
-          prog_spec_symbolic_execute inv_step.
-          solve_final_state.
+    step_prog; intros.
+    destruct a'; simpl in *; intuition idtac.
+    eexists (_, _); simpl; intuition idtac.
 
-          unfold statdb_abstraction in *.
-          simpl in *.
-          intuition.
+    step_prog; intros.
+    eexists (_, _); simpl; intuition idtac.
 
-        + (* Prove that your implementation of [mean] refines StatDbAPI.man *)
-          (* SOL *)
-          lift_world.
-          prog_spec_symbolic_execute inv_step.
-          * solve_final_state.
+    step_prog; intros.
+    eexists (_, _); simpl; intuition idtac.
 
-            unfold statdb_abstraction in *; intuition.
-            destruct s; simpl in *; try congruence.
+    step_prog; intros.
+    eexists (_, _); simpl; intuition idtac.
 
-          * solve_final_state.
+    step_prog; intros.
+    eauto.
 
-            unfold statdb_abstraction in *; intuition.
-            unfold statdb_abstraction in *; intuition.
-          (* END *)
-          (* STUB: pocs_admit. *)
+    simpl in *; intuition subst.
 
-      - cannot_crash.
-      - eapply then_init_compose; eauto.
-        prog_spec_symbolic_execute inv_step.
+    eexists; intuition auto.
+    unfold statdb_abstraction in *; simpl in *.
+    intuition omega.
 
-        solve_final_state.
+    unfold wipe in *; intuition.
+  Qed.
 
-        instantiate (1 := nil).
-        simpl; auto.
-        simpl; auto.
-        reflexivity.
+  Theorem mean_ok :
+    prog_spec
+      (fun (_ : unit) state => {|
+        pre := True;
+        post := fun r state' =>
+          state' = state /\
+          (state = nil /\ r = None \/
+           state <> nil /\ r = Some (fold_right plus 0 state / length state));
+        recover := fun _ _ => False
+      |})
+      mean statdb_recover abstr.
+  Proof.
+    unfold mean.
+    intros.
 
-      Unshelve.
-      all: eauto.
-    Defined.
+    apply spec_abstraction_compose; simpl.
 
-  End Implementation.
+    step_prog; intros.
+    destruct a'; simpl in *; intuition idtac.
+    eexists (_, _); simpl; intuition idtac.
+
+    destruct (r == 0).
+
+    - step_prog; intros.
+      eauto.
+
+      simpl in *; intuition subst.
+      2: unfold wipe in *; intuition.
+
+      unfold statdb_abstraction in *.
+      destruct l; intuition; simpl in *; try congruence.
+      exists nil; intuition auto.
+
+    - step_prog; intros.
+      eexists (_, _); simpl; intuition idtac.
+
+      step_prog; intros.
+      eauto.
+
+      simpl in *; intuition subst.
+      2: unfold wipe in *; intuition.
+
+      unfold statdb_abstraction in *.
+      destruct l; intuition.
+
+      eexists; intuition auto.
+      right.
+      intuition ( try congruence ).
+  Qed.
 
 End StatDB.
 
-Print Assumptions StatDB.statdb.
+Print Assumptions StatDB.add_ok.

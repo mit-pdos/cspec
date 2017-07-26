@@ -6,9 +6,11 @@ Module Vars.
   | VarCount
   | VarSum.
 
-  Inductive Op : Type -> Type :=
-  | Read (v : var) : Op nat
-  | Write (v : var) (val : nat) : Op unit.
+  Axiom init : prog InitResult.
+  Axiom read : var -> prog nat.
+  Axiom write : var -> nat -> prog unit.
+  Axiom var_recover : prog unit.
+
 
   (** The state the program manipulates as it executes. *)
   Record State := mkState {
@@ -16,45 +18,49 @@ Module Vars.
     StateSum : nat;
   }.
 
-  Instance var_dec : EqualDec var.
-    unfold EqualDec; intros.
-    destruct x; destruct y;
-      try (left; congruence);
-      try (right; congruence).
-  Defined.
+  Axiom abstr : Abstraction State.
 
-  (* help out type inference *)
-  Implicit Type (state:State).
 
-  Inductive op_step : forall `(op: Op T), Semantics State T :=
-  | step_read_count : forall r state,
-      StateCount state = r ->
-      op_step (Read VarCount) state r state
-  | step_read_sum : forall r state,
-      StateSum state = r ->
-      op_step (Read VarSum) state r state
-  | step_write_count : forall val state,
-      op_step (Write VarCount val) state tt (mkState val (StateSum state))
-  | step_write_sum : forall val state,
-      op_step (Write VarSum val) state tt (mkState (StateCount state) val).
+  Axiom read_ok : forall v,
+    prog_spec
+      (fun '(count, sum) state => {|
+        pre := StateCount state = count /\ StateSum state = sum;
+        post := fun r state' =>
+          state' = state /\
+          match v with
+          | VarCount => r = count
+          | VarSum => r = sum
+          end;
+        recover := fun _ _ => False
+      |})
+      (read v) var_recover abstr.
+  Hint Resolve read_ok.
 
-  Definition crash_relation state state' := False.
-  Definition inited state := True.
+  Axiom write_ok : forall v val,
+    prog_spec
+      (fun '(count, sum) state => {|
+        pre := StateCount state = count /\ StateSum state = sum;
+        post := fun r state' =>
+          r = tt /\
+          match v with
+          | VarCount => state' = mkState val sum
+          | VarSum => state' = mkState count val
+          end;
+        recover := fun _ _ => False
+      |})
+      (write v val) var_recover abstr.
+  Hint Resolve write_ok.
 
-  Definition API : InterfaceAPI Op State :=
-    {|
-      op_sem := @op_step;
-      crash_effect := crash_relation;
-      init_sem := inited;
-    |}.
 
-  Ltac inv_step :=
-    idtac;  (* Ltac evaluation order issue when passing tactics *)
-    match goal with
-    | [ H: op_step _ _ _ _ |- _ ] =>
-      inversion H; subst; clear H;
-      repeat sigT_eq;
-      safe_intuition
-    end.
+  Definition wipe (state state' : State) := False.
+
+  Axiom recover_noop : rec_noop var_recover abstr wipe.
+  Hint Resolve recover_noop.
 
 End Vars.
+
+Extraction Language Haskell.
+
+Extract Constant Vars.read => "Variables.read".
+Extract Constant Vars.write => "Variables.write".
+Extract Constant Vars.abstr => "Hoare.Build_LayerAbstraction".
