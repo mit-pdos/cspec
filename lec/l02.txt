@@ -91,37 +91,66 @@ generated code:
 === Replicated disk (no recovery)
 
 diagram: two disks
+  failure model: disk can stop working at any point
+  disks report failure (read/write will indicate if disk failed)
   at least one disk remains live
   disks do not come back from a failure
-  failure model: disk can stop working at any point
 
-how to write the abstraction relations?
-  several cases to consider
-    first disk live, second disk live, both are live and equal..
-    slightly annoying to consider 3x everything
-    maybe_holds intuition
-
-Coq formalization
+Coq formalization of the fault model (TwoDisk)
+  src/TwoDisk/TwoDiskAPI.v
   [bg_failure]
-  [prog_spec] to simplify specs, proofs
+
+Concurrency makes reasoning about execution difficult
+  Concurrency: disk failure can happen at any point in the execution
+  Two specific problems:
+    Creates many forks in the symbolic execution tree
+    Makes it difficult to reason about state, because state keeps changing
+  two techniques that will help us
+
+technique 1: pre- and post-conditions (predicates)
+  [prog_spec]
+  like Hoare logic
+  also includes a recovery condition that we will talk about tomorrow
     will let us talk about possible ways the system can crash
-    avoids the 6 cases we saw above in RemappedDisk
-  [maybe_holds] to make the predicates succinct
-    re-stating execution semantics
-    src/ReplicatedDisk/TwoDiskProgSpec.v
-    [maybe_holds_stable]
-  [prog_spec] ghost state for the disk
+  helps avoid the 6 cases we saw above in RemappedDisk
 
-work through implementation of Read, DiskSize, DiskSizeInit,
-  init_at, Init
+  the reason we might be able to avoid considering all these cases is that we
+    can write the pre- and post-conditions in a way that captures all cases.
 
-walk through the proofs for each of them, interleaved with code
+technique 2: a way of writing predicates that combines many executions
+  main idea: stable predicates
+  stability: not affected by concurrent execution (due to [bg_failure])
+  example: how to write the abstraction relations?
+    naive plan: first disk live \/ second disk live \/ both are live and equal..
+    if you break this up into 3 cases, the "both are live" is not stable
+      must consider a "fork" at every point where "both are live" degrades
+    better plan: stable facts that remain true regardless of [bg_failure]
+    [maybe_holds]: d_0 ?|= eq d_s /\ d_1 ?|= eq d_s
 
-pay attention to [descend] in DiskSizeInit: instantiate existential quantifiers
-  will need it for the [Write_ok] proof
+to use these techniques, first re-state the code-level semantics using [prog_spec]
+  src/ReplicatedDisk/TwoDiskProgSpec.v
+  [maybe_holds]
+  [maybe_holds_stable]
+  [prog_spec] ghost state: here, typically tuple of disk + frame predicate
+
+src/ReplicatedDisk/ReplicatedDiskImpl.v
+  work through implementations of Read, DiskSize, DiskSizeInit, init_at, Init
+    what if we didn't initialize?
+    of course our abstraction wouldn't hold, but so what?
+    could someone observe an incorrect behavior at the spec level?
+  walk through the proof of Read_ok
+  discuss Write_ok and write_read_ok specs
+  walk through the proof of DiskSize_ok: same as Read_ok, basically
+  discuss init_at_ok: induction because of fixpoint loop
+  walk through the proof of DiskSizeInit_ok
+    if we do two [step]s in a row, we get an [exists] subgoal
+    automation couldn't figure out how to instantiate the evars for precondition
+    reason: it depends on [r], the result of the first [DiskSize] call
+    [destruct r] first, now [step] can keep going through
 
 assignment:
+  git pull to get some small updates
   implement Write
   prove Write_ok
-  prove the sanity-checker: write_read_ok
+  prove the sanity-checker: write_read_check_ok
   optionally prove init_at_ok and Init_ok
