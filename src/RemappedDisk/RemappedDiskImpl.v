@@ -1,5 +1,5 @@
 Require Import POCS.
-Require Import RemappedDisk.RemappedDiskAPI.
+Require Import OneDisk.OneDiskAPI.
 Require Import BadSectorDisk.BadSectorAPI.
 
 
@@ -47,7 +47,7 @@ Module RemappedDisk (bd : BadSectorAPI) <: RemappedDiskAPI.
     bd.recover.
 
 
-  Inductive remapped_abstraction (bs_state : BadSectorAPI.State) (rd_disk : RemappedDiskAPI.State) : Prop :=
+  Inductive remapped_abstraction (bs_state : BadSectorAPI.State) (rd_disk : OneDiskAPI.State) : Prop :=
     | RemappedAbstraction :
       let bs_disk := stateDisk bs_state in
       let bs_addr := stateBadSector bs_state in
@@ -65,7 +65,7 @@ Module RemappedDisk (bd : BadSectorAPI) <: RemappedDiskAPI.
         (Hsize : size bs_disk = size rd_disk + 1),
       remapped_abstraction bs_state rd_disk.
 
-  Definition abstr : Abstraction RemappedDiskAPI.State :=
+  Definition abstr : Abstraction OneDiskAPI.State :=
     abstraction_compose bd.abstr {| abstraction := remapped_abstraction |}.
 
   Ltac invert_abstraction :=
@@ -74,7 +74,7 @@ Module RemappedDisk (bd : BadSectorAPI) <: RemappedDiskAPI.
     end.
 
 
-  Theorem read_ok : forall a, prog_spec (RemappedDiskAPI.read_spec a) (read a) recover abstr.
+  Theorem read_ok : forall a, prog_spec (OneDiskAPI.read_spec a) (read a) recover abstr.
   Proof.
     unfold read.
     intros.
@@ -128,7 +128,7 @@ Module RemappedDisk (bd : BadSectorAPI) <: RemappedDiskAPI.
       + rewrite <- Hgoodsec; auto.
   Qed.
 
-  Theorem write_ok : forall a v, prog_spec (RemappedDiskAPI.write_spec a v) (write a v) recover abstr.
+  Theorem write_ok : forall a v, prog_spec (OneDiskAPI.write_spec a v) (write a v) recover abstr.
   Proof.
     unfold write.
     intros.
@@ -201,7 +201,7 @@ Module RemappedDisk (bd : BadSectorAPI) <: RemappedDiskAPI.
         repeat rewrite diskUpd_neq by omega. eauto.
   Qed.
 
-  Theorem diskSize_ok : prog_spec RemappedDiskAPI.diskSize_spec diskSize recover abstr.
+  Theorem diskSize_ok : prog_spec OneDiskAPI.diskSize_spec diskSize recover abstr.
   Proof.
     unfold diskSize.
     intros.
@@ -225,7 +225,7 @@ Module RemappedDisk (bd : BadSectorAPI) <: RemappedDiskAPI.
     omega.
   Qed.
 
-  Theorem recover_noop : rec_noop recover abstr RemappedDiskAPI.wipe.
+  Theorem recover_noop : rec_noop recover abstr OneDiskAPI.wipe.
   Proof.
     pocs_admit.
   Qed.
