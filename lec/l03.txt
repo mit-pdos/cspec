@@ -1,0 +1,69 @@
+L3: Recovery
+
+=== Solution of exercise 3
+
+=== Recovery
+
+Crashes & recovery
+
+  What happens when a computer crashes
+    Stops
+    Reboot
+    Runs recovery
+    Start serving request again
+
+  What do we need recovery?
+    Consider replicated disk without recovery
+    Consider write
+      if we crash between two disk updates,
+      the disks are out of sync.
+    Consider two back-to-back reads of out-of-sync block
+      first read returns value of first disk
+      first disk fails
+      second read returns different value
+      --> Not allowed by spec
+
+   Computer may crash during recovery
+     Recovery function must be idempotent
+     That is, we can run it over and over
+ 
+How do we model this?
+  Draw state diagram
+    Each code state can start running recovery
+    Fork off regular code path with recovery steps
+    If recovery ends, it ends in some state
+      that state is either the old spec state
+      or corresponds to the new spec state
+    Crashes during recovery
+      Every state can invoke recovery again!
+
+   Result: infinite many executions
+     Need: a loop invariant
+     Observation: exploit idempotence of recovery procedure
+       Its crash condition must imply its precondition
+
+Example: replicated disk
+   What is the crash condition?
+     interesting case: crash during write
+     what are the possible code states?
+   What must the recovery procedure do?
+     sync up the disk disks
+   Can the recovery procedure be idempotent?
+     what code states can it be in if computer crashes?
+     Same states as write
+     So, yes, must be possible to be idempotent
+
+Look at some code
+  read_ok, write_ok's crash conditions
+  implementation of recovery
+    fixup, recovery_at
+  proofs of recovey
+    draw on board (DiskStatus, RecStatus)
+    diagram of when you transition status
+  proof of fixup_ok, and recover_at_ok
+  
+  
+
+
+
+
