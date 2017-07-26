@@ -70,3 +70,21 @@ to keep track of the kinds of symbolic execution cases we need to handle:
 
   [if] statements inside a program, like
     Ret (if foo then 1 else 2)
+
+===
+
+Why should we go with [prog_spec] instead of Butler-style refinement?
+
+- Proof engineering problem.  Need to separately reason about crash-free
+  executions vs. recovery.  This means reasoning about a non-atomic interface
+  which Butler-style refinement does not support.  Could in principle reason
+  about normal+recovery, but that makes the proofs complicated.
+
+- Crashes are not special.  Could model them in the same way as Butler-style
+  refinement does, by setting a "recovering" bit and halting execution on a
+  crash.  Recovery will pick up the "recovering" state and clean it up.
+
+- To make the invariant precise enough, you'd have to include the PC of every
+  thread in the global invariant, which makes the invariant unwieldy.  The
+  [prog_spec] approach separates out reasoning about thread-private vs global
+  state.
