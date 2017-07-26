@@ -10,6 +10,11 @@ draw refinement diagram
     Implemented in Haskell
     No proof
 
+What is a disk?
+  Show generic disk
+    uninterpreted memory (See Upd.v)
+    with a domain (See Sized.v)
+
 Abstraction function
   draw picture of spec disk and code disk
     code disk has one more block
