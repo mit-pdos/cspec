@@ -7,14 +7,14 @@ Definition get_spec : Specification unit (block*block) unit State :=
   fun (_ : unit) state => {|
     pre := True;
     post := fun r state' => r = state;
-    recover := fun _ _ => False
+    recover := fun _ state' => state' = state
   |}.
 
 Definition put_spec v : Specification unit unit unit State :=
   fun (_ : unit) state => {|
     pre := True;
     post := fun r state' => r = tt /\ state' = v;
-    recover := fun _ _ => False
+    recover := fun _ state' => state' = state \/ state' = v
   |}.
 
 Definition wipe (state state' : State) := False.
