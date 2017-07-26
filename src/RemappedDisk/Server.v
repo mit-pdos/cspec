@@ -35,28 +35,20 @@ CoFixpoint handle : prog unit :=
     (* TODO: bounds checks *)
     data <- read off blocks;
     _ <- sendResponse
-      {| rhandle := h;
-         error := ESuccess;
-         data := data; |};
+      {| rhandle := h; error := ESuccess; data := data; |};
     handle
   | Write h off _ dat =>
     _ <- write off _ dat;
     _ <- sendResponse
-      {| rhandle := h;
-         error := ESuccess;
-         data := bnull |};
+      {| rhandle := h; error := ESuccess; data := bnull |};
     handle
   | Flush h =>
     _ <- sendResponse
-      {| rhandle := h;
-         error := ESuccess;
-         data := bnull |};
+      {| rhandle := h; error := ESuccess; data := bnull |};
     handle
   | UnknownOp h =>
     _ <- sendResponse
-      {| rhandle := h;
-         error := EInvalid;
-         data := bnull |};
+      {| rhandle := h; error := EInvalid; data := bnull |};
     handle
   | Disconnect => Ret tt
   end.

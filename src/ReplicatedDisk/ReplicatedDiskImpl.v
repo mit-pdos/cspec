@@ -444,11 +444,17 @@ Module RD.
     Proof.
       unfold DiskSizeInit.
       step.
+      destruct r.
       step.
-      destruct r; descend; intuition eauto.
-      - destruct r; try step.
-        destruct (v == v0); step.
-      - destruct r; step.
+      - destruct r.
+        + destruct (size H0 == v).
+          * step.
+          * step.
+        + step.
+      - step.
+        destruct r.
+        + step.
+        + step.
     Qed.
 
     Hint Resolve DiskSizeInit_ok.
