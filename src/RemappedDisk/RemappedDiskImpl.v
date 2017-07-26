@@ -2,261 +2,237 @@ Require Import POCS.
 Require Import RemappedDisk.RemappedDiskAPI.
 Require Import BadSectorDisk.BadSectorAPI.
 
-Import BadSectorDisk.
-Import RemappedDisk.
 
-Module RemappedDisk.
+Module RemappedDisk (bd : BadSectorAPI) <: RemappedDiskAPI.
 
-  Section Implementation.
+  Definition read (a : addr) : prog block :=
+    bs <- bd.getBadSector;
+    if a == bs then
+      len <- bd.diskSize;
+      r <- bd.read (len-1);
+      Ret r
+    else
+      r <- bd.read a;
+      Ret r.
 
-    Variable (bd : Interface BadSectorDisk.API).
-
-    Definition read (a : addr) : prog block :=
-      bs <- Prim bd (GetBadSector);
+  Definition write (a : addr) (b : block) : prog unit :=
+    len <- bd.diskSize;
+    if a == (len-1) then
+      Ret tt
+    else
+      bs <- bd.getBadSector;
       if a == bs then
-        len <- Prim bd (BadDiskSize);
-        Prim bd (BadRead (len-1))
-      else
-        Prim bd (BadRead a).
-
-    Definition write (a : addr) (b : block) : prog unit :=
-      (* Fill in your implementation here. *)
-      (* SOL *)
-      len <- Prim bd (BadDiskSize);
-      if a == (len-1) then
+        _ <- bd.write (len-1) b;
         Ret tt
       else
-        bs <- Prim bd (GetBadSector);
-        if a == bs then
-          Prim bd (BadWrite (len-1) b)
-        else
-          Prim bd (BadWrite a b).
+        _ <- bd.write a b;
+        Ret tt.
 
-    Definition write_stub (a : addr) (b : block) : prog unit :=
-      (* END *)
-      Prim bd (BadWrite a b).
+  Definition diskSize : prog nat :=
+    len <- bd.diskSize;
+    Ret (len - 1).
 
-    Definition diskSize : prog nat :=
-      len <- Prim bd (BadDiskSize);
-      Ret (len - 1).
-
-    Definition rd_op_impl T (op: RemappedDisk.Op T) : prog T :=
-      match op with
-      | Read a => read a
-      | Write a b => write a b
-      | DiskSize => diskSize
-      end.
-
-    Definition init : prog InitResult :=
-      len <- Prim bd (BadDiskSize);
-      if len == 0 then
-        Ret InitFailed
+  Definition init : prog InitResult :=
+    len <- bd.diskSize;
+    if len == 0 then
+      Ret InitFailed
+    else
+      bs <- bd.getBadSector;
+      if (lt_dec bs len) then
+        Ret Initialized
       else
-        bs <- Prim bd (GetBadSector);
-        if (lt_dec bs len) then
-          Ret Initialized
-        else
-          Ret InitFailed.
+        Ret InitFailed.
 
-    Definition impl : InterfaceImpl RemappedDisk.Op :=
-      {| op_impl := rd_op_impl;
-         recover_impl := Ret tt;
-         init_impl := then_init (iInit bd) init; |}.
+  Definition recover : prog unit :=
+    bd.recover.
 
-    Inductive remapped_abstraction (bs_state : BadSectorDisk.State) (rd_disk : RemappedDisk.State) : Prop :=
-      | RemappedAbstraction :
-        let bs_disk := stateDisk bs_state in
-        let bs_addr := stateBadSector bs_state in
-        forall
-          (* Fill in the rest of your abstraction here. *)
-          (* Hint 1: What should be true about the non-bad sectors? *)
-          (* Hint 2: What should be true about the bad sector? *)
-          (* Hint 3: What if the bad sector address is the last address? *)
-          (* Hint 4: What if the bad sector address is past the end of the disk? *)
-          (* SOL *)
-          (Hgoodsec : forall a, a <> bs_addr /\ a <> size rd_disk -> bs_disk a = rd_disk a)
-          (Hremap : bs_addr <> size rd_disk -> bs_disk (size rd_disk) = rd_disk bs_addr)
-          (Hbsok : bs_addr < size bs_disk)
-          (* END *)
-          (Hsize : size bs_disk = size rd_disk + 1),
-        remapped_abstraction bs_state rd_disk.
 
-    Definition abstr : Abstraction RemappedDisk.State :=
-      abstraction_compose
-        (interface_abs bd)
-        {| abstraction := remapped_abstraction |}.
+  Inductive remapped_abstraction (bs_state : BadSectorAPI.State) (rd_disk : RemappedDiskAPI.State) : Prop :=
+    | RemappedAbstraction :
+      let bs_disk := stateDisk bs_state in
+      let bs_addr := stateBadSector bs_state in
+      forall
+        (* Fill in the rest of your abstraction here. *)
+        (* Hint 1: What should be true about the non-bad sectors? *)
+        (* Hint 2: What should be true about the bad sector? *)
+        (* Hint 3: What if the bad sector address is the last address? *)
+        (* Hint 4: What if the bad sector address is past the end of the disk? *)
+        (* SOL *)
+        (Hgoodsec : forall a, a <> bs_addr /\ a <> size rd_disk -> bs_disk a = rd_disk a)
+        (Hremap : bs_addr <> size rd_disk -> bs_disk (size rd_disk) = rd_disk bs_addr)
+        (Hbsok : bs_addr < size bs_disk)
+        (* END *)
+        (Hsize : size bs_disk = size rd_disk + 1),
+      remapped_abstraction bs_state rd_disk.
 
-    Ltac invert_abstraction :=
-      match goal with
-      | H : remapped_abstraction _ _ |- _ => inversion H; clear H; subst_var; simpl in *
-      end.
+  Definition abstr : Abstraction RemappedDiskAPI.State :=
+    abstraction_compose bd.abstr {| abstraction := remapped_abstraction |}.
 
-    Definition rd : Interface RemappedDisk.API.
-      unshelve econstructor.
-      - exact impl.
-      - exact abstr.
-      - destruct op.
+  Ltac invert_abstraction :=
+    match goal with
+    | H : remapped_abstraction _ _ |- _ => inversion H; clear H; subst_var; simpl in *
+    end.
 
-        + lift_world.
-          prog_spec_symbolic_execute inv_step.
 
-          * solve_final_state.
-            invert_abstraction.
+  Theorem read_ok : forall a, prog_spec (RemappedDiskAPI.read_spec a) (read a) recover abstr.
+  Proof.
+    unfold read.
+    intros.
 
-            (* SOL *)
-            rewrite Hsize in *.
-            replace (size s + 1 - 1) with (size s) in * by omega.
+    apply spec_abstraction_compose; simpl.
 
-            destruct (v0 == size s).
-            {
-              right. apply disk_oob_eq. omega.
-            }
-            {
-              left. rewrite <- Hremap; auto.
-            }
-            (* END *)
-            (* Prove that the read returns the correct result, by relying on facts
-             * from your abstraction. *)
-            (* STUB: all: pocs_admit. *)
+    step_prog; intros.
+    destruct a'; simpl in *; intuition idtac.
+    exists tt; simpl; intuition idtac.
 
-          * solve_final_state.
-            invert_abstraction.
-            exfalso.
-            apply disk_inbounds_not_none with (d := d) (a := size d - 1).
-            omega.
-            auto.
+    destruct (a == r); subst.
+    - step_prog; intros.
+      exists tt; simpl; intuition idtac.
 
-          * solve_final_state.
-            invert_abstraction.
-            right.
-            apply disk_oob_eq.
-            omega.
+      step_prog; intros.
+      exists tt; simpl; intuition idtac.
 
-          * solve_final_state.
-            invert_abstraction.
+      step_prog; intros.
+      eauto.
 
-            (* SOL *)
-            destruct (a == size s); subst.
-            {
-              right. apply disk_oob_eq. omega.
-            }
-            {
-              left. rewrite <- Hgoodsec; auto.
-            }
-            (* END *)
-            (* Prove that the read returns the correct result, by relying on facts
-             * from your abstraction. *)
-            (* STUB: all: pocs_admit. *)
+      simpl in *; intuition subst.
+      2: unfold wipe in *; intuition.
 
-          * solve_final_state.
-            invert_abstraction.
-            right.
-            apply disk_oob_eq.
-            apply disk_none_oob in H7. omega.
+      exists s. split. split. auto.
+      2: auto.
 
-          * solve_final_state.
-            exfalso.
-            congruence.
+      invert_abstraction.
+      rewrite Hsize in H7.
+      replace (size s + 1 - 1) with (size s) in * by omega.
 
-        + (* Prove that your implementation of write creates a state in which your
-           * abstraction holds.
-           *)
-          (* SOL *)
-          lift_world.
-          prog_spec_symbolic_execute inv_step.
+      destruct (stateBadSector state == size s).
+      + rewrite disk_oob_eq by omega. constructor.
+      + rewrite <- Hremap; auto.
 
-          * solve_final_state.
-            rewrite diskUpd_none; auto.
+    - step_prog; intros.
+      exists tt; simpl; intuition idtac.
 
-            invert_abstraction.
-            apply disk_oob_eq. omega.
+      step_prog; intros.
+      eauto.
 
-          * solve_final_state.
-            invert_abstraction.
+      simpl in *; intuition subst.
+      2: unfold wipe in *; intuition.
 
-            rewrite Hsize in *.
-            replace (size s + 1 - 1) with (size s) in * by omega.
+      exists s. split. split. auto.
+      2: auto.
 
-            constructor; simpl; autorewrite with upd; auto; intros; destruct_ands.
+      invert_abstraction.
 
-            {
-              repeat rewrite diskUpd_neq by congruence. auto.
-            }
-            {
-              repeat rewrite diskUpd_eq; auto; omega.
-            }
-            {
-              omega.
-            }
+      destruct (a == size s).
+      + rewrite disk_oob_eq by omega. constructor.
+      + rewrite <- Hgoodsec; auto.
+  Qed.
 
-          * solve_final_state.
-            invert_abstraction.
+  Theorem write_ok : forall a v, prog_spec (RemappedDiskAPI.write_spec a v) (write a v) recover abstr.
+  Proof.
+    unfold write.
+    intros.
 
-            constructor; simpl; autorewrite with upd; auto; intros; destruct_ands.
-            {
-              destruct (a == a0); subst.
-              {
-                destruct (lt_dec a0 (size d)).
-                {
-                  repeat rewrite diskUpd_eq by omega.
-                  auto.
-                }
-                {
-                  repeat rewrite diskUpd_oob_eq by omega.
-                  auto.
-                }
-              }
-              {
-                repeat rewrite diskUpd_neq by omega.
-                auto.
-              }
-            }
-            {
-              repeat rewrite diskUpd_neq by omega.
-              auto.
-            }
-          (* END *)
-          (* STUB: all: pocs_admit. *)
+    apply spec_abstraction_compose; simpl.
 
-        + lift_world.
-          prog_spec_symbolic_execute inv_step.
-          solve_final_state.
-          invert_abstraction.
-          omega.
+    step_prog; intros.
+    destruct a'; simpl in *; intuition idtac.
+    exists tt; simpl; intuition idtac.
 
-      - cannot_crash.
-      - eapply then_init_compose; eauto.
-        prog_spec_symbolic_execute inv_step.
+    destruct (a == r-1); subst.
+    - step_prog; intros.
+      eauto.
 
-        + solve_final_state.
-        + match_abstraction_for_step.
-          case_eq (d (size d - 1)); intros.
-          * exists (diskUpd (shrink d) v1 b); split; [ | constructor ].
+      simpl in *; intuition subst.
+      2: unfold wipe in *; intuition.
 
-            constructor; simpl; autorewrite with upd; auto; intros; destruct_ands; try omega.
+      exists s. split. split. auto.
+      2: auto.
 
-            (* SOL *)
-            { autorewrite with upd.
-              rewrite shrink_preserves; auto.
-              autorewrite with upd. omega. }
-            { rewrite diskUpd_eq; auto.
-              autorewrite with upd. omega. }
-            (* END *)
-            (* Prove that the init function establishes the abstraction.
-             *)
-            (* STUB: all: pocs_admit. *)
+      rewrite diskUpd_oob_noop; auto.
+      invert_abstraction.
+      omega.
 
-          * apply disk_none_oob in H. omega.
+    - step_prog; intros.
+      exists tt; simpl; intuition idtac.
 
-        + eexists; intuition auto; eauto.
+      destruct (a == r0).
+      + step_prog; intros.
+        exists tt; simpl; intuition idtac.
 
-      Grab Existential Variables.
-      all: eauto.
+        step_prog; intros.
+        eauto.
 
-    Defined.
+        simpl in *; intuition subst.
+        2: unfold wipe in *; intuition.
 
-  End Implementation.
+        eexists. split. split. reflexivity. reflexivity.
+
+        invert_abstraction.
+        rewrite Hsize. replace (size s + 1 - 1) with (size s) by omega.
+        constructor; simpl.
+
+        all: autorewrite with upd; intuition idtac.
+        repeat rewrite diskUpd_neq by omega. eauto.
+        repeat rewrite diskUpd_eq by omega; auto.
+
+      + step_prog; intros.
+        exists tt; simpl; intuition idtac.
+
+        step_prog; intros.
+        eauto.
+
+        simpl in *; intuition subst.
+        2: unfold wipe in *; intuition.
+
+        eexists. split. split. reflexivity. reflexivity.
+
+        invert_abstraction.
+        constructor; simpl.
+
+        all: autorewrite with upd; intuition idtac.
+
+        destruct (lt_dec a (size s)).
+        destruct (a == a1); subst.
+        repeat rewrite diskUpd_eq by omega; auto.
+        repeat rewrite diskUpd_neq by omega; auto.
+        repeat rewrite diskUpd_oob_noop by omega. auto.
+
+        repeat rewrite diskUpd_neq by omega. eauto.
+  Qed.
+
+  Theorem diskSize_ok : prog_spec RemappedDiskAPI.diskSize_spec diskSize recover abstr.
+  Proof.
+    unfold diskSize.
+    intros.
+
+    apply spec_abstraction_compose; simpl.
+
+    step_prog; intros.
+    destruct a'; simpl in *; intuition idtac.
+    exists tt; simpl; intuition idtac.
+
+    step_prog; intros.
+    eauto.
+
+    simpl in *; intuition subst.
+    2: unfold wipe in *; intuition.
+
+    exists s. split. split. auto.
+    2: auto.
+
+    invert_abstraction.
+    omega.
+  Qed.
+
+  Theorem recover_noop : rec_noop recover abstr RemappedDiskAPI.wipe.
+  Proof.
+    pocs_admit.
+  Qed.
 
 End RemappedDisk.
 
-Print Assumptions RemappedDisk.rd.
+
+Require Import BadSectorImpl.
+Module x := RemappedDisk BadSectorDisk.
+Print Assumptions x.read_ok.

@@ -1,35 +1,54 @@
 Require Import POCS.
 
-Module RemappedDisk.
 
-  Inductive Op : Type -> Type :=
-  | Read (a:addr) : Op block
-  | Write (a:addr) (b:block) : Op unit
-  | DiskSize : Op nat.
+Definition State := disk.
 
-  Definition State := disk.
+Definition read_spec a : Specification _ block unit State :=
+  fun (_ : unit) state => {|
+    pre := True;
+    post := fun r state' =>
+      state' = state /\
+      state a ?|= eq r;
+    recover := fun _ _ => False
+  |}.
 
-  (* help out type inference *)
-  Implicit Type (state:State).
+Definition write_spec a v : Specification _ _ unit State :=
+  fun (_ : unit) state => {|
+    pre := True;
+    post := fun r state' =>
+      r = tt /\ state' = diskUpd state a v;
+    recover := fun _ _ => False
+  |}.
 
-  Inductive step : forall `(op: Op T), Semantics State T :=
-  | step_read : forall a r (d : disk),
-      d a = Some r \/ d a = None ->
-      step (Read a) d r d
-  | step_write : forall a b (d : disk),
-      step (Write a b) d tt (diskUpd d a b)
-  | step_size : forall d r,
-      r = size d ->
-      step DiskSize d r d.
+Definition diskSize_spec : Specification _ nat unit State :=
+  fun (_ : unit) state => {|
+    pre := True;
+    post := fun r state' =>
+      state' = state /\ r = size state;
+    recover := fun _ _ => False
+  |}.
 
-  Definition crash_relation state state' := False.
-  Definition inited state := True.
+Definition wipe (state state' : State) := False.
 
-  Definition API : InterfaceAPI Op State :=
-    {|
-      op_sem := @step;
-      crash_effect := crash_relation;
-      init_sem := inited;
-    |}.
 
-End RemappedDisk.
+Module Type RemappedDiskAPI.
+
+  Parameter init : prog InitResult.
+  Parameter read : addr -> prog block.
+  Parameter write : addr -> block -> prog unit.
+  Parameter diskSize : prog nat.
+  Parameter recover : prog unit.
+
+  Axiom abstr : Abstraction State.
+
+  Axiom read_ok : forall a, prog_spec (read_spec a) (read a) recover abstr.
+  Axiom write_ok : forall a v, prog_spec (write_spec a v) (write a v) recover abstr.
+  Axiom diskSize_ok : prog_spec diskSize_spec diskSize recover abstr.
+  Axiom recover_noop : rec_noop recover abstr wipe.
+
+  Hint Resolve read_ok.
+  Hint Resolve write_ok.
+  Hint Resolve diskSize_ok.
+  Hint Resolve recover_noop.
+
+End RemappedDiskAPI.

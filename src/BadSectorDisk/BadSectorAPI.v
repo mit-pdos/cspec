@@ -1,56 +1,68 @@
 Require Import POCS.
 
-Module BadSectorDisk.
+Record State :=
+  mkState {
+    stateDisk : disk;
+    stateBadSector : addr;
+  }.
 
-  Inductive Op : Type -> Type :=
-  | BadRead (a:addr) : Op block
-  | BadWrite (a:addr) (b:block) : Op unit
-  | GetBadSector : Op addr
-  | BadDiskSize : Op nat.
+Definition read_spec a : Specification _ block unit State :=
+  fun (_ : unit) state => {|
+    pre := True;
+    post := fun r state' =>
+      state' = state /\
+      (stateDisk state) a ?|= eq r;
+    recover := fun _ _ => False
+  |}.
 
-  Record State :=
-    mkState {
-      stateDisk : disk;
-      stateBadSector : addr;
-    }.
+Definition write_spec a v : Specification _ _ unit State :=
+  fun (_ : unit) state => {|
+    pre := True;
+    post := fun r state' =>
+      r = tt /\ state' = mkState (diskUpd (stateDisk state) a v) (stateBadSector state);
+    recover := fun _ _ => False
+  |}.
 
-  (* help out type inference *)
-  Implicit Type (state:State).
+Definition getBadSector_spec : Specification _ addr unit State :=
+  fun (_ : unit) state => {|
+    pre := True;
+    post := fun r state' =>
+      state' = state /\ r = stateBadSector state;
+    recover := fun _ _ => False
+  |}.
 
-  Inductive op_step : forall `(op: Op T), Semantics State T :=
-  | step_read : forall a r (d : disk) bs,
-      a <> bs -> d a = Some r ->
-      op_step (BadRead a) (mkState d bs) r (mkState d bs)
-  | step_read_oob : forall a r (d : disk) bs,
-      a <> bs -> d a = None ->
-      op_step (BadRead a) (mkState d bs) r (mkState d bs)
-  | step_read_bad : forall a r (d : disk) bs,
-      a = bs ->
-      op_step (BadRead a) (mkState d bs) r (mkState d bs)
-  | step_write : forall a b (d : disk) bs,
-      op_step (BadWrite a b) (mkState d bs) tt (mkState (diskUpd d a b) bs)
-  | step_get_bs : forall d bs,
-      op_step GetBadSector (mkState d bs) bs (mkState d bs)
-  | step_size : forall d bs,
-      op_step BadDiskSize (mkState d bs) (size d) (mkState d bs).
+Definition diskSize_spec : Specification _ nat unit State :=
+  fun (_ : unit) state => {|
+    pre := True;
+    post := fun r state' =>
+      state' = state /\ r = size (stateDisk state);
+    recover := fun _ _ => False
+  |}.
 
-  Definition crash_relation state state' := False.
-  Definition inited state := True.
+Definition wipe (state state' : State) := False.
 
-  Definition API : InterfaceAPI Op State :=
-    {|
-      op_sem := @op_step;
-      crash_effect := crash_relation;
-      init_sem := inited;
-    |}.
 
-  Ltac inv_step :=
-    idtac;  (* Ltac evaluation order issue when passing tactics *)
-    match goal with
-    | [ H: op_step _ _ _ _ |- _ ] =>
-      inversion H; subst; clear H;
-      repeat sigT_eq;
-      safe_intuition
-    end.
+Module Type BadSectorAPI.
 
-End BadSectorDisk.
+  Parameter init : prog InitResult.
+  Parameter read : addr -> prog block.
+  Parameter write : addr -> block -> prog unit.
+  Parameter getBadSector : prog addr.
+  Parameter diskSize : prog nat.
+  Parameter recover : prog unit.
+
+  Axiom abstr : Abstraction State.
+
+  Axiom read_ok : forall a, prog_spec (read_spec a) (read a) recover abstr.
+  Axiom write_ok : forall a v, prog_spec (write_spec a v) (write a v) recover abstr.
+  Axiom getBadSector_ok : prog_spec getBadSector_spec getBadSector recover abstr.
+  Axiom diskSize_ok : prog_spec diskSize_spec diskSize recover abstr.
+  Axiom recover_noop : rec_noop recover abstr wipe.
+
+  Hint Resolve read_ok.
+  Hint Resolve write_ok.
+  Hint Resolve getBadSector_ok.
+  Hint Resolve diskSize_ok.
+  Hint Resolve recover_noop.
+
+End BadSectorAPI.
