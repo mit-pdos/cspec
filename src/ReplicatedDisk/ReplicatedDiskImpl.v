@@ -531,8 +531,6 @@ Module RD.
      * Recovery implementation.
      *)
 
-    (* SOL *)
-
     Inductive RecStatus :=
     (* continue working, nothing interesting has happened *)
     | Continue
@@ -554,10 +552,7 @@ Module RD.
             Ret Continue
           else
             mu <- Prim td (TD.Write d1 a v);
-            Ret (match mu with
-                 | Working _ => RepairDoneOrFailed
-                 | Failed => RepairDoneOrFailed
-                 end)
+            Ret RepairDoneOrFailed
         | Failed => Ret RepairDoneOrFailed
         end
       | Failed => Ret RepairDoneOrFailed
@@ -961,6 +956,10 @@ Module RD.
         (irec td)
         (interface_abs td).
     Proof.
+      (* Prove that [Recover] satisfies its spec above, [Recover_spec],
+       * in the absence of repeated recovery.
+       *)
+      (* SOL *)
       unfold Recover, Recover_spec; intros.
       step.
       rename_by_type DiskStatus s.
@@ -977,6 +976,8 @@ Module RD.
 
         exists d, (OutOfSync a b); intuition eauto.
         step.
+      (* END *)
+      (* STUB: pocs_admit. *)
     Qed.
 
     Theorem Recover_ok :
@@ -986,15 +987,20 @@ Module RD.
         (irec td)
         (interface_abs td).
     Proof.
+      (* Prove that [Recover] is safe to repeatedly crash and recover.
+       *)
       eapply idempotent_loopspec; simpl.
       - eapply Recover_rok.
-      - unfold idempotent; intuition; simplify.
+      - (* SOL *)
+        unfold idempotent; intuition; simplify.
         rename a0 into d.
         destruct b; intuition eauto.
         exists d, FullySynced; intuition eauto.
         exists d, FullySynced; intuition eauto.
         exists d, (OutOfSync a b); intuition eauto.
         exists (diskUpd d a b), FullySynced; intuition eauto.
+        (* END *)
+        (* STUB: pocs_admit. *)
     Qed.
 
     Hint Resolve Recover_ok.
@@ -1052,12 +1058,16 @@ Module RD.
           (Write a b) (_ <- irec td; Recover)
           (interface_abs td).
     Proof.
+      (* Prove that [Recover] properly recovers from all crashes in [Write]. *)
+      (* SOL *)
       start.
       rename a0 into d.
       descend; (intuition eauto); simplify.
       - exists d, FullySynced; intuition eauto.
       - exists d, (OutOfSync a b); intuition eauto.
       - exists (diskUpd d a b), FullySynced; intuition eauto.
+      (* END *)
+      (* STUB: pocs_admit. *)
      Qed.
 
     Theorem DiskSize_rok :
@@ -1087,7 +1097,6 @@ Module RD.
 
     Hint Resolve Read_rok Write_rok DiskSize_rok Recover_rok.
 
-    (* END *)
 
     (* Now we gather up the implementation and all the correctness proofs,
      * expressing them in terms of the high-level API in D.API. *)

@@ -80,4 +80,16 @@ Your job is to fill in several other parts of that file:
 
 ## Exercise 4: replicated disk with recovery
 
-TBD
+Your job is to finish the proof of correctness
+for recovery.  Specifically, finish these proofs in
+`src/ReplicatedDisk/ReplicatedDiskImpl.v`:
+
+- Prove `Recover_rok`.
+
+- Prove `Recover_ok`.
+
+- Prove `Write_rok`.
+
+You will need to understand the details of `fixup` and the predicates
+used in the postconditions of `fixup`'s correctness theorems.  We plan
+to cover this in lecture.
