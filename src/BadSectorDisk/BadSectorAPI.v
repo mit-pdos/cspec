@@ -12,7 +12,7 @@ Definition read_spec a : Specification _ block unit State :=
     post := fun r state' =>
       state' = state /\
       (stateDisk state) a ?|= eq r;
-    recover := fun _ _ => False
+    recover := fun _ state' => state' = state
   |}.
 
 Definition write_spec a v : Specification _ _ unit State :=
@@ -20,7 +20,9 @@ Definition write_spec a v : Specification _ _ unit State :=
     pre := True;
     post := fun r state' =>
       r = tt /\ state' = mkState (diskUpd (stateDisk state) a v) (stateBadSector state);
-    recover := fun _ _ => False
+    recover := fun _ state' =>
+      state' = state \/
+      state' = mkState (diskUpd (stateDisk state) a v) (stateBadSector state)
   |}.
 
 Definition getBadSector_spec : Specification _ addr unit State :=
@@ -28,7 +30,7 @@ Definition getBadSector_spec : Specification _ addr unit State :=
     pre := True;
     post := fun r state' =>
       state' = state /\ r = stateBadSector state;
-    recover := fun _ _ => False
+    recover := fun _ state' => state' = state
   |}.
 
 Definition diskSize_spec : Specification _ nat unit State :=
@@ -36,10 +38,10 @@ Definition diskSize_spec : Specification _ nat unit State :=
     pre := True;
     post := fun r state' =>
       state' = state /\ r = size (stateDisk state);
-    recover := fun _ _ => False
+    recover := fun _ state' => state' = state
   |}.
 
-Definition wipe (state state' : State) := False.
+Definition wipe (state state' : State) := state' = state.
 
 
 Module Type BadSectorAPI.

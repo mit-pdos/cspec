@@ -84,19 +84,22 @@ Module RemappedDisk (bd : BadSectorAPI) <: OneDiskAPI.
     step_prog; intros.
     destruct a'; simpl in *; intuition idtac.
     exists tt; simpl; intuition idtac.
+    2: unfold wipe in *; simpl in *; intuition subst; eauto.
 
     destruct (a == r); subst.
     - step_prog; intros.
       exists tt; simpl; intuition idtac.
+      2: unfold wipe in *; simpl in *; intuition subst; eauto.
 
       step_prog; intros.
       exists tt; simpl; intuition idtac.
+      2: unfold wipe in *; simpl in *; intuition subst; eauto.
 
       step_prog; intros.
       eauto.
 
       simpl in *; intuition subst.
-      2: unfold wipe in *; intuition.
+      2: unfold wipe in *; simpl in *; intuition subst; eauto.
 
       exists s. split. split. auto.
       2: auto.
@@ -111,12 +114,13 @@ Module RemappedDisk (bd : BadSectorAPI) <: OneDiskAPI.
 
     - step_prog; intros.
       exists tt; simpl; intuition idtac.
+      2: unfold wipe in *; simpl in *; intuition subst; eauto.
 
       step_prog; intros.
       eauto.
 
       simpl in *; intuition subst.
-      2: unfold wipe in *; intuition.
+      2: unfold wipe in *; simpl in *; intuition subst; eauto.
 
       exists s. split. split. auto.
       2: auto.
@@ -128,6 +132,48 @@ Module RemappedDisk (bd : BadSectorAPI) <: OneDiskAPI.
       + rewrite <- Hgoodsec; auto.
   Qed.
 
+  Lemma remapped_abstraction_diskUpd_remap : forall state s v,
+    remapped_abstraction state s ->
+    remapped_abstraction (mkState
+      (diskUpd (stateDisk state) (size (stateDisk state) - 1) v)
+      (stateBadSector state)) (diskUpd s (stateBadSector state) v).
+  Proof.
+    intros.
+    invert_abstraction.
+    rewrite Hsize. replace (size s + 1 - 1) with (size s) by omega.
+    constructor; simpl.
+
+    all: autorewrite with upd; intuition idtac.
+    repeat rewrite diskUpd_neq by omega. eauto.
+    repeat rewrite diskUpd_eq by omega; auto.
+  Qed.
+
+  Lemma remapped_abstraction_diskUpd_noremap : forall state s a v,
+    remapped_abstraction state s ->
+    a <> size (stateDisk state) - 1 ->
+    a <> stateBadSector state ->
+    remapped_abstraction (mkState
+      (diskUpd (stateDisk state) a v)
+      (stateBadSector state)) (diskUpd s a v).
+  Proof.
+    intros.
+    invert_abstraction.
+    constructor; simpl.
+
+    all: autorewrite with upd; intuition idtac.
+
+    destruct (lt_dec a (size s)).
+    destruct (a == a0); subst.
+    repeat rewrite diskUpd_eq by omega; auto.
+    repeat rewrite diskUpd_neq by omega; auto.
+    repeat rewrite diskUpd_oob_noop by omega. auto.
+
+    repeat rewrite diskUpd_neq by omega. eauto.
+  Qed.
+
+  Hint Resolve remapped_abstraction_diskUpd_remap.
+  Hint Resolve remapped_abstraction_diskUpd_noremap.
+
   Theorem write_ok : forall a v, prog_spec (OneDiskAPI.write_spec a v) (write a v) recover abstr.
   Proof.
     unfold write.
@@ -138,13 +184,14 @@ Module RemappedDisk (bd : BadSectorAPI) <: OneDiskAPI.
     step_prog; intros.
     destruct a'; simpl in *; intuition idtac.
     exists tt; simpl; intuition idtac.
+    2: unfold wipe in *; simpl in *; intuition subst; eauto.
 
     destruct (a == r-1); subst.
     - step_prog; intros.
       eauto.
 
       simpl in *; intuition subst.
-      2: unfold wipe in *; intuition.
+      2: unfold wipe in *; simpl in *; intuition subst; eauto.
 
       exists s. split. split. auto.
       2: auto.
@@ -155,50 +202,33 @@ Module RemappedDisk (bd : BadSectorAPI) <: OneDiskAPI.
 
     - step_prog; intros.
       exists tt; simpl; intuition idtac.
+      2: unfold wipe in *; simpl in *; intuition subst; eauto.
 
       destruct (a == r0).
       + step_prog; intros.
         exists tt; simpl; intuition idtac.
+        2: unfold wipe in *; simpl in *; intuition subst; eauto.
+        2: unfold wipe in *; simpl in *; intuition subst; eauto.
 
         step_prog; intros.
         eauto.
 
         simpl in *; intuition subst.
-        2: unfold wipe in *; intuition.
+        2: unfold wipe in *; simpl in *; intuition subst; eauto.
 
-        eexists. split. split. reflexivity. reflexivity.
-
-        invert_abstraction.
-        rewrite Hsize. replace (size s + 1 - 1) with (size s) by omega.
-        constructor; simpl.
-
-        all: autorewrite with upd; intuition idtac.
-        repeat rewrite diskUpd_neq by omega. eauto.
-        repeat rewrite diskUpd_eq by omega; auto.
+        eauto.
 
       + step_prog; intros.
         exists tt; simpl; intuition idtac.
+        2: unfold wipe in *; simpl in *; intuition subst; eauto.
+        2: unfold wipe in *; simpl in *; intuition subst; eauto.
 
         step_prog; intros.
         eauto.
 
         simpl in *; intuition subst.
-        2: unfold wipe in *; intuition.
-
-        eexists. split. split. reflexivity. reflexivity.
-
-        invert_abstraction.
-        constructor; simpl.
-
-        all: autorewrite with upd; intuition idtac.
-
-        destruct (lt_dec a (size s)).
-        destruct (a == a1); subst.
-        repeat rewrite diskUpd_eq by omega; auto.
-        repeat rewrite diskUpd_neq by omega; auto.
-        repeat rewrite diskUpd_oob_noop by omega. auto.
-
-        repeat rewrite diskUpd_neq by omega. eauto.
+        2: unfold wipe in *; simpl in *; intuition subst; eauto.
+        eauto.
   Qed.
 
   Theorem diskSize_ok : prog_spec OneDiskAPI.diskSize_spec diskSize recover abstr.
@@ -211,12 +241,13 @@ Module RemappedDisk (bd : BadSectorAPI) <: OneDiskAPI.
     step_prog; intros.
     destruct a'; simpl in *; intuition idtac.
     exists tt; simpl; intuition idtac.
+    2: unfold wipe in *; simpl in *; intuition subst; eauto.
 
     step_prog; intros.
     eauto.
 
     simpl in *; intuition subst.
-    2: unfold wipe in *; intuition.
+    2: unfold wipe in *; simpl in *; intuition subst; eauto.
 
     exists s. split. split. auto.
     2: auto.
@@ -227,7 +258,16 @@ Module RemappedDisk (bd : BadSectorAPI) <: OneDiskAPI.
 
   Theorem recover_noop : rec_noop recover abstr OneDiskAPI.wipe.
   Proof.
-    pocs_admit.
+    unfold rec_noop.
+    intros.
+
+    apply spec_abstraction_compose; simpl.
+    step_prog; intros.
+    eauto.
+
+    destruct a; simpl in *.
+    unfold wipe, OneDiskAPI.wipe in *; intuition eauto.
+    subst; eauto.
   Qed.
 
 End RemappedDisk.
@@ -235,4 +275,4 @@ End RemappedDisk.
 
 Require Import BadSectorImpl.
 Module x := RemappedDisk BadSectorDisk.
-Print Assumptions x.read_ok.
+Print Assumptions x.write_ok.
