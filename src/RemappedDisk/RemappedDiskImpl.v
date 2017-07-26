@@ -3,7 +3,7 @@ Require Import OneDisk.OneDiskAPI.
 Require Import BadSectorDisk.BadSectorAPI.
 
 
-Module RemappedDisk (bd : BadSectorAPI) <: RemappedDiskAPI.
+Module RemappedDisk (bd : BadSectorAPI) <: OneDiskAPI.
 
   Definition read (a : addr) : prog block :=
     bs <- bd.getBadSector;

@@ -9,7 +9,8 @@ Definition read_spec a : Specification _ block unit State :=
     post := fun r state' =>
       state' = state /\
       state a ?|= eq r;
-    recover := fun _ _ => False
+    recover := fun _ state' =>
+      state' = state
   |}.
 
 Definition write_spec a v : Specification _ _ unit State :=
@@ -17,7 +18,8 @@ Definition write_spec a v : Specification _ _ unit State :=
     pre := True;
     post := fun r state' =>
       r = tt /\ state' = diskUpd state a v;
-    recover := fun _ _ => False
+    recover := fun _ state' =>
+      state' = state \/ state' = diskUpd state a v
   |}.
 
 Definition diskSize_spec : Specification _ nat unit State :=
@@ -25,10 +27,11 @@ Definition diskSize_spec : Specification _ nat unit State :=
     pre := True;
     post := fun r state' =>
       state' = state /\ r = size state;
-    recover := fun _ _ => False
+    recover := fun _ state' =>
+      state' = state
   |}.
 
-Definition wipe (state state' : State) := False.
+Definition wipe (state state' : State) := state' = state.
 
 
 Module Type OneDiskAPI.
