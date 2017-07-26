@@ -17,7 +17,7 @@ Definition put_spec v : Specification unit unit unit State :=
     recover := fun _ state' => state' = state \/ state' = v
   |}.
 
-Definition wipe (state state' : State) := False.
+Definition wipe (state state' : State) := state = state'.
 
 
 Module Type AtomicPairAPI.

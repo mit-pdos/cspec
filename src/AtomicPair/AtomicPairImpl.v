@@ -257,7 +257,16 @@ Module AtomicPair (d : OneDiskAPI) <: AtomicPairAPI.
 
   Theorem recover_noop : rec_noop recover abstr AtomicPairAPI.wipe.
   Proof.
-    pocs_admit.
+    unfold rec_noop.
+    intros.
+
+    apply spec_abstraction_compose; simpl.
+    step_prog; intros.
+    eauto.
+
+    destruct a; simpl in *.
+    unfold wipe, AtomicPairAPI.wipe in *; intuition eauto.
+    subst; eauto.
   Qed.
 
 End AtomicPair.
