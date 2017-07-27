@@ -1,0 +1,37 @@
+L4: Wrap-up reasoning about crashes
+
+=== Solution to exercise 4
+
+Discuss proof Recover_rok
+
+Discuss proof Recover_ok
+ rexec?
+ idempotence
+
+=== Logging
+
+How to use a disk where a write may fail?
+  Consider a single disk
+  Consider banking application
+
+Example: transfer (a, b, 10)
+  requires updating two blocks
+
+Naive plan
+  write block a
+  write block b
+  what if we crash in the middle?
+  can we undo?
+  can we complete?
+
+Better plan
+  no updates in place
+
+=== Relaxing assumptions
+
+Atomic sector write
+
+Sector corruption
+
+Asynchronous disks
+
