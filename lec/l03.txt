@@ -58,13 +58,12 @@ How do we model this?
       Every state can invoke recovery again!
 
    Result: infinite many code paths
-     Need: a loop invariant
      Observation: exploit idempotence of recovery procedure
-       Its crash condition must imply its precondition
+       Its recovery condition must imply its precondition
        Collapses many code paths
 
 Example: replicated disk
-   What is the crash condition?
+   What is the recovery condition?
      interesting case: crash during write
      what are the possible code states?
    What must the recovery procedure do?
@@ -75,13 +74,19 @@ Example: replicated disk
      So, yes, must be possible to be idempotent
 
 Look at some code
-  read_ok, write_ok's crash conditions
+  read_ok, write_ok's recovery conditions
   implementation of recovery
     fixup, recovery_at
-  proofs of recovey
-    draw on board (DiskStatus, RecStatus)
-    diagram of when you transition status
-  proof of fixup_ok, and recover_at_ok
+  proofs of recovery
+    - draw on board (DiskStatus, RecStatus)
+    - diagram of when you transition status
+    - proof of fixup_ok, and recover_at_ok
+      also look at recovery condition
+    - proof of Recover_rok
+    - proof of Recover_ok
+      idempotence
+    - statementent of Write_rok.
+  
   
   
 
