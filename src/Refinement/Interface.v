@@ -79,8 +79,7 @@ Definition op_spec `(sem: Semantics State T) : Specification unit T unit State :
         fun v state' => sem state v state';
       recover :=
         fun r state' =>
-          r = tt /\
-          (exists state1 v, sem state v state1);
+          r = tt /\ (state' = state \/ exists v, sem state v state');
     |}.
 
 Inductive InitResult := Initialized | InitFailed.
