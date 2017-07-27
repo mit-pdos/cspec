@@ -13,6 +13,8 @@ Things to clean up:
 
 - comments in the code should point to where various pieces are defined (e.g., Interface, API, etc)
 
+- change [prog] to [proc], to stand for "procedure"
+
 ===
 
 Things we've figured out:
