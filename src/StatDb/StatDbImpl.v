@@ -68,7 +68,7 @@ Module StatDB (v : VarsAPI) <: StatDbAPI.
     unfold statdb_abstraction in *; simpl in *.
     intuition omega.
 
-    unfold wipe in *; intuition.
+    autounfold in *; intuition.
   Qed.
 
   Theorem mean_ok : prog_spec mean_spec mean recover abstr.
@@ -88,7 +88,7 @@ Module StatDB (v : VarsAPI) <: StatDbAPI.
       eauto.
 
       simpl in *; intuition subst.
-      2: unfold wipe in *; intuition.
+      2: autounfold in *; intuition.
 
       unfold statdb_abstraction in *.
       destruct s; intuition; simpl in *; try congruence.
@@ -101,7 +101,7 @@ Module StatDB (v : VarsAPI) <: StatDbAPI.
       eauto.
 
       simpl in *; intuition subst.
-      2: unfold wipe in *; intuition.
+      2: autounfold in *; intuition.
 
       unfold statdb_abstraction in *.
       destruct s; intuition.
@@ -111,11 +111,18 @@ Module StatDB (v : VarsAPI) <: StatDbAPI.
       intuition ( try congruence ).
   Qed.
 
-  Theorem recover_noop : rec_noop recover abstr wipe.
+  Theorem recover_noop : rec_noop recover abstr (@no_crash _).
   Proof.
-    pocs_admit.
+    unfold rec_noop.
+    intros.
 
-    (* XXX something involving [rec_noop_compose] *)
+    apply spec_abstraction_compose; simpl.
+    step_prog; intros.
+    eauto.
+
+    destruct a; simpl in *.
+    intuition.
+    eauto.
   Qed.
 
 End StatDB.

@@ -21,8 +21,6 @@ Definition mean_spec : Specification unit (option nat) unit State :=
     recover := fun _ _ => False
   |}.
 
-Definition wipe (state state' : State) := False.
-
 
 Module Type StatDbAPI.
 
@@ -35,7 +33,7 @@ Module Type StatDbAPI.
 
   Axiom add_ok : forall v, prog_spec (add_spec v) (add v) recover abstr.
   Axiom mean_ok : prog_spec mean_spec mean recover abstr.
-  Axiom recover_noop : rec_noop recover abstr wipe.
+  Axiom recover_noop : rec_noop recover abstr (@no_crash _).
 
   Hint Resolve add_ok.
   Hint Resolve mean_ok.

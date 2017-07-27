@@ -66,7 +66,6 @@ Inductive bg_failure : State -> State -> Prop :=
                (@Disks (Some d_0) None ltac:(congruence)).
 
 Definition combined_step := pre_step bg_failure (@op_step).
-Definition wipe (state state' : State) := state' = state.
 
 
 Module Type TwoDiskBaseAPI.
@@ -82,7 +81,7 @@ Module Type TwoDiskBaseAPI.
   Axiom read_ok : forall i a, prog_spec (op_spec (combined_step (op_read i a))) (read i a) recover abstr.
   Axiom write_ok : forall i a b, prog_spec (op_spec (combined_step (op_write i a b))) (write i a b) recover abstr.
   Axiom diskSize_ok : forall i, prog_spec (op_spec (combined_step (op_disksize i))) (diskSize i) recover abstr.
-  Axiom recover_noop : rec_noop recover abstr wipe.
+  Axiom recover_noop : rec_noop recover abstr (@no_wipe _).
 
   Hint Resolve read_ok.
   Hint Resolve write_ok.

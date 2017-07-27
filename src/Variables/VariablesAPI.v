@@ -34,8 +34,6 @@ Definition write_spec v val : Specification _ _ unit _ :=
     recover := fun _ _ => False
   |}.
 
-Definition wipe (state state' : State) := False.
-
 
 Module Type VarsAPI.
 
@@ -48,7 +46,7 @@ Module Type VarsAPI.
 
   Axiom read_ok : forall v, prog_spec (read_spec v) (read v) recover abstr.
   Axiom write_ok : forall v val, prog_spec (write_spec v val) (write v val) recover abstr.
-  Axiom recover_noop : rec_noop recover abstr wipe.
+  Axiom recover_noop : rec_noop recover abstr (@no_crash _).
 
   Hint Resolve read_ok.
   Hint Resolve write_ok.
