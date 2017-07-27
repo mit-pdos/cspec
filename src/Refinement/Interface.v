@@ -51,7 +51,7 @@ Definition post_step {opT State}
 
 (* The specification for each operation. Note that after recovery, the abstract
 state is expected to be atomic. *)
-Definition op_spec opT `(api: InterfaceAPI opT State) `(op: opT T) : Specification unit T unit State :=
+Definition op_spec_wipe opT `(api: InterfaceAPI opT State) `(op: opT T) : Specification unit T unit State :=
   fun (_:unit) state =>
     {|
       pre := True;
@@ -63,6 +63,18 @@ Definition op_spec opT `(api: InterfaceAPI opT State) `(op: opT T) : Specificati
           (crash_effect api state state' \/
            exists state1 v, op_sem api op state v state1 /\
                        crash_effect api state1 state');
+    |}.
+
+Definition op_spec `(sem: Semantics State T) : Specification unit T unit State :=
+  fun (_:unit) state =>
+    {|
+      pre := True;
+      post :=
+        fun v state' => sem state v state';
+      recover :=
+        fun r state' =>
+          r = tt /\
+          (exists state1 v, sem state v state1);
     |}.
 
 Inductive InitResult := Initialized | InitFailed.
@@ -107,7 +119,7 @@ Record Interface opT State (api: InterfaceAPI opT State) :=
   { interface_impl: InterfaceImpl opT;
     interface_abs: Abstraction State;
     impl_ok : forall `(op: opT T),
-        prog_spec (op_spec api op)
+        prog_spec (op_spec_wipe api op)
                   (op_impl interface_impl _ op)
                   (recover_impl interface_impl)
                   interface_abs;
