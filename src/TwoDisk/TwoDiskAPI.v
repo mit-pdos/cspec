@@ -28,14 +28,14 @@ Definition read_spec (i : diskId) (a : addr) : Specification _ _ unit _ :=
       get_disk (other i) state' ?|= F;
   |}.
 
-Definition write_spec (i : diskId) (a : addr) (b : block) : Specification _ _ unit _ :=
+Definition write_spec (i : diskId) (a : addr) (b : block) : Specification _ (DiskResult unit) unit _ :=
   fun '(d, F) state => {|
     pre :=
       get_disk i         state ?|= eq d /\
       get_disk (other i) state ?|= F;
     post := fun r state' =>
       match r with
-      | Working tt =>
+      | Working _ =>
         get_disk i         state' ?|= eq (diskUpd d a b) /\
         get_disk (other i) state' ?|= F
       | Failed =>

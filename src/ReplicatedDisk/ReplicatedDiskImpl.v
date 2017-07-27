@@ -1,530 +1,461 @@
 Require Import POCS.
 
 Require Import TwoDisk.TwoDiskAPI.
-Require Import ReplicatedDisk.ReplicatedDiskAPI.
-Require Import ReplicatedDisk.TwoDiskProgSpec.
+Require Import OneDisk.OneDiskAPI.
 
-Module RD.
 
-  Section ReplicatedDisk.
+Module ReplicatedDisk (td : TwoDiskAPI) <: OneDiskAPI.
 
-    (* The replicated disk implementation works for any implementation of two
-     * disks - [Interface] already captures the implementation and all the
-     * correctness proofs needed here. *)
-    Variable (td:Interface TD.API).
-
-    (**
-     * Implementation of the replicated disk API.
-     *)
-
-    Definition Read (a:addr) : prog block :=
-      mv0 <- Prim td (TD.Read d0 a);
-      match mv0 with
+  Definition read (a:addr) : prog block :=
+    mv0 <- td.read d0 a;
+    match mv0 with
+    | Working v => Ret v
+    | Failed =>
+      mv2 <- td.read d1 a;
+      match mv2 with
       | Working v => Ret v
-      | Failed =>
-        mv2 <- Prim td (TD.Read d1 a);
-        match mv2 with
-        | Working v => Ret v
-        | Failed => Ret block0
-        end
-      end.
+      | Failed => Ret block0
+      end
+    end.
 
-    Definition Write (a:addr) (b:block) : prog unit :=
-      (* Fill in your implementation here. *)
-      (* SOL *)
-      _ <- Prim td (TD.Write d0 a b);
-      _ <- Prim td (TD.Write d1 a b);
-      Ret tt.
+  Definition write (a:addr) (b:block) : prog unit :=
+    _ <- td.write d0 a b;
+    _ <- td.write d1 a b;
+    Ret tt.
 
-    Definition Write_stub (a:addr) (b:block) : prog unit :=
-      (* END *)
-      Ret tt.
-
-    Definition write_read_check (a : addr) (b : block) : prog block :=
-      _ <- Write a b;
-      b' <- Read a;
-      Ret b'.
-
-    Definition DiskSize : prog nat :=
-      msz <- Prim td (TD.DiskSize d0);
+  Definition diskSize : prog nat :=
+    msz <- td.diskSize d0;
+    match msz with
+    | Working sz => Ret sz
+    | Failed =>
+      msz <- td.diskSize d1;
       match msz with
       | Working sz => Ret sz
-      | Failed =>
-        msz <- Prim td (TD.DiskSize d1);
-        match msz with
-        | Working sz => Ret sz
-        | Failed => Ret 0
-        end
-      end.
+      | Failed => Ret 0
+      end
+    end.
 
-    Definition DiskSizeInit : prog (option nat) :=
-      sz1 <- Prim td (TD.DiskSize d0);
-      sz2 <- Prim td (TD.DiskSize d1);
-      match sz1 with
-      | Working sz1 =>
-        match sz2 with
-        | Working sz2 =>
-          if sz1 == sz2 then Ret (Some sz1) else Ret None
-        | Failed => Ret (Some sz1)
-        end
-      | Failed =>
-        match sz2 with
-        | Working sz2 => Ret (Some sz2)
-        | Failed => Ret None
-        end
-      end.
+  Definition diskSizeInit : prog (option nat) :=
+    sz1 <- td.diskSize d0;
+    sz2 <- td.diskSize d1;
+    match sz1 with
+    | Working sz1 =>
+      match sz2 with
+      | Working sz2 =>
+        if sz1 == sz2 then Ret (Some sz1) else Ret None
+      | Failed => Ret (Some sz1)
+      end
+    | Failed =>
+      match sz2 with
+      | Working sz2 => Ret (Some sz2)
+      | Failed => Ret None
+      end
+    end.
 
-    (* Initialize block a *)
-    Fixpoint init_at (a:nat) : prog unit :=
-      match a with
-      | 0 => Ret tt
-      | S a =>
-        _ <- Prim td (TD.Write d0 a block0);
-        _ <- Prim td (TD.Write d1 a block0);
-        init_at a
-      end.
+  (* Initialize block a *)
+  Fixpoint init_at (a:nat) : prog unit :=
+    match a with
+    | 0 => Ret tt
+    | S a =>
+      _ <- td.write d0 a block0;
+      _ <- td.write d1 a block0;
+      init_at a
+    end.
 
-    (* Recursively initialize every disk block *)
-    Definition Init : prog InitResult :=
-      size <- DiskSizeInit;
-      match size with
-      | Some sz =>
-        _ <- init_at sz;
-        Ret Initialized
-      | None =>
-        Ret InitFailed
-      end.
+  (* Recursively initialize every disk block *)
+  Definition init : prog InitResult :=
+    size <- diskSizeInit;
+    match size with
+    | Some sz =>
+      _ <- init_at sz;
+      Ret Initialized
+    | None =>
+      Ret InitFailed
+    end.
 
 
-    (**
-     * Helper lemmas and tactics for proofs.
-     *)
+  (**
+   * Helper lemmas and tactics for proofs.
+   *)
 
-    (* As the final step in giving the correctness of the replicated disk
-    operations, we prove recovery specs that include the replicated disk Recover
-    function. *)
+  (* As the final step in giving the correctness of the replicated disk
+  operations, we prove recovery specs that include the replicated disk Recover
+  function. *)
 
-    Lemma exists_tuple2 : forall A B (P: A * B -> Prop),
-        (exists a b, P (a, b)) ->
-        (exists p, P p).
-    Proof.
-      intros.
-      repeat deex; eauto.
-    Qed.
+  Lemma exists_tuple2 : forall A B (P: A * B -> Prop),
+      (exists a b, P (a, b)) ->
+      (exists p, P p).
+  Proof.
+    intros.
+    repeat deex; eauto.
+  Qed.
 
-    (* we use a focused hint database for rewriting because autorewrite becomes
-           very slow with just a handful of patterns *)
-    Create HintDb rd.
+  (* we use a focused hint database for rewriting because autorewrite becomes
+         very slow with just a handful of patterns *)
+  Create HintDb rd.
 
-    Ltac simplify :=
-      repeat match goal with
-             | |- forall _, _ => intros
-             | _ => deex
-             | _ => destruct_tuple
-             | |- _ /\ _ => split; [ solve [auto] | ]
-             | |- _ /\ _ => split; [ | solve [auto] ]
-             (* TODO: extract the match pattern inside the exists on a0 and use
-                    those names in exists_tuple *)
-             | |- exists (_: _*_), _ => apply exists_tuple2
-             | _ => progress simpl in *
-             | _ => progress safe_intuition
-             | _ => progress subst
-             | _ => progress autounfold with rd in *
-             | _ => progress autorewrite with rd in *
-             | [ u: unit |- _ ] => destruct u
-             | [ crashinv: _ -> Prop |- _ ] =>
-               match goal with
-               | [ H: forall _, _ -> crashinv _ |-
-                           crashinv _ ] =>
-                 eapply H
-               end
-             end.
+  Ltac simplify :=
+    repeat match goal with
+           | |- forall _, _ => intros
+           | _ => deex
+           | _ => destruct_tuple
+           | |- _ /\ _ => split; [ solve [auto] | ]
+           | |- _ /\ _ => split; [ | solve [auto] ]
+           (* TODO: extract the match pattern inside the exists on a0 and use
+                  those names in exists_tuple *)
+           | |- exists (_: _*_), _ => apply exists_tuple2
+           | _ => progress simpl in *
+           | _ => progress safe_intuition
+           | _ => progress subst
+           | _ => progress autounfold in *
+           | _ => progress autorewrite with rd in *
+           | [ u: unit |- _ ] => destruct u
+           | [ crashinv: _ -> Prop |- _ ] =>
+             match goal with
+             | [ H: forall _, _ -> crashinv _ |-
+                         crashinv _ ] =>
+               eapply H
+             end
+           end.
 
-    Ltac finish :=
-      repeat match goal with
-             | _ => solve_false
-             | _ => congruence
-             | _ => solve [ intuition (subst; eauto; try congruence) ]
-             | _ =>
-               (* if we can solve all the side conditions automatically, then it's
-               safe to run descend *)
-               descend; intuition eauto;
-               lazymatch goal with
-               | |- prog_spec _ _ _ _ => idtac
-               | _ => fail
-               end
-             end.
+  Ltac finish :=
+    repeat match goal with
+           | _ => solve_false
+           | _ => congruence
+           | _ => solve [ intuition (subst; eauto; try congruence) ]
+           | _ =>
+             (* if we can solve all the side conditions automatically, then it's
+             safe to run descend *)
+             descend; intuition eauto;
+             lazymatch goal with
+             | |- prog_spec _ _ _ _ => idtac
+             | _ => fail
+             end
+           end.
 
-    Ltac step :=
-      step_prog; simplify; finish.
+  Ltac step :=
+    step_prog; simplify; finish.
 
-    Ltac start := intros;
-                  match goal with
-                  | |- prog_spec _ _ (_ <- _; _) _ =>
-                    eapply compose_recovery; eauto; simplify
-                  end.
-
-    Hint Unfold TD.wipe : rd.
-
-    Implicit Type (state:TD.State).
+  Ltac start := intros;
+                match goal with
+                | |- prog_spec _ _ (_ <- _; _) _ =>
+                  eapply compose_recovery; eauto; simplify
+                end.
 
 
-    (**
-     * Specifications and proofs about our implementation of the replicated disk API,
-     * without considering our recovery.
-     *)
+  (**
+   * Specifications and proofs about our implementation of the replicated disk API,
+   * without considering our recovery.
+   *)
 
-    Lemma both_disks_not_missing : forall (state: TD.State),
-        TD.disk0 state ?|= missing ->
-        TD.disk1 state ?|= missing ->
-        False.
-    Proof.
-      destruct state; simpl; intros.
-      destruct disk0, disk1; simpl in *; eauto.
-    Qed.
-    Hint Resolve both_disks_not_missing : false.
+  Lemma both_disks_not_missing : forall (state: TwoDiskBaseAPI.State),
+      disk0 state ?|= missing ->
+      disk1 state ?|= missing ->
+      False.
+  Proof.
+    destruct state; simpl; intros.
+    destruct disk0, disk1; simpl in *; eauto.
+  Qed.
+  Hint Resolve both_disks_not_missing : false.
 
-    Theorem Read_ok : forall a,
-        prog_spec
-          (fun d state =>
-             {|
-               pre := TD.disk0 state ?|= eq d /\
-                      TD.disk1 state ?|= eq d;
-               post :=
-                 fun r state' =>
-                   d a ?|= eq r /\
-                   TD.disk0 state' ?|= eq d /\
-                   TD.disk1 state' ?|= eq d;
-               recover :=
-                 fun _ state' =>
-                   TD.disk0 state' ?|= eq d /\
-                   TD.disk1 state' ?|= eq d;
-             |})
-          (Read a)
-          (irec td)
-          (interface_abs td).
-    Proof.
-      unfold Read.
+  Lemma missing0_implies_any : forall (state: TwoDiskBaseAPI.State) P,
+      disk0 state ?|= missing ->
+      disk0 state ?|= P.
+  Proof.
+    destruct state; unfold missing; simpl; intros.
+    destruct disk0; eauto.
+    intuition.
+  Qed.
 
-      step.
+  Lemma missing1_implies_any : forall (state: TwoDiskBaseAPI.State) P,
+      disk1 state ?|= missing ->
+      disk1 state ?|= P.
+  Proof.
+    destruct state; unfold missing; simpl; intros.
+    destruct disk1; eauto.
+    intuition.
+  Qed.
 
-      destruct r; step.
-      destruct r; step.
-    Qed.
+  Hint Resolve missing0_implies_any.
+  Hint Resolve missing1_implies_any.
 
-    Hint Resolve Read_ok.
-
-
-    Theorem Write_ok : forall a b,
-        prog_spec
-          (fun d state =>
-             {|
-               pre :=
-                 TD.disk0 state ?|= eq d /\
-                 TD.disk1 state ?|= eq d;
-               post :=
-                 fun r state' =>
-                   r = tt /\
-                   (* Fill in your postcondition here *)
-                   (* SOL *)
-                   TD.disk0 state' ?|= eq (diskUpd d a b) /\
-                   TD.disk1 state' ?|= eq (diskUpd d a b);
-                   (* END *)
-                   (* STUB: True; *)
-               recover :=
-                 fun _ state' =>
-                   (* Fill in your recovery condition here *)
-                   (* SOL *)
-                   (TD.disk0 state' ?|= eq d /\
-                    TD.disk1 state' ?|= eq d) \/
-                   (a < size d /\
-                    TD.disk0 state' ?|= eq (diskUpd d a b) /\
-                    TD.disk1 state' ?|= eq d) \/
-                   (TD.disk0 state' ?|= eq (diskUpd d a b) /\
-                    TD.disk1 state' ?|= eq (diskUpd d a b));
-                   (* END *)
-                   (* STUB: True; *)
-             |})
-          (Write a b)
-          (irec td)
-          (interface_abs td).
-    Proof.
-      unfold Write.
-
-      step.
-
-      (* Prove your write implementation meets your postcondition and recovery condition. *)
-      (* SOL *)
-      (* STUB: all: pocs_admit. *)
-      destruct r; step.
-      descend; intuition eauto.
-
-      step.
-      destruct r; (intuition eauto); simplify.
-      destruct (lt_dec a (size a')).
-      eauto 10.
-      autorewrite with upd in *; eauto.
-
-      destruct r; step.
-      (* END *)
-    Qed.
-
-    Hint Resolve Write_ok.
-
-
-    Theorem write_read_check_ok : forall a b,
-        prog_spec
-          (fun d state =>
-             {|
-               pre :=
-                 a < size d /\
-                 TD.disk0 state ?|= eq d /\
-                 TD.disk1 state ?|= eq d;
-               post :=
-                 fun r state' =>
-                   r = b /\
-                   TD.disk0 state' ?|= eq (diskUpd d a b) /\
-                   TD.disk1 state' ?|= eq (diskUpd d a b);
-               recover :=
-                 fun _ state' =>
-                   True;
-             |})
-          (write_read_check a b)
-          (irec td)
-          (interface_abs td).
-    Proof.
-      unfold write_read_check.
-      step.
-      (* Prove that write_read_check meets its postcondition  *)
-      (* STUB: all: pocs_admit. *)
-      (* SOL *)
-      step.
-      step.
-      autorewrite with upd in *.
-      congruence.
-      (* END *)
-    Qed.
-
-    Hint Resolve write_read_check_ok.
-
-
-    Theorem DiskSize_ok :
+  Theorem read_int_ok : forall a,
       prog_spec
-        (fun '(d_0, d_1) state =>
+        (fun d state =>
            {|
-             pre :=
-               TD.disk0 state ?|= eq d_0 /\
-               TD.disk1 state ?|= eq d_1 /\
-               size d_0 = size d_1;
+             pre := disk0 state ?|= eq d /\
+                    disk1 state ?|= eq d;
              post :=
                fun r state' =>
-                 r = size d_0 /\
-                 r = size d_1 /\
-                 TD.disk0 state' ?|= eq d_0 /\
-                 TD.disk1 state' ?|= eq d_1;
+                 d a ?|= eq r /\
+                 disk0 state' ?|= eq d /\
+                 disk1 state' ?|= eq d;
              recover :=
                fun _ state' =>
-                 TD.disk0 state' ?|= eq d_0 /\
-                 TD.disk1 state' ?|= eq d_1;
+                 disk0 state' ?|= eq d /\
+                 disk1 state' ?|= eq d;
            |})
-        (DiskSize)
-        (irec td)
-        (interface_abs td).
-    Proof.
-      unfold DiskSize.
+        (read a)
+        td.recover
+        td.abstr.
+  Proof.
+    unfold read.
+
+    step.
+
+    destruct r; step.
+    destruct r; step.
+    simplify.
+  Qed.
+
+  Hint Resolve read_int_ok.
+
+
+  Theorem write_int_ok : forall a b,
+      prog_spec
+        (fun d state =>
+           {|
+             pre :=
+               disk0 state ?|= eq d /\
+               disk1 state ?|= eq d;
+             post :=
+               fun r state' =>
+                 r = tt /\
+                 disk0 state' ?|= eq (diskUpd d a b) /\
+                 disk1 state' ?|= eq (diskUpd d a b);
+             recover :=
+               fun _ state' =>
+                 (disk0 state' ?|= eq d /\
+                  disk1 state' ?|= eq d) \/
+                 (a < size d /\
+                  disk0 state' ?|= eq (diskUpd d a b) /\
+                  disk1 state' ?|= eq d) \/
+                 (disk0 state' ?|= eq (diskUpd d a b) /\
+                  disk1 state' ?|= eq (diskUpd d a b));
+           |})
+        (write a b)
+        td.recover
+        td.abstr.
+  Proof.
+    unfold write.
+
+    step.
+
+    destruct r; step.
+    descend; intuition eauto.
+
+    step.
+    destruct r; (intuition eauto); simplify.
+    destruct (lt_dec a (size a')).
+    eauto 10.
+    autorewrite with upd in *; eauto.
+
+    destruct r; step.
+    simplify.
+  Qed.
+
+  Hint Resolve write_int_ok.
+
+
+  Theorem diskSize_int_ok :
+    prog_spec
+      (fun '(d_0, d_1) state =>
+         {|
+           pre :=
+             disk0 state ?|= eq d_0 /\
+             disk1 state ?|= eq d_1 /\
+             size d_0 = size d_1;
+           post :=
+             fun r state' =>
+               r = size d_0 /\
+               r = size d_1 /\
+               disk0 state' ?|= eq d_0 /\
+               disk1 state' ?|= eq d_1;
+           recover :=
+             fun _ state' =>
+               disk0 state' ?|= eq d_0 /\
+               disk1 state' ?|= eq d_1;
+         |})
+      (diskSize)
+      td.recover
+      td.abstr.
+  Proof.
+    unfold diskSize.
+
+    step.
+
+    destruct r; step.
+    destruct r; step.
+    simplify.
+  Qed.
+
+  Hint Resolve diskSize_int_ok.
+
+
+  Definition equal_after a (d_0 d_1: disk) :=
+    size d_0 = size d_1 /\
+    forall a', a <= a' -> d_0 a' = d_1 a'.
+
+  Lemma le_eq_or_S_le : forall n m,
+      n <= m ->
+      n = m \/
+      S n <= m /\ n <> m.
+  Proof.
+    intros.
+    omega.
+  Qed.
+
+  Lemma equal_after_diskUpd : forall a d_0 d_1 b,
+      equal_after (S a) d_0 d_1 ->
+      equal_after a (diskUpd d_0 a b) (diskUpd d_1 a b).
+  Proof.
+    unfold equal_after; intuition.
+    autorewrite with upd; eauto.
+    apply le_eq_or_S_le in H; intuition subst.
+    destruct (lt_dec a' (size d_0)); autorewrite with upd.
+    assert (a' < size d_1) by congruence; autorewrite with upd; auto.
+    assert (~a' < size d_1) by congruence; autorewrite with upd; auto.
+    autorewrite with upd; eauto.
+  Qed.
+  Hint Resolve equal_after_diskUpd.
+
+  Theorem init_at_ok : forall a,
+      prog_spec
+        (fun '(d_0, d_1) state =>
+           {| pre :=
+                disk0 state ?|= eq d_0 /\
+                disk1 state ?|= eq d_1 /\
+                equal_after a d_0 d_1;
+              post :=
+                fun _ state' =>
+                  exists d_0' d_1': disk,
+                    disk0 state' ?|= eq d_0' /\
+                    disk1 state' ?|= eq d_1' /\
+                    equal_after 0 d_0' d_1';
+              recover :=
+                fun _ state' => True;
+           |})
+        (init_at a)
+        td.recover
+        td.abstr.
+  Proof.
+    induction a; simpl; intros.
+    - step.
+    - step.
 
       step.
-
-      destruct r; step.
-      destruct r; step.
-    Qed.
-
-    Hint Resolve DiskSize_ok.
-
-
-    Definition equal_after a (d_0 d_1: disk) :=
-      size d_0 = size d_1 /\
-      forall a', a <= a' -> d_0 a' = d_1 a'.
-
-    Lemma le_eq_or_S_le : forall n m,
-        n <= m ->
-        n = m \/
-        S n <= m /\ n <> m.
-    Proof.
-      intros.
-      omega.
-    Qed.
-
-    Lemma equal_after_diskUpd : forall a d_0 d_1 b,
-        equal_after (S a) d_0 d_1 ->
-        equal_after a (diskUpd d_0 a b) (diskUpd d_1 a b).
-    Proof.
-      unfold equal_after; intuition.
-      autorewrite with upd; eauto.
-      apply le_eq_or_S_le in H; intuition subst.
-      destruct (lt_dec a' (size d_0)); autorewrite with upd.
-      assert (a' < size d_1) by congruence; autorewrite with upd; auto.
-      assert (~a' < size d_1) by congruence; autorewrite with upd; auto.
-      autorewrite with upd; eauto.
-    Qed.
-    Hint Resolve equal_after_diskUpd.
-
-    Theorem init_at_ok : forall a,
-        prog_spec
-          (fun '(d_0, d_1) state =>
-             {| pre :=
-                  TD.disk0 state ?|= eq d_0 /\
-                  TD.disk1 state ?|= eq d_1 /\
-                  equal_after a d_0 d_1;
-                post :=
-                  fun _ state' =>
-                 (* Fill in your postcondition here *)
-                    exists d_0' d_1': disk,
-                   (* SOL *)
-                      TD.disk0 state' ?|= eq d_0' /\
-                      TD.disk1 state' ?|= eq d_1' /\
-                      equal_after 0 d_0' d_1';
-                 (* END *)
-                   (* STUB: True; *)
-
-                recover :=
-                  fun _ state' => True;
-             |})
-          (init_at a)
-          (irec td)
-          (interface_abs td).
-    Proof.
-      induction a; simpl; intros.
-      (* Prove your init_at implementation meets your postcondition *)
-      (* STUB: all: pocs_admit. *)
-      (* SOL *)
-      - step.
-      - step.
-
-        step.
+      destruct r; finish.
+      + step.
+        destruct r; simplify; finish.
+        (* TODO: why does the hint not trigger here? *)
+        descend; intuition eauto using equal_after_diskUpd.
+      + step.
         destruct r; finish.
-        + step.
-          destruct r; simplify; finish.
-          (* TODO: why does the hint not trigger here? *)
-          descend; intuition eauto using equal_after_diskUpd.
-        + step.
-          destruct r; finish.
-          descend; intuition eauto using equal_after_diskUpd.
-          descend; intuition eauto using equal_after_diskUpd.
+        descend; intuition eauto using equal_after_diskUpd.
+        descend; intuition eauto using equal_after_diskUpd.
 
-          Grab Existential Variables.
-          exact block0.
-      (* END *)
-    Qed.
+        Grab Existential Variables.
+        exact block0.
+  Qed.
 
-    Hint Resolve init_at_ok.
+  Hint Resolve init_at_ok.
 
 
-    Theorem DiskSizeInit_ok :
-        prog_spec
-          (fun '(d_0, d_1) state =>
-             {| pre :=
-                  TD.disk0 state ?|= eq d_0 /\
-                  TD.disk1 state ?|= eq d_1;
-                post :=
-                   fun r state' =>
-                    exists d_0' d_1',
-                      TD.disk0 state' ?|= eq d_0' /\
-                      TD.disk1 state' ?|= eq d_1' /\
-                      match r with
-                      | Some sz => size d_0' = sz /\ size d_1' = sz
-                      | None => True
-                      end;
-                recover :=
-                  fun _ state' => True;
-             |})
-          (DiskSizeInit)
-          (irec td)
-          (interface_abs td).
-    Proof.
-      unfold DiskSizeInit.
-      step.
-      destruct r.
-      step.
-      - destruct r.
-        + destruct (size H0 == v).
-          * step.
-          * step.
-        + step.
-      - step.
-        destruct r.
-        + step.
-        + step.
-    Qed.
-
-    Hint Resolve DiskSizeInit_ok.
-
-
-    Lemma equal_after_0_to_eq : forall d_0 d_1,
-        equal_after 0 d_0 d_1 ->
-        d_0 = d_1.
-    Proof.
-      unfold equal_after; intuition.
-      eapply diskMem_ext_eq.
-      extensionality a'.
-      eapply H1; omega.
-    Qed.
-
-    Lemma equal_after_size : forall d_0 d_1,
-        size d_0 = size d_1 ->
-        equal_after (size d_0) d_0 d_1.
-    Proof.
-      unfold equal_after; intuition.
-      assert (~a' < size d_0) by omega.
-      assert (~a' < size d_1) by congruence.
-      autorewrite with upd; eauto.
-    Qed.
-
-    Hint Resolve equal_after_size.
-    Hint Resolve equal_after_0_to_eq.
-
-    Theorem Init_ok :
-        prog_spec
-          (fun '(d_0, d_1) state =>
-             {| pre :=
-                  TD.disk0 state ?|= eq d_0 /\
-                  TD.disk1 state ?|= eq d_1;
-                post :=
-                  fun r state' =>
-                 (* Fill in your postcondition here *)
-                   (* SOL *)
-
+  Theorem diskSizeInit_ok :
+      prog_spec
+        (fun '(d_0, d_1) state =>
+           {| pre :=
+                disk0 state ?|= eq d_0 /\
+                disk1 state ?|= eq d_1;
+              post :=
+                 fun r state' =>
+                  exists d_0' d_1',
+                    disk0 state' ?|= eq d_0' /\
+                    disk1 state' ?|= eq d_1' /\
                     match r with
-                    | Initialized =>
-                      exists d_0' d_1',
-                      TD.disk0 state' ?|= eq d_0' /\
-                      TD.disk1 state' ?|= eq d_1' /\
-                      d_0' = d_1'
-                    | InitFailed =>
-                      True
+                    | Some sz => size d_0' = sz /\ size d_1' = sz
+                    | None => True
                     end;
-                  (* END *)
-                   (* STUB: True; *)
+              recover :=
+                fun _ state' => True;
+           |})
+        (diskSizeInit)
+        td.recover
+        td.abstr.
+  Proof.
+    unfold diskSizeInit.
+    step.
+    destruct r.
+    step.
+    - destruct r.
+      + destruct (size H0 == v).
+        * step.
+        * step.
+      + step.
+    - step.
+      destruct r.
+      + step.
+      + step.
+  Qed.
 
-                recover :=
-                  fun _ state' => True;
-             |})
-          (Init)
-          (irec td)
-          (interface_abs td).
-    Proof.
-      (* Prove your init implementation meets your postcondition *)
-      (* STUB: all: pocs_admit. *)
-      (* SOL *)
-      unfold Init.
-      step.
-      descend; intuition eauto.
-      destruct r; step.
-      step.
-      (* END *)
-    Qed.
+  Hint Resolve diskSizeInit_ok.
 
-    Hint Resolve Init_ok.
+
+  Lemma equal_after_0_to_eq : forall d_0 d_1,
+      equal_after 0 d_0 d_1 ->
+      d_0 = d_1.
+  Proof.
+    unfold equal_after; intuition.
+    eapply diskMem_ext_eq.
+    extensionality a'.
+    eapply H1; omega.
+  Qed.
+
+  Lemma equal_after_size : forall d_0 d_1,
+      size d_0 = size d_1 ->
+      equal_after (size d_0) d_0 d_1.
+  Proof.
+    unfold equal_after; intuition.
+    assert (~a' < size d_0) by omega.
+    assert (~a' < size d_1) by congruence.
+    autorewrite with upd; eauto.
+  Qed.
+
+  Hint Resolve equal_after_size.
+  Hint Resolve equal_after_0_to_eq.
+
+  Theorem init_ok :
+      prog_spec
+        (fun '(d_0, d_1) state =>
+           {| pre :=
+                disk0 state ?|= eq d_0 /\
+                disk1 state ?|= eq d_1;
+              post :=
+                fun r state' =>
+                  match r with
+                  | Initialized =>
+                    exists d_0' d_1',
+                    disk0 state' ?|= eq d_0' /\
+                    disk1 state' ?|= eq d_1' /\
+                    d_0' = d_1'
+                  | InitFailed =>
+                    True
+                  end;
+              recover :=
+                fun _ state' => True;
+           |})
+        (init)
+        td.recover
+        td.abstr.
+  Proof.
+    unfold init.
+    step.
+    descend; intuition eauto.
+    destruct r; step.
+    step.
+  Qed.
+
+  Hint Resolve init_ok.
 
 
     (**
