@@ -46,6 +46,13 @@ Things we've figured out:
     [prog_spec] approach separates out reasoning about thread-private vs global
     state.
 
+  + How to use refinement to reason about implementations of code inside of a
+    transaction system?  E.g., write-ahead-log provides a general transaction
+    facility, and then we want to run "A; B; C".  B cannot be atomic: it will
+    roll back to before A or after C, neither of which B knows about..  Can we
+    prove a refinement about B (e.g., the directory code in a FS) in isolation
+    of A and C?
+
 ===
 
 Notes for when we explain the labs to students:
