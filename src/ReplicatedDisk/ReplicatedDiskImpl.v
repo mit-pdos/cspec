@@ -207,11 +207,8 @@ Module RD.
       unfold Read.
 
       step.
-      clear H H0 state.
 
       destruct r; step.
-      clear H H0 state.
-
       destruct r; step.
     Qed.
 
@@ -236,7 +233,17 @@ Module RD.
                    (* STUB: True; *)
                recover :=
                  fun _ state' =>
-                   True
+                   (* Fill in your recovery condition here *)
+                   (* SOL *)
+                   (TD.disk0 state' ?|= eq d /\
+                    TD.disk1 state' ?|= eq d) \/
+                   (a < size d /\
+                    TD.disk0 state' ?|= eq (diskUpd d a b) /\
+                    TD.disk1 state' ?|= eq d) \/
+                   (TD.disk0 state' ?|= eq (diskUpd d a b) /\
+                    TD.disk1 state' ?|= eq (diskUpd d a b));
+                   (* END *)
+                   (* STUB: True; *)
              |})
           (Write a b)
           (irec td)
@@ -247,17 +254,19 @@ Module RD.
       step.
 
       (* Prove your write implementation meets your postcondition and recovery condition. *)
-      destruct r.
+      (* SOL *)
+      (* STUB: all: pocs_admit. *)
+      destruct r; step.
+      descend; intuition eauto.
+
       step.
-      step.
-      destruct r.
-      intuition eauto.
-      intuition eauto.
-      step.
-      step.
-      destruct r.
-      intuition eauto.
-      intuition eauto.
+      destruct r; (intuition eauto); simplify.
+      destruct (lt_dec a (size a')).
+      eauto 10.
+      autorewrite with upd in *; eauto.
+
+      destruct r; step.
+      (* END *)
     Qed.
 
     Hint Resolve Write_ok.
@@ -286,13 +295,14 @@ Module RD.
     Proof.
       unfold write_read_check.
       step.
-
       (* Prove that write_read_check meets its postcondition  *)
+      (* STUB: all: pocs_admit. *)
+      (* SOL *)
       step.
       step.
-
       autorewrite with upd in *.
       congruence.
+      (* END *)
     Qed.
 
     Hint Resolve write_read_check_ok.
@@ -385,26 +395,26 @@ Module RD.
           (interface_abs td).
     Proof.
       induction a; simpl; intros.
-
       (* Prove your init_at implementation meets your postcondition *)
+      (* STUB: all: pocs_admit. *)
+      (* SOL *)
       - step.
       - step.
-        step.
 
-        destruct r.
-        + finish.
-          step.
+        step.
+        destruct r; finish.
+        + step.
           destruct r; simplify; finish.
           (* TODO: why does the hint not trigger here? *)
           descend; intuition eauto using equal_after_diskUpd.
-        + finish.
-          step.
+        + step.
           destruct r; finish.
           descend; intuition eauto using equal_after_diskUpd.
           descend; intuition eauto using equal_after_diskUpd.
 
           Grab Existential Variables.
           exact block0.
+      (* END *)
     Qed.
 
     Hint Resolve init_at_ok.
