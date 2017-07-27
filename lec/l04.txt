@@ -17,21 +17,49 @@ How to use a disk where a write may fail?
 Example: transfer (a, b, 10)
   requires updating two blocks
 
-Naive plan
+Naive plan: overwrite
   write block a
   write block b
   what if we crash in the middle?
   can we undo?
   can we complete?
 
-Better plan
-  no updates in place
+Better plan: no updates in place
+  shadow copy
+  logging
 
+Logging
+  picture of disk with log and data
+  
+  start
+    append a to log
+    append b to log
+  commit
+    write commit record
+    install a and b
+  end
+    optionally truncate log
+    
+  recovery
+    no commit record: do nothing
+    commit record: install
+
+  is recovery idempotent?
+
+  class infrastructure can specify and proof a log
+    see FSCQ paper
+    
 === Relaxing assumptions
 
 Atomic sector write
 
-Sector corruption
+No bit-flips 
 
-Asynchronous disks
+Synchronous disks
+  Disk buffer internally to disk
+    must be explicitly flushed
+    concurrent
+  Buffering writes in computer's memory
+    to get absorption
 
+No concurrent procedure
