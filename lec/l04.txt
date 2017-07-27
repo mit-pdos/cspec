@@ -5,8 +5,12 @@ L4: Wrap-up reasoning about crashes
 Discuss proof Recover_rok
 
 Discuss proof Recover_ok
- rexec?
- idempotence
+  rexec?
+  exec_recover
+  exec
+  idempotence
+
+Read_rok: combine Read_ok + Recover_ok
 
 === Logging
 
@@ -25,7 +29,7 @@ Naive plan: overwrite
   can we complete?
 
 Better plan: no updates in place
-  shadow copy
+  shadow copy [btrfs, like functional data structure]
   logging
 
 Logging
@@ -48,12 +52,18 @@ Logging
 
   class infrastructure can specify and proof a log
     see FSCQ paper
-    
+
+maybe show FSCQ source code
+  log, rep invariants, specs
+  crash at higher levels is always LOG.rep
+
 === Relaxing assumptions
 
 Atomic sector write
+  model: crash condition randomizes
 
 No bit-flips 
+  model: concurrent corruption
 
 Synchronous disks
   Disk buffer internally to disk
@@ -61,5 +71,9 @@ Synchronous disks
     concurrent
   Buffering writes in computer's memory
     to get absorption
+  model: valuset
+
+Checksums
+  model: non-termination
 
 No concurrent procedure
