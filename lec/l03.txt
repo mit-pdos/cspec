@@ -27,7 +27,7 @@ Crashes & recovery
 
   What happens when a computer crashes?
     Stops
-    Reboot
+    Reboots
     Runs recovery
     Start serving request again
 
@@ -65,13 +65,13 @@ How do we model this?
 Example: replicated disk
    What is the recovery condition?
      interesting case: crash during write
-     what are the possible code states?
+     what are the possible recovery states?
    What must the recovery procedure do?
      sync up the disk disks
    Can the recovery procedure be idempotent?
-     what code states can it be in if computer crashes?
+     what crash states can it be in if computer crashes?
      Same states as write
-     So, yes, must be possible to be idempotent
+     So, yes, recovery is idempotent
 
 Look at some code
   read_ok, write_ok's recovery conditions
