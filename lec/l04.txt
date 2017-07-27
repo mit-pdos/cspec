@@ -14,7 +14,7 @@ Read_rok: combine Read_ok + Recover_ok
 
 === Logging
 
-How to use a disk where a write may fail?
+How to use a disk when the computer might crash?
   Consider a single disk
   Consider banking application
 
@@ -77,3 +77,9 @@ Checksums
   model: non-termination
 
 No concurrent procedure
+
+non-deterministic specs
+  seems important to hide irrelevant details
+
+No confidentiality guarantees
+  how to get confidentiality guarantees without deterministic specs?
