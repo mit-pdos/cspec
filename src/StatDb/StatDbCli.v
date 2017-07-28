@@ -3,8 +3,7 @@ Require Import StatDb.StatDbImpl.
 Require Import Variables.VariablesImpl.
 
 
-Module vars := VariablesImpl.
-Module statdb := StatDB vars.
+Module statdb := StatDB VariablesImpl.
 
 Axiom get_new_item : prog nat.
 Axiom report_mean : option nat -> prog unit.

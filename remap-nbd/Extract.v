@@ -4,7 +4,6 @@ Require Import ExtrHaskellBasic.
 Require Import ExtrHaskellNatInteger.
 Require Import Helpers.ExtrBytes.
 Require Import Refinement.ExtrProg.
-Require Import BadSectorDisk.ExtrBadSectorDisk.
 
 Extraction Language Haskell.
 

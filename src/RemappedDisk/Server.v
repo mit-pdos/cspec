@@ -1,30 +1,27 @@
 Require Import POCS.
 
-Require Import RemappedDisk.RemappedDiskAPI.
 Require Import RemappedDisk.RemappedDiskImpl.
-Require Import BadSectorDisk.ExtrBadSectorDisk.
+Require Import BadSectorDisk.BadSectorImpl.
 
 Require Import NBD.NbdData.
 Require Import NBD.ExtrServer.
 
-(* TODO: re-use this code for asynchronous implementation *)
-Definition d := RemappedDisk.rd BadSectorDisk.bs.
 
-Opaque blockbytes.
+Module d := RemappedDisk BadSectorDisk.
 
 Fixpoint read (off:nat) n : prog (bytes (n*blockbytes)) :=
   match n with
   | 0 => Ret bnull
-  | S n => b <- Prim d (RemappedDisk.Read off);
+  | S n => b <- d.read off;
             rest <- read (off+1) n;
             Ret (bappend b rest)
   end.
 
 Fixpoint write (off:nat) n (bs:bytes (n*blockbytes)) {struct n} : prog unit.
-  destruct n; simpl in *.
+  destruct n.
   - apply (Ret tt).
   - destruct (bsplit bs) as [b rest].
-    apply (Bind (Prim d (RemappedDisk.Write off b))); intros _.
+    apply (Bind (d.write off b)); intros _.
     apply (write (off+1) _ rest).
 Defined.
 
@@ -54,10 +51,10 @@ CoFixpoint handle : prog unit :=
   end.
 
 Definition serverLoop : prog unit :=
-  _ <- irec d;
+  _ <- d.recover;
   handle.
 
 Definition diskSize : prog nat :=
-  Prim d (RemappedDisk.DiskSize).
+  d.diskSize.
 
-Definition init := iInit d.
+Definition init := d.init.

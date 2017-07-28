@@ -5,7 +5,7 @@ cabal-version:       >=1.10
 
 library
   hs-source-dirs:      src
-  exposed-modules:     RemappedDiskImpl
+  exposed-modules:     Server
                      , Network.NBD
   other-modules:       Utils.Conversion
                      , BadSectorDisk.Ops
@@ -23,12 +23,10 @@ library
                      , NbdData
                      , Prog
                      , Sectors
-                     , Server
                      , Sized
                      , Specif
-                     , ExtrBadSectorDisk
+                     , BadSectorImpl
                      , BadSectorAPI
-                     , RemappedDiskAPI
                      , ExtrServer
   build-depends:       base >= 4.7 && < 5
                      , ghc-prim

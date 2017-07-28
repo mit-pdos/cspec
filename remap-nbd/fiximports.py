@@ -11,7 +11,7 @@ import_modules = {
     ["Helpers"],
 
     "import qualified BadSectorDisk.Ops":
-    ["ExtrBadSectorDisk"],
+    ["BadSectorImpl"],
 
     "import BadSectorDisk.Env":
     [
@@ -24,8 +24,7 @@ import_modules = {
         "Server",
         "ExtrServer",
         "Sync",
-        "ExtrBadSectorDisk",
-        "RemappedDiskImpl",
+        "BadSectorImpl",
     ],
 
     "import qualified Data.Word":
