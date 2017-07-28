@@ -7,8 +7,8 @@ library
   hs-source-dirs:      src
   exposed-modules:     StatDbCli, Variables.Env
   other-modules:       Variables.Ops, CLI.Stubs,
-                       Interface, StatDbAPI, StatDbImpl,
-                       VariablesAPI, ExtrVariables,
+                       Interface, StatDbAPI,
+                       VariablesAPI, VariablesImpl,
                        Hoare, Datatypes, Helpers, Prog,
                        Bool, Logic
   build-depends:       base >= 4.7 && < 5

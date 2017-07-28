@@ -8,7 +8,10 @@ import os, sys
 
 import_modules = {
     "import qualified Variables.Ops as Variables":
-    ["ExtrVariables"],
+    [
+        "VariablesImpl",
+        "StatDbCli",
+    ],
 
     "import qualified CLI.Stubs as CLI":
     ["StatDbCli"],
@@ -16,7 +19,7 @@ import_modules = {
     "import Variables.Env":
     [
         "Interface",
-        "ExtrVariables",
+        "VariablesImpl",
         "StatDbImpl",
         "StatDbCli",
     ],
