@@ -53,10 +53,16 @@ Module RemappedDisk (bd : BadSectorAPI) <: OneDiskAPI.
       let bs_addr := stateBadSector bs_state in
       forall
         (* Fill in the rest of your abstraction here. *)
-        (* Hint 1: What should be true about the non-bad sectors? *)
+        (* Hint 0: Try to prove [Read]'s correctness to discover what you need from this abstraction *)
+        (* Hint 1: What should be true about the non-bad sectors?   Replace [True] with what needs to be true *)
+        (Hgoodsectors : True)
         (* Hint 2: What should be true about the bad sector? *)
+        (Hbadsector : True)
         (* Hint 3: What if the bad sector address is the last address? *)
+        (Hbadlast : True)
         (* Hint 4: What if the bad sector address is past the end of the disk? *)
+        (* Hint 5: To refer to the contents of disk [d] at address [a], you can write [d a] *)
+        (* Hint 6: To refer to the size of disk [d], you can write [size d] *)
         (* SOL *)
         (Hgoodsec : forall a, a <> bs_addr /\ a <> size rd_disk -> bs_disk a = rd_disk a)
         (Hremap : bs_addr <> size rd_disk -> bs_disk (size rd_disk) = rd_disk bs_addr)
