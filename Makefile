@@ -27,7 +27,7 @@ COQRFLAGS := -R build Pocs
 BINS	:= statdb-cli remap-nbd replicate-nbd
 
 .PHONY: default
-default: $(patsubst %,bin/%,$(BINS))
+default: $(patsubst %,bin/%,$(BINS)) docs
 
 build/%.v: src/%.v
 	@mkdir -p $(@D)
@@ -47,6 +47,11 @@ build/%.vo: build/%.v
 
 .PHONY: coq
 coq: $(patsubst src/%.v,build/%.vo,$(CODE))
+
+.PHONY: docs
+docs: coq
+	@mkdir -p doc
+	coqdoc $(COQRFLAGS) -d doc $(patsubst src/%.v,build/%.v,$(CODE))
 
 .PHONY: %/extract
 %/extract: %/Extract.v %/fiximports.py build/Helpers/ExtrBytes.vo build/Refinement/ExtrProg.vo

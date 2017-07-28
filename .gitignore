@@ -1,5 +1,6 @@
 /build
 /bin
+/doc
 /.lia.cache
 .stack-work
 
