@@ -891,17 +891,17 @@ Module ReplicatedDisk (td : TwoDiskAPI) <: OneDiskAPI.
       td.abstr.
   Proof.
     unfold Recover, Recover_spec; intros.
-    step.
+    spec_cases; simplify.
     rename_by_type DiskStatus s.
+    rename_by_type disk d.
     destruct s; simplify.
-    + rename_by_type disk d.
-      exists d, d; intuition eauto.
+    + step.
       step.
       exists d, FullySynced; intuition eauto.
 
       step.
       simplify.
-    + rename_by_type disk d.
+    + step.
       exists (diskUpd d a b), d; (intuition eauto); simplify.
       step.
 

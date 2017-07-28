@@ -17,8 +17,6 @@ Things to clean up:
 
 - change [recover] name conflict: both Hoare.recover and customary recovery procedure name
 
-- add tactic to [intro] the ghost variables of a [prog_spec] goal
-
 ===
 
 Things we've figured out:
