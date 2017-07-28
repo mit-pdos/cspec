@@ -458,792 +458,692 @@ Module ReplicatedDisk (td : TwoDiskAPI) <: OneDiskAPI.
   Hint Resolve init_ok.
 
 
-    (**
-     * Recovery implementation.
-     *)
+  (**
+   * Recovery implementation.
+   *)
 
-    Inductive RecStatus :=
-    (* continue working, nothing interesting has happened *)
-    | Continue
-    (* some address has been repaired (or the recovery has exhausted the
-       addresses) - only one address can be out of sync and thus only it must be
-       recovered. *)
-    (* OR, one of the disks has failed, so don't bother continuing recovery since
-       the invariant is now trivially satisfied *)
-    | RepairDoneOrFailed.
+  Inductive RecStatus :=
+  (* continue working, nothing interesting has happened *)
+  | Continue
+  (* some address has been repaired (or the recovery has exhausted the
+     addresses) - only one address can be out of sync and thus only it must be
+     recovered. *)
+  (* OR, one of the disks has failed, so don't bother continuing recovery since
+     the invariant is now trivially satisfied *)
+  | RepairDoneOrFailed.
 
-    Definition fixup (a:addr) : prog RecStatus :=
-      mv0 <- Prim td (TD.Read d0 a);
-      match mv0 with
-      | Working v =>
-        mv2 <- Prim td (TD.Read d1 a);
-        match mv2 with
-        | Working v' =>
-          if v == v' then
-            Ret Continue
-          else
-            mu <- Prim td (TD.Write d1 a v);
-            Ret RepairDoneOrFailed
-        | Failed => Ret RepairDoneOrFailed
-        end
+  Definition fixup (a:addr) : prog RecStatus :=
+    mv0 <- td.read d0 a;
+    match mv0 with
+    | Working v =>
+      mv2 <- td.read d1 a;
+      match mv2 with
+      | Working v' =>
+        if v == v' then
+          Ret Continue
+        else
+          mu <- td.write d1 a v;
+          Ret RepairDoneOrFailed
       | Failed => Ret RepairDoneOrFailed
-      end.
+      end
+    | Failed => Ret RepairDoneOrFailed
+    end.
 
-    (* recursively performs recovery at [a-1], [a-2], down to 0 *)
-    Fixpoint recover_at (a:addr) : prog unit :=
-      match a with
-      | 0 => Ret tt
-      | S n =>
-        s <- fixup n;
-        match s with
-        | Continue => recover_at n
-        | RepairDoneOrFailed => Ret tt
-        end
-      end.
+  (* recursively performs recovery at [a-1], [a-2], down to 0 *)
+  Fixpoint recover_at (a:addr) : prog unit :=
+    match a with
+    | 0 => Ret tt
+    | S n =>
+      s <- fixup n;
+      match s with
+      | Continue => recover_at n
+      | RepairDoneOrFailed => Ret tt
+      end
+    end.
 
-    (* END *)
-
-    Definition Recover : prog unit :=
-    (* SOL *)
-      sz <- DiskSize;
-      _ <- recover_at sz;
-      Ret tt.
-
-    Definition Recover_stub : prog unit :=
-      (* END *)
-      Ret tt.
-
-    (* SOL *)
+  Definition Recover : prog unit :=
+    sz <- diskSize;
+    _ <- recover_at sz;
+    Ret tt.
 
 
-    (**
-     * Lemmas and recovery proofs.
-     *)
+  (**
+   * Lemmas and recovery proofs.
+   *)
 
-    Lemma if_lt_dec : forall A n m (a a':A),
-        n < m ->
-        (if lt_dec n m then a else a') = a.
-    Proof.
-      intros.
-      destruct (lt_dec n m); auto.
-      contradiction.
-    Qed.
+  Lemma if_lt_dec : forall A n m (a a':A),
+      n < m ->
+      (if lt_dec n m then a else a') = a.
+  Proof.
+    intros.
+    destruct (lt_dec n m); auto.
+    contradiction.
+  Qed.
 
-    Lemma disks_eq_inbounds : forall T (d: diskOf T) a v v',
-        a < size d ->
-        d a ?|= eq v ->
-        d a ?|= eq v' ->
-        v = v'.
-    Proof.
-      unfold disk_get; intros.
-      pose proof (diskMem_domain d a).
-      rewrite if_lt_dec in H2 by auto.
-      repeat deex.
-      rewrite H2 in H0.
-      replace (d a) in *; simpl in *; subst; auto.
-    Qed.
+  Lemma disks_eq_inbounds : forall T (d: diskOf T) a v v',
+      a < size d ->
+      d a ?|= eq v ->
+      d a ?|= eq v' ->
+      v = v'.
+  Proof.
+    unfold disk_get; intros.
+    pose proof (diskMem_domain d a).
+    rewrite if_lt_dec in H2 by auto.
+    repeat deex.
+    rewrite H2 in H0.
+    replace (d a) in *; simpl in *; subst; auto.
+  Qed.
 
-    (* we will show that fixup does nothing once the disks are the same *)
-    Theorem fixup_equal_ok : forall a,
-        prog_spec
-          (fun d state =>
-             {|
-               pre :=
-                 (* for simplicity we only consider in-bounds addresses, though
-                    if a is out-of-bounds fixup just might uselessly write to
-                    disk and not do anything *)
-                 a < size d /\
-                 TD.disk0 state ?|= eq d /\
-                 TD.disk1 state ?|= eq d;
-               post :=
-                 fun r state' =>
-                   match r with
-                   | Continue =>
-                     TD.disk0 state' ?|= eq d /\
-                     TD.disk1 state' ?|= eq d
-                   | RepairDoneOrFailed =>
-                     TD.disk0 state' ?|= eq d /\
-                     TD.disk1 state' ?|= eq d
-                   end;
-               recover :=
-                 fun _ state' =>
-                   TD.disk0 state' ?|= eq d /\
-                   TD.disk1 state' ?|= eq d;
-             |})
-          (fixup a)
-          (irec td)
-          (interface_abs td).
-    Proof.
-      unfold fixup.
-      step.
-
-      destruct r; step.
-
-      destruct r; try step.
-      is_eq v v0; try step.
-      assert (v = v0) by eauto using disks_eq_inbounds.
-      contradiction.
-    Qed.
-
-    Lemma diskUpd_maybe_same : forall (d:disk) a b,
-        d a ?|= eq b ->
-        diskUpd d a b = d.
-    Proof.
-      intros.
-      destruct (d a) eqn:?; simpl in *; subst;
-        autorewrite with upd;
-        auto.
-    Qed.
-
-    Hint Rewrite diskUpd_maybe_same using (solve [ auto ]) : rd.
-    Hint Rewrite diskUpd_eq using (solve [ auto ]) : rd.
-
-    Theorem fixup_correct_addr_ok : forall a,
-        prog_spec
-          (fun '(d, b) state =>
-             {|
-               pre :=
-                 a < size d /\
-                 TD.disk0 state ?|= eq (diskUpd d a b) /\
-                 TD.disk1 state ?|= eq d;
-               post :=
-                 fun r state' =>
-                   match r with
-                   | Continue =>
-                     (* could happen if b already happened to be value *)
-                     TD.disk0 state' ?|= eq (diskUpd d a b) /\
-                     TD.disk1 state' ?|= eq (diskUpd d a b)
-                   | RepairDoneOrFailed =>
-                     TD.disk0 state' ?|= eq (diskUpd d a b) /\
-                     TD.disk1 state' ?|= eq (diskUpd d a b) \/
-                     TD.disk0 state' ?|= eq d /\
-                     TD.disk1 state' ?|= eq d
-                   end;
-               recover :=
-                 fun _ state' =>
-                   (TD.disk0 state' ?|= eq (diskUpd d a b) /\
-                    TD.disk1 state' ?|= eq (diskUpd d a b)) \/
-                   (TD.disk0 state' ?|= eq (diskUpd d a b) /\
-                    TD.disk1 state' ?|= eq d) \/
-                   (TD.disk0 state' ?|= eq d /\
-                    TD.disk1 state' ?|= eq d);
-             |})
-          (fixup a)
-          (irec td)
-          (interface_abs td).
-    Proof.
-      unfold fixup; intros.
-      step.
-
-      destruct r; try step.
-
-      destruct r; try step.
-      match goal with
-      | |- context[diskUpd _ _ ?b] =>
-        is_eq b v; try step
-      end.
-
-      step.
-      destruct r; (intuition eauto); simplify; finish.
-    Qed.
-
-    Hint Resolve PeanoNat.Nat.lt_neq.
-    Hint Rewrite diskUpd_neq : rd.
-    Hint Resolve disks_eq_inbounds.
-
-    Theorem fixup_wrong_addr_ok : forall a,
-        prog_spec
-          (fun '(d, b, a') state =>
-             {|
-               pre :=
-                 a < size d /\
-                 (* recovery, working from end of disk, has not yet reached the
-                    correct address *)
-                 a' < a /\
-                 TD.disk0 state ?|= eq (diskUpd d a' b) /\
-                 TD.disk1 state ?|= eq d;
-               post :=
-                 fun r state' =>
-                   match r with
-                   | Continue =>
-                     TD.disk0 state' ?|= eq (diskUpd d a' b) /\
-                     TD.disk1 state' ?|= eq d
-                   | RepairDoneOrFailed =>
-                     TD.disk0 state' ?|= eq d /\
-                     TD.disk1 state' ?|= eq d \/
-                     TD.disk0 state' ?|= eq (diskUpd d a' b) /\
-                     TD.disk1 state' ?|= eq (diskUpd d a' b)
-                   end;
-               recover :=
-                 fun _ state' =>
-                   (TD.disk0 state' ?|= eq (diskUpd d a' b) /\
-                    TD.disk1 state' ?|= eq d) \/
-                   (TD.disk0 state' ?|= eq d /\
-                    TD.disk1 state' ?|= eq d);
-             |})
-          (fixup a)
-          (irec td)
-          (interface_abs td).
-    Proof.
-      unfold fixup; intros.
-      step.
-
-      destruct r; try step.
-
-      destruct r; try step.
-      is_eq v v0; try step.
-    Qed.
-
-    (* To make these specifications precise while also covering both the already
-     * synced and diverged disks cases, we keep track of which input state we're
-     * in from the input and use it to give an exact postcondition. *)
-    Inductive DiskStatus :=
-    | FullySynced
-    | OutOfSync (a:addr) (b:block).
-
-    Theorem fixup_ok : forall a,
-        prog_spec
-          (fun '(d, s) state =>
-             {|
-               pre :=
-                 a < size d /\
-                 match s with
-                 | FullySynced => TD.disk0 state ?|= eq d /\
-                                 TD.disk1 state ?|= eq d
-                 | OutOfSync a' b => a' <= a /\
-                                    TD.disk0 state ?|= eq (diskUpd d a' b) /\
-                                    TD.disk1 state ?|= eq d
-                 end;
-               post :=
-                 fun r state' =>
-                   match s with
-                   | FullySynced => TD.disk0 state' ?|= eq d /\
-                                   TD.disk1 state' ?|= eq d
-                   | OutOfSync a' b =>
-                     match r with
-                     | Continue =>
-                       (a' < a /\
-                        TD.disk0 state' ?|= eq (diskUpd d a' b) /\
-                        TD.disk1 state' ?|= eq d) \/
-                       (TD.disk0 state' ?|= eq (diskUpd d a' b) /\
-                        TD.disk1 state' ?|= eq (diskUpd d a' b))
-                     | RepairDone =>
-                       (TD.disk0 state' ?|= eq d /\
-                        TD.disk1 state' ?|= eq d) \/
-                       (TD.disk0 state' ?|= eq (diskUpd d a' b) /\
-                        TD.disk1 state' ?|= eq (diskUpd d a' b))
-                     end
-                   end;
-               recover :=
-                 fun _ state' =>
-                   match s with
-                   | FullySynced => TD.disk0 state' ?|= eq d /\
-                                   TD.disk1 state' ?|= eq d
-                   | OutOfSync a' b =>
-                     (TD.disk0 state' ?|= eq (diskUpd d a' b) /\
-                      TD.disk1 state' ?|= eq (diskUpd d a' b)) \/
-                     (TD.disk0 state' ?|= eq (diskUpd d a' b) /\
-                      TD.disk1 state' ?|= eq d) \/
-                     (TD.disk0 state' ?|= eq d /\
-                      TD.disk1 state' ?|= eq d)
-                   end;
-             |})
-          (fixup a)
-          (irec td)
-          (interface_abs td).
-    Proof.
-      spec_cases; simplify.
-      match goal with | x : DiskStatus |- _ => rename x into s end.
-      destruct s; intuition eauto.
-      - spec_case fixup_equal_ok; simplify; finish.
-        descend; (intuition eauto); destruct matches in *;
-          intuition eauto.
-      - apply PeanoNat.Nat.lt_eq_cases in H1; intuition.
-        + spec_case fixup_wrong_addr_ok; simplify; finish.
-          descend; intuition eauto.
-
-          destruct v; intuition eauto.
-        + spec_case fixup_correct_addr_ok; simplify; finish.
-          descend; intuition eauto.
-
-          destruct v; intuition eauto.
-    Qed.
-
-    Hint Resolve fixup_ok.
-
-    Hint Resolve Lt.lt_n_Sm_le.
-
-    Hint Rewrite diskUpd_size : rd.
-
-    Theorem recover_at_ok : forall a,
-        prog_spec
-          (fun '(d, s) state =>
-             {|
-               pre :=
-                 a <= size d /\
-                 match s with
-                 | FullySynced => TD.disk0 state ?|= eq d /\
-                                 TD.disk1 state ?|= eq d
-                 | OutOfSync a' b => a' < a /\
-                                    TD.disk0 state ?|= eq (diskUpd d a' b) /\
-                                    TD.disk1 state ?|= eq d
-                 end;
-               post :=
-                 fun r state' =>
-                   match s with
-                   | FullySynced =>
-                     TD.disk0 state' ?|= eq d /\
-                     TD.disk1 state' ?|= eq d
-                   | OutOfSync a' b =>
-                     (TD.disk0 state' ?|= eq d /\
-                      TD.disk1 state' ?|= eq d) \/
-                     (TD.disk0 state' ?|= eq (diskUpd d a' b) /\
-                      TD.disk1 state' ?|= eq (diskUpd d a' b))
-                   end;
-               recover :=
-                 fun _ state' =>
-                   match s with
-                   | FullySynced => TD.disk0 state' ?|= eq d /\
-                                   TD.disk1 state' ?|= eq d
-                   | OutOfSync a' b =>
-                     (TD.disk0 state' ?|= eq d /\
-                      TD.disk1 state' ?|= eq d) \/
-                     (TD.disk0 state' ?|= eq (diskUpd d a' b) /\
-                      TD.disk1 state' ?|= eq d) \/
-                     (TD.disk0 state' ?|= eq (diskUpd d a' b) /\
-                      TD.disk1 state' ?|= eq (diskUpd d a' b))
-                   end;
-             |})
-          (recover_at a)
-          (irec td)
-          (interface_abs td).
-    Proof.
-      induction a; simpl; intros.
-      - step.
-        rename_by_type DiskStatus s.
-        destruct s; intuition (subst; eauto).
-        omega.
-      - step.
-        rename_by_type DiskStatus s.
-        destruct s; intuition (subst; eauto).
-        rename_by_type (diskOf block) d.
-        exists d, FullySynced; intuition eauto.
-        destruct r; step.
-
-        exists d, FullySynced; intuition eauto.
-        rename_by_type (diskOf block) d.
-        exists d, (OutOfSync a0 b); intuition eauto.
-
-        destruct r; step.
-        intuition.
-        exists d, (OutOfSync a0 b); intuition eauto.
-        exists (diskUpd d a0 b), FullySynced; intuition eauto.
-        simplify; finish.
-    Qed.
-
-    Hint Resolve recover_at_ok.
-
-    Definition Recover_spec :=
-      (fun '(d, s) state =>
-         {|
-           pre :=
-             match s with
-             | FullySynced => TD.disk0 state ?|= eq d /\
-                             TD.disk1 state ?|= eq d
-             | OutOfSync a b => a < size d /\
-                               TD.disk0 state ?|= eq (diskUpd d a b) /\
-                               TD.disk1 state ?|= eq d
-             end;
-           post :=
-             fun (_:unit) state' =>
-               match s with
-               | FullySynced => TD.disk0 state' ?|= eq d /\
-                               TD.disk1 state' ?|= eq d
-               | OutOfSync a b =>
-                 (TD.disk0 state' ?|= eq d /\
-                  TD.disk1 state' ?|= eq d) \/
-                 (TD.disk0 state' ?|= eq (diskUpd d a b) /\
-                  TD.disk1 state' ?|= eq (diskUpd d a b))
-               end;
-           recover :=
-             fun (_:unit) state' =>
-               match s with
-               | FullySynced => TD.disk0 state' ?|= eq d /\
-                               TD.disk1 state' ?|= eq d
-               | OutOfSync a b =>
-                 (TD.disk0 state' ?|= eq d /\
-                  TD.disk1 state' ?|= eq d) \/
-                 (TD.disk0 state' ?|= eq (diskUpd d a b) /\
-                  TD.disk1 state' ?|= eq d) \/
-                 (TD.disk0 state' ?|= eq (diskUpd d a b) /\
-                  TD.disk1 state' ?|= eq (diskUpd d a b))
-               end;
-         |}).
-
-    Theorem Recover_rok :
-      prog_spec
-        Recover_spec
-        (Recover)
-        (irec td)
-        (interface_abs td).
-    Proof.
-      (* Prove that [Recover] satisfies its spec above, [Recover_spec],
-       * in the absence of repeated recovery.
-       *)
-      (* SOL *)
-      unfold Recover, Recover_spec; intros.
-      step.
-      rename_by_type DiskStatus s.
-      destruct s; simplify.
-      + rename_by_type disk d.
-        exists d, d; intuition eauto.
-        step.
-        exists d, FullySynced; intuition eauto.
-
-        step.
-      + rename_by_type disk d.
-        exists (diskUpd d a b), d; (intuition eauto); simplify.
-        step.
-
-        exists d, (OutOfSync a b); intuition eauto.
-        step.
-      (* END *)
-      (* STUB: pocs_admit. *)
-    Qed.
-
-    Theorem Recover_ok :
-      prog_loopspec
-        Recover_spec
-        (Recover)
-        (irec td)
-        (interface_abs td).
-    Proof.
-      (* Prove that [Recover] is safe to repeatedly crash and recover.
-       *)
-      eapply idempotent_loopspec; simpl.
-      - eapply Recover_rok.
-      - (* SOL *)
-        unfold idempotent; intuition; simplify.
-        rename a0 into d.
-        destruct b; intuition eauto.
-        exists d, FullySynced; intuition eauto.
-        exists d, FullySynced; intuition eauto.
-        exists d, (OutOfSync a b); intuition eauto.
-        exists (diskUpd d a b), FullySynced; intuition eauto.
-        (* END *)
-        (* STUB: pocs_admit. *)
-    Qed.
-
-    Hint Resolve Recover_ok.
-
-
-    (**
-     * Specifications and proofs about our implementation of the API
-     * with our own full recovery.
-     *)
-
-    Theorem Read_rok : forall a,
-        prog_spec
-          (fun d state =>
-             {|
-               pre := TD.disk0 state ?|= eq d /\
-                      TD.disk1 state ?|= eq d;
-               post :=
-                 fun r state' =>
-                   d a ?|= eq r /\
-                   TD.disk0 state' ?|= eq d /\
-                   TD.disk1 state' ?|= eq d;
-               recover :=
-                 fun _ state' =>
-                   TD.disk0 state' ?|= eq d /\
-                   TD.disk1 state' ?|= eq d;
-             |})
-          (Read a) (_ <- irec td; Recover)
-          (interface_abs td).
-    Proof.
-      start.
-      rename a0 into d.
-      descend; (intuition eauto); simplify.
-      exists d, FullySynced; intuition eauto.
-    Qed.
-
-    Theorem Write_rok : forall a b,
-        prog_spec
-          (fun d state =>
-             {|
-               pre :=
-                 TD.disk0 state ?|= eq d /\
-                 TD.disk1 state ?|= eq d;
-               post :=
-                 fun r state' =>
-                   r = tt /\
-                   TD.disk0 state' ?|= eq (diskUpd d a b) /\
-                   TD.disk1 state' ?|= eq (diskUpd d a b);
-               recover :=
-                 fun _ state' =>
-                    (TD.disk0 state' ?|= eq d /\
-                    TD.disk1 state' ?|= eq d) \/
-                   (TD.disk0 state' ?|= eq (diskUpd d a b) /\
-                    TD.disk1 state' ?|= eq (diskUpd d a b));
-              |})
-          (Write a b) (_ <- irec td; Recover)
-          (interface_abs td).
-    Proof.
-      (* Prove that [Recover] properly recovers from all crashes in [Write]. *)
-      (* SOL *)
-      start.
-      rename a0 into d.
-      descend; (intuition eauto); simplify.
-      - exists d, FullySynced; intuition eauto.
-      - exists d, (OutOfSync a b); intuition eauto.
-      - exists (diskUpd d a b), FullySynced; intuition eauto.
-      (* END *)
-      (* STUB: pocs_admit. *)
-     Qed.
-
-    Theorem DiskSize_rok :
+  (* we will show that fixup does nothing once the disks are the same *)
+  Theorem fixup_equal_ok : forall a,
       prog_spec
         (fun d state =>
            {|
-             pre := TD.disk0 state ?|= eq d /\
-                    TD.disk1 state ?|= eq d;
+             pre :=
+               (* for simplicity we only consider in-bounds addresses, though
+                  if a is out-of-bounds fixup just might uselessly write to
+                  disk and not do anything *)
+               a < size d /\
+               disk0 state ?|= eq d /\
+               disk1 state ?|= eq d;
              post :=
                fun r state' =>
-                 r = size d /\
-                 TD.disk0 state' ?|= eq d /\
-                 TD.disk1 state' ?|= eq d;
+                 match r with
+                 | Continue =>
+                   disk0 state' ?|= eq d /\
+                   disk1 state' ?|= eq d
+                 | RepairDoneOrFailed =>
+                   disk0 state' ?|= eq d /\
+                   disk1 state' ?|= eq d
+                 end;
              recover :=
                fun _ state' =>
-                 TD.disk0 state' ?|= eq d /\
-                 TD.disk1 state' ?|= eq d;
+                 disk0 state' ?|= eq d /\
+                 disk1 state' ?|= eq d;
            |})
-        (DiskSize) (_ <- irec td; Recover)
-        (interface_abs td).
-    Proof.
-      start.
-      rename a into d.
-      exists d, d; (intuition eauto); simplify.
+        (fixup a)
+        td.recover
+        td.abstr.
+  Proof.
+    unfold fixup.
+    step.
+
+    destruct r; step.
+
+    destruct r; try step.
+    is_eq v v0; try step.
+    simplify.
+    assert (v = v0) by eauto using disks_eq_inbounds.
+    contradiction.
+    simplify.
+    simplify.
+  Qed.
+
+  Lemma diskUpd_maybe_same : forall (d:disk) a b,
+      d a ?|= eq b ->
+      diskUpd d a b = d.
+  Proof.
+    intros.
+    destruct (d a) eqn:?; simpl in *; subst;
+      autorewrite with upd;
+      auto.
+  Qed.
+
+  Hint Rewrite diskUpd_maybe_same using (solve [ auto ]) : rd.
+  Hint Rewrite diskUpd_eq using (solve [ auto ]) : rd.
+
+  Theorem fixup_correct_addr_ok : forall a,
+      prog_spec
+        (fun '(d, b) state =>
+           {|
+             pre :=
+               a < size d /\
+               disk0 state ?|= eq (diskUpd d a b) /\
+               disk1 state ?|= eq d;
+             post :=
+               fun r state' =>
+                 match r with
+                 | Continue =>
+                   (* could happen if b already happened to be value *)
+                   disk0 state' ?|= eq (diskUpd d a b) /\
+                   disk1 state' ?|= eq (diskUpd d a b)
+                 | RepairDoneOrFailed =>
+                   disk0 state' ?|= eq (diskUpd d a b) /\
+                   disk1 state' ?|= eq (diskUpd d a b) \/
+                   disk0 state' ?|= eq d /\
+                   disk1 state' ?|= eq d
+                 end;
+             recover :=
+               fun _ state' =>
+                 (disk0 state' ?|= eq (diskUpd d a b) /\
+                  disk1 state' ?|= eq (diskUpd d a b)) \/
+                 (disk0 state' ?|= eq (diskUpd d a b) /\
+                  disk1 state' ?|= eq d) \/
+                 (disk0 state' ?|= eq d /\
+                  disk1 state' ?|= eq d);
+           |})
+        (fixup a)
+        td.recover
+        td.abstr.
+  Proof.
+    unfold fixup; intros.
+    step.
+
+    destruct r; try step.
+
+    destruct r; try step.
+    match goal with
+    | |- context[diskUpd _ _ ?b] =>
+      is_eq b v; try step
+    end.
+
+    simplify.
+
+    step.
+    destruct r; (intuition eauto); simplify; finish.
+
+    simplify.
+    simplify.
+  Qed.
+
+  Hint Resolve PeanoNat.Nat.lt_neq.
+  Hint Rewrite diskUpd_neq : rd.
+  Hint Resolve disks_eq_inbounds.
+
+  Theorem fixup_wrong_addr_ok : forall a,
+      prog_spec
+        (fun '(d, b, a') state =>
+           {|
+             pre :=
+               a < size d /\
+               (* recovery, working from end of disk, has not yet reached the
+                  correct address *)
+               a' < a /\
+               disk0 state ?|= eq (diskUpd d a' b) /\
+               disk1 state ?|= eq d;
+             post :=
+               fun r state' =>
+                 match r with
+                 | Continue =>
+                   disk0 state' ?|= eq (diskUpd d a' b) /\
+                   disk1 state' ?|= eq d
+                 | RepairDoneOrFailed =>
+                   disk0 state' ?|= eq d /\
+                   disk1 state' ?|= eq d \/
+                   disk0 state' ?|= eq (diskUpd d a' b) /\
+                   disk1 state' ?|= eq (diskUpd d a' b)
+                 end;
+             recover :=
+               fun _ state' =>
+                 (disk0 state' ?|= eq (diskUpd d a' b) /\
+                  disk1 state' ?|= eq d) \/
+                 (disk0 state' ?|= eq d /\
+                  disk1 state' ?|= eq d);
+           |})
+        (fixup a)
+        td.recover
+        td.abstr.
+  Proof.
+    unfold fixup; intros.
+    step.
+
+    destruct r; try step.
+
+    destruct r; try step.
+    is_eq v v0; try step.
+
+    simplify.
+    simplify.
+    simplify.
+  Qed.
+
+  (* To make these specifications precise while also covering both the already
+   * synced and diverged disks cases, we keep track of which input state we're
+   * in from the input and use it to give an exact postcondition. *)
+  Inductive DiskStatus :=
+  | FullySynced
+  | OutOfSync (a:addr) (b:block).
+
+  Theorem fixup_ok : forall a,
+      prog_spec
+        (fun '(d, s) state =>
+           {|
+             pre :=
+               a < size d /\
+               match s with
+               | FullySynced => disk0 state ?|= eq d /\
+                                disk1 state ?|= eq d
+               | OutOfSync a' b => a' <= a /\
+                                   disk0 state ?|= eq (diskUpd d a' b) /\
+                                   disk1 state ?|= eq d
+               end;
+             post :=
+               fun r state' =>
+                 match s with
+                 | FullySynced => disk0 state' ?|= eq d /\
+                                  disk1 state' ?|= eq d
+                 | OutOfSync a' b =>
+                   match r with
+                   | Continue =>
+                     (a' < a /\
+                      disk0 state' ?|= eq (diskUpd d a' b) /\
+                      disk1 state' ?|= eq d) \/
+                     (disk0 state' ?|= eq (diskUpd d a' b) /\
+                      disk1 state' ?|= eq (diskUpd d a' b))
+                   | RepairDone =>
+                     (disk0 state' ?|= eq d /\
+                      disk1 state' ?|= eq d) \/
+                     (disk0 state' ?|= eq (diskUpd d a' b) /\
+                      disk1 state' ?|= eq (diskUpd d a' b))
+                   end
+                 end;
+             recover :=
+               fun _ state' =>
+                 match s with
+                 | FullySynced => disk0 state' ?|= eq d /\
+                                  disk1 state' ?|= eq d
+                 | OutOfSync a' b =>
+                   (disk0 state' ?|= eq (diskUpd d a' b) /\
+                    disk1 state' ?|= eq (diskUpd d a' b)) \/
+                   (disk0 state' ?|= eq (diskUpd d a' b) /\
+                    disk1 state' ?|= eq d) \/
+                   (disk0 state' ?|= eq d /\
+                    disk1 state' ?|= eq d)
+                 end;
+           |})
+        (fixup a)
+        td.recover
+        td.abstr.
+  Proof.
+    spec_cases; simplify.
+    match goal with | x : DiskStatus |- _ => rename x into s end.
+    destruct s; intuition eauto.
+    - spec_case fixup_equal_ok; simplify; finish.
+      descend; (intuition eauto); destruct matches in *;
+        intuition eauto.
+    - apply PeanoNat.Nat.lt_eq_cases in H1; intuition.
+      + spec_case fixup_wrong_addr_ok; simplify; finish.
+        descend; intuition eauto.
+
+        destruct v; intuition eauto.
+      + spec_case fixup_correct_addr_ok; simplify; finish.
+        descend; intuition eauto.
+
+        destruct v; intuition eauto.
+  Qed.
+
+  Hint Resolve fixup_ok.
+
+  Hint Resolve Lt.lt_n_Sm_le.
+
+  Hint Rewrite diskUpd_size : rd.
+
+  Theorem recover_at_ok : forall a,
+      prog_spec
+        (fun '(d, s) state =>
+           {|
+             pre :=
+               a <= size d /\
+               match s with
+               | FullySynced => disk0 state ?|= eq d /\
+                                disk1 state ?|= eq d
+               | OutOfSync a' b => a' < a /\
+                                   disk0 state ?|= eq (diskUpd d a' b) /\
+                                   disk1 state ?|= eq d
+               end;
+             post :=
+               fun r state' =>
+                 match s with
+                 | FullySynced =>
+                   disk0 state' ?|= eq d /\
+                   disk1 state' ?|= eq d
+                 | OutOfSync a' b =>
+                   (disk0 state' ?|= eq d /\
+                    disk1 state' ?|= eq d) \/
+                   (disk0 state' ?|= eq (diskUpd d a' b) /\
+                    disk1 state' ?|= eq (diskUpd d a' b))
+                 end;
+             recover :=
+               fun _ state' =>
+                 match s with
+                 | FullySynced => disk0 state' ?|= eq d /\
+                                  disk1 state' ?|= eq d
+                 | OutOfSync a' b =>
+                   (disk0 state' ?|= eq d /\
+                    disk1 state' ?|= eq d) \/
+                   (disk0 state' ?|= eq (diskUpd d a' b) /\
+                    disk1 state' ?|= eq d) \/
+                   (disk0 state' ?|= eq (diskUpd d a' b) /\
+                    disk1 state' ?|= eq (diskUpd d a' b))
+                 end;
+           |})
+        (recover_at a)
+        td.recover
+        td.abstr.
+  Proof.
+    induction a; simpl; intros.
+    - step.
+      rename_by_type DiskStatus s.
+      destruct s; intuition (subst; eauto); simplify.
+      omega.
+    - step.
+      rename_by_type DiskStatus s.
+      destruct s; intuition (subst; eauto).
+      rename_by_type (diskOf block) d.
       exists d, FullySynced; intuition eauto.
-    Qed.
+      destruct r; step.
 
-    Hint Resolve Read_rok Write_rok DiskSize_rok Recover_rok.
+      exists d, FullySynced; intuition eauto.
+      rename_by_type (diskOf block) d.
+      exists d, (OutOfSync a0 b); intuition eauto.
 
+      destruct r; step.
+      intuition.
+      exists d, (OutOfSync a0 b); intuition eauto.
+      exists (diskUpd d a0 b), FullySynced; intuition eauto.
+      simplify; finish.
+  Qed.
 
-    (* Now we gather up the implementation and all the correctness proofs,
-     * expressing them in terms of the high-level API in D.API. *)
+  Hint Resolve recover_at_ok.
 
-    (* First, we prove some lemmas that re-express the D.API semantics in more
-     * convenient terms (in some cases, just for the sake of the automation). *)
+  Definition Recover_spec :=
+    (fun '(d, s) state =>
+       {|
+         pre :=
+           match s with
+           | FullySynced => disk0 state ?|= eq d /\
+                            disk1 state ?|= eq d
+           | OutOfSync a b => a < size d /\
+                              disk0 state ?|= eq (diskUpd d a b) /\
+                              disk1 state ?|= eq d
+           end;
+         post :=
+           fun (_:unit) state' =>
+             match s with
+             | FullySynced => disk0 state' ?|= eq d /\
+                              disk1 state' ?|= eq d
+             | OutOfSync a b =>
+               (disk0 state' ?|= eq d /\
+                disk1 state' ?|= eq d) \/
+               (disk0 state' ?|= eq (diskUpd d a b) /\
+                disk1 state' ?|= eq (diskUpd d a b))
+             end;
+         recover :=
+           fun (_:unit) state' =>
+             match s with
+             | FullySynced => disk0 state' ?|= eq d /\
+                              disk1 state' ?|= eq d
+             | OutOfSync a b =>
+               (disk0 state' ?|= eq d /\
+                disk1 state' ?|= eq d) \/
+               (disk0 state' ?|= eq (diskUpd d a b) /\
+                disk1 state' ?|= eq d) \/
+               (disk0 state' ?|= eq (diskUpd d a b) /\
+                disk1 state' ?|= eq (diskUpd d a b))
+             end;
+       |}).
 
-    Lemma read_step : forall a (state state':RD.State) b,
-        state a ?|= eq b ->
-        state' = state ->
-        RD.step (RD.Read a) state b state'.
-    Proof.
-      intros; subst.
-      constructor; auto.
-      intros.
-      replace (state a) in *; auto.
-    Qed.
+  Theorem Recover_rok :
+    prog_spec
+      Recover_spec
+      (Recover)
+      td.recover
+      td.abstr.
+  Proof.
+    unfold Recover, Recover_spec; intros.
+    step.
+    rename_by_type DiskStatus s.
+    destruct s; simplify.
+    + rename_by_type disk d.
+      exists d, d; intuition eauto.
+      step.
+      exists d, FullySynced; intuition eauto.
 
-    Lemma write_step : forall a b (state state':RD.State) u,
-        state' = diskUpd state a b ->
-        RD.step (RD.Write a b) state u state'.
-    Proof.
-      intros; subst.
-      destruct u.
-      econstructor; eauto.
-    Qed.
+      step.
+      simplify.
+    + rename_by_type disk d.
+      exists (diskUpd d a b), d; (intuition eauto); simplify.
+      step.
 
-    Lemma disk_size_step : forall (state state':RD.State) r,
-        r = size state ->
-        state' = state ->
-        RD.step (RD.DiskSize) state r state'.
-    Proof.
-      intros; subst.
-      econstructor; eauto.
-    Qed.
+      exists d, (OutOfSync a b); intuition eauto.
+      step.
 
-    Hint Resolve read_step write_step disk_size_step.
+      simplify.
+      intuition eauto.
+  Qed.
 
+  Theorem Recover_ok :
+    prog_loopspec
+      Recover_spec
+      (Recover)
+      td.recover
+      td.abstr.
+  Proof.
+    eapply idempotent_loopspec; simpl.
+    - eapply Recover_rok.
+    - unfold idempotent; intuition; simplify.
+      rename a0 into d.
+      destruct b; intuition eauto.
+      exists d, FullySynced; intuition eauto.
+      exists d, FullySynced; intuition eauto.
+      exists d, (OutOfSync a b); intuition eauto.
+      exists (diskUpd d a b), FullySynced; intuition eauto.
+  Qed.
 
-
-
-    (**
-     * The proof will require a refinement; we build one up based on the two
-     * disk state.
-     *)
-
-    Definition abstraction_f (state:TD.State) : RD.State :=
-      match state with
-      | TD.Disks (Some d) _ _ => d
-      | TD.Disks None (Some d) _ => d
-      | _ => empty_disk (* impossible *)
-      end.
-
-    Definition rd_invariant (state:TD.State) :=
-      match state with
-      | TD.Disks (Some d_0) (Some d_1) _ =>
-        d_0 = d_1
-      | _ => True
-      end.
-
-    Definition rd_layer_abstraction (state:TD.State) (state':RD.State) :=
-      rd_invariant state /\
-      state' = abstraction_f state.
-
-    (* We re-express the abstraction and invariant's behavior in terms of the
-       maybe holds (m ?|= F) statements in all of our specifications. *)
-
-    Ltac crush :=
-      intros; repeat match goal with
-                     | [ state: TD.State |- _ ] =>
-                       destruct state; simpl in *
-                     | _ => destruct matches in *
-                     | _ => eauto
-                     end.
-
-    Lemma invariant_to_disks_eq0 : forall state,
-        rd_invariant state ->
-        TD.disk0 state ?|= eq (abstraction_f state).
-    Proof.
-      crush.
-    Qed.
-
-    Lemma invariant_to_disks_eq1 : forall state,
-        rd_invariant state ->
-        TD.disk1 state ?|= eq (abstraction_f state).
-    Proof.
-      crush.
-    Qed.
-
-    Lemma disks_eq_to_invariant : forall state d,
-        TD.disk0 state ?|= eq d ->
-        TD.disk1 state ?|= eq d ->
-        rd_invariant state.
-    Proof.
-      crush.
-    Qed.
-
-    Lemma disks_eq_to_abstraction : forall state d,
-        TD.disk0 state ?|= eq d ->
-        TD.disk1 state ?|= eq d ->
-        d = abstraction_f state.
-    Proof.
-      crush.
-      solve_false.
-    Qed.
-
-    Lemma disks_eq_to_abstraction' : forall state d,
-        TD.disk0 state ?|= eq d ->
-        TD.disk1 state ?|= eq d ->
-        abstraction_f state = d.
-    Proof.
-      intros.
-      symmetry; eauto using disks_eq_to_abstraction.
-    Qed.
-
-    Hint Resolve invariant_to_disks_eq0 invariant_to_disks_eq1.
-    Hint Resolve
-         disks_eq_to_invariant
-         disks_eq_to_abstraction
-         disks_eq_to_abstraction'.
-
-    (* Finally, we put together the pieces of the [Interface]. Here we also
-     * convert from our specificatiosn above to the exact form that an Interface
-     * uses; the proofs are automatic after defining the lemmas above about D.step
-     * and the layer refinement. *)
-
-    Definition d_op_impl T (op:RD.Op T) : prog T :=
-      match op with
-      | RD.Read a => Read a
-      | RD.Write a b => Write a b
-      | RD.DiskSize => DiskSize
-      end.
-
-    Definition rd_abstraction : Abstraction RD.State :=
-      abstraction_compose
-        (interface_abs td)
-        {| abstraction := rd_layer_abstraction; |}.
-
-    Definition impl : InterfaceImpl RD.Op :=
-      {| op_impl := d_op_impl;
-         recover_impl := _ <- irec td; Recover;
-      init_impl := then_init (iInit td) (Init) |}.
-
-    Theorem state_some_disks : forall state,
-        exists d_0 d_1,
-          TD.disk0 state ?|= eq d_0 /\
-          TD.disk1 state ?|= eq d_1.
-    Proof.
-      destruct state.
-      destruct disk0, disk1; simpl; eauto.
-      exfalso; eauto.
-    Qed.
-
-    Theorem rd_crash_effect_valid :
-      crash_effect_valid {| abstraction := rd_layer_abstraction; |}
-                         TD.wipe (fun (state state':RD.State) => state' = state).
-    Proof.
-      econstructor; unfold TD.wipe; intuition (subst; eauto).
-    Qed.
-
-    Theorem rd_layer_abstraction_f : forall state,
-        rd_invariant state ->
-        rd_layer_abstraction state (abstraction_f state).
-    Proof.
-      unfold rd_layer_abstraction; intuition.
-    Qed.
-
-    Hint Resolve rd_layer_abstraction_f.
-
-    Definition rd : Interface RD.API.
-      unshelve econstructor.
-      - exact impl.
-      - exact rd_abstraction.
-      - intros.
-       (* SOL *)
-        destruct op; unfold op_spec;
-          apply spec_abstraction_compose;
-          eapply prog_spec_weaken; eauto;
-            unfold spec_impl, rd_layer_abstraction; simplify.
-        + exists (abstraction_f state); (intuition eauto); simplify; finish.
-        + exists (abstraction_f state); (intuition eauto); simplify; finish.
-          exists (abstraction_f state'); intuition eauto.
-          right; descend; intuition eauto.
-        + exists (abstraction_f state); (intuition eauto); simplify.
-          descend; intuition eauto.
-          descend; intuition eauto.
-        (* END *)
-        (* STUB: all: pocs_admit. *)
-      - 
-        (* SOL *)
-        eapply rec_noop_compose; eauto; simpl.
-        unfold TD.wipe, rd_layer_abstraction, Recover_spec; simplify.
-        exists (abstraction_f state0), FullySynced; intuition eauto.
-        descend; intuition eauto.
-        (* END *)
-        (* STUB: all: pocs_admit. *)
-      - 
-        (* SOL *)
-        eapply then_init_compose; eauto.
-        eapply prog_spec_weaken; unfold spec_impl; simplify.
-        eauto.
-        pose proof (state_some_disks state); simplify.
-        descend; intuition eauto.
-        destruct v; simplify; finish.
-        (* END *)
-        (* STUB: all: pocs_admit. *)
-
-        Grab Existential Variables.
-        all: auto.
+  Hint Resolve Recover_ok.
 
 
-        (* STUB: all: pocs_admit. *)
-    Defined.
+  Definition recover : prog unit :=
+    _ <- td.recover;
+    Recover.
 
-  End ReplicatedDisk.
 
-End RD.
+  (**
+   * Specifications and proofs about our implementation of the API
+   * with our own full recovery.
+   *)
 
-Print Assumptions RD.rd.
+  Theorem read_rok : forall a,
+    prog_spec
+          (fun d state =>
+             {|
+               pre := disk0 state ?|= eq d /\
+                      disk1 state ?|= eq d;
+               post :=
+                 fun r state' =>
+                   d a ?|= eq r /\
+                   disk0 state' ?|= eq d /\
+                   disk1 state' ?|= eq d;
+               Hoare.recover :=
+                 fun _ state' =>
+                   disk0 state' ?|= eq d /\
+                   disk1 state' ?|= eq d;
+             |})
+    (read a) recover td.abstr.
+  Proof.
+    unfold recover.
+    start.
+    rename a0 into d.
+    descend; (intuition eauto); simplify.
+    exists d, FullySynced; intuition eauto.
+  Qed.
+
+  Theorem write_rok : forall a b,
+      prog_spec
+        (fun d state =>
+           {|
+             pre :=
+               disk0 state ?|= eq d /\
+               disk1 state ?|= eq d;
+             post :=
+               fun r state' =>
+                 r = tt /\
+                 disk0 state' ?|= eq (diskUpd d a b) /\
+                 disk1 state' ?|= eq (diskUpd d a b);
+             Hoare.recover :=
+               fun _ state' =>
+                 (disk0 state' ?|= eq d /\
+                  disk1 state' ?|= eq d) \/
+                 (disk0 state' ?|= eq (diskUpd d a b) /\
+                  disk1 state' ?|= eq (diskUpd d a b));
+            |})
+        (write a b)
+        recover
+        td.abstr.
+  Proof.
+    unfold recover.
+    start.
+    rename a0 into d.
+    descend; (intuition eauto); simplify.
+    - exists d, FullySynced; intuition eauto.
+    - exists d, (OutOfSync a b); intuition eauto.
+    - exists (diskUpd d a b), FullySynced; intuition eauto.
+   Qed.
+
+  Theorem diskSize_rok :
+    prog_spec
+      (fun d state =>
+         {|
+           pre := disk0 state ?|= eq d /\
+                  disk1 state ?|= eq d;
+           post :=
+             fun r state' =>
+               r = size d /\
+               disk0 state' ?|= eq d /\
+               disk1 state' ?|= eq d;
+           Hoare.recover :=
+             fun _ state' =>
+               disk0 state' ?|= eq d /\
+               disk1 state' ?|= eq d;
+         |})
+      (diskSize)
+      recover
+      td.abstr.
+  Proof.
+    unfold recover.
+    start.
+    rename a into d.
+    exists d, d; (intuition eauto); simplify.
+    exists d, FullySynced; intuition eauto.
+  Qed.
+
+  Hint Resolve read_rok write_rok diskSize_rok Recover_rok.
+
+
+  Definition abstraction_f (state: TwoDiskBaseAPI.State) : OneDiskAPI.State :=
+    match state with
+    | @Disks (Some d) _ _ => d
+    | @Disks None (Some d) _ => d
+    | _ => empty_disk (* impossible *)
+    end.
+
+  Definition rd_invariant (state: TwoDiskBaseAPI.State) :=
+    match state with
+    | @Disks (Some d_0) (Some d_1) _ =>
+      d_0 = d_1
+    | _ => True
+    end.
+
+  Definition rd_layer_abstraction (state: TwoDiskBaseAPI.State) (state': OneDiskAPI.State) :=
+    rd_invariant state /\
+    state' = abstraction_f state.
+
+  Definition abstr : Abstraction OneDiskAPI.State :=
+    abstraction_compose td.abstr {| abstraction := rd_layer_abstraction; |}.
+
+
+  (* We re-express the abstraction and invariant's behavior in terms of the
+     maybe holds (m ?|= F) statements in all of our specifications. *)
+
+  Ltac crush :=
+    intros; repeat match goal with
+                   | [ state: TwoDiskBaseAPI.State |- _ ] =>
+                     destruct state; simpl in *
+                   | _ => destruct matches in *
+                   | _ => eauto
+                   end.
+
+  Lemma invariant_to_disks_eq0 : forall state,
+      rd_invariant state ->
+      disk0 state ?|= eq (abstraction_f state).
+  Proof.
+    crush.
+  Qed.
+
+  Lemma invariant_to_disks_eq1 : forall state,
+      rd_invariant state ->
+      disk1 state ?|= eq (abstraction_f state).
+  Proof.
+    crush.
+  Qed.
+
+  Lemma disks_eq_to_invariant : forall state d,
+      disk0 state ?|= eq d ->
+      disk1 state ?|= eq d ->
+      rd_invariant state.
+  Proof.
+    crush.
+  Qed.
+
+  Lemma disks_eq_to_abstraction : forall state d,
+      disk0 state ?|= eq d ->
+      disk1 state ?|= eq d ->
+      d = abstraction_f state.
+  Proof.
+    crush.
+    solve_false.
+  Qed.
+
+  Lemma disks_eq_to_abstraction' : forall state d,
+      disk0 state ?|= eq d ->
+      disk1 state ?|= eq d ->
+      abstraction_f state = d.
+  Proof.
+    intros.
+    symmetry; eauto using disks_eq_to_abstraction.
+  Qed.
+
+  Hint Resolve invariant_to_disks_eq0 invariant_to_disks_eq1.
+  Hint Resolve
+       disks_eq_to_invariant
+       disks_eq_to_abstraction
+       disks_eq_to_abstraction'.
+
+
+  Theorem read_ok : forall a, prog_spec (read_spec a) (read a) recover abstr.
+  Proof.
+    intros.
+    apply spec_abstraction_compose;
+      eapply prog_spec_weaken; eauto;
+      unfold spec_impl, rd_layer_abstraction; simplify.
+    exists (abstraction_f state); (intuition eauto); simplify; finish.
+  Qed.
+
+  Theorem write_ok : forall a v, prog_spec (write_spec a v) (write a v) recover abstr.
+  Proof.
+    intros.
+    apply spec_abstraction_compose;
+      eapply prog_spec_weaken; eauto;
+      unfold spec_impl, rd_layer_abstraction; simplify.
+    exists (abstraction_f state); (intuition eauto); simplify; finish.
+    exists (abstraction_f state'); intuition eauto.
+  Qed.
+
+  Theorem diskSize_ok : prog_spec diskSize_spec diskSize recover abstr.
+  Proof.
+    intros.
+    apply spec_abstraction_compose;
+      eapply prog_spec_weaken; eauto;
+      unfold spec_impl, rd_layer_abstraction; simplify.
+    exists (abstraction_f state); (intuition eauto); simplify; finish.
+  Qed.
+
+  Theorem recover_noop : rec_noop recover abstr (@no_wipe _).
+  Proof.
+    eapply rec_noop_compose; eauto; simpl.
+    autounfold; unfold rd_layer_abstraction, Recover_spec; simplify.
+    exists (abstraction_f state0), FullySynced; intuition eauto.
+    descend; intuition eauto.
+  Qed.
+
+End ReplicatedDisk.
