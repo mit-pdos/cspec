@@ -52,7 +52,7 @@ Module ReplicatedDisk (td : TwoDiskAPI) <: OneDiskAPI.
       end
     end.
 
-  (* Initialize block a *)
+  (* Recursively initialize block a and below *)
   Fixpoint init_at (a:nat) : prog unit :=
     match a with
     | 0 => Ret tt
@@ -62,7 +62,7 @@ Module ReplicatedDisk (td : TwoDiskAPI) <: OneDiskAPI.
       init_at a
     end.
 
-  (* Recursively initialize every disk block *)
+  (* Initialize every disk block *)
   Definition init : prog InitResult :=
     size <- diskSizeInit;
     match size with
