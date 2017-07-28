@@ -65,22 +65,22 @@ Module AtomicPair (d : OneDiskAPI) <: AtomicPairAPI.
     step_prog; intros.
     destruct a'; simpl in *; intuition idtac.
     exists tt; simpl; intuition idtac.
-    2: unfold wipe in *; simpl in *; intuition subst; eauto.
+    2: autounfold in *; simpl in *; intuition subst; eauto.
 
     destruct (r == block0).
     - step_prog; intros.
       exists tt; simpl; intuition idtac.
-      2: unfold wipe in *; simpl in *; intuition subst; eauto.
+      2: autounfold in *; simpl in *; intuition subst; eauto.
 
       step_prog; intros.
       exists tt; simpl; intuition idtac.
-      2: unfold wipe in *; simpl in *; intuition subst; eauto.
+      2: autounfold in *; simpl in *; intuition subst; eauto.
 
       step_prog; intros.
       eauto.
 
       simpl in *; intuition subst.
-      2: unfold wipe in *; simpl in *; intuition subst; eauto.
+      2: autounfold in *; simpl in *; intuition subst; eauto.
       eexists. split; eauto. destruct s.
 
       invert_abstraction; intuition.
@@ -89,17 +89,17 @@ Module AtomicPair (d : OneDiskAPI) <: AtomicPairAPI.
 
     - step_prog; intros.
       exists tt; simpl; intuition idtac.
-      2: unfold wipe in *; simpl in *; intuition subst; eauto.
+      2: autounfold in *; simpl in *; intuition subst; eauto.
 
       step_prog; intros.
       exists tt; simpl; intuition idtac.
-      2: unfold wipe in *; simpl in *; intuition subst; eauto.
+      2: autounfold in *; simpl in *; intuition subst; eauto.
 
       step_prog; intros.
       eauto.
 
       simpl in *; intuition subst.
-      2: unfold wipe in *; simpl in *; intuition subst; eauto.
+      2: autounfold in *; simpl in *; intuition subst; eauto.
       eexists. split; eauto. destruct s.
 
       invert_abstraction; intuition.
@@ -194,42 +194,42 @@ Module AtomicPair (d : OneDiskAPI) <: AtomicPairAPI.
     step_prog; intros.
     destruct a'; simpl in *; intuition idtac.
     exists tt; simpl; intuition.
-    2: unfold wipe in *; simpl in *; intuition subst; eauto 10.
+    2: autounfold in *; simpl in *; intuition subst; eauto 10.
 
     destruct (r == block0).
     - step_prog; intros.
       exists tt; simpl; intuition idtac.
-      2: unfold wipe in *; simpl in *; intuition subst; eauto 10.
-      2: unfold wipe in *; simpl in *; intuition subst; eauto 10.
+      2: autounfold in *; simpl in *; intuition subst; eauto 10.
+      2: autounfold in *; simpl in *; intuition subst; eauto 10.
 
       step_prog; intros.
       exists tt; simpl; intuition idtac.
-      2: unfold wipe in *; simpl in *; intuition subst; eauto 10.
-      2: unfold wipe in *; simpl in *; intuition subst; eauto 10.
+      2: autounfold in *; simpl in *; intuition subst; eauto 10.
+      2: autounfold in *; simpl in *; intuition subst; eauto 10.
 
       step_prog; intros.
       exists tt; simpl; intuition idtac.
-      2: unfold wipe in *; simpl in *; intuition subst; eauto 10.
-      2: unfold wipe in *; simpl in *; intuition subst; eauto 10.
+      2: autounfold in *; simpl in *; intuition subst; eauto 10.
+      2: autounfold in *; simpl in *; intuition subst; eauto 10.
 
       step_prog; intros.
       eauto.
 
       simpl in *; intuition subst.
-      unfold wipe in *; simpl in *; intuition subst; eauto 10.
-      unfold wipe in *; simpl in *; intuition subst; eauto 10.
+      autounfold in *; simpl in *; intuition subst; eauto 10.
+      autounfold in *; simpl in *; intuition subst; eauto 10.
 
     - step_prog; intros.
       exists tt; simpl; intuition idtac.
-      2: unfold wipe in *; simpl in *; intuition subst; eauto 10.
-      2: unfold wipe in *; simpl in *; intuition subst; eauto 10.
+      2: autounfold in *; simpl in *; intuition subst; eauto 10.
+      2: autounfold in *; simpl in *; intuition subst; eauto 10.
 
       2: assert (r = block1); subst.
       2: pose block0_block1_differ.
       2: unfold atomic_pair_abstraction in *; simpl in *; intuition auto.
       2: rewrite H2 in *; simpl in *; subst; congruence.
       2: rewrite H2 in *; simpl in *; subst; congruence.
-      2: unfold wipe in *; simpl in *; intuition subst; eauto 10.
+      2: autounfold in *; simpl in *; intuition subst; eauto 10.
 
       assert (r = block1); subst.
       pose block0_block1_differ.
@@ -239,23 +239,23 @@ Module AtomicPair (d : OneDiskAPI) <: AtomicPairAPI.
 
       step_prog; intros.
       exists tt; simpl; intuition idtac.
-      2: unfold wipe in *; simpl in *; intuition subst; eauto 10.
-      2: unfold wipe in *; simpl in *; intuition subst; eauto 10.
+      2: autounfold in *; simpl in *; intuition subst; eauto 10.
+      2: autounfold in *; simpl in *; intuition subst; eauto 10.
 
       step_prog; intros.
       exists tt; simpl; intuition idtac.
-      2: unfold wipe in *; simpl in *; intuition subst; eauto 10.
-      2: unfold wipe in *; simpl in *; intuition subst; eauto 10.
+      2: autounfold in *; simpl in *; intuition subst; eauto 10.
+      2: autounfold in *; simpl in *; intuition subst; eauto 10.
 
       step_prog; intros.
       eauto.
 
       simpl in *; intuition subst.
-      unfold wipe in *; simpl in *; intuition subst; eauto 10.
-      unfold wipe in *; simpl in *; intuition subst; eauto 10.
+      autounfold in *; simpl in *; intuition subst; eauto 10.
+      autounfold in *; simpl in *; intuition subst; eauto 10.
   Qed.
 
-  Theorem recover_noop : rec_noop recover abstr AtomicPairAPI.wipe.
+  Theorem recover_noop : rec_noop recover abstr (@no_wipe _).
   Proof.
     unfold rec_noop.
     intros.
@@ -265,7 +265,7 @@ Module AtomicPair (d : OneDiskAPI) <: AtomicPairAPI.
     eauto.
 
     destruct a; simpl in *.
-    unfold wipe, AtomicPairAPI.wipe in *; intuition eauto.
+    autounfold in *; intuition eauto.
     subst; eauto.
   Qed.
 

@@ -17,8 +17,6 @@ Definition put_spec v : Specification unit unit unit State :=
     recover := fun _ state' => state' = state \/ state' = v
   |}.
 
-Definition wipe (state state' : State) := state = state'.
-
 
 Module Type AtomicPairAPI.
 
@@ -31,7 +29,7 @@ Module Type AtomicPairAPI.
 
   Axiom get_ok : prog_spec get_spec get recover abstr.
   Axiom put_ok : forall v, prog_spec (put_spec v) (put v) recover abstr.
-  Axiom recover_noop : rec_noop recover abstr wipe.
+  Axiom recover_noop : rec_noop recover abstr (@no_wipe _).
 
   Hint Resolve get_ok.
   Hint Resolve put_ok.
