@@ -1138,7 +1138,7 @@ Module ReplicatedDisk (td : TwoDiskAPI) <: OneDiskAPI.
     exists (abstraction_f state); (intuition eauto); simplify; finish.
   Qed.
 
-  Theorem recover_noop : rec_noop recover abstr (@no_wipe _).
+  Theorem recover_noop : rec_noop recover abstr no_wipe.
   Proof.
     eapply rec_noop_compose; eauto; simpl.
     autounfold; unfold rd_layer_abstraction, Recover_spec; simplify.

@@ -97,7 +97,7 @@ Module TwoDisk (b : TwoDiskBaseAPI) <: TwoDiskAPI.
     eauto.
   Qed.
 
-  Theorem recover_noop : rec_noop recover abstr (@no_wipe _).
+  Theorem recover_noop : rec_noop recover abstr no_wipe.
   Proof.
     eauto.
   Qed.

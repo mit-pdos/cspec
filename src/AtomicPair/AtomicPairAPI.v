@@ -29,7 +29,7 @@ Module Type AtomicPairAPI.
 
   Axiom get_ok : prog_spec get_spec get recover abstr.
   Axiom put_ok : forall v, prog_spec (put_spec v) (put v) recover abstr.
-  Axiom recover_noop : rec_noop recover abstr (@no_wipe _).
+  Axiom recover_noop : rec_noop recover abstr no_wipe.
 
   Hint Resolve get_ok.
   Hint Resolve put_ok.

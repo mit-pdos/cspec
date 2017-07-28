@@ -49,10 +49,10 @@ Definition post_step {opT State}
     exists state', step op state v state' /\
           bg_step state' state''.
 
-Definition no_wipe State (state state' : State) : Prop := state' = state.
+Definition no_wipe {State} (state state' : State) : Prop := state' = state.
 Hint Unfold no_wipe.
 
-Definition no_crash State (state state' : State) : Prop := False.
+Definition no_crash {State} (state state' : State) : Prop := False.
 Hint Unfold no_crash.
 
 (* The specification for each operation. Note that after recovery, the abstract

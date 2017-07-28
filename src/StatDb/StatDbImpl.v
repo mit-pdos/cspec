@@ -3,6 +3,21 @@ Require Import Variables.VariablesAPI.
 Require Import StatDb.StatDbAPI.
 
 
+(**
+ * Coqdoc comment
+ ** foo
+ *)
+
+Definition foo := 5.
+
+(**
+ ** bar
+ - xx
+  - y
+  - z
+   - q
+ *)
+
 Module StatDB (v : VarsAPI) <: StatDbAPI.
 
   Definition add (v : nat) : prog unit :=
@@ -111,7 +126,7 @@ Module StatDB (v : VarsAPI) <: StatDbAPI.
       intuition ( try congruence ).
   Qed.
 
-  Theorem recover_noop : rec_noop recover abstr (@no_crash _).
+  Theorem recover_noop : rec_noop recover abstr no_crash.
   Proof.
     unfold rec_noop.
     intros.

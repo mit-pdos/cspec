@@ -17,7 +17,7 @@ Module TwoDiskBase <: TwoDiskBaseAPI.
   Axiom read_ok : forall i a, prog_spec (op_spec (combined_step (op_read i a))) (read i a) recover abstr.
   Axiom write_ok : forall i a b, prog_spec (op_spec (combined_step (op_write i a b))) (write i a b) recover abstr.
   Axiom diskSize_ok : forall i, prog_spec (op_spec (combined_step (op_disksize i))) (diskSize i) recover abstr.
-  Axiom recover_noop : rec_noop recover abstr (@no_wipe _).
+  Axiom recover_noop : rec_noop recover abstr no_wipe.
 
 End TwoDiskBase.
 

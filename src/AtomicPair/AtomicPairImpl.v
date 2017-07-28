@@ -255,7 +255,7 @@ Module AtomicPair (d : OneDiskAPI) <: AtomicPairAPI.
       autounfold in *; simpl in *; intuition subst; eauto 10.
   Qed.
 
-  Theorem recover_noop : rec_noop recover abstr (@no_wipe _).
+  Theorem recover_noop : rec_noop recover abstr no_wipe.
   Proof.
     unfold rec_noop.
     intros.

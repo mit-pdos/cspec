@@ -13,7 +13,7 @@ Axiom abstr : Abstraction State.
 
 Axiom read_ok : forall v, prog_spec (read_spec v) (read v) recover abstr.
 Axiom write_ok : forall v val, prog_spec (write_spec v val) (write v val) recover abstr.
-Axiom recover_noop : rec_noop recover abstr (@no_crash _).
+Axiom recover_noop : rec_noop recover abstr no_crash.
 
 Module Vars <: VarsAPI.
 

@@ -262,7 +262,7 @@ Module RemappedDisk (bd : BadSectorAPI) <: OneDiskAPI.
     omega.
   Qed.
 
-  Theorem recover_noop : rec_noop recover abstr (@no_wipe _).
+  Theorem recover_noop : rec_noop recover abstr no_wipe.
   Proof.
     unfold rec_noop.
     intros.

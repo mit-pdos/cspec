@@ -82,7 +82,7 @@ Module Type TwoDiskAPI.
   Axiom read_ok : forall i a, prog_spec (read_spec i a) (read i a) recover abstr.
   Axiom write_ok : forall i a v, prog_spec (write_spec i a v) (write i a v) recover abstr.
   Axiom diskSize_ok : forall i, prog_spec (diskSize_spec i) (diskSize i) recover abstr.
-  Axiom recover_noop : rec_noop recover abstr (@no_wipe _).
+  Axiom recover_noop : rec_noop recover abstr no_wipe.
 
   Hint Resolve read_ok.
   Hint Resolve write_ok.

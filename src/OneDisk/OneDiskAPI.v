@@ -45,7 +45,7 @@ Module Type OneDiskAPI.
   Axiom read_ok : forall a, prog_spec (read_spec a) (read a) recover abstr.
   Axiom write_ok : forall a v, prog_spec (write_spec a v) (write a v) recover abstr.
   Axiom diskSize_ok : prog_spec diskSize_spec diskSize recover abstr.
-  Axiom recover_noop : rec_noop recover abstr (@no_wipe _).
+  Axiom recover_noop : rec_noop recover abstr no_wipe.
 
   Hint Resolve read_ok.
   Hint Resolve write_ok.
