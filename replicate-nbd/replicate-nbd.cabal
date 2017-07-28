@@ -15,10 +15,9 @@ cabal-version:       >=1.10
 
 library
   hs-source-dirs:      src
-  exposed-modules:     ReplicatedDiskImpl
+  exposed-modules:     Server
                      , Network.NBD
   other-modules:       Utils.Conversion
-                     , ReplicatedDiskAPI
                      , Replication.TwoDiskOps
                      , Replication.TwoDiskEnvironment
                      , Network.NBD.Data
@@ -34,10 +33,10 @@ library
                      , NbdData
                      , Prog
                      , Sectors
-                     , Server
                      , Specif
-                     , TwoDiskAPI
-                     , ExtrTwoDisk
+                     , OneDiskAPI
+                     , TwoDiskBaseAPI
+                     , TwoDiskBaseImpl
                      , ExtrServer
   build-depends:       base >= 4.7 && < 5
                      , ghc-prim

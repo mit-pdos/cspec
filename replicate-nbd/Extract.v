@@ -4,7 +4,6 @@ Require Import ExtrHaskellNatInteger.
 Require Import ExtrHaskellBasic.
 Require Import Helpers.ExtrBytes.
 Require Import Refinement.ExtrProg.
-Require Import TwoDisk.ExtrTwoDisk.
 
 Extraction Language Haskell.
 

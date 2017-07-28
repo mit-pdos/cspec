@@ -1,19 +1,20 @@
 Require Import POCS.
 
 Require Import ReplicatedDisk.ReplicatedDiskImpl.
-Require Import ReplicatedDisk.ReplicatedDiskAPI.
-Require Import TwoDisk.ExtrTwoDisk.
+Require Import TwoDisk.TwoDiskImpl.
+Require Import TwoDisk.TwoDiskBaseImpl.
 
 Require Import NBD.NbdData.
 Require Import NBD.ExtrServer.
 
-(* TODO: re-use this code for asynchronous implementation *)
-Definition d := RD.rd TD.td.
+
+Module td := TwoDisk TwoDiskBase.
+Module rd := ReplicatedDisk td.
 
 Fixpoint read (off:nat) n : prog (bytes (n*blockbytes)) :=
   match n with
   | 0 => Ret bnull
-  | S n => b <- Prim d (RD.Read off);
+  | S n => b <- rd.read off;
             rest <- read (off+1) n;
             Ret (bappend b rest)
   end.
@@ -23,7 +24,7 @@ Fixpoint write (off:nat) n (bs:bytes (n*blockbytes)) {struct n} : prog unit.
   - apply (Ret tt).
   - replace (S n * blockbytes) with (blockbytes + n * blockbytes) in * by reflexivity.
     destruct (bsplit bs) as [b rest].
-    apply (Bind (Prim d (RD.Write off b))); intros _.
+    apply (Bind (rd.write off b)); intros _.
     apply (write (off+1) _ rest).
 Defined.
 
@@ -61,10 +62,10 @@ CoFixpoint handle : prog unit :=
   end.
 
 Definition diskSize : prog nat :=
-  Prim d RD.DiskSize.
+  rd.diskSize.
 
 Definition serverLoop : prog unit :=
-  _ <- irec d;
+  _ <- rd.recover;
   handle.
 
-Definition init := iInit d.
+Definition init := rd.init.

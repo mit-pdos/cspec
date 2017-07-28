@@ -11,7 +11,9 @@ import_modules = {
     ["Helpers"],
 
     "import qualified Replication.TwoDiskOps as TD":
-    ["ExtrTwoDisk"],
+    [
+        "TwoDiskBaseImpl",
+    ],
 
     "import Replication.TwoDiskEnvironment":
     [
@@ -24,7 +26,7 @@ import_modules = {
         "ReplicatedDiskImpl",
         "ExtrServer",
         "Server",
-        "ExtrTwoDisk",
+        "TwoDiskBaseImpl",
     ],
 
     "import qualified Data.Word":
