@@ -41,8 +41,6 @@ Definition diskSize_spec : Specification _ nat unit State :=
     recover := fun _ state' => state' = state
   |}.
 
-Definition wipe (state state' : State) := state' = state.
-
 
 Module Type BadSectorAPI.
 
@@ -59,7 +57,7 @@ Module Type BadSectorAPI.
   Axiom write_ok : forall a v, prog_spec (write_spec a v) (write a v) recover abstr.
   Axiom getBadSector_ok : prog_spec getBadSector_spec getBadSector recover abstr.
   Axiom diskSize_ok : prog_spec diskSize_spec diskSize recover abstr.
-  Axiom recover_noop : rec_noop recover abstr wipe.
+  Axiom recover_noop : rec_noop recover abstr (@no_wipe _).
 
   Hint Resolve read_ok.
   Hint Resolve write_ok.

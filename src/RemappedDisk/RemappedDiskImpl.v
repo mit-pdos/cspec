@@ -84,22 +84,22 @@ Module RemappedDisk (bd : BadSectorAPI) <: OneDiskAPI.
     step_prog; intros.
     destruct a'; simpl in *; intuition idtac.
     exists tt; simpl; intuition idtac.
-    2: unfold wipe in *; simpl in *; intuition subst; eauto.
+    2: autounfold in *; simpl in *; intuition subst; eauto.
 
     destruct (a == r); subst.
     - step_prog; intros.
       exists tt; simpl; intuition idtac.
-      2: unfold wipe in *; simpl in *; intuition subst; eauto.
+      2: autounfold in *; simpl in *; intuition subst; eauto.
 
       step_prog; intros.
       exists tt; simpl; intuition idtac.
-      2: unfold wipe in *; simpl in *; intuition subst; eauto.
+      2: autounfold in *; simpl in *; intuition subst; eauto.
 
       step_prog; intros.
       eauto.
 
       simpl in *; intuition subst.
-      2: unfold wipe in *; simpl in *; intuition subst; eauto.
+      2: autounfold in *; simpl in *; intuition subst; eauto.
 
       exists s. split. split. auto.
       2: auto.
@@ -114,13 +114,13 @@ Module RemappedDisk (bd : BadSectorAPI) <: OneDiskAPI.
 
     - step_prog; intros.
       exists tt; simpl; intuition idtac.
-      2: unfold wipe in *; simpl in *; intuition subst; eauto.
+      2: autounfold in *; simpl in *; intuition subst; eauto.
 
       step_prog; intros.
       eauto.
 
       simpl in *; intuition subst.
-      2: unfold wipe in *; simpl in *; intuition subst; eauto.
+      2: autounfold in *; simpl in *; intuition subst; eauto.
 
       exists s. split. split. auto.
       2: auto.
@@ -184,14 +184,14 @@ Module RemappedDisk (bd : BadSectorAPI) <: OneDiskAPI.
     step_prog; intros.
     destruct a'; simpl in *; intuition idtac.
     exists tt; simpl; intuition idtac.
-    2: unfold wipe in *; simpl in *; intuition subst; eauto.
+    2: autounfold in *; simpl in *; intuition subst; eauto.
 
     destruct (a == r-1); subst.
     - step_prog; intros.
       eauto.
 
       simpl in *; intuition subst.
-      2: unfold wipe in *; simpl in *; intuition subst; eauto.
+      2: autounfold in *; simpl in *; intuition subst; eauto.
 
       exists s. split. split. auto.
       2: auto.
@@ -202,32 +202,32 @@ Module RemappedDisk (bd : BadSectorAPI) <: OneDiskAPI.
 
     - step_prog; intros.
       exists tt; simpl; intuition idtac.
-      2: unfold wipe in *; simpl in *; intuition subst; eauto.
+      2: autounfold in *; simpl in *; intuition subst; eauto.
 
       destruct (a == r0).
       + step_prog; intros.
         exists tt; simpl; intuition idtac.
-        2: unfold wipe in *; simpl in *; intuition subst; eauto.
-        2: unfold wipe in *; simpl in *; intuition subst; eauto.
+        2: autounfold in *; simpl in *; intuition subst; eauto.
+        2: autounfold in *; simpl in *; intuition subst; eauto.
 
         step_prog; intros.
         eauto.
 
         simpl in *; intuition subst.
-        2: unfold wipe in *; simpl in *; intuition subst; eauto.
+        2: autounfold in *; simpl in *; intuition subst; eauto.
 
         eauto.
 
       + step_prog; intros.
         exists tt; simpl; intuition idtac.
-        2: unfold wipe in *; simpl in *; intuition subst; eauto.
-        2: unfold wipe in *; simpl in *; intuition subst; eauto.
+        2: autounfold in *; simpl in *; intuition subst; eauto.
+        2: autounfold in *; simpl in *; intuition subst; eauto.
 
         step_prog; intros.
         eauto.
 
         simpl in *; intuition subst.
-        2: unfold wipe in *; simpl in *; intuition subst; eauto.
+        2: autounfold in *; simpl in *; intuition subst; eauto.
         eauto.
   Qed.
 
@@ -241,13 +241,13 @@ Module RemappedDisk (bd : BadSectorAPI) <: OneDiskAPI.
     step_prog; intros.
     destruct a'; simpl in *; intuition idtac.
     exists tt; simpl; intuition idtac.
-    2: unfold wipe in *; simpl in *; intuition subst; eauto.
+    2: autounfold in *; simpl in *; intuition subst; eauto.
 
     step_prog; intros.
     eauto.
 
     simpl in *; intuition subst.
-    2: unfold wipe in *; simpl in *; intuition subst; eauto.
+    2: autounfold in *; simpl in *; intuition subst; eauto.
 
     exists s. split. split. auto.
     2: auto.
@@ -256,7 +256,7 @@ Module RemappedDisk (bd : BadSectorAPI) <: OneDiskAPI.
     omega.
   Qed.
 
-  Theorem recover_noop : rec_noop recover abstr OneDiskAPI.wipe.
+  Theorem recover_noop : rec_noop recover abstr (@no_wipe _).
   Proof.
     unfold rec_noop.
     intros.
@@ -266,7 +266,7 @@ Module RemappedDisk (bd : BadSectorAPI) <: OneDiskAPI.
     eauto.
 
     destruct a; simpl in *.
-    unfold wipe, OneDiskAPI.wipe in *; intuition eauto.
+    autounfold in *; intuition eauto.
     subst; eauto.
   Qed.
 
