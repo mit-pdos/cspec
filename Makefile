@@ -22,7 +22,7 @@ CODE += $(wildcard src/AtomicPair/*.v)
 CODE += $(wildcard src/TwoDisk/*.v)
 CODE += $(wildcard src/ReplicatedDisk/*.v)
 
-COQRFLAGS := -R build Pocs
+COQRFLAGS := -R build POCS
 
 BINS	:= statdb-cli remap-nbd replicate-nbd
 
@@ -69,6 +69,7 @@ bin/%: %/extract
 .PHONY: clean
 clean:
 	rm -rf build
+	rm -rf doc
 	rm -f $(foreach d,$(BINS),$(d)/src/*.hs)
 	rm -rf $(foreach d,$(BINS),$(d)/.stack-work)
 	rm -f $(foreach b,$(BINS),bin/$(b))
