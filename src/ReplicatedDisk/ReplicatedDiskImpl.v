@@ -992,7 +992,8 @@ Module RD.
       eapply idempotent_loopspec; simpl.
       - eapply Recover_rok.
       - (* SOL *)
-        unfold idempotent; intuition; simplify.
+        unfold idempotent.
+        intuition; simplify.
         rename a0 into d.
         destruct b; intuition eauto.
         exists d, FullySynced; intuition eauto.
@@ -1060,7 +1061,12 @@ Module RD.
     Proof.
       (* Prove that [Recover] properly recovers from all crashes in [Write]. *)
       (* SOL *)
-      start.
+      intros.
+      eapply compose_recovery.
+      apply Write_ok.
+      apply Recover_ok.
+
+      simplify.
       rename a0 into d.
       descend; (intuition eauto); simplify.
       - exists d, FullySynced; intuition eauto.
