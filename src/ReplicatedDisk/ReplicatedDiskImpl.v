@@ -388,7 +388,7 @@ Module ReplicatedDisk (td : TwoDiskAPI) <: OneDiskAPI.
     destruct r.
     step.
     - destruct r.
-      + destruct (size H0 == v).
+      + destruct (size d_0 == v).
         * step.
         * step.
       + step.
@@ -756,7 +756,7 @@ Module ReplicatedDisk (td : TwoDiskAPI) <: OneDiskAPI.
         td.abstr.
   Proof.
     spec_cases; simplify.
-    match goal with | x : DiskStatus |- _ => rename x into s end.
+    rename_by_type DiskStatus s.
     destruct s; intuition eauto.
     - spec_case fixup_equal_ok; simplify; finish.
       descend; (intuition eauto); destruct matches in *;
