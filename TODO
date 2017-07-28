@@ -17,6 +17,10 @@ Things to clean up:
 
 - change [recover] name conflict: both Hoare.recover and customary recovery procedure name
 
+- horizontal composition: compose NBD and TwoDisk/BadSectorDisk
+
+- security with horizontal composition: make [prog_spec] a two-execution property
+
 ===
 
 Things we've figured out:

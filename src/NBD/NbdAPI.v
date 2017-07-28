@@ -1,0 +1,105 @@
+Require Import POCS.
+
+
+Parameter Handle : Type.
+
+Inductive Request :=
+| Read (h:Handle) (off:addr) (blocks:nat)
+| Write (h:Handle) (off:addr) (len:nat) (dat:bytes (len*blockbytes))
+| Flush (h:Handle)
+| Disconnect
+| UnknownOp (h:Handle).
+
+Inductive ErrorCode :=
+| ESuccess
+| EInvalid
+| ENospc.
+
+Record Response :=
+  { rhandle: Handle;
+    error: ErrorCode;
+    data_len: nat;
+    data: bytes data_len; }.
+
+Record State := mkState {
+  StateDisk : disk;
+  StateReq : option Request
+}.
+
+
+Fixpoint read_match (d : disk) (off : addr) (blocks : nat) : bytes (blocks * blockbytes) -> Prop :=
+  match blocks with
+  | O => fun data => True
+  | S blocks' =>
+    fun (data : bytes ((S blocks') * blockbytes)) =>
+    let (thisdata, otherdata) := bsplit data in
+    d off = Some thisdata /\
+    read_match d (S off) blocks' otherdata
+  end.
+
+Fixpoint write_upd (d : disk) (off : addr) (blocks : nat) : bytes (blocks * blockbytes) -> disk :=
+  match blocks with
+  | O => fun data => d
+  | S blocks' =>
+    fun (data : bytes ((S blocks') * blockbytes)) =>
+    let (thisdata, otherdata) := bsplit data in
+    write_upd (diskUpd d off thisdata) (S off) blocks' otherdata
+  end.
+
+Definition read_match' (d : disk) (off : addr) (blocks : nat) (len : nat)
+                       (H : len = blocks * blockbytes) (data : bytes len) : Prop.
+  rewrite H in data.
+  exact (read_match d off blocks data).
+Defined.
+
+
+Definition getRequest_spec : Specification _ Request unit State :=
+  fun (_ : unit) state => {|
+    pre := True;
+    post := fun r state' =>
+      state' = mkState (StateDisk state) (Some r);
+    recover := fun _ state' =>
+      state' = mkState (StateDisk state) None
+  |}.
+
+Definition sendResponse_spec (resp : Response) : Specification _ unit unit State :=
+  fun '(disk, disk', req) state => {|
+    pre :=
+      let '(@Build_Response rhandle error data_len data) := resp in
+      state = mkState disk (Some req) /\
+      match req with
+      | Read h off blocks => h = rhandle /\ disk' = disk /\
+        (error = ESuccess /\ exists Hlen,
+         @read_match' disk off blocks data_len Hlen data) \/
+        (error <> ESuccess /\ data_len = 0)
+      | Write h off len data => h = rhandle /\ data_len = 0 /\
+        (error = ESuccess /\ disk' = write_upd disk off len data) \/
+        (error <> ESuccess /\ disk' = disk)
+      | Flush h => h = rhandle /\ data_len = 0 /\ disk' = disk
+      | Disconnect => False
+      | UnknownOp h => h = rhandle /\ error = EInvalid /\ data_len = 0 /\ disk' = disk
+      end;
+    post := fun r state' =>
+      state' = mkState disk' None;
+    recover := fun _ state' =>
+      state' = mkState disk None \/ state' = mkState disk' None
+  |}.
+
+Definition wipe_req (state state' : State) := state' = mkState (StateDisk state) None.
+Hint Unfold wipe_req.
+
+
+Module Type NbdAPI.
+
+  Parameter init : prog InitResult.
+  Parameter getRequest : prog Request.
+  Parameter sendResponse : Response -> prog unit.
+  Parameter recover : prog unit.
+
+  Axiom abstr : Abstraction State.
+
+  Axiom getRequest_ok : prog_spec (getRequest_spec) (getRequest) recover abstr.
+  Axiom sendResponse_ok : forall resp, prog_spec (sendResponse_spec resp) (sendResponse resp) recover abstr.
+  Axiom recover_noop : rec_noop recover abstr wipe_req.
+
+End NbdAPI.
