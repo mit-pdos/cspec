@@ -16,7 +16,7 @@ import           Hoare (InitResult(..))
 import           NbdAPI
 import           Network.NBD.Data
 import           BadSectorDisk.Env
-import qualified Server
+import qualified RemappedServer as Server
 import           System.Exit (die)
 import           Utils.Conversion
 

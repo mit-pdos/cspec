@@ -59,8 +59,8 @@ docs: coq
 	./scripts/add-preprocess.sh $(patsubst %/extract,%/src/*.hs,$@)
 
 statdb-cli/extract: build/StatDb/StatDbCli.vo
-remap-nbd/extract: build/RemappedDisk/Server.vo
-replicate-nbd/extract: build/ReplicatedDisk/Server.vo
+remap-nbd/extract: build/RemappedDisk/RemappedServer.vo
+replicate-nbd/extract: build/ReplicatedDisk/ReplicatedServer.vo
 
 bin/%: %/extract
 	mkdir -p $(@D)

@@ -16,7 +16,7 @@ import           Hoare (InitResult(..))
 import           NbdAPI
 import           Network.NBD.Data
 import           Replication.TwoDiskEnvironment
-import qualified Server
+import qualified ReplicatedServer as Server
 import           System.Exit (die)
 import           Utils.Conversion
 

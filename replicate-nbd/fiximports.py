@@ -26,7 +26,7 @@ import_modules = {
         "ReplicatedDiskImpl",
         "NbdImpl",
         "NbdServer",
-        "Server",
+        "ReplicatedServer",
         "TwoDiskBaseImpl",
     ],
 

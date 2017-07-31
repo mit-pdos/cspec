@@ -15,7 +15,7 @@ cabal-version:       >=1.10
 
 library
   hs-source-dirs:      src
-  exposed-modules:     Server
+  exposed-modules:     ReplicatedServer
                      , Network.NBD
   other-modules:       Utils.Conversion
                      , Replication.TwoDiskOps
@@ -23,7 +23,6 @@ library
                      , Network.NBD.Data
                      , Network.ServerOps
                      , Helpers
-                     , Logic
                      , Datatypes
                      , Def
                      , SimpleDisk
@@ -31,6 +30,7 @@ library
                      , Hoare
                      , NbdAPI
                      , NbdImpl
+                     , NbdServer
                      , Prog
                      , Sectors
                      , Specif

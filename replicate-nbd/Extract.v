@@ -7,7 +7,7 @@ Require Import Refinement.ExtrProg.
 
 Extraction Language Haskell.
 
-Require Import ReplicatedDisk.Server.
+Require Import ReplicatedDisk.ReplicatedServer.
 
 Separate Extraction diskSize serverLoop init.
 

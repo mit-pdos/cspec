@@ -5,7 +5,7 @@ cabal-version:       >=1.10
 
 library
   hs-source-dirs:      src
-  exposed-modules:     Server
+  exposed-modules:     RemappedServer
                      , Network.NBD
   other-modules:       Utils.Conversion
                      , BadSectorDisk.Ops
@@ -21,6 +21,8 @@ library
                      , Hoare
                      , NbdAPI
                      , NbdImpl
+                     , NbdServer
+                     , OneDiskAPI
                      , Prog
                      , Sectors
                      , Sized

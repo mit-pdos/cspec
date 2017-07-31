@@ -21,7 +21,7 @@ import_modules = {
         "ReadWrite",
         "Recovery",
         "ReplicatedDisk",
-        "Server",
+        "RemappedServer",
         "NbdImpl",
         "NbdServer",
         "Sync",
