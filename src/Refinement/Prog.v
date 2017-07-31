@@ -43,7 +43,7 @@ Arguments Crashed {T} w.
 Axiom step:forall T, opT T -> Semantics world T.
 
 (* On crash, the world state is modified to remove mutable data according to
-[world_crash]. Not that this is a function; it should be a deterministic
+[world_crash]. Note that this is a function; it should be a deterministic
 process to replace in-memory state with default values. *)
 Axiom world_crash: world -> world.
 

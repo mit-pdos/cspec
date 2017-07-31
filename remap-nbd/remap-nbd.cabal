@@ -19,7 +19,6 @@ library
                      , SimpleDisk
                      , GenericDisk
                      , Hoare
-                     , Interface
                      , NbdAPI
                      , NbdImpl
                      , Prog

@@ -140,7 +140,7 @@ Qed.
 
 (** * splitting spec into multiple cases *)
 
-Theorem spec_cases : forall `(spec: Specification A T R State)
+Theorem spec_intros : forall `(spec: Specification A T R State)
                        `(p: prog T) `(rec: prog R)
                        `(abs: Abstraction State),
     (forall a state0,
@@ -161,7 +161,7 @@ Proof.
   simpl in *; eauto.
 Qed.
 
-Ltac spec_cases := intros; eapply spec_cases.
+Ltac spec_intros := intros; eapply spec_intros; intros.
 
 Ltac spec_case pf :=
   eapply prog_spec_weaken; [ solve [ apply pf ] |
@@ -363,27 +363,6 @@ Proof.
   destruct r; safe_intuition (repeat deex; eauto).
 Qed.
 
-(* TODO: this is currently unused; is it necessary? *)
-Record crash_effect_valid `(abs: LayerAbstraction State1 State2)
-       (wipe1: State1 -> State1 -> Prop)
-       (wipe2: State2 -> State2 -> Prop) :=
-  { wipe_abstraction: forall w state state', wipe1 w state ->
-                                abstraction abs state state' ->
-                                exists w', abstraction abs w w' /\
-                                      wipe2 w' state';
-    wipe_abstraction': forall w w' state', abstraction abs w w' ->
-                                  wipe2 w' state' ->
-                                  exists state, wipe1 w state /\
-                                       abstraction abs state state';
-    wipe_trans: forall state state' state'', wipe2 state state' ->
-                                wipe2 state' state'' ->
-                                wipe2 state state''; }.
-
-Definition wipe_valid
-           `(abs: Abstraction State)
-           (wipe: State -> State -> Prop) :=
-  crash_effect_valid abs (fun w w' => w' = world_crash w) wipe.
-
 Theorem rec_noop_compose : forall `(rec: prog unit) `(rec2: prog unit)
                              `(abs1: Abstraction State1)
                              (wipe1: State1 -> State1 -> Prop)
@@ -446,3 +425,74 @@ Ltac step_prog :=
       |- prog_spec _ ?p _ _ ] =>
     eapply prog_spec_weaken; [ eapply H | unfold spec_impl ]
   end.
+
+
+(** Helpers for defining step-based semantics. *)
+
+Definition pre_step {opT State}
+           (bg_step: State -> State -> Prop)
+           (step: forall `(op: opT T), Semantics State T) :
+  forall T (op: opT T), Semantics State T :=
+  fun T (op: opT T) state v state'' =>
+    exists state', bg_step state state' /\
+          step op state' v state''.
+
+Definition post_step {opT State}
+           (step: forall `(op: opT T), Semantics State T)
+           (bg_step: State -> State -> Prop) :
+  forall T (op: opT T), Semantics State T :=
+  fun T (op: opT T) state v state'' =>
+    exists state', step op state v state' /\
+          bg_step state' state''.
+
+Definition op_spec `(sem: Semantics State T) : Specification unit T unit State :=
+  fun (_:unit) state =>
+    {|
+      pre := True;
+      post :=
+        fun v state' => sem state v state';
+      recover :=
+        fun r state' =>
+          r = tt /\ (state' = state \/ exists v, sem state v state');
+    |}.
+
+(** Helpers for defining wipe relations after a crash. *)
+
+Definition no_wipe {State} (state state' : State) : Prop := state' = state.
+Hint Unfold no_wipe.
+
+Definition no_crash {State} (state state' : State) : Prop := False.
+Hint Unfold no_crash.
+
+(** Lemmas about initialization code. *)
+
+Inductive InitResult := Initialized | InitFailed.
+
+Definition init_invariant
+           (init: prog InitResult) (rec: prog unit)
+           `(abs: Abstraction State) (init_sem: State -> Prop) :=
+  prog_spec
+    (fun (_:unit) w =>
+       {| pre := True;
+          post :=
+            fun r w' => match r with
+                     | Initialized =>
+                       exists state, abstraction abs w' state /\ init_sem state
+                     | InitFailed => True
+                     end;
+          recover :=
+            fun _ w' => True;
+       |}) init rec (IdAbstraction world).
+
+Theorem init_invariant_any_rec : forall (init: prog InitResult)
+                                   (rec rec': prog unit)
+                                   `(abs: Abstraction State)
+                                   (init_sem: State -> Prop),
+    init_invariant init rec abs init_sem ->
+    init_invariant init rec' abs init_sem.
+Proof.
+  unfold init_invariant, prog_spec; simpl; intros.
+  destruct matches; subst; eauto.
+  eapply rexec_finish_any_rec in H2.
+  eapply H in H2; eauto.
+Qed.

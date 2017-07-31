@@ -755,7 +755,7 @@ Module ReplicatedDisk (td : TwoDiskAPI) <: OneDiskAPI.
         td.recover
         td.abstr.
   Proof.
-    spec_cases; simplify.
+    spec_intros; simplify.
     rename_by_type DiskStatus s.
     destruct s; intuition eauto.
     - spec_case fixup_equal_ok; simplify; finish.
@@ -891,7 +891,7 @@ Module ReplicatedDisk (td : TwoDiskAPI) <: OneDiskAPI.
       td.abstr.
   Proof.
     unfold Recover, Recover_spec; intros.
-    spec_cases; simplify.
+    spec_intros; simplify.
     rename_by_type DiskStatus s.
     rename_by_type disk d.
     destruct s; simplify.

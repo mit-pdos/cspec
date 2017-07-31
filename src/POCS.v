@@ -18,6 +18,5 @@ Require Export SepLogic.Pred.MemIsExcept.
 Require Export Disk.SimpleDisk.
 Require Export Disk.Sectors.
 
-Require Export Refinement.Interface.
 Require Export Refinement.Prog.
 Require Export Refinement.Hoare.

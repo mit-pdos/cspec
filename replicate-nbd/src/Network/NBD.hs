@@ -12,7 +12,7 @@ import qualified Data.ByteString as BS
 import           Data.Conduit.Cereal
 import           Data.Conduit.Network
 import           Data.Serialize
-import           Interface (InitResult(..))
+import           Hoare (InitResult(..))
 import           NbdAPI
 import           Network.NBD.Data
 import           Replication.TwoDiskEnvironment
