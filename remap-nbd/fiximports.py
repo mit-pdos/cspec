@@ -22,16 +22,20 @@ import_modules = {
         "Recovery",
         "ReplicatedDisk",
         "Server",
-        "ExtrServer",
+        "NbdImpl",
         "Sync",
         "BadSectorImpl",
     ],
 
     "import qualified Data.Word":
-    ["NbdData"],
+    [
+        "NbdAPI",
+    ],
 
     "import Network.ServerOps as Server":
-    ["ExtrServer"]
+    [
+        "NbdImpl",
+    ],
 }
 
 module_imports = {}

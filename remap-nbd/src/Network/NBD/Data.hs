@@ -5,7 +5,7 @@ import           Control.Exception.Base (Exception)
 import           Data.Bits
 import           Data.Typeable (Typeable)
 import           GHC.Word
-import           NbdData
+import           NbdAPI
 
 {-# ANN module ("HLint: ignore Use camelCase"::String) #-}
 

@@ -3,13 +3,13 @@ Require Import POCS.
 Require Import ReplicatedDisk.ReplicatedDiskImpl.
 Require Import TwoDisk.TwoDiskImpl.
 Require Import TwoDisk.TwoDiskBaseImpl.
-
-Require Import NBD.NbdData.
-Require Import NBD.ExtrServer.
+Require Import NBD.NbdImpl.
+Require Import NBD.NbdAPI.
 
 
 Module td := TwoDisk TwoDiskBase.
 Module rd := ReplicatedDisk td.
+Module nbd := NbdImpl.
 
 Fixpoint read (off:nat) n : prog (bytes (n*blockbytes)) :=
   match n with
@@ -29,31 +29,31 @@ Fixpoint write (off:nat) n (bs:bytes (n*blockbytes)) {struct n} : prog unit.
 Defined.
 
 CoFixpoint handle : prog unit :=
-  req <- getRequest;
+  req <- nbd.getRequest;
   match req with
   | Read h off blocks =>
     (* TODO: bounds checks *)
     data <- read off blocks;
-    _ <- sendResponse
+    _ <- nbd.sendResponse
       {| rhandle := h;
          error := ESuccess;
          data := data; |};
     handle
   | Write h off _ dat =>
     _ <- write off _ dat;
-    _ <- sendResponse
+    _ <- nbd.sendResponse
       {| rhandle := h;
          error := ESuccess;
          data := bnull |};
     handle
   | Flush h =>
-    _ <- sendResponse
+    _ <- nbd.sendResponse
       {| rhandle := h;
          error := ESuccess;
          data := bnull |};
     handle
   | UnknownOp h =>
-    _ <- sendResponse
+    _ <- nbd.sendResponse
       {| rhandle := h;
          error := EInvalid;
          data := bnull |};

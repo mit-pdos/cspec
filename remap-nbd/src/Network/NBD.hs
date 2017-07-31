@@ -13,7 +13,7 @@ import           Data.Conduit.Cereal
 import           Data.Conduit.Network
 import           Data.Serialize
 import           Interface (InitResult(..))
-import NbdData
+import           NbdAPI
 import           Network.NBD.Data
 import           BadSectorDisk.Env
 import qualified Server
@@ -118,7 +118,7 @@ getCommand = do
             return $ Write handle
               (offset `div` blocksize)
               (len `div` blocksize) dat
-        | typ == nbd_CMD_FLUSH = return $ NbdData.Flush handle
+        | typ == nbd_CMD_FLUSH = return $ NbdAPI.Flush handle
         | typ == nbd_CMD_DISC = return Disconnect
         | otherwise = return $ UnknownOp handle in
     command
@@ -146,7 +146,7 @@ handleCommands doLog e = handle
       case cmd of
         Read _ off len -> debug $ "read at " ++ show (off*blocksize) ++ " of length " ++ show (len*blocksize)
         Write _ off len _ -> debug $ "write at " ++ show (off*blocksize) ++ " of length " ++ show (len*blocksize)
-        NbdData.Flush _ -> debug "flush"
+        NbdAPI.Flush _ -> debug "flush"
         Disconnect -> debug "disconnect command"
         UnknownOp _ -> debug "unknown command"
       r <- liftIO $ do

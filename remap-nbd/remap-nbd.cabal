@@ -20,14 +20,14 @@ library
                      , GenericDisk
                      , Hoare
                      , Interface
-                     , NbdData
+                     , NbdAPI
+                     , NbdImpl
                      , Prog
                      , Sectors
                      , Sized
                      , Specif
                      , BadSectorImpl
                      , BadSectorAPI
-                     , ExtrServer
   build-depends:       base >= 4.7 && < 5
                      , ghc-prim
                      , bytestring

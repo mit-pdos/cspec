@@ -1,6 +1,6 @@
 module Network.ServerOps where
 
-import NbdData
+import NbdAPI
 import Control.Monad.Reader (reader, liftIO)
 import Control.Concurrent.MVar (takeMVar, putMVar)
 import BadSectorDisk.Env
