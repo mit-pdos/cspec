@@ -14,7 +14,9 @@ import_modules = {
     ],
 
     "import qualified CLI.Stubs as CLI":
-    ["StatDbCli"],
+    [
+        "StatDbCli",
+    ],
 
     "import Variables.Env":
     [

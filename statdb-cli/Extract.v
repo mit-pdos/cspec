@@ -1,4 +1,4 @@
-Cd "statdb-cli/src/".
+Cd "statdb-cli/extract/".
 
 Require Import ExtrHaskellBasic.
 Require Import ExtrHaskellNatInteger.

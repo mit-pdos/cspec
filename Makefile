@@ -55,8 +55,9 @@ docs: coq
 
 .PHONY: %/extract
 %/extract: %/Extract.v %/fiximports.py build/Helpers/ExtrBytes.vo build/Refinement/ExtrProg.vo
+	@mkdir -p $@
 	coqtop $(COQRFLAGS) -batch -noglob -load-vernac-source $<
-	./scripts/add-preprocess.sh $(patsubst %/extract,%/src/*.hs,$@)
+	./scripts/add-preprocess.sh $@/*.hs
 
 statdb-cli/extract: build/StatDb/StatDbCli.vo
 remap-nbd/extract: build/RemappedDisk/RemappedServer.vo
@@ -70,6 +71,6 @@ bin/%: %/extract
 clean:
 	rm -rf build
 	rm -rf doc
-	rm -f $(foreach d,$(BINS),$(d)/src/*.hs)
+	rm -rf $(foreach d,$(BINS),$(d)/extract)
 	rm -rf $(foreach d,$(BINS),$(d)/.stack-work)
 	rm -f $(foreach b,$(BINS),bin/$(b))

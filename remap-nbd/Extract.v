@@ -1,4 +1,4 @@
-Cd "remap-nbd/src/".
+Cd "remap-nbd/extract/".
 
 Require Import ExtrHaskellBasic.
 Require Import ExtrHaskellNatInteger.

@@ -8,10 +8,14 @@ import os, sys
 
 import_modules = {
     "import qualified Data.ByteString as BS":
-    ["Helpers"],
+    [
+        "Helpers",
+    ],
 
     "import qualified BadSectorDisk.Ops":
-    ["BadSectorImpl"],
+    [
+        "BadSectorImpl",
+    ],
 
     "import BadSectorDisk.Env":
     [

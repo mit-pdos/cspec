@@ -1,4 +1,4 @@
-Cd "replicate-nbd/src/".
+Cd "replicate-nbd/extract/".
 
 Require Import ExtrHaskellNatInteger.
 Require Import ExtrHaskellBasic.

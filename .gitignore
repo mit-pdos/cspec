@@ -2,7 +2,8 @@
 /bin
 /doc
 /.lia.cache
-.stack-work
+/*/.stack-work
+/*/extract
 
 # emacs
 *.aux

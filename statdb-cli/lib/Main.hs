@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -F -pgmF ./fiximports.py #-}
 module Main where
 
 import Variables.Env
