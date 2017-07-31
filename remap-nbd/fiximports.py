@@ -23,6 +23,7 @@ import_modules = {
         "ReplicatedDisk",
         "Server",
         "NbdImpl",
+        "NbdServer",
         "Sync",
         "BadSectorImpl",
     ],

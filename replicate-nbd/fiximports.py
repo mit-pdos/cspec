@@ -25,6 +25,7 @@ import_modules = {
         "Recovery",
         "ReplicatedDiskImpl",
         "NbdImpl",
+        "NbdServer",
         "Server",
         "TwoDiskBaseImpl",
     ],
