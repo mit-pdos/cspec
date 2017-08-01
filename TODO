@@ -21,6 +21,8 @@ Things to clean up:
 
 - security with horizontal composition: make [prog_spec] a two-execution property
 
+- something extractable for lab3 (atomic pair)
+
 ===
 
 Things we've figured out:
