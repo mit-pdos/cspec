@@ -2,8 +2,8 @@ Require Import Automation.
 Require Import Omega.
 Require Import RelationClasses.
 
-Require Export Disk.Sectors.
-Require Import SepLogic.Mem.Def SepLogic.Mem.Upd SepLogic.Mem.Sized.
+Require Export Sectors.
+Require Import MemState.Mem.Def MemState.Mem.Upd MemState.Mem.Sized.
 
 Record diskOf T :=
   mkDisk { size: nat;

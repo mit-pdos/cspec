@@ -1,6 +1,6 @@
 Require Import Automation.
 Require Import Setoid Classes.Morphisms.
-Require Import SepLogic.Mem.Def.
+Require Import MemState.Mem.Def.
 
 (* [pred A V] is a predicate over [mem A V]; we wrap it in a record to make
 judgements explicit rather than mere function applications.

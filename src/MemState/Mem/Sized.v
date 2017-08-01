@@ -1,8 +1,8 @@
 Require Import Omega.
 
 Require Import Automation.
-Require Import SepLogic.Mem.Def.
-Require Import SepLogic.Mem.Upd.
+Require Import MemState.Mem.Def.
+Require Import MemState.Mem.Upd.
 
 (** We define [sized_domain], which specifies that a [mem nat V] has a contiguous
 domain from 0 through some bound sz (that is, 0 through (sz-1) map to something,

@@ -1,9 +1,9 @@
 Require Import Automation.
 Require Import Helpers.
 
-Require Import SepLogic.Mem.Def.
-Require Import SepLogic.Mem.Upd.
-Require Import SepLogic.Pred.Def.
+Require Import MemState.Mem.Def.
+Require Import MemState.Mem.Upd.
+Require Import MemState.Pred.Def.
 
 Definition pred_except `(F: pred A V) {AEQ: EqualDec A} a v : pred A V :=
   mkPred (fun m => upd m a v |= F).

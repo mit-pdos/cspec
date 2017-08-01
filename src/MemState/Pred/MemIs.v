@@ -1,5 +1,5 @@
-Require Import SepLogic.Mem.Def.
-Require Import SepLogic.Pred.Def.
+Require Import MemState.Mem.Def.
+Require Import MemState.Pred.Def.
 
 Definition mem_is `(m: mem A V) : pred A V :=
   mkPred (fun m' => m' = m).

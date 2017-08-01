@@ -1,6 +1,6 @@
 Require Import Helpers.
 Require Import Automation.
-Require Import SepLogic.Mem.Def.
+Require Import MemState.Mem.Def.
 
 Section Upd.
 

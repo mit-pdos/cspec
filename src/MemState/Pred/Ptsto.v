@@ -1,9 +1,9 @@
 Require Import Automation.
 Require Import Helpers.
 
-Require Import SepLogic.Mem.Def.
-Require Import SepLogic.Mem.Upd.
-Require Import SepLogic.Pred.Def.
+Require Import MemState.Mem.Def.
+Require Import MemState.Mem.Upd.
+Require Import MemState.Pred.Def.
 
 Definition singleton A V (a:A) (v:V) {AEQ:EqualDec A} : mem A V :=
   fun a' => if a == a' then Some v else None.

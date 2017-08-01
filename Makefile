@@ -1,10 +1,10 @@
 ## Common library code
 CODE := $(wildcard src/POCS.v)
 CODE += $(wildcard src/Helpers/*.v)
-CODE += $(wildcard src/SepLogic/Pred/*.v)
-CODE += $(wildcard src/SepLogic/Mem/*.v)
+CODE += $(wildcard src/MemState/Pred/*.v)
+CODE += $(wildcard src/MemState/Mem/*.v)
+CODE += $(wildcard src/MemState/Disk/*.v)
 CODE += $(wildcard src/Refinement/*.v)
-CODE += $(wildcard src/Disk/*.v)
 CODE += $(wildcard src/Common/*.v)
 
 ## Lab 1: StatDB

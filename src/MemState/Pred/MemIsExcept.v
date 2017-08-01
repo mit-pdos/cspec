@@ -1,12 +1,12 @@
 Require Import Automation.
 Require Import Helpers.
 
-Require Import SepLogic.Mem.Def.
-Require Import SepLogic.Mem.Upd.
-Require Import SepLogic.Pred.Def.
-Require Import SepLogic.Pred.MemIs.
-Require Import SepLogic.Pred.Ptsto.
-Require Import SepLogic.Pred.Except.
+Require Import MemState.Mem.Def.
+Require Import MemState.Mem.Upd.
+Require Import MemState.Pred.Def.
+Require Import MemState.Pred.MemIs.
+Require Import MemState.Pred.Ptsto.
+Require Import MemState.Pred.Except.
 
 Theorem mem_is_except : forall `(m: mem A V) {AEQ:EqualDec A} a v,
     m a = Some v ->
