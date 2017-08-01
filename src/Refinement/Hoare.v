@@ -477,7 +477,7 @@ Definition then_init (init1 init2: prog InitResult) : prog InitResult :=
 
 Definition inited_any {State} (s : State) : Prop := True.
 
-Definition init_invariant
+Definition init_abstraction
            (init: prog InitResult) (rec: prog unit)
            `(abs: Abstraction State) (init_sem: State -> Prop) :=
   prog_spec
@@ -493,14 +493,14 @@ Definition init_invariant
             fun _ w' => True;
        |}) init rec (IdAbstraction world).
 
-Theorem init_invariant_any_rec : forall (init: prog InitResult)
+Theorem init_abstraction_any_rec : forall (init: prog InitResult)
                                    (rec rec': prog unit)
                                    `(abs: Abstraction State)
                                    (init_sem: State -> Prop),
-    init_invariant init rec abs init_sem ->
-    init_invariant init rec' abs init_sem.
+    init_abstraction init rec abs init_sem ->
+    init_abstraction init rec' abs init_sem.
 Proof.
-  unfold init_invariant, prog_spec; simpl; intros.
+  unfold init_abstraction, prog_spec; simpl; intros.
   destruct matches; subst; eauto.
   eapply rexec_finish_any_rec in H2.
   eapply H in H2; eauto.
@@ -512,7 +512,7 @@ Theorem then_init_compose : forall (init1 init2: prog InitResult)
                               `(abs2: LayerAbstraction State1 State2)
                               (init1_sem: State1 -> Prop)
                               (init2_sem: State2 -> Prop),
-    init_invariant init1 rec abs1 init1_sem ->
+    init_abstraction init1 rec abs1 init1_sem ->
     prog_spec
       (fun (_:unit) state =>
          {| pre := True;
@@ -524,11 +524,11 @@ Theorem then_init_compose : forall (init1 init2: prog InitResult)
                        end;
             recover :=
               fun _ state' => True; |}) init2 rec abs1 ->
-    init_invariant (then_init init1 init2) rec' (abstraction_compose abs1 abs2) init2_sem.
+    init_abstraction (then_init init1 init2) rec' (abstraction_compose abs1 abs2) init2_sem.
 Proof.
   intros.
-  eapply init_invariant_any_rec with rec.
-  unfold init_invariant; intros.
+  eapply init_abstraction_any_rec with rec.
+  unfold init_abstraction; intros.
   step_prog; intuition; simpl in *.
   descend; intuition eauto.
   destruct r.

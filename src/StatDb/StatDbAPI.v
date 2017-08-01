@@ -34,7 +34,7 @@ Module Type StatDbAPI.
 
   Parameter abstr : Abstraction State.
 
-  Axiom init_ok : init_invariant init recover abstr inited.
+  Axiom init_ok : init_abstraction init recover abstr inited.
   Axiom add_ok : forall v, prog_spec (add_spec v) (add v) recover abstr.
   Axiom mean_ok : prog_spec mean_spec mean recover abstr.
   Axiom recover_noop : rec_noop recover abstr no_crash.

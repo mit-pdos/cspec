@@ -41,7 +41,7 @@ Module StatDB (v : VarsAPI) <: StatDbAPI.
       {| abstraction := statdb_abstraction |}.
 
 
-  Theorem init_ok : init_invariant init recover abstr inited.
+  Theorem init_ok : init_abstraction init recover abstr inited.
   Proof.
     eapply then_init_compose; eauto.
     unfold init'.
