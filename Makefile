@@ -1,26 +1,23 @@
+## Common library code
 CODE := $(wildcard src/POCS.v)
 CODE += $(wildcard src/Helpers/*.v)
 CODE += $(wildcard src/SepLogic/Pred/*.v)
 CODE += $(wildcard src/SepLogic/Mem/*.v)
 CODE += $(wildcard src/Refinement/*.v)
 CODE += $(wildcard src/Disk/*.v)
+CODE += $(wildcard src/Common/*.v)
 
-## For StatDB lab
-CODE += $(wildcard src/Variables/*.v)
-CODE += $(wildcard src/StatDb/*.v)
+## Lab 1: StatDB
+CODE += $(wildcard src/Lab1/*.v)
 
-## For bad sector remapping lab
-CODE += $(wildcard src/BadSectorDisk/*.v)
-CODE += $(wildcard src/RemappedDisk/*.v)
-CODE += $(wildcard src/NBD/*.v)
+## Lab 2: bad sector remapping
+CODE += $(wildcard src/Lab2/*.v)
 
-## For atomic pair lab
-CODE += $(wildcard src/OneDisk/*.v)
-CODE += $(wildcard src/AtomicPair/*.v)
+## Lab 3: atomic pair
+CODE += $(wildcard src/Lab3/*.v)
 
-## For disk mirroring lab
-CODE += $(wildcard src/TwoDisk/*.v)
-CODE += $(wildcard src/ReplicatedDisk/*.v)
+## Lab 4: disk mirroring
+CODE += $(wildcard src/Lab4/*.v)
 
 COQRFLAGS := -R build POCS
 
@@ -59,9 +56,9 @@ docs: coq
 	coqtop $(COQRFLAGS) -batch -noglob -load-vernac-source $<
 	./scripts/add-preprocess.sh $@/*.hs
 
-statdb-cli/extract: build/StatDb/StatDbCli.vo
-remap-nbd/extract: build/RemappedDisk/RemappedServer.vo
-replicate-nbd/extract: build/ReplicatedDisk/ReplicatedServer.vo
+statdb-cli/extract: build/Lab1/StatDbCli.vo
+remap-nbd/extract: build/Lab2/RemappedServer.vo
+replicate-nbd/extract: build/Lab4/ReplicatedServer.vo
 
 bin/%: %/extract
 	mkdir -p $(@D)

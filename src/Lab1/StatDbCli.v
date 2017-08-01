@@ -1,6 +1,6 @@
 Require Import POCS.
-Require Import StatDb.StatDbImpl.
-Require Import Variables.VariablesImpl.
+Require Import StatDbImpl.
+Require Import VariablesImpl.
 
 
 Module statdb := StatDB Vars.

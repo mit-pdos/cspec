@@ -1,7 +1,7 @@
 Require Import POCS.
 
-Require Import TwoDisk.TwoDiskAPI.
-Require Import OneDisk.OneDiskAPI.
+Require Import TwoDiskAPI.
+Require Import Common.OneDiskAPI.
 
 
 Module ReplicatedDisk (td : TwoDiskAPI) <: OneDiskAPI.

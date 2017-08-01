@@ -1,5 +1,5 @@
 Require Import POCS.
-Require Export TwoDisk.TwoDiskBaseAPI.
+Require Export TwoDiskBaseAPI.
 
 
 Definition other (i : diskId) :=

@@ -1,8 +1,8 @@
 Require Import POCS.
 
-Require Import RemappedDisk.RemappedDiskImpl.
-Require Import BadSectorDisk.BadSectorImpl.
-Require Import NBD.NbdServer.
+Require Import RemappedDiskImpl.
+Require Import BadSectorImpl.
+Require Import Common.NbdServer.
 
 
 Module d := RemappedDisk BadSectorDisk.

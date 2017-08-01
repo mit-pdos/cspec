@@ -1,9 +1,9 @@
 Require Import POCS.
 
-Require Import ReplicatedDisk.ReplicatedDiskImpl.
-Require Import TwoDisk.TwoDiskImpl.
-Require Import TwoDisk.TwoDiskBaseImpl.
-Require Import NBD.NbdServer.
+Require Import ReplicatedDiskImpl.
+Require Import TwoDiskImpl.
+Require Import TwoDiskBaseImpl.
+Require Import Common.NbdServer.
 
 
 Module td := TwoDisk TwoDiskBase.

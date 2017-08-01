@@ -1,6 +1,6 @@
 Require Import POCS.
-Require Import OneDisk.OneDiskAPI.
-Require Import BadSectorDisk.BadSectorAPI.
+Require Import OneDiskAPI.
+Require Import BadSectorAPI.
 
 
 Module RemappedDisk (bd : BadSectorAPI) <: OneDiskAPI.

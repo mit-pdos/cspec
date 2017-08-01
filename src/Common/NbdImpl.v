@@ -1,5 +1,5 @@
 Require Import POCS.
-Require Import NBD.NbdAPI.
+Require Import NbdAPI.
 
 
 Extraction Language Haskell.

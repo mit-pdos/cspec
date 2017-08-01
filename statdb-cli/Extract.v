@@ -6,7 +6,7 @@ Require Import Refinement.ExtrProg.
 
 Extraction Language Haskell.
 
-Require Import StatDb.StatDbCli.
+Require Import Lab1.StatDbCli.
 
 Extract Inlined Constant PeanoNat.Nat.div => "(\n m -> if m Prelude.== 0 then 0 else Prelude.div n m)".
 

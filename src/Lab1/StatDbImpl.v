@@ -1,6 +1,6 @@
 Require Import POCS.
-Require Import Variables.VariablesAPI.
-Require Import StatDb.StatDbAPI.
+Require Import VariablesAPI.
+Require Import StatDbAPI.
 
 
 Module StatDB (v : VarsAPI) <: StatDbAPI.

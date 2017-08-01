@@ -7,7 +7,7 @@ Require Import Refinement.ExtrProg.
 
 Extraction Language Haskell.
 
-Require Import RemappedDisk.RemappedServer.
+Require Import Lab2.RemappedServer.
 
 Extract Inlined Constant Compare_dec.lt_dec => "((Prelude.<) :: Prelude.Integer -> Prelude.Integer -> Prelude.Bool)".
 

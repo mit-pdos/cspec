@@ -1,8 +1,8 @@
 Require Import POCS.
 
-Require Import OneDisk.OneDiskAPI.
-Require Import NBD.NbdAPI.
-Require Import NBD.NbdImpl.
+Require Import OneDiskAPI.
+Require Import NbdAPI.
+Require Import NbdImpl.
 
 Module nbd := NbdImpl.
 

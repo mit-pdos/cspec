@@ -1,6 +1,6 @@
 Require Import POCS.
-Require Import TwoDisk.TwoDiskAPI.
-Require Import TwoDisk.TwoDiskBaseAPI.
+Require Import TwoDiskAPI.
+Require Import TwoDiskBaseAPI.
 
 
 Module TwoDisk (b : TwoDiskBaseAPI) <: TwoDiskAPI.
