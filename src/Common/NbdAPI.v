@@ -40,13 +40,11 @@ Fixpoint read_match (d : disk) (off : addr) (blocks : nat) : bytes (blocks * blo
     read_match d (S off) blocks' otherdata
   end.
 
-Fixpoint write_upd (d : disk) (off : addr) (blocks : nat) : bytes (blocks * blockbytes) -> disk :=
+Fixpoint write_upd (d : disk) (off : addr) (blocks : list (bytes blockbytes)) : disk :=
   match blocks with
-  | O => fun data => d
-  | S blocks' =>
-    fun (data : bytes ((S blocks') * blockbytes)) =>
-    let (thisdata, otherdata) := bsplit data in
-    write_upd (diskUpd d off thisdata) (S off) blocks' otherdata
+  | nil => d
+  | b :: blocks' =>
+    write_upd (diskUpd d off b) (S off) blocks'
   end.
 
 Definition read_match' (d : disk) (off : addr) (blocks : nat) (len : nat)
@@ -76,7 +74,7 @@ Definition sendResponse_spec (resp : Response) : Specification _ unit unit State
          @read_match' disk off blocks data_len Hlen data) \/
         (error <> ESuccess /\ data_len = 0)
       | Write h off len data => h = rhandle /\ data_len = 0 /\
-        (error = ESuccess /\ disk' = write_upd disk off len data) \/
+        (error = ESuccess /\ disk' = write_upd disk off (bsplit_list data)) \/
         (error <> ESuccess /\ disk' = disk)
       | Flush h => h = rhandle /\ data_len = 0 /\ disk' = disk
       | Disconnect => False

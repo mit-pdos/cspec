@@ -16,13 +16,77 @@ Module NBDServer (d : OneDiskAPI).
               Ret (bappend b rest)
     end.
 
-  Fixpoint write (off:nat) n (bs:bytes (n*blockbytes)) {struct n} : prog unit.
-    destruct n.
-    - apply (Ret tt).
-    - destruct (bsplit bs) as [b rest].
-      apply (Bind (d.write off b)); intros _.
-      apply (write (off+1) _ rest).
-  Defined.
+  Fixpoint write (off:nat) (bl : list (bytes blockbytes)) : prog unit :=
+    match bl with
+    | nil => Ret tt
+    | b :: bl' =>
+      _ <- d.write off b;
+      write (off+1) bl'
+    end.
+
+  Theorem read_ok : forall n off, prog_spec (fun (_ : unit) state => {|
+      pre := off + n <= size state;
+      post := fun r state' => state' = state /\ read_match state off n r;
+      recover := fun _ state' => state' = state
+    |}) (read off n) d.recover d.abstr.
+  Proof.
+    induction n; intros.
+    - simpl.
+      step_prog; eauto; simpl.
+      intuition eauto.
+    - simpl read.
+
+      step_prog; intros.
+      exists tt; simpl in *; (intuition subst); eauto.
+
+      step_prog; intros.
+      exists tt; simpl in *; (intuition subst); eauto.
+
+      omega.
+
+      step_prog; eauto.
+      simpl in *; intros.
+      rewrite bsplit_bappend. autounfold.
+      intuition subst; eauto.
+      edestruct disk_inbounds_exists with (d := state) (a := off); try omega.
+      rewrite H0 in H2. simpl in *. subst; eauto.
+      replace (S off) with (off + 1) by omega; auto.
+  Qed.
+
+  Theorem write_ok : forall blocks off, prog_spec (fun (_ : unit) state => {|
+      pre := True;
+      post := fun r state' =>
+        r = tt /\ state' = write_upd state off blocks;
+      recover := fun _ state' =>
+        exists nwritten,
+        state' = write_upd state off (firstn nwritten blocks)
+    |}) (write off blocks) d.recover d.abstr.
+  Proof.
+    induction blocks; intros.
+    - simpl.
+      step_prog; eauto; simpl.
+      intuition eauto.
+      exists 0; simpl; eauto.
+
+    - simpl write.
+
+      step_prog; intros.
+      exists tt; simpl in *; (intuition subst); eauto.
+
+      specialize (IHblocks (off + 1)).
+      step_prog; intros.
+      exists tt; simpl in *; (intuition subst); eauto.
+
+      f_equal; omega.
+
+      repeat deex; intuition subst.
+      exists (S nwritten); simpl.
+      f_equal; omega.
+
+      exists 0; simpl; auto.
+
+      exists 1; simpl; auto.
+  Qed.
 
   CoFixpoint handle : prog unit :=
     req <- nbd.getRequest;
@@ -34,7 +98,7 @@ Module NBDServer (d : OneDiskAPI).
         {| rhandle := h; error := ESuccess; data := data; |};
       handle
     | Write h off _ dat =>
-      _ <- write off _ dat;
+      _ <- write off (bsplit_list dat);
       _ <- nbd.sendResponse
         {| rhandle := h; error := ESuccess; data := bnull |};
       handle

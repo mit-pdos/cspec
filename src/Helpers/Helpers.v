@@ -1,5 +1,6 @@
 Require Import Arith.
 Require Import Bool.
+Require Import List.
 
 Set Implicit Arguments.
 
@@ -29,10 +30,18 @@ Axiom bytes_differ : forall n, bytes0 (S n) <> bytes1 n.
 Definition bnull : bytes 0 := bytes0 0.
 
 Axiom bappend : forall n1 n2, bytes n1 -> bytes n2 -> bytes (n1+n2).
-
 Axiom bsplit : forall n1 n2, bytes (n1+n2) -> bytes n1 * bytes n2.
-
 Arguments bsplit {n1 n2} bs.
+
+Axiom bsplit_bappend : forall n1 n2 (b1 : bytes n1) (b2 : bytes n2), bsplit (bappend b1 b2) = (b1, b2).
+
+Fixpoint bsplit_list {n} {m} : bytes (n * m) -> list (bytes m) :=
+  match n with
+  | O => fun _ => nil
+  | S n' => fun (bs : bytes ((S n') * m)) =>
+    let (this, rest) := bsplit bs in
+    this :: bsplit_list rest
+  end.
 
 
 (** Definition of [maybe_holds], stating a predicate holds over an optional
