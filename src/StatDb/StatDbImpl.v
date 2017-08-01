@@ -20,10 +20,12 @@ Module StatDB (v : VarsAPI) <: StatDbAPI.
       sum <- v.read VarSum;
       Ret (Some (sum / count)).
 
-  Definition init : prog InitResult :=
+  Definition init' : prog InitResult :=
     _ <- v.write VarCount 0;
     _ <- v.write VarSum 0;
     Ret Initialized.
+
+  Definition init := then_init v.init init'.
 
   Definition recover : prog unit :=
     v.recover.
@@ -38,6 +40,26 @@ Module StatDB (v : VarsAPI) <: StatDbAPI.
       v.abstr
       {| abstraction := statdb_abstraction |}.
 
+
+  Theorem init_ok : init_invariant init recover abstr inited.
+  Proof.
+    eapply then_init_compose; eauto.
+    unfold init'.
+
+    step_prog; intros.
+    exists (StateCount state, StateSum state); simpl; intuition idtac.
+
+    step_prog; intros.
+    exists (StateCount state0, StateSum state0); simpl; intuition idtac.
+
+    step_prog; intros.
+    eauto.
+
+    simpl in *; intuition subst.
+    exists nil.
+    unfold statdb_abstraction, inited.
+    intuition auto.
+  Qed.
 
   Theorem add_ok : forall v, prog_spec (add_spec v) (add v) recover abstr.
   Proof.

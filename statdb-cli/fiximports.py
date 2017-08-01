@@ -24,6 +24,7 @@ import_modules = {
         "VariablesImpl",
         "StatDbImpl",
         "StatDbCli",
+        "Hoare",
     ],
 }
 

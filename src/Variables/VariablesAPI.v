@@ -37,17 +37,19 @@ Definition write_spec v val : Specification _ _ unit _ :=
 
 Module Type VarsAPI.
 
-  Parameter init : prog InitResult.
-  Parameter read : var -> prog nat.
-  Parameter write : var -> nat -> prog unit.
-  Parameter recover : prog unit.
+  Axiom init : prog InitResult.
+  Axiom read : var -> prog nat.
+  Axiom write : var -> nat -> prog unit.
+  Axiom recover : prog unit.
 
   Axiom abstr : Abstraction State.
 
+  Axiom init_ok : init_invariant init recover abstr inited_any.
   Axiom read_ok : forall v, prog_spec (read_spec v) (read v) recover abstr.
   Axiom write_ok : forall v val, prog_spec (write_spec v val) (write v val) recover abstr.
   Axiom recover_noop : rec_noop recover abstr no_crash.
 
+  Hint Resolve init_ok.
   Hint Resolve read_ok.
   Hint Resolve write_ok.
   Hint Resolve recover_noop.

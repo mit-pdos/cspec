@@ -468,6 +468,15 @@ Hint Unfold no_crash.
 
 Inductive InitResult := Initialized | InitFailed.
 
+Definition then_init (init1 init2: prog InitResult) : prog InitResult :=
+  r <- init1;
+  match r with
+  | Initialized => init2
+  | Failed => Ret Failed
+  end.
+
+Definition inited_any {State} (s : State) : Prop := True.
+
 Definition init_invariant
            (init: prog InitResult) (rec: prog unit)
            `(abs: Abstraction State) (init_sem: State -> Prop) :=
@@ -495,4 +504,43 @@ Proof.
   destruct matches; subst; eauto.
   eapply rexec_finish_any_rec in H2.
   eapply H in H2; eauto.
+Qed.
+
+Theorem then_init_compose : forall (init1 init2: prog InitResult)
+                              (rec rec': prog unit)
+                              `(abs1: Abstraction State1)
+                              `(abs2: LayerAbstraction State1 State2)
+                              (init1_sem: State1 -> Prop)
+                              (init2_sem: State2 -> Prop),
+    init_invariant init1 rec abs1 init1_sem ->
+    prog_spec
+      (fun (_:unit) state =>
+         {| pre := True;
+            post :=
+              fun r state' => match r with
+                       | Initialized =>
+                         exists state'', abstraction abs2 state' state'' /\ init2_sem state''
+                       | InitFailed => True
+                       end;
+            recover :=
+              fun _ state' => True; |}) init2 rec abs1 ->
+    init_invariant (then_init init1 init2) rec' (abstraction_compose abs1 abs2) init2_sem.
+Proof.
+  intros.
+  eapply init_invariant_any_rec with rec.
+  unfold init_invariant; intros.
+  step_prog; intuition; simpl in *.
+  descend; intuition eauto.
+  destruct r.
+  - clear H.
+    unfold prog_spec in *; (intuition eauto); simpl in *;
+      subst; repeat deex.
+    eapply H in H3; eauto.
+    destruct matches in *; safe_intuition (repeat deex; eauto).
+    descend; intuition eauto.
+  - unfold prog_spec; simpl; intros.
+    destruct matches; subst; eauto.
+    eexists; intuition eauto.
+    inv_rexec; inv_exec.
+    congruence.
 Qed.
