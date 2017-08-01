@@ -80,6 +80,11 @@ Module TwoDisk (b : TwoDiskBaseAPI) <: TwoDiskAPI.
   Hint Unfold combined_step.
 
 
+  Theorem init_ok : init_abstraction init recover abstr inited_any.
+  Proof.
+    eauto.
+  Qed.
+
   Theorem read_ok : forall i a, prog_spec (read_spec i a) (read i a) recover abstr.
   Proof.
     unshelve prim.

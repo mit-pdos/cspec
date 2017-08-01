@@ -32,7 +32,7 @@ Module RemappedDisk (bd : BadSectorAPI) <: OneDiskAPI.
     len <- bd.diskSize;
     Ret (len - 1).
 
-  Definition init : prog InitResult :=
+  Definition init' : prog InitResult :=
     len <- bd.diskSize;
     if len == 0 then
       Ret InitFailed
@@ -42,6 +42,8 @@ Module RemappedDisk (bd : BadSectorAPI) <: OneDiskAPI.
         Ret Initialized
       else
         Ret InitFailed.
+
+  Definition init := then_init bd.init init'.
 
   Definition recover : prog unit :=
     bd.recover.
@@ -79,6 +81,38 @@ Module RemappedDisk (bd : BadSectorAPI) <: OneDiskAPI.
     | H : remapped_abstraction _ _ |- _ => inversion H; clear H; subst_var; simpl in *
     end.
 
+
+  Theorem init_ok : init_abstraction init recover abstr inited_any.
+  Proof.
+    eapply then_init_compose; eauto.
+
+    step_prog; intros.
+    exists tt; simpl; intuition idtac.
+
+    destruct (r == 0).
+    step_prog; intros; eauto.
+
+    step_prog; intros.
+    exists tt; simpl; intuition idtac.
+
+    destruct (lt_dec r0 r).
+    all: step_prog; intros; eauto.
+
+    simpl in *; intuition subst.
+
+    case_eq (stateDisk state (size (stateDisk state) - 1)); intros.
+    2: exfalso; eapply disk_inbounds_not_none; [ | eauto ]; omega.
+
+    exists (diskUpd (shrink (stateDisk state)) (stateBadSector state) b).
+    unfold inited_any. (intuition idtac); auto; intros; autorewrite with upd in *; intuition idtac.
+    rewrite diskUpd_neq by omega.
+    rewrite shrink_preserves; auto.
+    rewrite shrink_size; omega.
+
+    rewrite diskUpd_eq; auto.
+    rewrite shrink_size; omega.
+    omega.
+  Qed.
 
   Theorem read_ok : forall a, prog_spec (OneDiskAPI.read_spec a) (read a) recover abstr.
   Proof.

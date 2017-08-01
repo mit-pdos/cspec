@@ -29,13 +29,15 @@ Module AtomicPair (d : OneDiskAPI) <: AtomicPairAPI.
       _ <- d.write 0 block0;
       Ret tt.
 
-  Definition init : prog InitResult :=
+  Definition init' : prog InitResult :=
     len <- d.diskSize;
     if len == 5 then
       _ <- d.write 0 block0;
       Ret Initialized
     else
       Ret InitFailed.
+
+  Definition init := then_init d.init init'.
 
   Definition recover : prog unit :=
     d.recover.
@@ -54,6 +56,36 @@ Module AtomicPair (d : OneDiskAPI) <: AtomicPairAPI.
     | H : atomic_pair_abstraction _ _ |- _ => inversion H; clear H; subst_var; simpl in *
     end.
 
+
+  Theorem init_ok : init_abstraction init recover abstr inited_any.
+  Proof.
+    eapply then_init_compose; eauto.
+
+    step_prog; intros.
+    exists tt; simpl; intuition idtac.
+
+    destruct (r == 5).
+    - step_prog; intros.
+      exists tt; simpl; intuition idtac.
+
+      step_prog; intros.
+      eauto.
+
+      simpl in *; intuition subst.
+      edestruct disk_inbounds_exists with (d := state) (a := 1); try omega.
+      edestruct disk_inbounds_exists with (d := state) (a := 2); try omega.
+
+      unfold atomic_pair_abstraction; exists (x, x0); simpl.
+      autorewrite with upd.
+      repeat rewrite diskUpd_eq by omega.
+      repeat rewrite diskUpd_neq by omega.
+      intuition auto.
+
+    - step_prog; intros.
+      eauto.
+
+      simpl in *; intuition subst.
+  Qed.
 
   Theorem get_ok : prog_spec get_spec get recover abstr.
   Proof.

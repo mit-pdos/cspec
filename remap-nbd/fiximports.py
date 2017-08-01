@@ -19,17 +19,11 @@ import_modules = {
 
     "import BadSectorDisk.Env":
     [
-        "DiskSize",
-        "Init",
-        "Interface",
-        "ReadWrite",
-        "Recovery",
-        "ReplicatedDisk",
         "RemappedServer",
         "NbdImpl",
         "NbdServer",
-        "Sync",
         "BadSectorImpl",
+        "Hoare",
     ],
 
     "import qualified Data.Word":

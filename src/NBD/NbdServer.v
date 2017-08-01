@@ -50,12 +50,13 @@ Module NBDServer (d : OneDiskAPI).
     end.
 
   Definition serverLoop : prog unit :=
+    _ <- nbd.recover;
     _ <- d.recover;
     handle.
 
   Definition diskSize : prog nat :=
     d.diskSize.
 
-  Definition init := d.init.
+  Definition init := then_init nbd.init d.init.
 
 End NBDServer.

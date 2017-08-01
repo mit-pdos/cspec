@@ -63,7 +63,7 @@ Module ReplicatedDisk (td : TwoDiskAPI) <: OneDiskAPI.
     end.
 
   (* Initialize every disk block *)
-  Definition init : prog InitResult :=
+  Definition init' : prog InitResult :=
     size <- diskSizeInit;
     match size with
     | Some sz =>
@@ -72,6 +72,8 @@ Module ReplicatedDisk (td : TwoDiskAPI) <: OneDiskAPI.
     | None =>
       Ret InitFailed
     end.
+
+  Definition init := then_init td.init init'.
 
 
   (**
@@ -424,7 +426,7 @@ Module ReplicatedDisk (td : TwoDiskAPI) <: OneDiskAPI.
   Hint Resolve equal_after_size.
   Hint Resolve equal_after_0_to_eq.
 
-  Theorem init_ok :
+  Theorem init'_ok :
       prog_spec
         (fun '(d_0, d_1) state =>
            {| pre :=
@@ -444,7 +446,7 @@ Module ReplicatedDisk (td : TwoDiskAPI) <: OneDiskAPI.
               recover :=
                 fun _ state' => True;
            |})
-        (init)
+        (init')
         td.recover
         td.abstr.
   Proof.
@@ -455,7 +457,7 @@ Module ReplicatedDisk (td : TwoDiskAPI) <: OneDiskAPI.
     step.
   Qed.
 
-  Hint Resolve init_ok.
+  Hint Resolve init'_ok.
 
 
   (**
@@ -1109,6 +1111,31 @@ Module ReplicatedDisk (td : TwoDiskAPI) <: OneDiskAPI.
        disks_eq_to_abstraction
        disks_eq_to_abstraction'.
 
+
+  Theorem init_ok : init_abstraction init recover abstr inited_any.
+  Proof.
+    intros.
+    eapply then_init_compose; eauto.
+    eapply prog_spec_weaken; eauto.
+    unfold spec_impl; intros.
+    destruct state.
+    destruct disk0; destruct disk1; try solve [ exfalso; eauto ].
+    - exists (d, d0); simpl; intuition eauto.
+      unfold rd_layer_abstraction, rd_invariant, abstraction_f.
+      destruct v; repeat deex; eauto.
+      destruct state'. destruct disk0; destruct disk1; try solve [ exfalso; eauto ].
+      all: eexists; intuition eauto; congruence.
+    - exists (d, d); simpl; intuition eauto.
+      unfold rd_layer_abstraction, rd_invariant, abstraction_f.
+      destruct v; repeat deex; eauto.
+      destruct state'. destruct disk0; destruct disk1; try solve [ exfalso; eauto ].
+      all: eexists; intuition eauto; congruence.
+    - exists (d, d); simpl; intuition eauto.
+      unfold rd_layer_abstraction, rd_invariant, abstraction_f.
+      destruct v; repeat deex; eauto.
+      destruct state'. destruct disk0; destruct disk1; try solve [ exfalso; eauto ].
+      all: eexists; intuition eauto; congruence.
+  Qed.
 
   Theorem read_ok : forall a, prog_spec (read_spec a) (read a) recover abstr.
   Proof.

@@ -42,6 +42,16 @@ Section GenericDisks.
     unfold disk_get in *; congruence.
   Qed.
 
+  Lemma disk_inbounds_exists : forall a d,
+      a < size d ->
+      exists b,
+      d a = Some b.
+  Proof.
+    intros.
+    case_eq (d a); intros; eauto.
+    exfalso; eapply disk_inbounds_not_none; eauto.
+  Qed.
+
   Lemma disk_none_oob : forall a d,
       d a = None ->
       ~a < size d.

@@ -13,6 +13,7 @@ Module NbdImpl <: NbdAPI.
 
   Axiom abstr : Abstraction State.
 
+  Axiom init_ok : init_abstraction init recover abstr inited.
   Axiom getRequest_ok : prog_spec (getRequest_spec) (getRequest) recover abstr.
   Axiom sendResponse_ok : forall resp, prog_spec (sendResponse_spec resp) (sendResponse resp) recover abstr.
   Axiom recover_noop : rec_noop recover abstr wipe_req.

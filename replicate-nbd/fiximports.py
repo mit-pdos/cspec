@@ -19,17 +19,12 @@ import_modules = {
 
     "import Replication.TwoDiskEnvironment":
     [
-        "ArrayAPI",
-        "DiskSize",
-        "Init",
-        "Interface",
-        "ReadWrite",
-        "Recovery",
         "ReplicatedDiskImpl",
         "NbdImpl",
         "NbdServer",
         "ReplicatedServer",
         "TwoDiskBaseImpl",
+        "Hoare",
     ],
 
     "import qualified Data.Word":

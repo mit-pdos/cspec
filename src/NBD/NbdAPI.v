@@ -27,6 +27,9 @@ Record State := mkState {
 }.
 
 
+Definition inited (s : State) : Prop :=
+  StateReq s = None.
+
 Fixpoint read_match (d : disk) (off : addr) (blocks : nat) : bytes (blocks * blockbytes) -> Prop :=
   match blocks with
   | O => fun data => True
@@ -98,8 +101,14 @@ Module Type NbdAPI.
 
   Axiom abstr : Abstraction State.
 
+  Axiom init_ok : init_abstraction init recover abstr inited.
   Axiom getRequest_ok : prog_spec (getRequest_spec) (getRequest) recover abstr.
   Axiom sendResponse_ok : forall resp, prog_spec (sendResponse_spec resp) (sendResponse resp) recover abstr.
   Axiom recover_noop : rec_noop recover abstr wipe_req.
+
+  Hint Resolve init_ok.
+  Hint Resolve getRequest_ok.
+  Hint Resolve sendResponse_ok.
+  Hint Resolve recover_noop.
 
 End NbdAPI.
