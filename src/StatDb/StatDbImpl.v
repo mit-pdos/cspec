@@ -3,21 +3,6 @@ Require Import Variables.VariablesAPI.
 Require Import StatDb.StatDbAPI.
 
 
-(**
- * Coqdoc comment
- ** foo
- *)
-
-Definition foo := 5.
-
-(**
- ** bar
- - xx
-  - y
-  - z
-   - q
- *)
-
 Module StatDB (v : VarsAPI) <: StatDbAPI.
 
   Definition add (v : nat) : prog unit :=
