@@ -25,7 +25,7 @@ Module NBDServer (d : OneDiskAPI).
     end.
 
   Theorem read_ok : forall n off, prog_spec (fun (_ : unit) state => {|
-      pre := off + n <= size state;
+      pre := True;
       post := fun r state' => state' = state /\ read_match state off n r;
       recover := fun _ state' => state' = state
     |}) (read off n) d.recover d.abstr.
@@ -42,14 +42,11 @@ Module NBDServer (d : OneDiskAPI).
       step_prog; intros.
       exists tt; simpl in *; (intuition subst); eauto.
 
-      omega.
-
       step_prog; eauto.
       simpl in *; intros.
       rewrite bsplit_bappend. autounfold.
       intuition subst; eauto.
-      edestruct disk_inbounds_exists with (d := state) (a := off); try omega.
-      rewrite H0 in H2. simpl in *. subst; eauto.
+      destruct (state off); simpl in *; intuition (subst; eauto).
       replace (S off) with (off + 1) by omega; auto.
   Qed.
 
