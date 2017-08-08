@@ -404,8 +404,7 @@ Module ReplicatedDisk (td : TwoDiskAPI) <: OneDiskAPI.
       d_0 = d_1.
   Proof.
     unfold equal_after; intuition.
-    eapply diskMem_ext_eq.
-    extensionality a'.
+    eapply disk_ext_eq; intros.
     eapply H1; omega.
   Qed.
 
@@ -524,12 +523,11 @@ Module ReplicatedDisk (td : TwoDiskAPI) <: OneDiskAPI.
       d a ?|= eq v' ->
       v = v'.
   Proof.
-    unfold disk_get; intros.
-    pose proof (diskMem_domain d a).
-    rewrite if_lt_dec in H2 by auto.
-    repeat deex.
-    rewrite H2 in H0.
-    replace (d a) in *; simpl in *; subst; auto.
+    intros.
+    case_eq (d a); intros.
+    - rewrite H2 in *. simpl in *. congruence.
+    - exfalso.
+      eapply disk_inbounds_not_none; eauto.
   Qed.
 
   (* we will show that fixup does nothing once the disks are the same *)

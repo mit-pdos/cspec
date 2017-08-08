@@ -75,7 +75,7 @@ Module AtomicPair (d : OneDiskAPI) <: AtomicPairAPI.
       edestruct disk_inbounds_exists with (d := state) (a := 1); try omega.
       edestruct disk_inbounds_exists with (d := state) (a := 2); try omega.
 
-      unfold atomic_pair_abstraction; exists (x, x0); simpl.
+      unfold atomic_pair_abstraction; exists (x, x0).
       autorewrite with upd.
       repeat rewrite diskUpd_eq by omega.
       repeat rewrite diskUpd_neq by omega.

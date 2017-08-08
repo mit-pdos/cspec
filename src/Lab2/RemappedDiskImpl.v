@@ -126,7 +126,7 @@ Module RemappedDisk (bd : BadSectorAPI) <: OneDiskAPI.
     exists tt; simpl; intuition idtac.
     2: autounfold in *; simpl in *; intuition subst; eauto.
 
-    destruct (a == r); subst.
+    destruct (a == r).
     - step_prog; intros.
       exists tt; simpl; intuition idtac.
       2: autounfold in *; simpl in *; intuition subst; eauto.

@@ -1,28 +1,21 @@
 Require Import Automation.
 Require Import Omega.
 Require Import RelationClasses.
+Require Import List.
 
 Require Export Sectors.
-Require Import MemState.Mem.Def MemState.Mem.Upd MemState.Mem.Sized.
 
-Record disk :=
-  mkDisk { size: nat;
-           (* The :> makes [diskMem] a coercion, allowing disks to be used in a
-           few contexts where memories are expected (for example, in separation
-           logic judgements). *)
-           diskMem :> mem addr block;
-           diskMem_domain: sized_domain diskMem size; }.
+
+Definition disk := list block.
 
 (* this coercion allows disks to be directly accessed with a function
-application: [d a] will implicitly call [disk_get d a] due to the coercion,
-which is [(diskMem d) a]. *)
-Definition disk_get (d:disk) : addr -> option block := diskMem d.
-Coercion disk_get : disk >-> Funclass.
+application: [d a] will implicitly call [nth_error d a] due to the coercion,
+which is [(nth_error d) a]. *)
+Coercion nth_error : list >-> Funclass.
 
-Arguments mkDisk size diskMem diskMem_domain.
+Definition size (d : disk) : nat := length d.
 
-Definition empty_disk : disk :=
-  @mkDisk 0 empty_mem (sized_domain_empty _).
+Definition empty_disk : disk := nil.
 
 Section GenericDisks.
 
@@ -34,10 +27,10 @@ Section GenericDisks.
       d a = None ->
       False.
   Proof.
+    unfold size.
     intros.
-    pose proof (diskMem_domain d a).
-    destruct matches in *; repeat deex.
-    unfold disk_get in *; congruence.
+    apply nth_error_None in H0.
+    omega.
   Qed.
 
   Lemma disk_inbounds_exists : forall a d,
@@ -45,9 +38,11 @@ Section GenericDisks.
       exists b,
       d a = Some b.
   Proof.
+    unfold size.
     intros.
     case_eq (d a); intros; eauto.
-    exfalso; eapply disk_inbounds_not_none; eauto.
+    apply nth_error_None in H0.
+    omega.
   Qed.
 
   Lemma disk_none_oob : forall a d,
@@ -59,237 +54,152 @@ Section GenericDisks.
     exfalso; eapply disk_inbounds_not_none; eauto.
   Qed.
 
-  Definition diskUpd d (a: addr) b : disk.
-  Proof.
-    destruct (lt_dec a (size d)).
-    - refine (@mkDisk (size d) (upd d a b) _).
-      apply sized_domain_upd_lt; auto.
-      exact (diskMem_domain d).
-    - exact d.
-  Defined.
+  Fixpoint diskUpd d (a: addr) b : disk :=
+    match d with
+    | nil => nil
+    | db :: drest =>
+      match a with
+      | O => b :: drest
+      | S a' => db :: diskUpd drest a' b
+      end
+    end.
 
   Lemma diskUpd_eq_some : forall d a b0 b,
-      disk_get d a = Some b0 ->
-      disk_get (diskUpd d a b) a = Some b.
+      d a = Some b0 ->
+      (diskUpd d a b) a = Some b.
   Proof.
-    intros.
-    pose proof (diskMem_domain d a).
-    unfold diskUpd.
-    destruct (lt_dec a (size d)); try contradiction; simpl.
-    autorewrite with upd; auto.
-    unfold disk_get in *.
-    congruence.
+    induction d; simpl; eauto.
+    - destruct a; simpl; intros; congruence.
+    - destruct a0; simpl; intros; eauto.
   Qed.
 
   Lemma diskUpd_eq : forall d a b,
       a < size d ->
       diskUpd d a b a = Some b.
   Proof.
-    intros.
-    unfold diskUpd.
-    destruct (lt_dec a (size d)); try contradiction; simpl.
-    autorewrite with upd; auto.
+    unfold size.
+    induction d; simpl; intros.
+    - omega.
+    - destruct a0; simpl; intros; eauto.
+      eapply IHd.
+      omega.
   Qed.
 
   Lemma disk_oob_eq : forall d a,
       ~a < size d ->
       d a = None.
   Proof.
-    intros.
-    unfold diskUpd.
-    pose proof (diskMem_domain d a).
-    destruct (lt_dec a (size d)); try contradiction; auto.
+    unfold size.
+    induction d; simpl; intros.
+    - induction a; eauto.
+    - destruct a0; simpl.
+      + omega.
+      + eapply IHd. omega.
   Qed.
 
   Lemma diskUpd_oob_eq : forall d a b,
       ~a < size d ->
       diskUpd d a b a = None.
   Proof.
-    intros.
-    unfold diskUpd.
-    pose proof (diskMem_domain d a).
-    destruct (lt_dec a (size d)); try contradiction; simpl; eauto.
+    unfold size.
+    induction d; simpl; intros.
+    - induction a; eauto.
+    - destruct a0; simpl.
+      + omega.
+      + eapply IHd. omega.
   Qed.
 
   Lemma diskUpd_neq : forall d a b a',
       a <> a' ->
       diskUpd d a b a' = d a'.
   Proof.
-    intros.
-    unfold diskUpd.
-    destruct (lt_dec a (size d)); simpl;
-      autorewrite with upd; auto.
+    induction d; simpl; intros; auto.
+    destruct a0; simpl.
+    - destruct a'; simpl; try omega; auto.
+    - destruct a'; simpl; auto.
   Qed.
 
   Lemma diskUpd_size : forall d a b,
       size (diskUpd d a b) = size d.
   Proof.
-    unfold diskUpd; intros.
-    destruct (lt_dec a (size d)); eauto.
+    induction d; simpl; eauto.
+    destruct a0; simpl; intros; eauto.
   Qed.
 
   Lemma diskUpd_none : forall d a b,
       d a = None ->
       diskUpd d a b = d.
   Proof.
-    unfold diskUpd; intros.
-    pose proof (diskMem_domain d a).
-    destruct (lt_dec a (size d)); eauto.
-    destruct H0; unfold disk_get in *; try congruence.
+    induction d; simpl; intros; auto.
+    destruct a0; simpl in *; try congruence.
+    rewrite IHd; eauto.
   Qed.
 
-  Lemma diskUpd_diskMem_commute : forall d a b0 b,
-      d a = Some b0 ->
-      diskMem (diskUpd d a b) = upd (diskMem d) a b.
-  Proof.
-    intros.
-    extensionality a'.
-    is_eq a a'; autorewrite with upd; eauto.
-    erewrite diskUpd_eq_some; eauto.
-    rewrite diskUpd_neq; auto.
-  Qed.
-
-  Definition diskUpdF d (a: addr) (f: block -> block) : disk.
-  Proof.
-    destruct (lt_dec a (size d)).
-    - destruct (d a).
-      refine (@mkDisk (size d) (upd d a (f b)) _).
-      apply sized_domain_upd_lt; auto.
-      exact (diskMem_domain d).
-      exact d. (* impossible, a is in bounds *)
-    - exact d.
-  Defined.
-
-  Theorem diskUpdF_size_eq : forall d a f,
-      size (diskUpdF d a f) = size d.
-  Proof.
-    unfold diskUpdF; intros.
-    destruct matches; auto.
-  Qed.
-
-  Theorem diskUpdF_neq : forall d a f a',
-      a <> a' ->
-      diskUpdF d a f a' = d a'.
-  Proof.
-    unfold diskUpdF; intros.
-    destruct matches; simpl; eauto.
-    autorewrite with upd; auto.
-  Qed.
-
-  Theorem diskUpdF_oob : forall d a f,
-      ~a < size d ->
-      diskUpdF d a f = d.
-  Proof.
-    unfold diskUpdF; intros.
-    destruct matches; simpl; eauto.
-  Qed.
-
-  Theorem diskUpdF_none : forall d a f,
-      d a = None ->
-      diskUpdF d a f = d.
-  Proof.
-    unfold diskUpdF; intros.
-    destruct matches; simpl; eauto.
-  Qed.
-
-  Theorem diskUpdF_inbounds : forall d a f,
-      a < size d ->
-      exists v, d a = Some v /\
-           diskUpdF d a f a = Some (f v).
-  Proof.
-    unfold diskUpdF; intros.
-    pose proof (diskMem_domain d a).
-    destruct matches; simpl; autorewrite with upd; eauto.
-    repeat deex; unfold disk_get in *; congruence.
-  Qed.
-
-  Theorem diskUpdF_eq : forall d a f v,
-      d a = Some v ->
-      diskUpdF d a f a = Some (f v).
-  Proof.
-    unfold diskUpdF; intros.
-    pose proof (diskMem_domain d a).
-    destruct matches; simpl; autorewrite with upd; eauto.
-    repeat deex; unfold disk_get in *; congruence.
-  Qed.
-
-  (**
-   * disks are actually equal when their memories are equal;
-   * besides being useful in practice, this to some extent
-   * justifies the diskMem coercion, since disks are uniquely
-   * determined by their memories, subject to the sized_domain
-   * proofs.
-   *)
-  Theorem diskMem_ext_eq : forall d d',
-      diskMem d = diskMem d' ->
+  Theorem disk_ext_eq : forall d d',
+      (forall a, d a = d' a) ->
       d = d'.
   Proof.
-    intros.
-    destruct d, d'; simpl in *; subst.
-    pose proof (sized_domain_unique_sz diskMem_domain0 diskMem_domain1); subst.
-    f_equal.
-    apply ProofIrrelevance.proof_irrelevance.
+    induction d; simpl; intros.
+    - destruct d'; simpl; intros; eauto.
+      specialize (H 0); simpl in *.
+      congruence.
+    - destruct d'; simpl; intros.
+      + specialize (H 0); simpl in *.
+        congruence.
+      + specialize (H 0) as H'; simpl in H'.
+        f_equal; try congruence.
+        eapply IHd; intros.
+        specialize (H (S a0)); simpl in H.
+        eauto.
   Qed.
 
   Theorem diskUpd_same : forall d a b,
       d a = Some b ->
       diskUpd d a b = d.
   Proof.
-    intros.
-    apply diskMem_ext_eq.
-    extensionality a'.
-    is_eq a a'; autorewrite with upd; auto.
-    erewrite diskUpd_eq_some; eauto.
-    rewrite diskUpd_neq by auto; auto.
+    induction d; simpl; intros; auto.
+    destruct a0; simpl in *.
+    - congruence.
+    - rewrite IHd; eauto.
   Qed.
 
   Lemma diskUpd_oob_noop : forall d a b,
       ~a < size d ->
       diskUpd d a b = d.
   Proof.
-    intros.
-    unfold diskUpd.
-    pose proof (diskMem_domain d a).
-    destruct (lt_dec a (size d)); try contradiction; simpl; eauto.
+    induction d; simpl; intros; auto.
+    destruct a0; simpl in *.
+    - omega.
+    - rewrite IHd; auto; omega.
   Qed.
 
   (**
    * Support for shrinking a disk by one address.
    *)
-  Definition shrink d : disk.
-    case_eq (size d); intros.
-    - exact d.
-    - refine (@mkDisk n (delete (diskMem d) n) _).
-      eapply sized_domain_delete_last; eauto.
-      exact (diskMem_domain d).
-  Defined.
+  Definition shrink (d : disk) : disk :=
+    firstn (length d - 1) d.
 
   Lemma shrink_size : forall d,
       size d <> 0 ->
       size (shrink d) = size d - 1.
   Proof.
-    intros.
-    case_eq (size d); intros; try congruence.
-    unfold shrink.
-    generalize (diskMem_domain d).
-    rewrite H0.
-    intros; simpl; omega.
+    unfold size, shrink; intros.
+    rewrite firstn_length.
+    rewrite min_l; omega.
   Qed.
 
   Lemma shrink_preserves : forall d a,
       a <> size (shrink d) ->
       (shrink d) a = d a.
   Proof.
-    intros.
-    case_eq (size d); intros.
-    - unfold shrink; generalize (diskMem_domain d).
-      rewrite H0; auto.
-    - unfold shrink; generalize (diskMem_domain d).
-      rewrite H0; intros.
-      simpl.
-      rewrite delete_neq; auto.
-      rewrite shrink_size in H by omega.
-      omega.
+    unfold shrink.
+    induction d; simpl; intros; auto.
+    destruct d; simpl in *.
+    - destruct a0; try omega; simpl.
+      destruct a0; auto.
+    - destruct a0; simpl; auto.
+      replace (length d - 0) with (length d) in * by omega.
+      rewrite <- IHd; auto.
   Qed.
 
 End GenericDisks.
@@ -301,95 +211,8 @@ Hint Rewrite diskUpd_size : upd.
 Hint Rewrite diskUpd_neq using (solve [ auto ]) : upd.
 Hint Rewrite diskUpd_none using (solve [ auto ]) : upd.
 
-Hint Rewrite diskUpdF_size_eq : upd.
-Hint Rewrite diskUpdF_oob using (solve [ auto ]) : upd.
-Hint Rewrite diskUpdF_none using (solve [ auto ]) : upd.
-Hint Rewrite diskUpdF_neq using (solve [ auto ]) : upd.
-
 Hint Rewrite diskUpd_same using (solve [ auto ]) : upd.
 Hint Rewrite diskUpd_oob_noop using (solve [ auto ]) : upd.
 
 Hint Rewrite shrink_size using (solve [ auto ]) : upd.
 Hint Rewrite shrink_preserves using (solve [ auto ]) : upd.
-
-Lemma same_size_disks_not_different : forall (d: disk) (d': disk) a v,
-    size d = size d' ->
-    d a = Some v ->
-    d' a = None ->
-    False.
-Proof.
-  intros.
-  pose proof (diskMem_domain d' a).
-  destruct (lt_dec a (size d')).
-  repeat deex; unfold disk_get in *; congruence.
-  pose proof (diskMem_domain d a).
-  destruct (lt_dec a (size d)); unfold disk_get in *; congruence.
-Qed.
-
-Record pointwise_prop (P: block -> Prop) (d: disk) : Prop :=
-  { pointwise_prop_holds :
-      forall a, match d a with
-           | Some bs => P bs
-           | None => True
-           end; }.
-
-(* expressed for nice inversion *)
-Record pointwise_rel (rel: block -> block -> Prop) (d: disk) (d': disk) : Prop :=
-  { pointwise_sizes_eq: size d = size d';
-    pointwise_rel_holds: forall a,
-        match d a, d' a with
-        | Some bs, Some bs' => rel bs bs'
-        | None, None => True
-        | _, _ => False
-        end; }.
-
-Ltac pointwise_at a :=
-  repeat match goal with
-         | [ H: pointwise_rel _ _ _ |- _ ] =>
-           apply pointwise_rel_holds with (a:=a) in H
-         end.
-
-Ltac pointwise :=
-  match goal with
-  | [ |- pointwise_rel _ _ _ ] =>
-    econstructor;
-    [ repeat match goal with
-             | [ H: pointwise_rel _ _ _ |- _ ] =>
-               apply pointwise_sizes_eq in H
-             end; simpl in *; try congruence |
-      let a := fresh "a" in
-      intro a; pointwise_at a;
-      simpl in *;
-      destruct matches in *; eauto; try contradiction ]
-  end.
-
-Instance pointwise_rel_preorder {rel: block -> block -> Prop} {po:PreOrder rel} :
-  PreOrder (pointwise_rel rel).
-Proof.
-  econstructor; hnf; intros.
-  - pointwise.
-    reflexivity.
-  - pointwise.
-    etransitivity; eauto.
-Qed.
-
-Theorem pointwise_rel_weaken : forall (rel rel': block -> block -> Prop) d d',
-    pointwise_rel rel d d' ->
-    (forall x y, rel x y -> rel' x y) ->
-    pointwise_rel rel' d d'.
-Proof.
-  intros.
-  pointwise.
-Qed.
-
-Definition mapDisk (f: block -> block) (d:disk) : disk.
-Proof.
-  refine {| size := size d;
-            diskMem := fun a =>
-                         match d a with
-                         | Some v => Some (f v)
-                         | None => None
-                         end; |}.
-  apply sized_domain_pointwise.
-  apply diskMem_domain.
-Defined.

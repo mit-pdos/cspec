@@ -3,7 +3,7 @@ Require Import POCS.
 
 Definition State := disk.
 
-Definition read_spec a : Specification _ block unit State :=
+Definition read_spec (a : addr) : Specification _ block unit State :=
   fun (_ : unit) state => {|
     pre := True;
     post := fun r state' =>
@@ -13,7 +13,7 @@ Definition read_spec a : Specification _ block unit State :=
       state' = state
   |}.
 
-Definition write_spec a v : Specification _ _ unit State :=
+Definition write_spec (a : addr) (v : block) : Specification _ _ unit State :=
   fun (_ : unit) state => {|
     pre := True;
     post := fun r state' =>
