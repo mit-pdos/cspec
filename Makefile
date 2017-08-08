@@ -1,7 +1,6 @@
 ## Common library code
 CODE := $(wildcard src/POCS.v)
 CODE += $(wildcard src/Helpers/*.v)
-CODE += $(wildcard src/MemState/Pred/*.v)
 CODE += $(wildcard src/MemState/Mem/*.v)
 CODE += $(wildcard src/MemState/Disk/*.v)
 CODE += $(wildcard src/Refinement/*.v)
