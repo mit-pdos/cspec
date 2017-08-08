@@ -4,10 +4,6 @@ Require Export Omega.
 Require Export Helpers.Automation.
 Require Export Helpers.Helpers.
 
-Require Export MemState.Mem.Def.
-Require Export MemState.Mem.Upd.
-Require Export MemState.Mem.Sized.
-
 Require Export MemState.Disk.Disk.
 Require Export MemState.Disk.Sectors.
 
