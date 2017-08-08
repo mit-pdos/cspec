@@ -349,12 +349,8 @@ Module ReplicatedDisk (td : TwoDiskAPI) <: OneDiskAPI.
       destruct r; finish.
       + step.
         destruct r; simplify; finish.
-        (* TODO: why does the hint not trigger here? *)
-        descend; intuition eauto using equal_after_diskUpd.
       + step.
         destruct r; finish.
-        descend; intuition eauto using equal_after_diskUpd.
-        descend; intuition eauto using equal_after_diskUpd.
 
         Grab Existential Variables.
         exact block0.
@@ -522,7 +518,7 @@ Module ReplicatedDisk (td : TwoDiskAPI) <: OneDiskAPI.
     contradiction.
   Qed.
 
-  Lemma disks_eq_inbounds : forall T (d: diskOf T) a v v',
+  Lemma disks_eq_inbounds : forall (d: disk) a v v',
       a < size d ->
       d a ?|= eq v ->
       d a ?|= eq v' ->
@@ -696,7 +692,6 @@ Module ReplicatedDisk (td : TwoDiskAPI) <: OneDiskAPI.
 
     simplify.
     simplify.
-    simplify.
   Qed.
 
   (* To make these specifications precise while also covering both the already
@@ -831,12 +826,12 @@ Module ReplicatedDisk (td : TwoDiskAPI) <: OneDiskAPI.
     - step.
       rename_by_type DiskStatus s.
       destruct s; intuition (subst; eauto).
-      rename_by_type (diskOf block) d.
+      rename_by_type disk d.
       exists d, FullySynced; intuition eauto.
       destruct r; step.
 
       exists d, FullySynced; intuition eauto.
-      rename_by_type (diskOf block) d.
+      rename_by_type disk d.
       exists d, (OutOfSync a0 b); intuition eauto.
 
       destruct r; step.
@@ -902,16 +897,13 @@ Module ReplicatedDisk (td : TwoDiskAPI) <: OneDiskAPI.
       exists d, FullySynced; intuition eauto.
 
       step.
-      simplify.
+
     + step.
       exists (diskUpd d a b), d; (intuition eauto); simplify.
       step.
 
       exists d, (OutOfSync a b); intuition eauto.
       step.
-
-      simplify.
-      intuition eauto.
   Qed.
 
   Theorem Recover_ok :

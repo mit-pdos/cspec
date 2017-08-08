@@ -8,7 +8,7 @@ Require Export MemState.Mem.Def.
 Require Export MemState.Mem.Upd.
 Require Export MemState.Mem.Sized.
 
-Require Export MemState.Disk.SimpleDisk.
+Require Export MemState.Disk.Disk.
 Require Export MemState.Disk.Sectors.
 
 Require Export Refinement.Prog.

@@ -5,31 +5,29 @@ Require Import RelationClasses.
 Require Export Sectors.
 Require Import MemState.Mem.Def MemState.Mem.Upd MemState.Mem.Sized.
 
-Record diskOf T :=
+Record disk :=
   mkDisk { size: nat;
            (* The :> makes [diskMem] a coercion, allowing disks to be used in a
            few contexts where memories are expected (for example, in separation
            logic judgements). *)
-           diskMem :> mem addr T;
+           diskMem :> mem addr block;
            diskMem_domain: sized_domain diskMem size; }.
 
 (* this coercion allows disks to be directly accessed with a function
 application: [d a] will implicitly call [disk_get d a] due to the coercion,
 which is [(diskMem d) a]. *)
-Definition disk_get {T} (d:diskOf T) : addr -> option T := diskMem d.
-Coercion disk_get : diskOf >-> Funclass.
+Definition disk_get (d:disk) : addr -> option block := diskMem d.
+Coercion disk_get : disk >-> Funclass.
 
-Arguments mkDisk {T} size diskMem diskMem_domain.
+Arguments mkDisk size diskMem diskMem_domain.
 
-Definition empty_disk {T} : diskOf T :=
-  mkDisk 0 empty_mem (sized_domain_empty _).
+Definition empty_disk : disk :=
+  @mkDisk 0 empty_mem (sized_domain_empty _).
 
 Section GenericDisks.
 
-  Variable (T:Type).
-
-  Implicit Type (d:diskOf T).
-  Implicit Type (b: T).
+  Implicit Type (d: disk).
+  Implicit Type (b: block).
 
   Lemma disk_inbounds_not_none : forall a d,
       a < size d ->
@@ -61,10 +59,10 @@ Section GenericDisks.
     exfalso; eapply disk_inbounds_not_none; eauto.
   Qed.
 
-  Definition diskUpd d (a: addr) b : diskOf T.
+  Definition diskUpd d (a: addr) b : disk.
   Proof.
     destruct (lt_dec a (size d)).
-    - refine (mkDisk (size d) (upd d a b) _).
+    - refine (@mkDisk (size d) (upd d a b) _).
       apply sized_domain_upd_lt; auto.
       exact (diskMem_domain d).
     - exact d.
@@ -151,11 +149,11 @@ Section GenericDisks.
     rewrite diskUpd_neq; auto.
   Qed.
 
-  Definition diskUpdF d (a: addr) (f: T -> T) : diskOf T.
+  Definition diskUpdF d (a: addr) (f: block -> block) : disk.
   Proof.
     destruct (lt_dec a (size d)).
     - destruct (d a).
-      refine (mkDisk (size d) (upd d a (f t)) _).
+      refine (@mkDisk (size d) (upd d a (f b)) _).
       apply sized_domain_upd_lt; auto.
       exact (diskMem_domain d).
       exact d. (* impossible, a is in bounds *)
@@ -258,10 +256,10 @@ Section GenericDisks.
   (**
    * Support for shrinking a disk by one address.
    *)
-  Definition shrink d : diskOf T.
+  Definition shrink d : disk.
     case_eq (size d); intros.
     - exact d.
-    - refine (mkDisk n (delete (diskMem d) n) _).
+    - refine (@mkDisk n (delete (diskMem d) n) _).
       eapply sized_domain_delete_last; eauto.
       exact (diskMem_domain d).
   Defined.
@@ -314,7 +312,7 @@ Hint Rewrite diskUpd_oob_noop using (solve [ auto ]) : upd.
 Hint Rewrite shrink_size using (solve [ auto ]) : upd.
 Hint Rewrite shrink_preserves using (solve [ auto ]) : upd.
 
-Lemma same_size_disks_not_different : forall T T' (d: diskOf T) (d': diskOf T') a v,
+Lemma same_size_disks_not_different : forall (d: disk) (d': disk) a v,
     size d = size d' ->
     d a = Some v ->
     d' a = None ->
@@ -328,7 +326,7 @@ Proof.
   destruct (lt_dec a (size d)); unfold disk_get in *; congruence.
 Qed.
 
-Record pointwise_prop T (P: T -> Prop) (d: diskOf T) : Prop :=
+Record pointwise_prop (P: block -> Prop) (d: disk) : Prop :=
   { pointwise_prop_holds :
       forall a, match d a with
            | Some bs => P bs
@@ -336,7 +334,7 @@ Record pointwise_prop T (P: T -> Prop) (d: diskOf T) : Prop :=
            end; }.
 
 (* expressed for nice inversion *)
-Record pointwise_rel T T' (rel: T -> T' -> Prop) (d: diskOf T) (d': diskOf T') : Prop :=
+Record pointwise_rel (rel: block -> block -> Prop) (d: disk) (d': disk) : Prop :=
   { pointwise_sizes_eq: size d = size d';
     pointwise_rel_holds: forall a,
         match d a, d' a with
@@ -365,7 +363,7 @@ Ltac pointwise :=
       destruct matches in *; eauto; try contradiction ]
   end.
 
-Instance pointwise_rel_preorder {T} {rel: T -> T -> Prop} {po:PreOrder rel} :
+Instance pointwise_rel_preorder {rel: block -> block -> Prop} {po:PreOrder rel} :
   PreOrder (pointwise_rel rel).
 Proof.
   econstructor; hnf; intros.
@@ -375,7 +373,7 @@ Proof.
     etransitivity; eauto.
 Qed.
 
-Theorem pointwise_rel_weaken : forall T T' (rel rel': T -> T' -> Prop) d d',
+Theorem pointwise_rel_weaken : forall (rel rel': block -> block -> Prop) d d',
     pointwise_rel rel d d' ->
     (forall x y, rel x y -> rel' x y) ->
     pointwise_rel rel' d d'.
@@ -384,7 +382,7 @@ Proof.
   pointwise.
 Qed.
 
-Definition mapDisk {T T'} (f: T -> T') (d:diskOf T) : diskOf T'.
+Definition mapDisk (f: block -> block) (d:disk) : disk.
 Proof.
   refine {| size := size d;
             diskMem := fun a =>
