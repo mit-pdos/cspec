@@ -6,20 +6,20 @@ Extraction Language Haskell.
 
 Module BadSectorDisk <: BadSectorAPI.
 
-  Axiom init : prog InitResult.
-  Axiom read : addr -> prog block.
-  Axiom write : addr -> block -> prog unit.
-  Axiom getBadSector : prog addr.
-  Axiom size : prog nat.
-  Axiom recover : prog unit.
+  Axiom init : proc InitResult.
+  Axiom read : addr -> proc block.
+  Axiom write : addr -> block -> proc unit.
+  Axiom getBadSector : proc addr.
+  Axiom size : proc nat.
+  Axiom recover : proc unit.
 
   Axiom abstr : Abstraction State.
 
   Axiom init_ok : init_abstraction init recover abstr inited_any.
-  Axiom read_ok : forall a, prog_spec (read_spec a) (read a) recover abstr.
-  Axiom write_ok : forall a v, prog_spec (write_spec a v) (write a v) recover abstr.
-  Axiom getBadSector_ok : prog_spec getBadSector_spec getBadSector recover abstr.
-  Axiom size_ok : prog_spec size_spec size recover abstr.
+  Axiom read_ok : forall a, proc_spec (read_spec a) (read a) recover abstr.
+  Axiom write_ok : forall a v, proc_spec (write_spec a v) (write a v) recover abstr.
+  Axiom getBadSector_ok : proc_spec getBadSector_spec getBadSector recover abstr.
+  Axiom size_ok : proc_spec size_spec size recover abstr.
   Axiom recover_noop : rec_noop recover abstr no_wipe.
 
 End BadSectorDisk.

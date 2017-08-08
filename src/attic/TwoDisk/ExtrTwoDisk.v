@@ -5,12 +5,12 @@ Require Import Refinement.Interface.
 
 Module TD.
 
-  Axiom hs_read : diskId -> addr -> prog (DiskResult block).
-  Axiom hs_write : diskId -> addr -> block -> prog (DiskResult unit).
-  Axiom hs_sync : diskId -> prog (DiskResult unit).
-  Axiom hs_diskSize : diskId -> prog (DiskResult nat).
+  Axiom hs_read : diskId -> addr -> proc (DiskResult block).
+  Axiom hs_write : diskId -> addr -> block -> proc (DiskResult unit).
+  Axiom hs_sync : diskId -> proc (DiskResult unit).
+  Axiom hs_diskSize : diskId -> proc (DiskResult nat).
 
-  Definition td_op_impl T (op: TD.Op T) : prog T :=
+  Definition td_op_impl T (op: TD.Op T) : proc T :=
     match op with
     | TD.Read d a => hs_read d a
     | TD.Write d a b => hs_write d a b
@@ -28,7 +28,7 @@ Module TD.
   Axiom abstr : Abstraction TD.State.
 
   Axiom impl_ok :  forall (T : Type) (op : TD.Op T),
-      prog_spec (op_spec TD.API op) (op_impl impl T op)
+      proc_spec (op_spec TD.API op) (op_impl impl T op)
                 (recover_impl impl) abstr.
   Axiom init_ok : init_invariant (init_impl impl) (recover_impl impl) abstr TD.inited.
   Axiom recover_ok : rec_noop (recover_impl impl) abstr (crash_effect TD.API).

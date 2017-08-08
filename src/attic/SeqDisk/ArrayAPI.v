@@ -13,7 +13,7 @@ Section ArrayDisk.
 
   Variable (d:Interface D.API).
 
-  Fixpoint read (off:nat) n : prog (bytes (n*blockbytes)) :=
+  Fixpoint read (off:nat) n : proc (bytes (n*blockbytes)) :=
     match n with
     | 0 => Ret bnull
     | S n => b <- Prim d (D.Read off);
@@ -21,7 +21,7 @@ Section ArrayDisk.
               Ret (bappend b rest)
     end.
 
-  Fixpoint write (off:nat) n (bs:bytes (n*blockbytes)) {struct n} : prog unit.
+  Fixpoint write (off:nat) n (bs:bytes (n*blockbytes)) {struct n} : proc unit.
     destruct n; simpl in *.
     - apply (Ret tt).
     - destruct (bsplit bs) as [b rest].
@@ -29,13 +29,13 @@ Section ArrayDisk.
       apply (write (off+1) _ rest).
   Defined.
 
-  Definition sync : prog unit :=
+  Definition sync : proc unit :=
     Prim d (D.Sync).
 
-  Definition recover : prog unit :=
+  Definition recover : proc unit :=
     irec d.
 
-  Definition init : prog InitResult :=
+  Definition init : proc InitResult :=
     iInit d.
 
 End ArrayDisk.

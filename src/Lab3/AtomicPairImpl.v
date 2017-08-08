@@ -5,7 +5,7 @@ Require Import Common.OneDiskAPI.
 
 Module AtomicPair (d : OneDiskAPI) <: AtomicPairAPI.
 
-  Definition get : prog (block*block) :=
+  Definition get : proc (block*block) :=
     ptr <- d.read 0;
     if ptr == block0 then
       a <- d.read 1;
@@ -16,7 +16,7 @@ Module AtomicPair (d : OneDiskAPI) <: AtomicPairAPI.
       b <- d.read 4;
       Ret (a, b).
 
-  Definition put (p : block*block) : prog unit :=
+  Definition put (p : block*block) : proc unit :=
     ptr <- d.read 0;
     if ptr == block0 then
       _ <- d.write 3 (fst p);
@@ -29,7 +29,7 @@ Module AtomicPair (d : OneDiskAPI) <: AtomicPairAPI.
       _ <- d.write 0 block0;
       Ret tt.
 
-  Definition init' : prog InitResult :=
+  Definition init' : proc InitResult :=
     len <- d.size;
     if len == 5 then
       _ <- d.write 0 block0;
@@ -39,7 +39,7 @@ Module AtomicPair (d : OneDiskAPI) <: AtomicPairAPI.
 
   Definition init := then_init d.init init'.
 
-  Definition recover : prog unit :=
+  Definition recover : proc unit :=
     d.recover.
 
 
@@ -87,7 +87,7 @@ Module AtomicPair (d : OneDiskAPI) <: AtomicPairAPI.
       simpl in *; intuition subst.
   Qed.
 
-  Theorem get_ok : prog_spec get_spec get recover abstr.
+  Theorem get_ok : proc_spec get_spec get recover abstr.
   Proof.
     unfold get.
     intros.
@@ -216,7 +216,7 @@ Module AtomicPair (d : OneDiskAPI) <: AtomicPairAPI.
   Hint Resolve atomic_pair_abstraction_diskUpd340.
   Hint Resolve atomic_pair_abstraction_diskUpd120.
 
-  Theorem put_ok : forall v, prog_spec (put_spec v) (put v) recover abstr.
+  Theorem put_ok : forall v, proc_spec (put_spec v) (put v) recover abstr.
   Proof.
     unfold put.
     intros.

@@ -48,7 +48,7 @@ Ltac finish :=
            safe to run descend *)
            descend; intuition eauto;
            lazymatch goal with
-           | |- prog_spec _ _ _ _ => idtac
+           | |- proc_spec _ _ _ _ => idtac
            | _ => fail
            end
          end.

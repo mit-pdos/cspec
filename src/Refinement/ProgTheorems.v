@@ -4,18 +4,18 @@ Require Import RelationClasses.
 Require Import Automation.
 Require Import Prog.
 
-(** Here we prove some basic sanity checks on prog and its semantics. *)
+(** Here we prove some basic sanity checks on proc and its semantics. *)
 
 Local Hint Constructors exec.
 
-Theorem can_crash_at_begin : forall `(p: prog T) w,
+Theorem can_crash_at_begin : forall `(p: proc T) w,
     can_crash ->
     exec p w (Crashed w).
 Proof.
   eauto.
 Qed.
 
-Theorem can_crash_at_end : forall `(p: prog T) w v w',
+Theorem can_crash_at_end : forall `(p: proc T) w v w',
     can_crash ->
     exec p w (Finished v w') ->
     exec p w (Crashed w').
@@ -40,7 +40,7 @@ we're proving that exec treats programs up to the monad laws as equivalences
 between programs).
  *)
 
-Definition exec_equiv T (p: prog T) p' :=
+Definition exec_equiv T (p: proc T) p' :=
   forall w r, exec p w r <-> exec p' w r.
 
 Instance exec_equiv_equiv T : Equivalence (exec_equiv (T:=T)).
@@ -61,7 +61,7 @@ Ltac cleanup_exec :=
             apply exec_ret in H; safe_intuition; subst ]
   end.
 
-Theorem monad_left_id : forall T T' (p: T' -> prog T) v,
+Theorem monad_left_id : forall T T' (p: T' -> proc T) v,
     exec_equiv (Bind (Ret v) p) (p v).
 Proof.
   unfold exec_equiv; split; intros.
@@ -69,7 +69,7 @@ Proof.
   - eapply ExecBindFinished; eauto.
 Qed.
 
-Theorem monad_right_id : forall `(p: prog T),
+Theorem monad_right_id : forall `(p: proc T),
     exec_equiv (Bind p (fun v => Ret v)) p.
 Proof.
   unfold exec_equiv; split; intros.
@@ -77,9 +77,9 @@ Proof.
   - destruct r; eauto.
 Qed.
 
-Theorem monad_assoc : forall `(p1: prog T)
-                        `(p2: T -> prog T')
-                        `(p3: T' -> prog T''),
+Theorem monad_assoc : forall `(p1: proc T)
+                        `(p2: T -> proc T')
+                        `(p3: T' -> proc T''),
     exec_equiv (Bind (Bind p1 p2) p3) (Bind p1 (fun v => Bind (p2 v) p3)).
 Proof.
   unfold exec_equiv; split; intros.
@@ -88,7 +88,7 @@ Proof.
 Qed.
 
 (** invert a bind execution *)
-Lemma exec_bind : forall T T' `(p: prog T) (p': T -> prog T')
+Lemma exec_bind : forall T T' `(p: proc T) (p': T -> proc T')
                     w r,
     exec (Bind p p') w r ->
     (exists v w', exec p w (Finished v w') /\
@@ -102,7 +102,7 @@ Qed.
 
 Local Hint Constructors rexec.
 
-Theorem rexec_equiv : forall T (p p': prog T) `(rec: prog R) w r,
+Theorem rexec_equiv : forall T (p p': proc T) `(rec: proc R) w r,
     exec_equiv p p' ->
     rexec p' rec w r ->
     rexec p rec w r.
@@ -114,9 +114,9 @@ Proof.
 Qed.
 
 (* When a program finishes, its recovery procedure is irrelevant. *)
-Lemma rexec_finish_any_rec : forall `(p: prog T)
-                               `(rec: prog R)
-                               `(rec': prog R')
+Lemma rexec_finish_any_rec : forall `(p: proc T)
+                               `(rec: proc R)
+                               `(rec': proc R')
                                w v w',
     rexec p rec w (RFinished v w') ->
     rexec p rec' w (RFinished v w').
@@ -125,9 +125,9 @@ Proof.
   inversion H; subst; eauto.
 Qed.
 
-Lemma rexec_recover_bind_inv : forall `(p: prog T)
-                                 `(p': T -> prog T')
-                                 `(rec: prog R)
+Lemma rexec_recover_bind_inv : forall `(p: proc T)
+                                 `(p': T -> proc T')
+                                 `(rec: proc R)
                                  w rv w'',
     rexec (Bind p p') rec w (Recovered rv w'') ->
     rexec p rec w (Recovered rv w'') \/
@@ -157,8 +157,8 @@ into three stages:
   from iteration to the next, initialized with the run of p in the first step.
 - Finally, the computer stops crashing and [p' rv] can run to completion.
  *)
-Lemma exec_recover_bind_inv : forall `(p: prog R)
-                                `(p': R -> prog R')
+Lemma exec_recover_bind_inv : forall `(p: proc R)
+                                `(p': R -> proc R')
                                 w rv' w'',
     exec_recover (Bind p p') w rv' w'' ->
     exists rv1 w1, exec_recover p w rv1 w1 /\

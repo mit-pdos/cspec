@@ -16,7 +16,7 @@ Section ReplicatedDisk.
 
   Variable (td:Interface TD.API).
 
-  Definition Sync : prog unit :=
+  Definition Sync : proc unit :=
     _ <- Prim td (TD.Sync d0);
       _ <- Prim td (TD.Sync d1);
       Ret tt.
@@ -24,7 +24,7 @@ Section ReplicatedDisk.
   Hint Unfold TD.wipe : rd.
 
   Theorem Sync_ok :
-    prog_spec
+    proc_spec
       (fun '(d_0, d_1) state =>
          {|
            pre :=

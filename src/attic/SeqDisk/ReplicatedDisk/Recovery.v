@@ -29,7 +29,7 @@ Section ReplicatedDiskRecovery.
        invariant is now trivially satisfied *)
     | DiskFailed (i:diskId).
 
-    Definition fixup (a:addr) : prog RecStatus :=
+    Definition fixup (a:addr) : proc RecStatus :=
       mv0 <- Prim td (TD.Read d0 a);
         match mv0 with
         | Working v => mv2 <- Prim td (TD.Read d1 a);
@@ -48,7 +48,7 @@ Section ReplicatedDiskRecovery.
         end.
 
     (* recursively performs recovery at [a-1], [a-2], down to 0 *)
-    Fixpoint recover_at (a:addr) : prog RecStatus :=
+    Fixpoint recover_at (a:addr) : proc RecStatus :=
       match a with
       | 0 => Ret RepairDone
       | S n => s <- fixup n;
@@ -59,7 +59,7 @@ Section ReplicatedDiskRecovery.
                 end
       end.
 
-    Definition Recover : prog unit :=
+    Definition Recover : proc unit :=
       sz <- DiskSize td;
         _ <- recover_at sz;
         Ret tt.
@@ -91,7 +91,7 @@ Section ReplicatedDiskRecovery.
 
     (* we will show that fixup does nothing once the disks are the same *)
     Theorem fixup_equal_ok : forall a,
-        prog_spec
+        proc_spec
           (fun d state =>
              {|
                pre :=
@@ -146,7 +146,7 @@ Section ReplicatedDiskRecovery.
     Hint Rewrite diskUpd_eq using (solve [ auto ]) : rd.
 
     Theorem fixup_correct_addr_ok : forall a,
-        prog_spec
+        proc_spec
           (fun '(d, b) state =>
              {|
                pre :=
@@ -201,7 +201,7 @@ Section ReplicatedDiskRecovery.
     Hint Resolve disks_eq_inbounds.
 
     Theorem fixup_wrong_addr_ok : forall a,
-        prog_spec
+        proc_spec
           (fun '(d, b, a') state =>
              {|
                pre :=
@@ -257,7 +257,7 @@ Section ReplicatedDiskRecovery.
     | OutOfSync (a:addr) (b:block).
 
     Theorem fixup_ok : forall a,
-        prog_spec
+        proc_spec
           (fun '(d, s) state =>
              {|
                pre :=
@@ -340,7 +340,7 @@ Section ReplicatedDiskRecovery.
     Hint Rewrite diskUpd_size : rd.
 
     Theorem recover_at_ok : forall a,
-        prog_spec
+        proc_spec
           (fun '(d, s) state =>
              {|
                pre :=
@@ -458,7 +458,7 @@ Section ReplicatedDiskRecovery.
          |}).
 
     Theorem Recover_rok :
-      prog_spec
+      proc_spec
         Recover_spec
         (Recover)
         (irec td)

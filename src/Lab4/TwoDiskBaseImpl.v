@@ -6,18 +6,18 @@ Extraction Language Haskell.
 
 Module TwoDiskBase <: TwoDiskBaseAPI.
 
-  Axiom init : prog InitResult.
-  Axiom read : diskId -> addr -> prog (DiskResult block).
-  Axiom write : diskId -> addr -> block -> prog (DiskResult unit).
-  Axiom size : diskId -> prog (DiskResult nat).
-  Axiom recover : prog unit.
+  Axiom init : proc InitResult.
+  Axiom read : diskId -> addr -> proc (DiskResult block).
+  Axiom write : diskId -> addr -> block -> proc (DiskResult unit).
+  Axiom size : diskId -> proc (DiskResult nat).
+  Axiom recover : proc unit.
 
   Axiom abstr : Abstraction State.
 
   Axiom init_ok : init_abstraction init recover abstr inited_any.
-  Axiom read_ok : forall i a, prog_spec (op_spec (combined_step (op_read i a))) (read i a) recover abstr.
-  Axiom write_ok : forall i a b, prog_spec (op_spec (combined_step (op_write i a b))) (write i a b) recover abstr.
-  Axiom size_ok : forall i, prog_spec (op_spec (combined_step (op_size i))) (size i) recover abstr.
+  Axiom read_ok : forall i a, proc_spec (op_spec (combined_step (op_read i a))) (read i a) recover abstr.
+  Axiom write_ok : forall i a b, proc_spec (op_spec (combined_step (op_write i a b))) (write i a b) recover abstr.
+  Axiom size_ok : forall i, proc_spec (op_spec (combined_step (op_size i))) (size i) recover abstr.
   Axiom recover_noop : rec_noop recover abstr no_wipe.
 
 End TwoDiskBase.

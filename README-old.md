@@ -13,7 +13,7 @@ improving this connection:
 of states would be parametrized by the return type). A small step can
 peel off one bind, or switch to recovery. Executing means turning the
 program into a `Ret`. Note that we still need to record whether we're
-in recovery, since the type of the program will change to `prog unit`
+in recovery, since the type of the program will change to `proc unit`
 (at this point we can build this into the framework).
 
 - Now a program is really synonymous with a transition system: just
@@ -73,13 +73,13 @@ Note that this guide has not been updated to reflect the addition of asynchronou
   [0, size).
 * [Refinement/](src/Refinement/)
 
-  We define an axiomatic `prog` inductive for programs. These programs have
+  We define an axiomatic `proc` inductive for programs. These programs have
   entirely opaque behavior, manipulating states of an axiom type `world`.
   Everything is built up in terms of _refinement_. The bottom-most level of the
   refinement goes from the two disk API to the `world` states, which we define
   in Haskell and assume has the appropriate refinement specification.
 
-  - [ProgLang/Prog.v](src/Refinement/ProgLang/Prog.v): axiomatically defined programs. `prog` provides `Bind`
+  - [ProgLang/Prog.v](src/Refinement/ProgLang/Prog.v): axiomatically defined programs. `proc` provides `Bind`
     and `Ret` combinators to build up programs, but other operations available
     are opaque.
   - [ProgLang/ProgTheorems.v](src/Refinement/ProgLang/ProgTheorems.v): some basic theorems about the execution

@@ -5,7 +5,7 @@ Require Import BadSectorAPI.
 
 Module RemappedDisk (bd : BadSectorAPI) <: OneDiskAPI.
 
-  Definition read (a : addr) : prog block :=
+  Definition read (a : addr) : proc block :=
     bs <- bd.getBadSector;
     if a == bs then
       len <- bd.size;
@@ -15,7 +15,7 @@ Module RemappedDisk (bd : BadSectorAPI) <: OneDiskAPI.
       r <- bd.read a;
       Ret r.
 
-  Definition write (a : addr) (b : block) : prog unit :=
+  Definition write (a : addr) (b : block) : proc unit :=
     len <- bd.size;
     if a == (len-1) then
       Ret tt
@@ -28,11 +28,11 @@ Module RemappedDisk (bd : BadSectorAPI) <: OneDiskAPI.
         _ <- bd.write a b;
         Ret tt.
 
-  Definition size : prog nat :=
+  Definition size : proc nat :=
     len <- bd.size;
     Ret (len - 1).
 
-  Definition init' : prog InitResult :=
+  Definition init' : proc InitResult :=
     len <- bd.size;
     if len == 0 then
       Ret InitFailed
@@ -45,7 +45,7 @@ Module RemappedDisk (bd : BadSectorAPI) <: OneDiskAPI.
 
   Definition init := then_init bd.init init'.
 
-  Definition recover : prog unit :=
+  Definition recover : proc unit :=
     bd.recover.
 
 
@@ -114,7 +114,7 @@ Module RemappedDisk (bd : BadSectorAPI) <: OneDiskAPI.
     omega.
   Qed.
 
-  Theorem read_ok : forall a, prog_spec (OneDiskAPI.read_spec a) (read a) recover abstr.
+  Theorem read_ok : forall a, proc_spec (OneDiskAPI.read_spec a) (read a) recover abstr.
   Proof.
     unfold read.
     intros.
@@ -214,7 +214,7 @@ Module RemappedDisk (bd : BadSectorAPI) <: OneDiskAPI.
   Hint Resolve remapped_abstraction_diskUpd_remap.
   Hint Resolve remapped_abstraction_diskUpd_noremap.
 
-  Theorem write_ok : forall a v, prog_spec (OneDiskAPI.write_spec a v) (write a v) recover abstr.
+  Theorem write_ok : forall a v, proc_spec (OneDiskAPI.write_spec a v) (write a v) recover abstr.
   Proof.
     unfold write.
     intros.
@@ -271,7 +271,7 @@ Module RemappedDisk (bd : BadSectorAPI) <: OneDiskAPI.
         eauto.
   Qed.
 
-  Theorem size_ok : prog_spec OneDiskAPI.size_spec size recover abstr.
+  Theorem size_ok : proc_spec OneDiskAPI.size_spec size recover abstr.
   Proof.
     unfold diskSize.
     intros.

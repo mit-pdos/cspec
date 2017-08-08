@@ -12,7 +12,7 @@ Require Import NBD.ExtrServer.
 (* TODO: re-use this code for asynchronous implementation *)
 Definition d := RD.rd TD.td.
 
-CoFixpoint handle : prog unit :=
+CoFixpoint handle : proc unit :=
   req <- getRequest;
   match req with
   | Read h off blocks =>
@@ -46,10 +46,10 @@ CoFixpoint handle : prog unit :=
   | Disconnect => Ret tt
   end.
 
-Definition diskSizes : prog (nat * nat + nat) :=
+Definition diskSizes : proc (nat * nat + nat) :=
   DiskSizes TD.td.
 
-Definition serverLoop : prog unit :=
+Definition serverLoop : proc unit :=
   _ <- ArrayAPI.recover d;
   handle.
 

@@ -28,7 +28,7 @@ List of high-level concepts to explain within and outside of code for students t
 * "axiomatic"
 * predicates
 * "extensional" equality
-* idea of `prog` being a model of programs
+* idea of `proc` being a model of programs
 * semantics for an operation
 * inductive predicates
 * big-step vs small-step semantics

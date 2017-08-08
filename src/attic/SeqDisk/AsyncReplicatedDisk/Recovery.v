@@ -31,7 +31,7 @@ Section AsyncReplicatedDisk.
        invariant is now trivially satisfied *)
     | DiskFailed (i:diskId).
 
-    Definition fixup (a:addr) : prog RecStatus :=
+    Definition fixup (a:addr) : proc RecStatus :=
       mv0 <- Prim td (TD.Read d0 a);
         match mv0 with
         | Working v => mv2 <- Prim td (TD.Read d1 a);
@@ -50,7 +50,7 @@ Section AsyncReplicatedDisk.
         end.
 
     (* recursively performs recovery at [a-1], [a-2], down to 0 *)
-    Fixpoint recover_at (a:addr) : prog RecStatus :=
+    Fixpoint recover_at (a:addr) : proc RecStatus :=
       match a with
       | 0 => Ret Continue
       | S n => s <- fixup n;
@@ -60,7 +60,7 @@ Section AsyncReplicatedDisk.
                 end
       end.
 
-    Definition Recover : prog unit :=
+    Definition Recover : proc unit :=
       sz <- DiskSize td;
         _ <- recover_at sz;
         _ <- Prim td (TD.Sync d0);
@@ -304,7 +304,7 @@ Section AsyncReplicatedDisk.
     Qed.
 
     Theorem fixup_ok : forall a,
-        prog_spec
+        proc_spec
           (fun '(d0__i, d1__i) state =>
              {|
                pre :=
@@ -401,7 +401,7 @@ Section AsyncReplicatedDisk.
     Hint Resolve le_S_trans.
 
     Theorem recover_at_ok : forall a,
-        prog_spec
+        proc_spec
           (fun '(d0__i, d1__i) state =>
              {|
                pre :=
@@ -786,7 +786,7 @@ Section AsyncReplicatedDisk.
              end.
 
     Theorem Recover_rok :
-      prog_spec
+      proc_spec
         Recover_spec
         (Recover)
         (irec td)

@@ -17,7 +17,7 @@ Section ReplicatedDiskReadWrite.
 
   Variable (td:Interface TD.API).
 
-  Definition Read (a:addr) : prog block :=
+  Definition Read (a:addr) : proc block :=
     mv0 <- Prim td (TD.Read d0 a);
       match mv0 with
       | Working v => Ret v
@@ -28,7 +28,7 @@ Section ReplicatedDiskReadWrite.
                    end
       end.
 
-  Definition Write (a:addr) (b:block) : prog unit :=
+  Definition Write (a:addr) (b:block) : proc unit :=
     _ <- Prim td (TD.Write d0 a b);
       _ <- Prim td (TD.Write d1 a b);
       Ret tt.
@@ -40,7 +40,7 @@ Section ReplicatedDiskReadWrite.
   Implicit Type (state:TD.State).
 
   Theorem Read_ok : forall a,
-      prog_spec
+      proc_spec
         (fun d state =>
            {|
              pre := TD.disk0 state |= eq d /\
@@ -68,7 +68,7 @@ Section ReplicatedDiskReadWrite.
   Qed.
 
   Theorem Write_ok : forall a b,
-      prog_spec
+      proc_spec
         (fun d state =>
            {|
              pre :=

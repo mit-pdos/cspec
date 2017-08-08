@@ -5,14 +5,14 @@ Require Import StatDbAPI.
 
 Module StatDB (v : VarsAPI) <: StatDbAPI.
 
-  Definition add (v : nat) : prog unit :=
+  Definition add (v : nat) : proc unit :=
     sum <- v.read VarSum;
     count <- v.read VarCount;
     _ <- v.write VarSum (sum + v);
     _ <- v.write VarCount (count + 1);
     Ret tt.
 
-  Definition mean : prog (option nat) :=
+  Definition mean : proc (option nat) :=
     count <- v.read VarCount;
     if count == 0 then
       Ret None
@@ -20,14 +20,14 @@ Module StatDB (v : VarsAPI) <: StatDbAPI.
       sum <- v.read VarSum;
       Ret (Some (sum / count)).
 
-  Definition init' : prog InitResult :=
+  Definition init' : proc InitResult :=
     _ <- v.write VarCount 0;
     _ <- v.write VarSum 0;
     Ret Initialized.
 
   Definition init := then_init v.init init'.
 
-  Definition recover : prog unit :=
+  Definition recover : proc unit :=
     v.recover.
 
 
@@ -61,7 +61,7 @@ Module StatDB (v : VarsAPI) <: StatDbAPI.
     intuition auto.
   Qed.
 
-  Theorem add_ok : forall v, prog_spec (add_spec v) (add v) recover abstr.
+  Theorem add_ok : forall v, proc_spec (add_spec v) (add v) recover abstr.
   Proof.
     unfold add.
     intros.
@@ -93,7 +93,7 @@ Module StatDB (v : VarsAPI) <: StatDbAPI.
     autounfold in *; intuition.
   Qed.
 
-  Theorem mean_ok : prog_spec mean_spec mean recover abstr.
+  Theorem mean_ok : proc_spec mean_spec mean recover abstr.
   Proof.
     unfold mean.
     intros.

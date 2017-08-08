@@ -18,7 +18,7 @@ Section Init.
 
   Variable (td:Interface TD.API).
 
-  Fixpoint init_at (a:nat) : prog unit :=
+  Fixpoint init_at (a:nat) : proc unit :=
     match a with
     | 0 => Ret tt
     | S a => _ <- Prim td (TD.Write d0 a block0);
@@ -26,7 +26,7 @@ Section Init.
               init_at a
     end.
 
-  Definition DiskSizes : prog (nat * nat + nat) :=
+  Definition DiskSizes : proc (nat * nat + nat) :=
     sz1 <- Prim td (TD.DiskSize d0);
       match sz1 with
       | Working sz1 => sz2 <- Prim td (TD.DiskSize d1);
@@ -43,7 +43,7 @@ Section Init.
                    end
       end.
 
-  Definition Init : prog InitResult :=
+  Definition Init : proc InitResult :=
     sizes <- DiskSizes;
       match sizes with
       | inr sz => _ <- init_at sz;
@@ -80,7 +80,7 @@ Section Init.
   Hint Resolve equal_after_diskUpd.
 
   Theorem init_at_ok : forall a,
-      prog_spec
+      proc_spec
         (fun '(d_0, d_1) state =>
            {| pre :=
                 TD.disk0 state |= eq d_0 /\
@@ -123,7 +123,7 @@ Section Init.
   Hint Resolve both_disks_not_missing : false.
 
   Theorem DiskSizes_ok :
-      prog_spec
+      proc_spec
         (fun '(d_0, d_1) state =>
            {| pre :=
                 TD.disk0 state |= eq d_0 /\
@@ -178,7 +178,7 @@ Section Init.
   Hint Resolve DiskSizes_ok.
 
   Theorem Init_ok :
-      prog_spec
+      proc_spec
         (fun '(d_0, d_1) state =>
            {| pre :=
                 TD.disk0 state |= eq d_0 /\

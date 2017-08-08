@@ -1,6 +1,6 @@
 module BadSectorDisk.Env
   (
-    TheProg
+    TheProc
   , Env
   , diskHandle
   , badSector
@@ -26,7 +26,7 @@ data Env =
       , requests :: MVar Request
       , responses :: MVar Response }
 
-type TheProg = ReaderT Env IO
+type TheProc = ReaderT Env IO
 
 newEnv :: FilePath -> Integer -> IO Env
 newEnv fn badSectorArg = pure Env
@@ -36,5 +36,5 @@ newEnv fn badSectorArg = pure Env
   where openFile :: FilePath -> IO Fd
         openFile path = openFd path ReadWrite Nothing defaultFileFlags
 
-runBS :: Env -> TheProg a -> IO a
+runBS :: Env -> TheProc a -> IO a
 runBS e m = runReaderT m e

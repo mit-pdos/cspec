@@ -37,7 +37,7 @@ Module RD.
 
     Ltac start := intros;
                   match goal with
-                  | |- prog_spec _ _ (_ <- _; _) _ =>
+                  | |- proc_spec _ _ (_ <- _; _) _ =>
                     eapply compose_recovery; eauto; simplify
                   end.
 
@@ -101,7 +101,7 @@ Module RD.
     Hint Resolve crashesTo_one_of_same_wipeHist.
 
     Theorem Read_rok : forall a,
-        prog_spec
+        proc_spec
           (fun d state =>
              {|
                pre := TD.disk0 state |= covered d /\
@@ -159,7 +159,7 @@ Module RD.
     Hint Resolve crashesTo_upd_or_not.
 
     Theorem Write_rok : forall a b,
-        prog_spec
+        proc_spec
           (fun d state =>
              {|
                pre :=
@@ -191,7 +191,7 @@ Module RD.
     Qed.
 
     Theorem DiskSize_rok :
-      prog_spec
+      proc_spec
         (fun d state =>
            {|
              pre := TD.disk0 state |= covered d /\
@@ -241,7 +241,7 @@ Module RD.
     Hint Resolve then_flush_crashesTo.
 
     Theorem Sync_rok :
-      prog_spec
+      proc_spec
         (fun d state =>
            {|
              pre := TD.disk0 state |= covered d /\
@@ -368,7 +368,7 @@ Module RD.
 
     (* Finally, we put together the pieces of the [Interface]. *)
 
-    Definition d_op_impl T (op:D.Op T) : prog T :=
+    Definition d_op_impl T (op:D.Op T) : proc T :=
       match op with
       | D.Read a => Read td a
       | D.Write a b => Write td a b
@@ -490,7 +490,7 @@ Module RD.
       - intros.
         destruct op; unfold op_spec;
           apply spec_abstraction_compose;
-          eapply prog_spec_weaken; eauto;
+          eapply proc_spec_weaken; eauto;
             unfold spec_impl, rd_layer_abstraction; simplify.
         + descend; (intuition eauto); simplify.
           descend; intuition eauto using pred_weaken.
@@ -513,7 +513,7 @@ Module RD.
         eapply pred_weaken; eauto.
         eapply pred_weaken; eauto.
       - eapply then_init_compose; eauto.
-        eapply prog_spec_weaken; unfold spec_impl; simplify.
+        eapply proc_spec_weaken; unfold spec_impl; simplify.
         pose proof (state_some_disks state); simplify.
         descend; intuition eauto.
         destruct v; simplify; finish.

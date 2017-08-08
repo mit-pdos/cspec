@@ -116,10 +116,10 @@ StatDB in Coq
   shallow embedding
     uses Gallina for most of the programming language
     also splits the state into two parts: shared state and "per-invocation" state
-    per-invocation state is implicit in [prog]'s execution and arguments being passed
+    per-invocation state is implicit in [proc]'s execution and arguments being passed
 
   reasoning about executions:
-    src/Refinement/Hoare.v, [prog_spec]
+    src/Refinement/Hoare.v, [proc_spec]
 
   refinement
     src/Refinement/Interface.v
@@ -137,7 +137,7 @@ Implement and prove [add]
 
   proof:
       lift_world.
-      prog_spec_symbolic_execute inv_step.
+      proc_spec_symbolic_execute inv_step.
       solve_final_state.
 
       unfold statdb_abstraction in *.

@@ -6,7 +6,7 @@ Require Import Common.OneDiskAPI.
 
 Module ReplicatedDisk (td : TwoDiskAPI) <: OneDiskAPI.
 
-  Definition read (a:addr) : prog block :=
+  Definition read (a:addr) : proc block :=
     mv0 <- td.read d0 a;
     match mv0 with
     | Working v => Ret v
@@ -18,12 +18,12 @@ Module ReplicatedDisk (td : TwoDiskAPI) <: OneDiskAPI.
       end
     end.
 
-  Definition write (a:addr) (b:block) : prog unit :=
+  Definition write (a:addr) (b:block) : proc unit :=
     _ <- td.write d0 a b;
     _ <- td.write d1 a b;
     Ret tt.
 
-  Definition size : prog nat :=
+  Definition size : proc nat :=
     msz <- td.size d0;
     match msz with
     | Working sz => Ret sz
@@ -35,7 +35,7 @@ Module ReplicatedDisk (td : TwoDiskAPI) <: OneDiskAPI.
       end
     end.
 
-  Definition sizeInit : prog (option nat) :=
+  Definition sizeInit : proc (option nat) :=
     sz1 <- td.size d0;
     sz2 <- td.size d1;
     match sz1 with
@@ -53,7 +53,7 @@ Module ReplicatedDisk (td : TwoDiskAPI) <: OneDiskAPI.
     end.
 
   (* Recursively initialize block a and below *)
-  Fixpoint init_at (a:nat) : prog unit :=
+  Fixpoint init_at (a:nat) : proc unit :=
     match a with
     | 0 => Ret tt
     | S a =>
@@ -63,7 +63,7 @@ Module ReplicatedDisk (td : TwoDiskAPI) <: OneDiskAPI.
     end.
 
   (* Initialize every disk block *)
-  Definition init' : prog InitResult :=
+  Definition init' : proc InitResult :=
     size <- sizeInit;
     match size with
     | Some sz =>
@@ -130,7 +130,7 @@ Module ReplicatedDisk (td : TwoDiskAPI) <: OneDiskAPI.
              safe to run descend *)
              descend; intuition eauto;
              lazymatch goal with
-             | |- prog_spec _ _ _ _ => idtac
+             | |- proc_spec _ _ _ _ => idtac
              | _ => fail
              end
            end.
@@ -140,7 +140,7 @@ Module ReplicatedDisk (td : TwoDiskAPI) <: OneDiskAPI.
 
   Ltac start := intros;
                 match goal with
-                | |- prog_spec _ _ (_ <- _; _) _ =>
+                | |- proc_spec _ _ (_ <- _; _) _ =>
                   eapply compose_recovery; eauto; simplify
                 end.
 
@@ -182,7 +182,7 @@ Module ReplicatedDisk (td : TwoDiskAPI) <: OneDiskAPI.
   Hint Resolve missing1_implies_any.
 
   Theorem read_int_ok : forall a,
-      prog_spec
+      proc_spec
         (fun d state =>
            {|
              pre := disk0 state ?|= eq d /\
@@ -214,7 +214,7 @@ Module ReplicatedDisk (td : TwoDiskAPI) <: OneDiskAPI.
 
 
   Theorem write_int_ok : forall a b,
-      prog_spec
+      proc_spec
         (fun d state =>
            {|
              pre :=
@@ -260,7 +260,7 @@ Module ReplicatedDisk (td : TwoDiskAPI) <: OneDiskAPI.
 
 
   Theorem size_int_ok :
-    prog_spec
+    proc_spec
       (fun '(d_0, d_1) state =>
          {|
            pre :=
@@ -322,7 +322,7 @@ Module ReplicatedDisk (td : TwoDiskAPI) <: OneDiskAPI.
   Hint Resolve equal_after_diskUpd.
 
   Theorem init_at_ok : forall a,
-      prog_spec
+      proc_spec
         (fun '(d_0, d_1) state =>
            {| pre :=
                 disk0 state ?|= eq d_0 /\
@@ -360,7 +360,7 @@ Module ReplicatedDisk (td : TwoDiskAPI) <: OneDiskAPI.
 
 
   Theorem sizeInit_ok :
-      prog_spec
+      proc_spec
         (fun '(d_0, d_1) state =>
            {| pre :=
                 disk0 state ?|= eq d_0 /\
@@ -422,7 +422,7 @@ Module ReplicatedDisk (td : TwoDiskAPI) <: OneDiskAPI.
   Hint Resolve equal_after_0_to_eq.
 
   Theorem init'_ok :
-      prog_spec
+      proc_spec
         (fun '(d_0, d_1) state =>
            {| pre :=
                 disk0 state ?|= eq d_0 /\
@@ -469,7 +469,7 @@ Module ReplicatedDisk (td : TwoDiskAPI) <: OneDiskAPI.
      the invariant is now trivially satisfied *)
   | RepairDoneOrFailed.
 
-  Definition fixup (a:addr) : prog RecStatus :=
+  Definition fixup (a:addr) : proc RecStatus :=
     mv0 <- td.read d0 a;
     match mv0 with
     | Working v =>
@@ -487,7 +487,7 @@ Module ReplicatedDisk (td : TwoDiskAPI) <: OneDiskAPI.
     end.
 
   (* recursively performs recovery at [a-1], [a-2], down to 0 *)
-  Fixpoint recover_at (a:addr) : prog unit :=
+  Fixpoint recover_at (a:addr) : proc unit :=
     match a with
     | 0 => Ret tt
     | S n =>
@@ -498,7 +498,7 @@ Module ReplicatedDisk (td : TwoDiskAPI) <: OneDiskAPI.
       end
     end.
 
-  Definition Recover : prog unit :=
+  Definition Recover : proc unit :=
     sz <- size;
     _ <- recover_at sz;
     Ret tt.
@@ -532,7 +532,7 @@ Module ReplicatedDisk (td : TwoDiskAPI) <: OneDiskAPI.
 
   (* we will show that fixup does nothing once the disks are the same *)
   Theorem fixup_equal_ok : forall a,
-      prog_spec
+      proc_spec
         (fun d state =>
            {|
              pre :=
@@ -589,7 +589,7 @@ Module ReplicatedDisk (td : TwoDiskAPI) <: OneDiskAPI.
   Hint Rewrite diskUpd_eq using (solve [ auto ]) : rd.
 
   Theorem fixup_correct_addr_ok : forall a,
-      prog_spec
+      proc_spec
         (fun '(d, b) state =>
            {|
              pre :=
@@ -647,7 +647,7 @@ Module ReplicatedDisk (td : TwoDiskAPI) <: OneDiskAPI.
   Hint Resolve disks_eq_inbounds.
 
   Theorem fixup_wrong_addr_ok : forall a,
-      prog_spec
+      proc_spec
         (fun '(d, b, a') state =>
            {|
              pre :=
@@ -700,7 +700,7 @@ Module ReplicatedDisk (td : TwoDiskAPI) <: OneDiskAPI.
   | OutOfSync (a:addr) (b:block).
 
   Theorem fixup_ok : forall a,
-      prog_spec
+      proc_spec
         (fun '(d, s) state =>
            {|
              pre :=
@@ -774,7 +774,7 @@ Module ReplicatedDisk (td : TwoDiskAPI) <: OneDiskAPI.
   Hint Rewrite diskUpd_size : rd.
 
   Theorem recover_at_ok : forall a,
-      prog_spec
+      proc_spec
         (fun '(d, s) state =>
            {|
              pre :=
@@ -879,7 +879,7 @@ Module ReplicatedDisk (td : TwoDiskAPI) <: OneDiskAPI.
        |}).
 
   Theorem Recover_rok :
-    prog_spec
+    proc_spec
       Recover_spec
       (Recover)
       td.recover
@@ -925,7 +925,7 @@ Module ReplicatedDisk (td : TwoDiskAPI) <: OneDiskAPI.
   Hint Resolve Recover_ok.
 
 
-  Definition recover : prog unit :=
+  Definition recover : proc unit :=
     _ <- td.recover;
     Recover.
 
@@ -936,7 +936,7 @@ Module ReplicatedDisk (td : TwoDiskAPI) <: OneDiskAPI.
    *)
 
   Theorem read_rok : forall a,
-    prog_spec
+    proc_spec
           (fun d state =>
              {|
                pre := disk0 state ?|= eq d /\
@@ -961,7 +961,7 @@ Module ReplicatedDisk (td : TwoDiskAPI) <: OneDiskAPI.
   Qed.
 
   Theorem write_rok : forall a b,
-      prog_spec
+      proc_spec
         (fun d state =>
            {|
              pre :=
@@ -993,7 +993,7 @@ Module ReplicatedDisk (td : TwoDiskAPI) <: OneDiskAPI.
    Qed.
 
   Theorem size_rok :
-    prog_spec
+    proc_spec
       (fun d state =>
          {|
            pre := disk0 state ?|= eq d /\
@@ -1106,7 +1106,7 @@ Module ReplicatedDisk (td : TwoDiskAPI) <: OneDiskAPI.
   Proof.
     intros.
     eapply then_init_compose; eauto.
-    eapply prog_spec_weaken; eauto.
+    eapply proc_spec_weaken; eauto.
     unfold spec_impl; intros.
     destruct state.
     destruct disk0; destruct disk1; try solve [ exfalso; eauto ].
@@ -1127,30 +1127,30 @@ Module ReplicatedDisk (td : TwoDiskAPI) <: OneDiskAPI.
       all: eexists; intuition eauto; congruence.
   Qed.
 
-  Theorem read_ok : forall a, prog_spec (read_spec a) (read a) recover abstr.
+  Theorem read_ok : forall a, proc_spec (read_spec a) (read a) recover abstr.
   Proof.
     intros.
     apply spec_abstraction_compose;
-      eapply prog_spec_weaken; eauto;
+      eapply proc_spec_weaken; eauto;
       unfold spec_impl, rd_layer_abstraction; simplify.
     exists (abstraction_f state); (intuition eauto); simplify; finish.
   Qed.
 
-  Theorem write_ok : forall a v, prog_spec (write_spec a v) (write a v) recover abstr.
+  Theorem write_ok : forall a v, proc_spec (write_spec a v) (write a v) recover abstr.
   Proof.
     intros.
     apply spec_abstraction_compose;
-      eapply prog_spec_weaken; eauto;
+      eapply proc_spec_weaken; eauto;
       unfold spec_impl, rd_layer_abstraction; simplify.
     exists (abstraction_f state); (intuition eauto); simplify; finish.
     exists (abstraction_f state'); intuition eauto.
   Qed.
 
-  Theorem size_ok : prog_spec size_spec size recover abstr.
+  Theorem size_ok : proc_spec size_spec size recover abstr.
   Proof.
     intros.
     apply spec_abstraction_compose;
-      eapply prog_spec_weaken; eauto;
+      eapply proc_spec_weaken; eauto;
       unfold spec_impl, rd_layer_abstraction; simplify.
     exists (abstraction_f state); (intuition eauto); simplify; finish.
   Qed.

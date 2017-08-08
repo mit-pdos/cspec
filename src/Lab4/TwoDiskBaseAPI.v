@@ -70,18 +70,18 @@ Definition combined_step := pre_step bg_failure (@op_step).
 
 Module Type TwoDiskBaseAPI.
 
-  Parameter init : prog InitResult.
-  Parameter read : diskId -> addr -> prog (DiskResult block).
-  Parameter write : diskId -> addr -> block -> prog (DiskResult unit).
-  Parameter size : diskId -> prog (DiskResult nat).
-  Parameter recover : prog unit.
+  Parameter init : proc InitResult.
+  Parameter read : diskId -> addr -> proc (DiskResult block).
+  Parameter write : diskId -> addr -> block -> proc (DiskResult unit).
+  Parameter size : diskId -> proc (DiskResult nat).
+  Parameter recover : proc unit.
 
   Axiom abstr : Abstraction State.
 
   Axiom init_ok : init_abstraction init recover abstr inited_any.
-  Axiom read_ok : forall i a, prog_spec (op_spec (combined_step (op_read i a))) (read i a) recover abstr.
-  Axiom write_ok : forall i a b, prog_spec (op_spec (combined_step (op_write i a b))) (write i a b) recover abstr.
-  Axiom size_ok : forall i, prog_spec (op_spec (combined_step (op_size i))) (size i) recover abstr.
+  Axiom read_ok : forall i a, proc_spec (op_spec (combined_step (op_read i a))) (read i a) recover abstr.
+  Axiom write_ok : forall i a b, proc_spec (op_spec (combined_step (op_write i a b))) (write i a b) recover abstr.
+  Axiom size_ok : forall i, proc_spec (op_spec (combined_step (op_size i))) (size i) recover abstr.
   Axiom recover_noop : rec_noop recover abstr no_wipe.
 
   Hint Resolve init_ok.

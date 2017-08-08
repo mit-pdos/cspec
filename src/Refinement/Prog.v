@@ -20,14 +20,14 @@ useful functionality (it will be assumed later when we introduce primitives).
 Programs can be combined with [Bind] and [Ret].
 
  Why do we even have BaseOp? The intention here is that programs should have
- opaque behavior, so we make sure that one of the constructors of [prog] allows
+ opaque behavior, so we make sure that one of the constructors of [proc] allows
  arbitrary additional behavior. Otherwise, we would know that [Bind] and [Ret]
  are only enough for pure programs that do not have side effects.
  *)
-CoInductive prog : forall T:Type, Type :=
-| BaseOp : forall T, opT T -> prog T
-| Ret : forall T, T -> prog T
-| Bind : forall T T', prog T -> (T -> prog T') -> prog T'.
+CoInductive proc : forall T:Type, Type :=
+| BaseOp : forall T, opT T -> proc T
+| Ret : forall T, T -> proc T
+| Bind : forall T T', proc T -> (T -> proc T') -> proc T'.
 
 (** A Semantics is a transition relation for a particular program, relating an
 initial state to a return value and final state. *)
@@ -56,7 +56,7 @@ Parameter can_crash: Prop.
 
    Note that crashing is entirely modeled here: operations are always atomic,
    but otherwise crashes can occur before or after any operation. *)
-Inductive exec : forall T, prog T -> world -> Result T -> Prop :=
+Inductive exec : forall T, proc T -> world -> Result T -> Prop :=
 | ExecOp : forall T (op: opT T) w v w',
     step op w v w' ->
     exec (BaseOp op) w (Finished v w')
@@ -64,7 +64,7 @@ Inductive exec : forall T, prog T -> world -> Result T -> Prop :=
     can_crash ->
     step op w v w' ->
     exec (BaseOp op) w (Crashed w')
-| ExecCrashBegin : forall T (p: prog T) w,
+| ExecCrashBegin : forall T (p: proc T) w,
     can_crash ->
     exec p w (Crashed w)
 | ExecRet : forall T (v:T) w,
@@ -72,12 +72,12 @@ Inductive exec : forall T, prog T -> world -> Result T -> Prop :=
 | ExecRetCrash : forall T (v:T) w,
     can_crash ->
     exec (Ret v) w (Crashed w)
-| ExecBindFinished : forall T T' (p: prog T) (p': T -> prog T')
+| ExecBindFinished : forall T T' (p: proc T) (p': T -> proc T')
                        w v w' r,
     exec p w (Finished v w') ->
     exec (p' v) w' r ->
     exec (Bind p p') w r
-| ExecBindCrashed : forall T T' (p: prog T) (p': T -> prog T')
+| ExecBindCrashed : forall T T' (p: proc T) (p': T -> proc T')
                       w w',
     exec p w (Crashed w') ->
     exec (Bind p p') w (Crashed w').
@@ -94,7 +94,7 @@ Arguments Recovered {T R} v w.
 
    This models running rec in an infinite retry loop.
  *)
-Inductive exec_recover R (rec:prog R) (w:world) : R -> world -> Prop :=
+Inductive exec_recover R (rec:proc R) (w:world) : R -> world -> Prop :=
 | ExecRecoverExec : forall v w',
     exec rec w (Finished v w') ->
     exec_recover rec w v w'
@@ -114,11 +114,11 @@ Inductive exec_recover R (rec:prog R) (w:world) : R -> world -> Prop :=
      Note that this is a thin wrapper that chains execution and recovery
      self-execution - the constructors are not recursive.
  *)
-Inductive rexec T R : prog T -> prog R -> world -> RResult T R -> Prop :=
-| RExec : forall (p:prog T) (rec:prog R) w v w',
+Inductive rexec T R : proc T -> proc R -> world -> RResult T R -> Prop :=
+| RExec : forall (p:proc T) (rec:proc R) w v w',
     exec p w (Finished v w') ->
     rexec p rec w (RFinished v w')
-| RExecCrash : forall (p:prog T) (rec:prog R) w w' rv w'',
+| RExecCrash : forall (p:proc T) (rec:proc R) w w' rv w'',
     exec p w (Crashed w') ->
     exec_recover rec (world_crash w') rv w'' ->
     rexec p rec w (Recovered rv w'').

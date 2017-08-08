@@ -9,7 +9,7 @@ Module ReplicatedDisk.
 
     Variable (td : Interface TD.API).
 
-    Definition read (a:nat) : prog block :=
+    Definition read (a:nat) : proc block :=
       mv0 <- Prim td (TD.Read d0 a);
       match mv0 with
       | Working v => Ret v
@@ -21,12 +21,12 @@ Module ReplicatedDisk.
         end
       end.
 
-    Definition write (a:nat) (b:block) : prog unit :=
+    Definition write (a:nat) (b:block) : proc unit :=
       _ <- Prim td (TD.Write d0 a b);
       _ <- Prim td (TD.Write d1 a b);
       Ret tt.
 
-    Definition diskSize : prog nat :=
+    Definition diskSize : proc nat :=
       msz <- Prim td (TD.DiskSize d0);
       match msz with
       | Working sz => Ret sz
@@ -38,14 +38,14 @@ Module ReplicatedDisk.
         end
       end.
 
-    Definition rd_op_impl T (op: ReplicatedDisk.Op T) : prog T :=
+    Definition rd_op_impl T (op: ReplicatedDisk.Op T) : proc T :=
       match op with
       | ReplicatedDisk.Read a => read a
       | ReplicatedDisk.Write a b => write a b
       | ReplicatedDisk.DiskSize => diskSize
       end.
 
-    Fixpoint init_at (a:nat) : prog unit :=
+    Fixpoint init_at (a:nat) : proc unit :=
       match a with
       | 0 => Ret tt
       | S a =>
@@ -54,7 +54,7 @@ Module ReplicatedDisk.
         init_at a
       end.
 
-    Definition Init : prog InitResult :=
+    Definition Init : proc InitResult :=
       size <- diskSize;
       _ <- init_at size;
       Ret Initialized.
@@ -72,7 +72,7 @@ Module ReplicatedDisk.
        invariant is now trivially satisfied *)
     | DiskFailed (i:diskId).
 
-    Definition fixup (a:nat) : prog RecStatus :=
+    Definition fixup (a:nat) : proc RecStatus :=
       mv0 <- Prim td (TD.Read d0 a);
       match mv0 with
       | Working v =>
@@ -93,7 +93,7 @@ Module ReplicatedDisk.
       end.
 
     (* recursively performs recovery at [a-1], [a-2], down to 0 *)
-    Fixpoint recover_at (a:nat) : prog unit :=
+    Fixpoint recover_at (a:nat) : proc unit :=
       match a with
       | 0 => Ret tt
       | S n =>
@@ -107,7 +107,7 @@ Module ReplicatedDisk.
         end
       end.
 
-    Definition Recover : prog unit :=
+    Definition Recover : proc unit :=
       sz <- diskSize;
       _  <- recover_at sz;
       Ret tt.
@@ -1455,9 +1455,9 @@ Module ReplicatedDisk.
 
 unfold write in H1.
 
-Search prog_spec Bind.
+Search proc_spec Bind.
 
-    Lemma rexec_bind_recovered : forall T T2 R (p1 : prog T) (p2 : T -> prog T2) (rec : prog R) w w' (res : R),
+    Lemma rexec_bind_recovered : forall T T2 R (p1 : proc T) (p2 : T -> proc T2) (rec : proc R) w w' (res : R),
       rexec (Bind p1 p2) rec w (Recovered res w') ->
       (rexec p1 rec w (Recovered res w')) \/
       (exists w'' res'',
@@ -1474,7 +1474,7 @@ Search prog_spec Bind.
       - left. econstructor; eauto.
     Qed.
 
-    Lemma rexec_bind : forall T T2 R (p1 : prog T) (p2 : T -> prog T2) (rec : prog R) w out,
+    Lemma rexec_bind : forall T T2 R (p1 : proc T) (p2 : T -> proc T2) (rec : proc R) w out,
       rexec (Bind p1 p2) rec w out ->
       exists out',
       rexec p1 rec w out' /\
@@ -1638,7 +1638,7 @@ Check impl_ok.
           apply spec_abstraction_compose;
             unfold spec_impl, abstr.
         + (* Read *)
-          unfold prog_spec; intros.
+          unfold proc_spec; intros.
           destruct a0; simpl in *; intuition.
           inv_rexec.
           -- (* no recovery *)
@@ -1653,7 +1653,7 @@ Check impl_ok.
             ++ (* crash during recovery, run recovery again *)
               admit.
         + (* Write *)
-          unfold prog_spec; intros.
+          unfold proc_spec; intros.
           destruct a0; simpl in *; intuition.
           inv_rexec.
           -- eapply write_ok; eauto.
@@ -1665,7 +1665,7 @@ Check impl_ok.
             ++ (* crash during recovery, run recovery again *)
               admit.
         + (* diskSize *)
-          unfold prog_spec; intros.
+          unfold proc_spec; intros.
           destruct a; simpl in *; intuition.
           inv_rexec.
           -- (* wo recovery *)

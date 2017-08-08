@@ -69,7 +69,7 @@ Hint Resolve holds_in_none_eq.
 Hint Resolve pred_missing.
 
 Theorem TDRead0_ok : forall (i: Interface TD.API) a,
-    prog_spec
+    proc_spec
       (fun '(d_0, F) state =>
          {|
            pre := TD.disk0 state |= eq d_0 /\
@@ -95,7 +95,7 @@ Proof.
 Qed.
 
 Theorem TDRead1_ok : forall (i: Interface TD.API) a,
-    prog_spec
+    proc_spec
       (fun '(F, d_1) state =>
          {|
            pre := TD.disk0 state |= F /\
@@ -121,7 +121,7 @@ Proof.
 Qed.
 
 Theorem TDWrite0_ok : forall (i: Interface TD.API) a b,
-    prog_spec
+    proc_spec
       (fun '(d_0, F) state =>
          {|
            pre := TD.disk0 state |= eq d_0 /\
@@ -153,7 +153,7 @@ Proof.
 Qed.
 
 Theorem TDWrite1_ok : forall (i: Interface TD.API) a b,
-    prog_spec
+    proc_spec
       (fun '(F, d_1) state =>
          {|
            pre := TD.disk0 state |= F /\
@@ -185,7 +185,7 @@ Proof.
 Qed.
 
 Theorem TDDiskSize0_ok : forall (i: Interface TD.API),
-    prog_spec
+    proc_spec
       (fun '(d_0, F) state =>
          {|
            pre := TD.disk0 state |= eq d_0 /\
@@ -212,7 +212,7 @@ Proof.
 Qed.
 
 Theorem TDDiskSize1_ok : forall (i: Interface TD.API),
-    prog_spec
+    proc_spec
       (fun '(F, d_1) state =>
          {|
            pre := TD.disk0 state |= F /\
@@ -239,7 +239,7 @@ Proof.
 Qed.
 
 Theorem TDSync_ok : forall (i: Interface TD.API) d_ident,
-    prog_spec
+    proc_spec
       (fun '(F0, F1) state =>
          {|
            pre := TD.disk0 state |= F0 /\

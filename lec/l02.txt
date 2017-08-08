@@ -44,7 +44,7 @@ Prove read
 	case 3: read bad sector
       branch 2: address is not a bad sector
         ...
-    forward pointer: [prog_spec] and Hoare logic will make this cleaner
+    forward pointer: [proc_spec] and Hoare logic will make this cleaner
 
 Write implementation
   do not allow writing to the last sector
@@ -108,7 +108,7 @@ Concurrency makes reasoning about execution difficult
   two techniques that will help us
 
 technique 1: pre- and post-conditions (predicates)
-  [prog_spec]
+  [proc_spec]
   like Hoare logic
   also includes a recovery condition that we will talk about tomorrow
     will let us talk about possible ways the system can crash
@@ -127,11 +127,11 @@ technique 2: a way of writing predicates that combines many executions
     better plan: stable facts that remain true regardless of [bg_failure]
     [maybe_holds]: d_0 ?|= eq d_s /\ d_1 ?|= eq d_s
 
-to use these techniques, first re-state the code-level semantics using [prog_spec]
+to use these techniques, first re-state the code-level semantics using [proc_spec]
   src/ReplicatedDisk/TwoDiskProgSpec.v
   [maybe_holds]
   [maybe_holds_stable]
-  [prog_spec] ghost state: here, typically tuple of disk + frame predicate
+  [proc_spec] ghost state: here, typically tuple of disk + frame predicate
 
 src/ReplicatedDisk/ReplicatedDiskImpl.v
   work through implementations of Read, DiskSize, DiskSizeInit, init_at, Init

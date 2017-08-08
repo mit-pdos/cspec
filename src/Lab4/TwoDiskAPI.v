@@ -71,18 +71,18 @@ Definition size_spec (i : diskId) : Specification _ _ unit _ :=
 
 Module Type TwoDiskAPI.
 
-  Parameter init : prog InitResult.
-  Parameter read : diskId -> addr -> prog (DiskResult block).
-  Parameter write : diskId -> addr -> block -> prog (DiskResult unit).
-  Parameter size : diskId -> prog (DiskResult nat).
-  Parameter recover : prog unit.
+  Parameter init : proc InitResult.
+  Parameter read : diskId -> addr -> proc (DiskResult block).
+  Parameter write : diskId -> addr -> block -> proc (DiskResult unit).
+  Parameter size : diskId -> proc (DiskResult nat).
+  Parameter recover : proc unit.
 
   Axiom abstr : Abstraction State.
 
   Axiom init_ok : init_abstraction init recover abstr inited_any.
-  Axiom read_ok : forall i a, prog_spec (read_spec i a) (read i a) recover abstr.
-  Axiom write_ok : forall i a v, prog_spec (write_spec i a v) (write i a v) recover abstr.
-  Axiom size_ok : forall i, prog_spec (size_spec i) (size i) recover abstr.
+  Axiom read_ok : forall i a, proc_spec (read_spec i a) (read i a) recover abstr.
+  Axiom write_ok : forall i a v, proc_spec (write_spec i a v) (write i a v) recover abstr.
+  Axiom size_ok : forall i, proc_spec (size_spec i) (size i) recover abstr.
   Axiom recover_noop : rec_noop recover abstr no_wipe.
 
   Hint Resolve init_ok.

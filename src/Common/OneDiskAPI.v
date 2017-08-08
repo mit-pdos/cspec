@@ -34,18 +34,18 @@ Definition size_spec : Specification _ nat unit State :=
 
 Module Type OneDiskAPI.
 
-  Parameter init : prog InitResult.
-  Parameter read : addr -> prog block.
-  Parameter write : addr -> block -> prog unit.
-  Parameter size : prog nat.
-  Parameter recover : prog unit.
+  Parameter init : proc InitResult.
+  Parameter read : addr -> proc block.
+  Parameter write : addr -> block -> proc unit.
+  Parameter size : proc nat.
+  Parameter recover : proc unit.
 
   Axiom abstr : Abstraction State.
 
   Axiom init_ok : init_abstraction init recover abstr inited_any.
-  Axiom read_ok : forall a, prog_spec (read_spec a) (read a) recover abstr.
-  Axiom write_ok : forall a v, prog_spec (write_spec a v) (write a v) recover abstr.
-  Axiom size_ok : prog_spec size_spec size recover abstr.
+  Axiom read_ok : forall a, proc_spec (read_spec a) (read a) recover abstr.
+  Axiom write_ok : forall a v, proc_spec (write_spec a v) (write a v) recover abstr.
+  Axiom size_ok : proc_spec size_spec size recover abstr.
   Axiom recover_noop : rec_noop recover abstr no_wipe.
 
   Hint Resolve init_ok.

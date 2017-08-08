@@ -196,7 +196,7 @@ Hint Resolve then_wipe_wipe0 then_wipe_wipe1.
 Hint Resolve then_wipe_covered.
 
 Theorem TDRead0_ok : forall (i: Interface TD.API) a,
-    prog_spec
+    proc_spec
       (fun '(d_0, F) state =>
          {|
            pre := TD.disk0 state |= covered d_0 /\
@@ -232,7 +232,7 @@ Proof.
 Qed.
 
 Theorem TDRead1_ok : forall (i: Interface TD.API) a,
-    prog_spec
+    proc_spec
       (fun '(F, d_1) state =>
          {|
            pre := TD.disk0 state |= F /\
@@ -313,7 +313,7 @@ Qed.
 Hint Resolve covered_diskUpd_buffer.
 
 Theorem TDWrite0_ok : forall (i: Interface TD.API) a b,
-    prog_spec
+    proc_spec
       (fun '(d_0, F) state =>
          {|
            pre := TD.disk0 state |= covered d_0 /\
@@ -355,7 +355,7 @@ Proof.
 Qed.
 
 Theorem TDWrite1_ok : forall (i: Interface TD.API) a b,
-    prog_spec
+    proc_spec
       (fun '(F, d_1) state =>
          {|
            pre := TD.disk0 state |= F /\
@@ -407,7 +407,7 @@ Qed.
 Hint Resolve covered_size_eq'.
 
 Theorem TDDiskSize0_ok : forall (i: Interface TD.API),
-    prog_spec
+    proc_spec
       (fun '(d_0, F) state =>
          {|
            pre := TD.disk0 state |= covered d_0 /\
@@ -441,7 +441,7 @@ Proof.
 Qed.
 
 Theorem TDDiskSize1_ok : forall (i: Interface TD.API),
-    prog_spec
+    proc_spec
       (fun '(F, d_1) state =>
          {|
            pre := TD.disk0 state |= F /\
@@ -547,7 +547,7 @@ Qed.
 Hint Resolve then_wipe_then_flush.
 
 Theorem TDSync0_ok : forall (i: Interface TD.API),
-    prog_spec
+    proc_spec
       (fun '(F0, F1) state =>
          {|
            pre := TD.disk0 state |= F0 /\
@@ -578,7 +578,7 @@ Proof.
 Qed.
 
 Theorem TDSync1_ok : forall (i: Interface TD.API),
-    prog_spec
+    proc_spec
       (fun '(F0, F1) state =>
          {|
            pre := TD.disk0 state |= F0 /\

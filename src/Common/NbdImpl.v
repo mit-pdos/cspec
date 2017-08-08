@@ -6,16 +6,16 @@ Extraction Language Haskell.
 
 Module NbdImpl <: NbdAPI.
 
-  Axiom init: prog InitResult.
-  Axiom getRequest : prog Request.
-  Axiom sendResponse : Response -> prog unit.
-  Axiom recover : prog unit.
+  Axiom init: proc InitResult.
+  Axiom getRequest : proc Request.
+  Axiom sendResponse : Response -> proc unit.
+  Axiom recover : proc unit.
 
   Axiom abstr : Abstraction State.
 
   Axiom init_ok : init_abstraction init recover abstr inited.
-  Axiom getRequest_ok : prog_spec (getRequest_spec) (getRequest) recover abstr.
-  Axiom sendResponse_ok : forall resp, prog_spec (sendResponse_spec resp) (sendResponse resp) recover abstr.
+  Axiom getRequest_ok : proc_spec (getRequest_spec) (getRequest) recover abstr.
+  Axiom sendResponse_ok : forall resp, proc_spec (sendResponse_spec resp) (sendResponse resp) recover abstr.
   Axiom recover_noop : rec_noop recover abstr wipe_req.
 
 End NbdImpl.

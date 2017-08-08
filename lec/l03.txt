@@ -4,14 +4,14 @@ L3: Recovery
 
 approach to proofs: Hoare logic
   pre- and post-conditions for procedures
-  general shape of what [prog_spec] says:
+  general shape of what [proc_spec] says:
 
           pre                   post
            |                      |
            V                      V
     code state --[procedure]--> state'
 
-  top-level [prog_spec] statement has a precondition that maps the
+  top-level [proc_spec] statement has a precondition that maps the
     starting code state to the starting spec state, and postcondition
     that maps the final code state to the correspoding final spec state.
 
@@ -19,21 +19,21 @@ approach to proofs: Hoare logic
     postcondition.  useful for saying "if exists some abstract state in
     the precondition, then..."
 
-automating [prog_spec] proofs
-  what if we need a proof for a [prog_spec] about "a ; b"?
+automating [proc_spec] proofs
+  what if we need a proof for a [proc_spec] about "a ; b"?
 
      pre                             post
       |                               |
       V                               V
     state0 --[a]--> state1 --[b]--> state2
 
-  find a [prog_spec] for [a] and line up our precondition with that spec's
-  then reduce to proving a [prog_spec] for b, with [a]'s post as the new pre
+  find a [proc_spec] for [a] and line up our precondition with that spec's
+  then reduce to proving a [proc_spec] for b, with [a]'s post as the new pre
   keep doing this repeatedly
 
   two requirements:
-    - can find a [prog_spec] for the [a] program
-    - can line up our current state precondition with [a]'s [prog_spec] pre
+    - can find a [proc_spec] for the [a] program
+    - can line up our current state precondition with [a]'s [proc_spec] pre
 
 src/ReplicatedDisk/ReplicatedDiskImpl.v
   work through implementations of Read, DiskSize, DiskSizeInit, init_at, Init
@@ -42,7 +42,7 @@ src/ReplicatedDisk/ReplicatedDiskImpl.v
     could someone observe an incorrect behavior at the spec level?
 
   walk through the proof of Read_ok
-    pull up src/ReplicatedDisk/TwoDiskProgSpec.v to see the [prog_spec] of Read
+    pull up src/ReplicatedDisk/TwoDiskProgSpec.v to see the [proc_spec] of Read
 
   Write implementation and proof of Write_ok
 

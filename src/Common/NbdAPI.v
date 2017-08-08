@@ -92,16 +92,16 @@ Hint Unfold wipe_req.
 
 Module Type NbdAPI.
 
-  Parameter init : prog InitResult.
-  Parameter getRequest : prog Request.
-  Parameter sendResponse : Response -> prog unit.
-  Parameter recover : prog unit.
+  Parameter init : proc InitResult.
+  Parameter getRequest : proc Request.
+  Parameter sendResponse : Response -> proc unit.
+  Parameter recover : proc unit.
 
   Axiom abstr : Abstraction State.
 
   Axiom init_ok : init_abstraction init recover abstr inited.
-  Axiom getRequest_ok : prog_spec (getRequest_spec) (getRequest) recover abstr.
-  Axiom sendResponse_ok : forall resp, prog_spec (sendResponse_spec resp) (sendResponse resp) recover abstr.
+  Axiom getRequest_ok : proc_spec (getRequest_spec) (getRequest) recover abstr.
+  Axiom sendResponse_ok : forall resp, proc_spec (sendResponse_spec resp) (sendResponse resp) recover abstr.
   Axiom recover_noop : rec_noop recover abstr wipe_req.
 
   Hint Resolve init_ok.

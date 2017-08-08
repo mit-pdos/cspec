@@ -17,7 +17,7 @@ Section AsyncReplicatedDisk.
 
   Variable (td:Interface TD.API).
 
-  Definition Read (a:addr) : prog block :=
+  Definition Read (a:addr) : proc block :=
     mv0 <- Prim td (TD.Read d0 a);
       match mv0 with
       | Working v => Ret v
@@ -28,7 +28,7 @@ Section AsyncReplicatedDisk.
                    end
       end.
 
-  Definition Write (a:addr) (b:block) : prog unit :=
+  Definition Write (a:addr) (b:block) : proc unit :=
     _ <- Prim td (TD.Write d0 a b);
       _ <- Prim td (TD.Write d1 a b);
       Ret tt.
@@ -42,7 +42,7 @@ Section AsyncReplicatedDisk.
   Hint Resolve pred_weaken.
 
   Theorem Read_ok : forall a,
-      prog_spec
+      proc_spec
         (fun d state =>
            {|
              pre := TD.disk0 state |= covered d /\
@@ -70,7 +70,7 @@ Section AsyncReplicatedDisk.
   Qed.
 
   Theorem Write_ok : forall a b,
-      prog_spec
+      proc_spec
         (fun d state =>
            {|
              pre :=

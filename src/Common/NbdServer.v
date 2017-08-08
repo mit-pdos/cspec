@@ -8,7 +8,7 @@ Module nbd := NbdImpl.
 
 Module NBDServer (d : OneDiskAPI).
 
-  Fixpoint read (off:nat) n : prog (bytes (n*blockbytes)) :=
+  Fixpoint read (off:nat) n : proc (bytes (n*blockbytes)) :=
     match n with
     | 0 => Ret bnull
     | S n => b <- d.read off;
@@ -16,7 +16,7 @@ Module NBDServer (d : OneDiskAPI).
               Ret (bappend b rest)
     end.
 
-  Fixpoint write (off:nat) (bl : list (bytes blockbytes)) : prog unit :=
+  Fixpoint write (off:nat) (bl : list (bytes blockbytes)) : proc unit :=
     match bl with
     | nil => Ret tt
     | b :: bl' =>
@@ -24,7 +24,7 @@ Module NBDServer (d : OneDiskAPI).
       write (off+1) bl'
     end.
 
-  Theorem read_ok : forall n off, prog_spec (fun (_ : unit) state => {|
+  Theorem read_ok : forall n off, proc_spec (fun (_ : unit) state => {|
       pre := True;
       post := fun r state' => state' = state /\ read_match state off n r;
       recover := fun _ state' => state' = state
@@ -50,7 +50,7 @@ Module NBDServer (d : OneDiskAPI).
       replace (S off) with (off + 1) by omega; auto.
   Qed.
 
-  Theorem write_ok : forall blocks off, prog_spec (fun (_ : unit) state => {|
+  Theorem write_ok : forall blocks off, proc_spec (fun (_ : unit) state => {|
       pre := True;
       post := fun r state' =>
         r = tt /\ state' = write_upd state off blocks;
@@ -85,7 +85,7 @@ Module NBDServer (d : OneDiskAPI).
       exists 1; simpl; auto.
   Qed.
 
-  CoFixpoint handle : prog unit :=
+  CoFixpoint handle : proc unit :=
     req <- nbd.getRequest;
     match req with
     | Read h off blocks =>
@@ -110,12 +110,12 @@ Module NBDServer (d : OneDiskAPI).
     | Disconnect => Ret tt
     end.
 
-  Definition serverLoop : prog unit :=
+  Definition serverLoop : proc unit :=
     _ <- nbd.recover;
     _ <- d.recover;
     handle.
 
-  Definition size : prog nat :=
+  Definition size : proc nat :=
     d.size.
 
   Definition init := then_init nbd.init d.init.

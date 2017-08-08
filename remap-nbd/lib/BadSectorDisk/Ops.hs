@@ -13,7 +13,7 @@ import                   System.Posix.Types (Fd)
 import                   System.Posix.Unistd (fileSynchronise)
 import                   Utils.Conversion
 
-read :: Coq_addr -> TheProg BS.ByteString
+read :: Coq_addr -> TheProc BS.ByteString
 read a = do
   fd <- reader diskHandle
   bs <- reader badSector
@@ -22,7 +22,7 @@ read a = do
   else
     liftIO $ fdPread fd blocksize (fromIntegral $ addrToOffset a)
 
-write :: Coq_addr -> BS.ByteString -> TheProg ()
+write :: Coq_addr -> BS.ByteString -> TheProc ()
 write a b = do
   fd <- reader diskHandle
   liftIO $ fdPwrite fd b (fromIntegral $ addrToOffset a)
@@ -30,13 +30,13 @@ write a b = do
 
 -- |implementation of two disk DiskSize operation - note that this size is
 -- reported to Coq in blocks
-size :: TheProg Integer
+size :: TheProc Integer
 size = do
   fd <- reader diskHandle
   off <- liftIO $ fdSeek fd SeekFromEnd 0
   return (fromIntegral off `div` blocksize)
 
-getBadSector :: TheProg Integer
+getBadSector :: TheProc Integer
 getBadSector = do
   bs <- reader badSector
   return bs

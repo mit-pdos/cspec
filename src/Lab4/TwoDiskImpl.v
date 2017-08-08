@@ -69,7 +69,7 @@ Module TwoDisk (b : TwoDiskBaseAPI) <: TwoDiskAPI.
 
   Ltac prim :=
     intros;
-    eapply prog_spec_weaken; [ eauto | unfold spec_impl ]; eexists;
+    eapply proc_spec_weaken; [ eauto | unfold spec_impl ]; eexists;
     intuition eauto; cleanup;
     intuition eauto; cleanup.
 
@@ -85,18 +85,18 @@ Module TwoDisk (b : TwoDiskBaseAPI) <: TwoDiskAPI.
     eauto.
   Qed.
 
-  Theorem read_ok : forall i a, prog_spec (read_spec i a) (read i a) recover abstr.
+  Theorem read_ok : forall i a, proc_spec (read_spec i a) (read i a) recover abstr.
   Proof.
     unshelve prim.
     eauto.
   Qed.
 
-  Theorem write_ok : forall i a v, prog_spec (write_spec i a v) (write i a v) recover abstr.
+  Theorem write_ok : forall i a v, proc_spec (write_spec i a v) (write i a v) recover abstr.
   Proof.
     admit.
   Admitted.
 
-  Theorem size_ok : forall i, prog_spec (size_spec i) (size i) recover abstr.
+  Theorem size_ok : forall i, proc_spec (size_spec i) (size i) recover abstr.
   Proof.
     unshelve prim.
     eauto.

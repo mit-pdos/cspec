@@ -16,7 +16,7 @@ Section ReplicatedDisk.
 
   Variable (td:Interface TD.API).
 
-  Definition DiskSize : prog nat :=
+  Definition DiskSize : proc nat :=
     msz <- Prim td (TD.DiskSize d0);
       match msz with
       | Working sz => Ret sz
@@ -33,7 +33,7 @@ Section ReplicatedDisk.
     Hint Resolve pred_weaken.
 
     Theorem DiskSize_ok :
-      prog_spec
+      proc_spec
         (fun '(d_0, d_1) state =>
            {|
              pre :=
