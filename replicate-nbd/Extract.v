@@ -9,6 +9,6 @@ Extraction Language Haskell.
 
 Require Import Lab4.ReplicatedServer.
 
-Separate Extraction diskSize serverLoop init.
+Separate Extraction size serverLoop init.
 
 Cd "../../".

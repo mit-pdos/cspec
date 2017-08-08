@@ -8,7 +8,7 @@ Module TwoDisk (b : TwoDiskBaseAPI) <: TwoDiskAPI.
   Definition init := b.init.
   Definition read := b.read.
   Definition write := b.write.
-  Definition diskSize := b.diskSize.
+  Definition size := b.size.
   Definition recover := b.recover.
 
   Definition abstr := b.abstr.
@@ -96,7 +96,7 @@ Module TwoDisk (b : TwoDiskBaseAPI) <: TwoDiskAPI.
     admit.
   Admitted.
 
-  Theorem diskSize_ok : forall i, prog_spec (diskSize_spec i) (diskSize i) recover abstr.
+  Theorem size_ok : forall i, prog_spec (size_spec i) (size i) recover abstr.
   Proof.
     unshelve prim.
     eauto.

@@ -46,7 +46,7 @@ Module NBDServer (d : OneDiskAPI).
       simpl in *; intros.
       rewrite bsplit_bappend. autounfold.
       intuition subst; eauto.
-      destruct (state off); simpl in *; intuition (subst; eauto).
+      destruct (diskGet state off); simpl in *; intuition (subst; eauto).
       replace (S off) with (off + 1) by omega; auto.
   Qed.
 
@@ -115,8 +115,8 @@ Module NBDServer (d : OneDiskAPI).
     _ <- d.recover;
     handle.
 
-  Definition diskSize : prog nat :=
-    d.diskSize.
+  Definition size : prog nat :=
+    d.size.
 
   Definition init := then_init nbd.init d.init.
 

@@ -11,6 +11,6 @@ Require Import Lab2.RemappedServer.
 
 Extract Inlined Constant Compare_dec.lt_dec => "((Prelude.<) :: Prelude.Integer -> Prelude.Integer -> Prelude.Bool)".
 
-Separate Extraction serverLoop init diskSize.
+Separate Extraction serverLoop init size.
 
 Cd "../../".

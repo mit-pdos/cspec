@@ -30,8 +30,8 @@ write a b = do
 
 -- |implementation of two disk DiskSize operation - note that this size is
 -- reported to Coq in blocks
-diskSize :: TheProg Integer
-diskSize = do
+size :: TheProg Integer
+size = do
   fd <- reader diskHandle
   off <- liftIO $ fdSeek fd SeekFromEnd 0
   return (fromIntegral off `div` blocksize)

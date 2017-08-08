@@ -8,12 +8,10 @@ Require Export Sectors.
 
 Definition disk := list block.
 
-(* this coercion allows disks to be directly accessed with a function
-application: [d a] will implicitly call [nth_error d a] due to the coercion,
-which is [(nth_error d) a]. *)
-Coercion nth_error : list >-> Funclass.
+Definition diskGet (d : disk) (a : addr) : option block :=
+  nth_error d a.
 
-Definition size (d : disk) : nat := length d.
+Definition diskSize (d : disk) : nat := length d.
 
 Definition empty_disk : disk := nil.
 
@@ -23,34 +21,34 @@ Section GenericDisks.
   Implicit Type (b: block).
 
   Lemma disk_inbounds_not_none : forall a d,
-      a < size d ->
-      d a = None ->
+      a < diskSize d ->
+      diskGet d a = None ->
       False.
   Proof.
-    unfold size.
+    unfold diskSize.
     intros.
     apply nth_error_None in H0.
     omega.
   Qed.
 
   Lemma disk_inbounds_exists : forall a d,
-      a < size d ->
+      a < diskSize d ->
       exists b,
-      d a = Some b.
+      diskGet d a = Some b.
   Proof.
-    unfold size.
+    unfold diskSize.
     intros.
-    case_eq (d a); intros; eauto.
+    case_eq (diskGet d a); intros; eauto.
     apply nth_error_None in H0.
     omega.
   Qed.
 
   Lemma disk_none_oob : forall a d,
-      d a = None ->
-      ~a < size d.
+      diskGet d a = None ->
+      ~a < diskSize d.
   Proof.
     intros.
-    destruct (lt_dec a (size d)); eauto.
+    destruct (lt_dec a (diskSize d)); eauto.
     exfalso; eapply disk_inbounds_not_none; eauto.
   Qed.
 
@@ -65,8 +63,8 @@ Section GenericDisks.
     end.
 
   Lemma diskUpd_eq_some : forall d a b0 b,
-      d a = Some b0 ->
-      (diskUpd d a b) a = Some b.
+      diskGet d a = Some b0 ->
+      diskGet (diskUpd d a b) a = Some b.
   Proof.
     induction d; simpl; eauto.
     - destruct a; simpl; intros; congruence.
@@ -74,10 +72,10 @@ Section GenericDisks.
   Qed.
 
   Lemma diskUpd_eq : forall d a b,
-      a < size d ->
-      diskUpd d a b a = Some b.
+      a < diskSize d ->
+      diskGet (diskUpd d a b) a = Some b.
   Proof.
-    unfold size.
+    unfold diskSize.
     induction d; simpl; intros.
     - omega.
     - destruct a0; simpl; intros; eauto.
@@ -86,10 +84,10 @@ Section GenericDisks.
   Qed.
 
   Lemma disk_oob_eq : forall d a,
-      ~a < size d ->
-      d a = None.
+      ~a < diskSize d ->
+      diskGet d a = None.
   Proof.
-    unfold size.
+    unfold diskSize.
     induction d; simpl; intros.
     - induction a; eauto.
     - destruct a0; simpl.
@@ -98,10 +96,10 @@ Section GenericDisks.
   Qed.
 
   Lemma diskUpd_oob_eq : forall d a b,
-      ~a < size d ->
-      diskUpd d a b a = None.
+      ~a < diskSize d ->
+      diskGet (diskUpd d a b) a = None.
   Proof.
-    unfold size.
+    unfold diskSize.
     induction d; simpl; intros.
     - induction a; eauto.
     - destruct a0; simpl.
@@ -111,7 +109,7 @@ Section GenericDisks.
 
   Lemma diskUpd_neq : forall d a b a',
       a <> a' ->
-      diskUpd d a b a' = d a'.
+      diskGet (diskUpd d a b) a' = diskGet d a'.
   Proof.
     induction d; simpl; intros; auto.
     destruct a0; simpl.
@@ -120,14 +118,14 @@ Section GenericDisks.
   Qed.
 
   Lemma diskUpd_size : forall d a b,
-      size (diskUpd d a b) = size d.
+      diskSize (diskUpd d a b) = diskSize d.
   Proof.
     induction d; simpl; eauto.
     destruct a0; simpl; intros; eauto.
   Qed.
 
   Lemma diskUpd_none : forall d a b,
-      d a = None ->
+      diskGet d a = None ->
       diskUpd d a b = d.
   Proof.
     induction d; simpl; intros; auto.
@@ -136,7 +134,7 @@ Section GenericDisks.
   Qed.
 
   Theorem disk_ext_eq : forall d d',
-      (forall a, d a = d' a) ->
+      (forall a, diskGet d a = diskGet d' a) ->
       d = d'.
   Proof.
     induction d; simpl; intros.
@@ -154,7 +152,7 @@ Section GenericDisks.
   Qed.
 
   Theorem diskUpd_same : forall d a b,
-      d a = Some b ->
+      diskGet d a = Some b ->
       diskUpd d a b = d.
   Proof.
     induction d; simpl; intros; auto.
@@ -164,7 +162,7 @@ Section GenericDisks.
   Qed.
 
   Lemma diskUpd_oob_noop : forall d a b,
-      ~a < size d ->
+      ~a < diskSize d ->
       diskUpd d a b = d.
   Proof.
     induction d; simpl; intros; auto.
@@ -180,17 +178,17 @@ Section GenericDisks.
     firstn (length d - 1) d.
 
   Lemma shrink_size : forall d,
-      size d <> 0 ->
-      size (shrink d) = size d - 1.
+      diskSize d <> 0 ->
+      diskSize (shrink d) = diskSize d - 1.
   Proof.
-    unfold size, shrink; intros.
+    unfold diskSize, shrink; intros.
     rewrite firstn_length.
     rewrite min_l; omega.
   Qed.
 
   Lemma shrink_preserves : forall d a,
-      a <> size (shrink d) ->
-      (shrink d) a = d a.
+      a <> diskSize (shrink d) ->
+      diskGet (shrink d) a = diskGet d a.
   Proof.
     unfold shrink.
     induction d; simpl; intros; auto.

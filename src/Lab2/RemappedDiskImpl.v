@@ -8,7 +8,7 @@ Module RemappedDisk (bd : BadSectorAPI) <: OneDiskAPI.
   Definition read (a : addr) : prog block :=
     bs <- bd.getBadSector;
     if a == bs then
-      len <- bd.diskSize;
+      len <- bd.size;
       r <- bd.read (len-1);
       Ret r
     else
@@ -16,7 +16,7 @@ Module RemappedDisk (bd : BadSectorAPI) <: OneDiskAPI.
       Ret r.
 
   Definition write (a : addr) (b : block) : prog unit :=
-    len <- bd.diskSize;
+    len <- bd.size;
     if a == (len-1) then
       Ret tt
     else
@@ -28,12 +28,12 @@ Module RemappedDisk (bd : BadSectorAPI) <: OneDiskAPI.
         _ <- bd.write a b;
         Ret tt.
 
-  Definition diskSize : prog nat :=
-    len <- bd.diskSize;
+  Definition size : prog nat :=
+    len <- bd.size;
     Ret (len - 1).
 
   Definition init' : prog InitResult :=
-    len <- bd.diskSize;
+    len <- bd.size;
     if len == 0 then
       Ret InitFailed
     else
@@ -66,11 +66,11 @@ Module RemappedDisk (bd : BadSectorAPI) <: OneDiskAPI.
         (* Hint 5: To refer to the contents of disk [d] at address [a], you can write [d a] *)
         (* Hint 6: To refer to the size of disk [d], you can write [size d] *)
         (* SOL *)
-        (Hgoodsec : forall a, a <> bs_addr /\ a <> size rd_disk -> bs_disk a = rd_disk a)
-        (Hremap : bs_addr <> size rd_disk -> bs_disk (size rd_disk) = rd_disk bs_addr)
-        (Hbsok : bs_addr < size bs_disk)
+        (Hgoodsec : forall a, a <> bs_addr /\ a <> diskSize rd_disk -> diskGet bs_disk a = diskGet rd_disk a)
+        (Hremap : bs_addr <> diskSize rd_disk -> diskGet bs_disk (diskSize rd_disk) = diskGet rd_disk bs_addr)
+        (Hbsok : bs_addr < diskSize bs_disk)
         (* END *)
-        (Hsize : size bs_disk = size rd_disk + 1),
+        (Hsize : diskSize bs_disk = diskSize rd_disk + 1),
       remapped_abstraction bs_state rd_disk.
 
   Definition abstr : Abstraction OneDiskAPI.State :=
@@ -100,7 +100,7 @@ Module RemappedDisk (bd : BadSectorAPI) <: OneDiskAPI.
 
     simpl in *; intuition subst.
 
-    case_eq (stateDisk state (size (stateDisk state) - 1)); intros.
+    case_eq (diskGet (stateDisk state) (diskSize (stateDisk state) - 1)); intros.
     2: exfalso; eapply disk_inbounds_not_none; [ | eauto ]; omega.
 
     exists (diskUpd (shrink (stateDisk state)) (stateBadSector state) b).
@@ -146,9 +146,9 @@ Module RemappedDisk (bd : BadSectorAPI) <: OneDiskAPI.
 
       invert_abstraction.
       rewrite Hsize in H7.
-      replace (size s + 1 - 1) with (size s) in * by omega.
+      replace (diskSize s + 1 - 1) with (diskSize s) in * by omega.
 
-      destruct (stateBadSector state == size s).
+      destruct (stateBadSector state == diskSize s).
       + rewrite disk_oob_eq by omega. constructor.
       + rewrite <- Hremap; auto.
 
@@ -167,7 +167,7 @@ Module RemappedDisk (bd : BadSectorAPI) <: OneDiskAPI.
 
       invert_abstraction.
 
-      destruct (a == size s).
+      destruct (a == diskSize s).
       + rewrite disk_oob_eq by omega. constructor.
       + rewrite <- Hgoodsec; auto.
   Qed.
@@ -175,12 +175,12 @@ Module RemappedDisk (bd : BadSectorAPI) <: OneDiskAPI.
   Lemma remapped_abstraction_diskUpd_remap : forall state s v,
     remapped_abstraction state s ->
     remapped_abstraction (mkState
-      (diskUpd (stateDisk state) (size (stateDisk state) - 1) v)
+      (diskUpd (stateDisk state) (diskSize (stateDisk state) - 1) v)
       (stateBadSector state)) (diskUpd s (stateBadSector state) v).
   Proof.
     intros.
     invert_abstraction.
-    rewrite Hsize. replace (size s + 1 - 1) with (size s) by omega.
+    rewrite Hsize. replace (diskSize s + 1 - 1) with (diskSize s) by omega.
     constructor; simpl.
 
     all: autorewrite with upd; intuition idtac.
@@ -190,7 +190,7 @@ Module RemappedDisk (bd : BadSectorAPI) <: OneDiskAPI.
 
   Lemma remapped_abstraction_diskUpd_noremap : forall state s a v,
     remapped_abstraction state s ->
-    a <> size (stateDisk state) - 1 ->
+    a <> diskSize (stateDisk state) - 1 ->
     a <> stateBadSector state ->
     remapped_abstraction (mkState
       (diskUpd (stateDisk state) a v)
@@ -202,7 +202,7 @@ Module RemappedDisk (bd : BadSectorAPI) <: OneDiskAPI.
 
     all: autorewrite with upd; intuition idtac.
 
-    destruct (lt_dec a (size s)).
+    destruct (lt_dec a (diskSize s)).
     destruct (a == a0); subst.
     repeat rewrite diskUpd_eq by omega; auto.
     repeat rewrite diskUpd_neq by omega; auto.
@@ -271,7 +271,7 @@ Module RemappedDisk (bd : BadSectorAPI) <: OneDiskAPI.
         eauto.
   Qed.
 
-  Theorem diskSize_ok : prog_spec OneDiskAPI.diskSize_spec diskSize recover abstr.
+  Theorem size_ok : prog_spec OneDiskAPI.size_spec size recover abstr.
   Proof.
     unfold diskSize.
     intros.

@@ -36,7 +36,7 @@ Fixpoint read_match (d : disk) (off : addr) (blocks : nat) : bytes (blocks * blo
   | S blocks' =>
     fun (data : bytes ((S blocks') * blockbytes)) =>
     let (thisdata, otherdata) := bsplit data in
-    (d off = Some thisdata \/ d off = None) /\
+    (diskGet d off = Some thisdata \/ diskGet d off = None) /\
     read_match d (S off) blocks' otherdata
   end.
 

@@ -9,5 +9,5 @@ Module d := RemappedDisk BadSectorDisk.
 Module s := NBDServer d.
 
 Definition serverLoop := s.serverLoop.
-Definition diskSize := s.diskSize.
+Definition size := s.size.
 Definition init := s.init.

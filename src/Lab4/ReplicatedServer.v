@@ -11,5 +11,5 @@ Module rd := ReplicatedDisk td.
 Module s := NBDServer rd.
 
 Definition serverLoop := s.serverLoop.
-Definition diskSize := s.diskSize.
+Definition size := s.size.
 Definition init := s.init.

@@ -23,21 +23,21 @@ Module ReplicatedDisk (td : TwoDiskAPI) <: OneDiskAPI.
     _ <- td.write d1 a b;
     Ret tt.
 
-  Definition diskSize : prog nat :=
-    msz <- td.diskSize d0;
+  Definition size : prog nat :=
+    msz <- td.size d0;
     match msz with
     | Working sz => Ret sz
     | Failed =>
-      msz <- td.diskSize d1;
+      msz <- td.size d1;
       match msz with
       | Working sz => Ret sz
       | Failed => Ret 0
       end
     end.
 
-  Definition diskSizeInit : prog (option nat) :=
-    sz1 <- td.diskSize d0;
-    sz2 <- td.diskSize d1;
+  Definition sizeInit : prog (option nat) :=
+    sz1 <- td.size d0;
+    sz2 <- td.size d1;
     match sz1 with
     | Working sz1 =>
       match sz2 with
@@ -64,7 +64,7 @@ Module ReplicatedDisk (td : TwoDiskAPI) <: OneDiskAPI.
 
   (* Initialize every disk block *)
   Definition init' : prog InitResult :=
-    size <- diskSizeInit;
+    size <- sizeInit;
     match size with
     | Some sz =>
       _ <- init_at sz;
@@ -189,7 +189,7 @@ Module ReplicatedDisk (td : TwoDiskAPI) <: OneDiskAPI.
                     disk1 state ?|= eq d;
              post :=
                fun r state' =>
-                 d a ?|= eq r /\
+                 diskGet d a ?|= eq r /\
                  disk0 state' ?|= eq d /\
                  disk1 state' ?|= eq d;
              recover :=
@@ -229,7 +229,7 @@ Module ReplicatedDisk (td : TwoDiskAPI) <: OneDiskAPI.
                fun _ state' =>
                  (disk0 state' ?|= eq d /\
                   disk1 state' ?|= eq d) \/
-                 (a < size d /\
+                 (a < diskSize d /\
                   disk0 state' ?|= eq (diskUpd d a b) /\
                   disk1 state' ?|= eq d) \/
                  (disk0 state' ?|= eq (diskUpd d a b) /\
@@ -248,7 +248,7 @@ Module ReplicatedDisk (td : TwoDiskAPI) <: OneDiskAPI.
 
     step.
     destruct r; (intuition eauto); simplify.
-    destruct (lt_dec a (size a')).
+    destruct (lt_dec a (diskSize a')).
     eauto 10.
     autorewrite with upd in *; eauto.
 
@@ -259,18 +259,18 @@ Module ReplicatedDisk (td : TwoDiskAPI) <: OneDiskAPI.
   Hint Resolve write_int_ok.
 
 
-  Theorem diskSize_int_ok :
+  Theorem size_int_ok :
     prog_spec
       (fun '(d_0, d_1) state =>
          {|
            pre :=
              disk0 state ?|= eq d_0 /\
              disk1 state ?|= eq d_1 /\
-             size d_0 = size d_1;
+             diskSize d_0 = diskSize d_1;
            post :=
              fun r state' =>
-               r = size d_0 /\
-               r = size d_1 /\
+               r = diskSize d_0 /\
+               r = diskSize d_1 /\
                disk0 state' ?|= eq d_0 /\
                disk1 state' ?|= eq d_1;
            recover :=
@@ -278,11 +278,11 @@ Module ReplicatedDisk (td : TwoDiskAPI) <: OneDiskAPI.
                disk0 state' ?|= eq d_0 /\
                disk1 state' ?|= eq d_1;
          |})
-      (diskSize)
+      (size)
       td.recover
       td.abstr.
   Proof.
-    unfold diskSize.
+    unfold size.
 
     step.
 
@@ -291,12 +291,12 @@ Module ReplicatedDisk (td : TwoDiskAPI) <: OneDiskAPI.
     simplify.
   Qed.
 
-  Hint Resolve diskSize_int_ok.
+  Hint Resolve size_int_ok.
 
 
   Definition equal_after a (d_0 d_1: disk) :=
-    size d_0 = size d_1 /\
-    forall a', a <= a' -> d_0 a' = d_1 a'.
+    diskSize d_0 = diskSize d_1 /\
+    forall a', a <= a' -> diskGet d_0 a' = diskGet d_1 a'.
 
   Lemma le_eq_or_S_le : forall n m,
       n <= m ->
@@ -314,9 +314,9 @@ Module ReplicatedDisk (td : TwoDiskAPI) <: OneDiskAPI.
     unfold equal_after; intuition.
     autorewrite with upd; eauto.
     apply le_eq_or_S_le in H; intuition subst.
-    destruct (lt_dec a' (size d_0)); autorewrite with upd.
-    assert (a' < size d_1) by congruence; autorewrite with upd; auto.
-    assert (~a' < size d_1) by congruence; autorewrite with upd; auto.
+    destruct (lt_dec a' (diskSize d_0)); autorewrite with upd.
+    assert (a' < diskSize d_1) by congruence; autorewrite with upd; auto.
+    assert (~a' < diskSize d_1) by congruence; autorewrite with upd; auto.
     autorewrite with upd; eauto.
   Qed.
   Hint Resolve equal_after_diskUpd.
@@ -359,7 +359,7 @@ Module ReplicatedDisk (td : TwoDiskAPI) <: OneDiskAPI.
   Hint Resolve init_at_ok.
 
 
-  Theorem diskSizeInit_ok :
+  Theorem sizeInit_ok :
       prog_spec
         (fun '(d_0, d_1) state =>
            {| pre :=
@@ -371,22 +371,22 @@ Module ReplicatedDisk (td : TwoDiskAPI) <: OneDiskAPI.
                     disk0 state' ?|= eq d_0' /\
                     disk1 state' ?|= eq d_1' /\
                     match r with
-                    | Some sz => size d_0' = sz /\ size d_1' = sz
+                    | Some sz => diskSize d_0' = sz /\ diskSize d_1' = sz
                     | None => True
                     end;
               recover :=
                 fun _ state' => True;
            |})
-        (diskSizeInit)
+        (sizeInit)
         td.recover
         td.abstr.
   Proof.
-    unfold diskSizeInit.
+    unfold sizeInit.
     step.
     destruct r.
     step.
     - destruct r.
-      + destruct (size d_0 == v).
+      + destruct (diskSize d_0 == v).
         * step.
         * step.
       + step.
@@ -396,7 +396,7 @@ Module ReplicatedDisk (td : TwoDiskAPI) <: OneDiskAPI.
       + step.
   Qed.
 
-  Hint Resolve diskSizeInit_ok.
+  Hint Resolve sizeInit_ok.
 
 
   Lemma equal_after_0_to_eq : forall d_0 d_1,
@@ -409,12 +409,12 @@ Module ReplicatedDisk (td : TwoDiskAPI) <: OneDiskAPI.
   Qed.
 
   Lemma equal_after_size : forall d_0 d_1,
-      size d_0 = size d_1 ->
-      equal_after (size d_0) d_0 d_1.
+      diskSize d_0 = diskSize d_1 ->
+      equal_after (diskSize d_0) d_0 d_1.
   Proof.
     unfold equal_after; intuition.
-    assert (~a' < size d_0) by omega.
-    assert (~a' < size d_1) by congruence.
+    assert (~a' < diskSize d_0) by omega.
+    assert (~a' < diskSize d_1) by congruence.
     autorewrite with upd; eauto.
   Qed.
 
@@ -499,7 +499,7 @@ Module ReplicatedDisk (td : TwoDiskAPI) <: OneDiskAPI.
     end.
 
   Definition Recover : prog unit :=
-    sz <- diskSize;
+    sz <- size;
     _ <- recover_at sz;
     Ret tt.
 
@@ -518,13 +518,13 @@ Module ReplicatedDisk (td : TwoDiskAPI) <: OneDiskAPI.
   Qed.
 
   Lemma disks_eq_inbounds : forall (d: disk) a v v',
-      a < size d ->
-      d a ?|= eq v ->
-      d a ?|= eq v' ->
+      a < diskSize d ->
+      diskGet d a ?|= eq v ->
+      diskGet d a ?|= eq v' ->
       v = v'.
   Proof.
     intros.
-    case_eq (d a); intros.
+    case_eq (diskGet d a); intros.
     - rewrite H2 in *. simpl in *. congruence.
     - exfalso.
       eapply disk_inbounds_not_none; eauto.
@@ -539,7 +539,7 @@ Module ReplicatedDisk (td : TwoDiskAPI) <: OneDiskAPI.
                (* for simplicity we only consider in-bounds addresses, though
                   if a is out-of-bounds fixup just might uselessly write to
                   disk and not do anything *)
-               a < size d /\
+               a < diskSize d /\
                disk0 state ?|= eq d /\
                disk1 state ?|= eq d;
              post :=
@@ -576,11 +576,11 @@ Module ReplicatedDisk (td : TwoDiskAPI) <: OneDiskAPI.
   Qed.
 
   Lemma diskUpd_maybe_same : forall (d:disk) a b,
-      d a ?|= eq b ->
+      diskGet d a ?|= eq b ->
       diskUpd d a b = d.
   Proof.
     intros.
-    destruct (d a) eqn:?; simpl in *; subst;
+    destruct (diskGet d a) eqn:?; simpl in *; subst;
       autorewrite with upd;
       auto.
   Qed.
@@ -593,7 +593,7 @@ Module ReplicatedDisk (td : TwoDiskAPI) <: OneDiskAPI.
         (fun '(d, b) state =>
            {|
              pre :=
-               a < size d /\
+               a < diskSize d /\
                disk0 state ?|= eq (diskUpd d a b) /\
                disk1 state ?|= eq d;
              post :=
@@ -651,7 +651,7 @@ Module ReplicatedDisk (td : TwoDiskAPI) <: OneDiskAPI.
         (fun '(d, b, a') state =>
            {|
              pre :=
-               a < size d /\
+               a < diskSize d /\
                (* recovery, working from end of disk, has not yet reached the
                   correct address *)
                a' < a /\
@@ -704,7 +704,7 @@ Module ReplicatedDisk (td : TwoDiskAPI) <: OneDiskAPI.
         (fun '(d, s) state =>
            {|
              pre :=
-               a < size d /\
+               a < diskSize d /\
                match s with
                | FullySynced => disk0 state ?|= eq d /\
                                 disk1 state ?|= eq d
@@ -778,7 +778,7 @@ Module ReplicatedDisk (td : TwoDiskAPI) <: OneDiskAPI.
         (fun '(d, s) state =>
            {|
              pre :=
-               a <= size d /\
+               a <= diskSize d /\
                match s with
                | FullySynced => disk0 state ?|= eq d /\
                                 disk1 state ?|= eq d
@@ -848,7 +848,7 @@ Module ReplicatedDisk (td : TwoDiskAPI) <: OneDiskAPI.
            match s with
            | FullySynced => disk0 state ?|= eq d /\
                             disk1 state ?|= eq d
-           | OutOfSync a b => a < size d /\
+           | OutOfSync a b => a < diskSize d /\
                               disk0 state ?|= eq (diskUpd d a b) /\
                               disk1 state ?|= eq d
            end;
@@ -943,7 +943,7 @@ Module ReplicatedDisk (td : TwoDiskAPI) <: OneDiskAPI.
                       disk1 state ?|= eq d;
                post :=
                  fun r state' =>
-                   d a ?|= eq r /\
+                   diskGet d a ?|= eq r /\
                    disk0 state' ?|= eq d /\
                    disk1 state' ?|= eq d;
                Hoare.recover :=
@@ -992,7 +992,7 @@ Module ReplicatedDisk (td : TwoDiskAPI) <: OneDiskAPI.
     - exists (diskUpd d a b), FullySynced; intuition eauto.
    Qed.
 
-  Theorem diskSize_rok :
+  Theorem size_rok :
     prog_spec
       (fun d state =>
          {|
@@ -1000,7 +1000,7 @@ Module ReplicatedDisk (td : TwoDiskAPI) <: OneDiskAPI.
                   disk1 state ?|= eq d;
            post :=
              fun r state' =>
-               r = size d /\
+               r = diskSize d /\
                disk0 state' ?|= eq d /\
                disk1 state' ?|= eq d;
            Hoare.recover :=
@@ -1008,7 +1008,7 @@ Module ReplicatedDisk (td : TwoDiskAPI) <: OneDiskAPI.
                disk0 state' ?|= eq d /\
                disk1 state' ?|= eq d;
          |})
-      (diskSize)
+      (size)
       recover
       td.abstr.
   Proof.
@@ -1019,7 +1019,7 @@ Module ReplicatedDisk (td : TwoDiskAPI) <: OneDiskAPI.
     exists d, FullySynced; intuition eauto.
   Qed.
 
-  Hint Resolve read_rok write_rok diskSize_rok Recover_rok.
+  Hint Resolve read_rok write_rok size_rok Recover_rok.
 
 
   Definition abstraction_f (state: TwoDiskBaseAPI.State) : OneDiskAPI.State :=
@@ -1146,7 +1146,7 @@ Module ReplicatedDisk (td : TwoDiskAPI) <: OneDiskAPI.
     exists (abstraction_f state'); intuition eauto.
   Qed.
 
-  Theorem diskSize_ok : prog_spec diskSize_spec diskSize recover abstr.
+  Theorem size_ok : prog_spec size_spec size recover abstr.
   Proof.
     intros.
     apply spec_abstraction_compose;

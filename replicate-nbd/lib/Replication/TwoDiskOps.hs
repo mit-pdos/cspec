@@ -38,7 +38,7 @@ sync d = ifExists d $ \fd ->
 
 -- |implementation of two disk DiskSize operation - note that this size is
 -- reported to Coq in blocks
-diskSize :: Coq_diskId -> TheProg (DiskResult Integer)
-diskSize d = ifExists d $ \fd -> do
+size :: Coq_diskId -> TheProg (DiskResult Integer)
+size d = ifExists d $ \fd -> do
     off <- fdSeek fd SeekFromEnd 0
     return (fromIntegral off `div` blocksize)

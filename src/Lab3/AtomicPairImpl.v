@@ -30,7 +30,7 @@ Module AtomicPair (d : OneDiskAPI) <: AtomicPairAPI.
       Ret tt.
 
   Definition init' : prog InitResult :=
-    len <- d.diskSize;
+    len <- d.size;
     if len == 5 then
       _ <- d.write 0 block0;
       Ret Initialized
@@ -44,9 +44,9 @@ Module AtomicPair (d : OneDiskAPI) <: AtomicPairAPI.
 
 
   Definition atomic_pair_abstraction (ds : OneDiskAPI.State) (ps : AtomicPairAPI.State) : Prop :=
-    size ds = 5 /\
-    (ds 0 = Some block0 /\ ds 1 = Some (fst ps) /\ ds 2 = Some (snd ps) \/
-     ds 0 = Some block1 /\ ds 3 = Some (fst ps) /\ ds 4 = Some (snd ps)).
+    diskSize ds = 5 /\
+    (diskGet ds 0 = Some block0 /\ diskGet ds 1 = Some (fst ps) /\ diskGet ds 2 = Some (snd ps) \/
+     diskGet ds 0 = Some block1 /\ diskGet ds 3 = Some (fst ps) /\ diskGet ds 4 = Some (snd ps)).
 
   Definition abstr : Abstraction AtomicPairAPI.State :=
     abstraction_compose d.abstr {| abstraction := atomic_pair_abstraction |}.
@@ -143,7 +143,7 @@ Module AtomicPair (d : OneDiskAPI) <: AtomicPairAPI.
   Lemma atomic_pair_abstraction_diskUpd12 : forall state s a v,
     (a = 1 \/ a = 2) ->
     atomic_pair_abstraction state s ->
-    state 0 ?|= eq block1 ->
+    diskGet state 0 ?|= eq block1 ->
     atomic_pair_abstraction (diskUpd state a v) s.
   Proof.
     unfold atomic_pair_abstraction; intros.
@@ -162,7 +162,7 @@ Module AtomicPair (d : OneDiskAPI) <: AtomicPairAPI.
   Lemma atomic_pair_abstraction_diskUpd34 : forall state s a v,
     (a = 3 \/ a = 4) ->
     atomic_pair_abstraction state s ->
-    state 0 ?|= eq block0 ->
+    diskGet state 0 ?|= eq block0 ->
     atomic_pair_abstraction (diskUpd state a v) s.
   Proof.
     unfold atomic_pair_abstraction; intros.
@@ -179,8 +179,8 @@ Module AtomicPair (d : OneDiskAPI) <: AtomicPairAPI.
 
   Lemma atomic_pair_abstraction_state0 : forall (state : State) F a v,
     a <> 0 ->
-    state 0 ?|= F ->
-    (diskUpd state a v) 0 ?|= F.
+    diskGet state 0 ?|= F ->
+    diskGet (diskUpd state a v) 0 ?|= F.
   Proof.
     intros.
     rewrite diskUpd_neq; auto.

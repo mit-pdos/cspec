@@ -30,12 +30,12 @@ Definition set_disk (i:diskId) (state:State) (d:disk) : State :=
 Inductive Op : Type -> Type :=
 | op_read (i : diskId) (a : addr) : Op (DiskResult block)
 | op_write (i : diskId) (a : addr) (b : block) : Op (DiskResult unit)
-| op_disksize (i : diskId) : Op (DiskResult nat).
+| op_size (i : diskId) : Op (DiskResult nat).
 
 Inductive op_step : forall `(op: Op T), Semantics State T :=
 | step_read : forall a i r state,
     match get_disk i state with
-    | Some d => match d a with
+    | Some d => match diskGet d a with
                | Some b0 => r = Working b0
                | None => exists b, r = Working b
                end
@@ -51,10 +51,10 @@ Inductive op_step : forall `(op: Op T), Semantics State T :=
     op_step (op_write i a b) state r state'
 | step_size : forall i state r,
     match get_disk i state with
-    | Some d => r = Working (size d)
+    | Some d => r = Working (diskSize d)
     | None => r = Failed
     end ->
-    op_step (op_disksize i) state r state.
+    op_step (op_size i) state r state.
 
 Inductive bg_failure : State -> State -> Prop :=
 | step_id : forall (state: State), bg_failure state state
@@ -73,7 +73,7 @@ Module Type TwoDiskBaseAPI.
   Parameter init : prog InitResult.
   Parameter read : diskId -> addr -> prog (DiskResult block).
   Parameter write : diskId -> addr -> block -> prog (DiskResult unit).
-  Parameter diskSize : diskId -> prog (DiskResult nat).
+  Parameter size : diskId -> prog (DiskResult nat).
   Parameter recover : prog unit.
 
   Axiom abstr : Abstraction State.
@@ -81,13 +81,13 @@ Module Type TwoDiskBaseAPI.
   Axiom init_ok : init_abstraction init recover abstr inited_any.
   Axiom read_ok : forall i a, prog_spec (op_spec (combined_step (op_read i a))) (read i a) recover abstr.
   Axiom write_ok : forall i a b, prog_spec (op_spec (combined_step (op_write i a b))) (write i a b) recover abstr.
-  Axiom diskSize_ok : forall i, prog_spec (op_spec (combined_step (op_disksize i))) (diskSize i) recover abstr.
+  Axiom size_ok : forall i, prog_spec (op_spec (combined_step (op_size i))) (size i) recover abstr.
   Axiom recover_noop : rec_noop recover abstr no_wipe.
 
   Hint Resolve init_ok.
   Hint Resolve read_ok.
   Hint Resolve write_ok.
-  Hint Resolve diskSize_ok.
+  Hint Resolve size_ok.
   Hint Resolve recover_noop.
 
 End TwoDiskBaseAPI.

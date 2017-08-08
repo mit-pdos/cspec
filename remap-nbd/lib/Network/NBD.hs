@@ -179,7 +179,7 @@ forkNbdServer e doLog =
       name <- negotiateNewstyle
       liftIO $ when (name /= "") $
         putStrLn $ "ignoring non-default export name " ++ show name
-      sz <- liftIO . runBS e $ Server.diskSize
+      sz <- liftIO . runBS e $ Server.size
       -- start transmission phase
       sendExportInformation (fromIntegral sz * blocksize)
       liftIO $ putStrLn "negotiated with client"
