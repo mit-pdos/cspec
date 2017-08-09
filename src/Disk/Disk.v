@@ -162,6 +162,15 @@ Proof.
   - rewrite IHd; eauto.
 Qed.
 
+Lemma diskUpd_twice : forall d a b b',
+    diskUpd (diskUpd d a b) a b' = diskUpd d a b'.
+Proof.
+  induction d; simpl; intros; auto.
+  destruct a0; simpl in *.
+  - congruence.
+  - rewrite IHd; eauto.
+Qed.
+
 Lemma diskUpd_oob_noop : forall d a b,
     ~a < diskSize d ->
     diskUpd d a b = d.
@@ -195,6 +204,36 @@ Proof.
     rewrite <- IHd; auto.
 Qed.
 
+Lemma diskShrink_diskUpd_last : forall d a b,
+    a >= diskSize d - 1 ->
+    diskShrink (diskUpd d a b) = diskShrink d.
+Proof.
+  unfold diskShrink; intros.
+  destruct (eq_nat_dec a (diskSize d - 1)); subst.
+  - clear H.
+    rewrite diskUpd_size; unfold diskSize.
+    induction d; simpl; auto.
+    destruct d; simpl in *; auto.
+    replace (length d - 0) with (length d) in * by omega.
+    f_equal; auto.
+  - rewrite diskUpd_oob_noop by omega; auto.
+Qed.
+
+Lemma diskShrink_diskUpd_notlast : forall d a b,
+    a < diskSize d - 1 ->
+    diskShrink (diskUpd d a b) = diskUpd (diskShrink d) a b.
+Proof.
+  unfold diskShrink.
+  induction d; simpl; auto; intros.
+  destruct a0; simpl; auto.
+  - destruct d; simpl; auto.
+  - destruct d; simpl in *; auto.
+    replace (length d - 0) with (length d) in * by omega.
+    rewrite <- IHd by omega.
+    destruct a0; simpl; try rewrite diskUpd_size; unfold diskSize;
+      replace (length d - 0) with (length d) by omega; auto.
+Qed.
+
 Hint Rewrite diskUpd_eq using (solve [ auto ]) : upd.
 Hint Rewrite disk_oob_eq using (solve [ auto ]) : upd.
 Hint Rewrite diskUpd_oob_eq using (solve [ auto ]) : upd.
@@ -204,6 +243,9 @@ Hint Rewrite diskUpd_none using (solve [ auto ]) : upd.
 
 Hint Rewrite diskUpd_same using (solve [ auto ]) : upd.
 Hint Rewrite diskUpd_oob_noop using (solve [ auto ]) : upd.
+Hint Rewrite diskUpd_twice : upd.
 
-Hint Rewrite diskShrink_size using (solve [ auto ]) : upd.
-Hint Rewrite diskShrink_preserves using (solve [ auto ]) : upd.
+Hint Rewrite diskShrink_size using (solve [ auto || omega ]) : upd.
+Hint Rewrite diskShrink_preserves using (solve [ auto || omega ]) : upd.
+Hint Rewrite diskShrink_diskUpd_last using (solve [ auto || omega ]) : upd.
+Hint Rewrite diskShrink_diskUpd_notlast using (solve [ auto || omega ]) : upd.
