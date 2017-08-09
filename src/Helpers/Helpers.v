@@ -103,7 +103,7 @@ Qed.
 
 Definition missing {T} : T -> Prop := fun _ => False.
 
-Corollary pred_missing : forall T (p: T -> Prop) mt,
+Theorem pred_missing : forall T (p: T -> Prop) mt,
     maybe_holds missing mt ->
     maybe_holds p mt.
 Proof.
