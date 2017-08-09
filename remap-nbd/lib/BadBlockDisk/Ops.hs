@@ -12,6 +12,11 @@ import "unix-bytestring" System.Posix.IO.ByteString
 import                   System.Posix.Types (Fd)
 import                   System.Posix.Unistd (fileSynchronise)
 import                   Utils.Conversion
+import                   Hoare
+
+init :: TheProc InitResult
+init = do
+  return Initialized
 
 read :: Coq_addr -> TheProc BS.ByteString
 read a = do
@@ -40,3 +45,7 @@ getBadBlock :: TheProc Integer
 getBadBlock = do
   bs <- reader badBlock
   return bs
+
+recover :: TheProc ()
+recover = do
+  return ()

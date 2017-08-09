@@ -22,6 +22,8 @@ Module TwoDiskBase <: TwoDiskBaseAPI.
 
 End TwoDiskBase.
 
+Extract Constant TwoDiskBase.init => "TD.init".
 Extract Constant TwoDiskBase.read => "TD.read".
 Extract Constant TwoDiskBase.write => "TD.write".
 Extract Constant TwoDiskBase.size => "TD.size".
+Extract Constant TwoDiskBase.recover => "TD.recover".

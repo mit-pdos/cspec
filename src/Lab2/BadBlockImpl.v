@@ -24,7 +24,9 @@ Module BadBlockDisk <: BadBlockAPI.
 
 End BadBlockDisk.
 
+Extract Constant BadBlockDisk.init => "BadBlockDisk.Ops.init".
 Extract Constant BadBlockDisk.read => "BadBlockDisk.Ops.read".
 Extract Constant BadBlockDisk.write => "BadBlockDisk.Ops.write".
 Extract Constant BadBlockDisk.getBadBlock => "BadBlockDisk.Ops.getBadBlock".
 Extract Constant BadBlockDisk.size => "BadBlockDisk.Ops.size".
+Extract Constant BadBlockDisk.recover => "BadBlockDisk.Ops.recover".

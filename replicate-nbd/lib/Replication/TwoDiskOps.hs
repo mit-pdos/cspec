@@ -12,6 +12,7 @@ import                   System.Posix.Types (Fd)
 import                   System.Posix.Unistd (fileSynchronise)
 import                   TwoDiskBaseAPI
 import                   Utils.Conversion
+import                   Hoare
 
 getDisk :: Coq_diskId -> TheProc (Maybe Fd)
 getDisk Coq_d0 = reader disk0 >>= liftIO
@@ -23,6 +24,10 @@ ifExists d m = do
   liftIO $ case mfd of
       Just fd -> Working <$> m fd
       Nothing -> return Failed
+
+init :: TheProc InitResult
+init = do
+  return Initialized
 
 read :: Coq_diskId -> Coq_addr -> TheProc (DiskResult BS.ByteString)
 read d a = ifExists d $ \fd ->
@@ -42,3 +47,7 @@ size :: Coq_diskId -> TheProc (DiskResult Integer)
 size d = ifExists d $ \fd -> do
     off <- fdSeek fd SeekFromEnd 0
     return (fromIntegral off `div` blocksize)
+
+recover :: TheProc ()
+recover = do
+  return ()
