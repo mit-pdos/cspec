@@ -3,7 +3,7 @@ Require Import Omega.
 Require Import RelationClasses.
 Require Import List.
 
-Require Export Sectors.
+Require Export Blocks.
 
 
 Definition disk := list block.

@@ -12,17 +12,17 @@ import_modules = {
         "Helpers",
     ],
 
-    "import qualified BadSectorDisk.Ops":
+    "import qualified BadBlockDisk.Ops":
     [
-        "BadSectorImpl",
+        "BadBlockImpl",
     ],
 
-    "import BadSectorDisk.Env":
+    "import BadBlockDisk.Env":
     [
         "RemappedServer",
         "NbdImpl",
         "NbdServer",
-        "BadSectorImpl",
+        "BadBlockImpl",
         "Hoare",
     ],
 

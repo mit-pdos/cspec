@@ -1,4 +1,4 @@
-Require Export Disk.Sectors.
+Require Export Disk.Blocks.
 
 Set Implicit Arguments.
 

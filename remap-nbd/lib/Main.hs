@@ -12,7 +12,7 @@ import System.IO
 data InitOptions = InitOptions
   { defaultSizeKB :: Int
   , initDiskPath :: FilePath
-  , initBadSector :: Integer }
+  , initBadBlock :: Integer }
 
 data Options = Start ServerOptions
              | Init InitOptions
@@ -20,13 +20,13 @@ data Options = Start ServerOptions
 parseDiskPath :: Parser FilePath
 parseDiskPath = argument str (metavar "FILE0") <|> pure ("disk.img")
 
-parseBadSector :: Parser Integer
-parseBadSector = argument auto (metavar "BADSECTOR") <|> pure 1
+parseBadBlock :: Parser Integer
+parseBadBlock = argument auto (metavar "BADBLOCK") <|> pure 1
 
 serverOptions :: Parser ServerOptions
 serverOptions = do
   diskPath <- parseDiskPath
-  diskBadSector <- parseBadSector
+  diskBadBlock <- parseBadBlock
   logCommands <- switch (long "debug"
                         <> short 'd'
                         <> help "log each operation received")
@@ -41,7 +41,7 @@ initOptions = do
       <> value (100*1024)
       <> metavar "KB" )
   initDiskPath <- parseDiskPath
-  initBadSector <- parseBadSector
+  initBadBlock <- parseBadBlock
   pure InitOptions {..}
 
 diskDefaultMessage :: String
@@ -74,7 +74,7 @@ runInit :: InitOptions -> IO ()
 runInit InitOptions
   { defaultSizeKB=size,
     initDiskPath=fn,
-    initBadSector=bs } = do
+    initBadBlock=bs } = do
   exists <- doesFileExist fn
   when (not exists) $
     withFile fn WriteMode $ \h ->

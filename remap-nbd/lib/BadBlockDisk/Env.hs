@@ -1,9 +1,9 @@
-module BadSectorDisk.Env
+module BadBlockDisk.Env
   (
     TheProc
   , Env
   , diskHandle
-  , badSector
+  , badBlock
   , requests
   , responses
   , newEnv
@@ -22,16 +22,16 @@ import System.Posix.Types
 
 data Env =
   Env { diskHandle :: Fd
-      , badSector :: Integer
+      , badBlock :: Integer
       , requests :: MVar Request
       , responses :: MVar Response }
 
 type TheProc = ReaderT Env IO
 
 newEnv :: FilePath -> Integer -> IO Env
-newEnv fn badSectorArg = pure Env
+newEnv fn badBlockArg = pure Env
   <*> openFile fn
-  <*> return badSectorArg
+  <*> return badBlockArg
   <*> newEmptyMVar <*> newEmptyMVar
   where openFile :: FilePath -> IO Fd
         openFile path = openFd path ReadWrite Nothing defaultFileFlags

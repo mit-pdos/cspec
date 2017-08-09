@@ -1,12 +1,12 @@
 {-# LANGUAGE PackageImports #-}
-module BadSectorDisk.Ops where
+module BadBlockDisk.Ops where
 
 import                   Control.Monad (void)
 import                   Control.Monad.Reader (reader, liftIO)
 import qualified         Data.ByteString as BS
 import qualified         Data.Char
-import                   BadSectorDisk.Env
-import                   Sectors
+import                   BadBlockDisk.Env
+import                   Blocks
 import                   System.IO (SeekMode(..))
 import "unix-bytestring" System.Posix.IO.ByteString
 import                   System.Posix.Types (Fd)
@@ -16,7 +16,7 @@ import                   Utils.Conversion
 read :: Coq_addr -> TheProc BS.ByteString
 read a = do
   fd <- reader diskHandle
-  bs <- reader badSector
+  bs <- reader badBlock
   if a == bs then
     return $ BS.replicate blocksize $ fromIntegral $ Data.Char.ord 'A'
   else
@@ -36,7 +36,7 @@ size = do
   off <- liftIO $ fdSeek fd SeekFromEnd 0
   return (fromIntegral off `div` blocksize)
 
-getBadSector :: TheProc Integer
-getBadSector = do
-  bs <- reader badSector
+getBadBlock :: TheProc Integer
+getBadBlock = do
+  bs <- reader badBlock
   return bs

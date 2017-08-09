@@ -1,11 +1,11 @@
 Require Import POCS.
 
 Require Import RemappedDiskImpl.
-Require Import BadSectorImpl.
+Require Import BadBlockImpl.
 Require Import Common.NbdServer.
 
 
-Module d := RemappedDisk BadSectorDisk.
+Module d := RemappedDisk BadBlockDisk.
 Module s := NBDServer d.
 
 Definition serverLoop := s.serverLoop.

@@ -15,7 +15,7 @@ import           Data.Serialize
 import           Hoare (InitResult(..))
 import           NbdAPI
 import           Network.NBD.Data
-import           BadSectorDisk.Env
+import           BadBlockDisk.Env
 import qualified RemappedServer as Server
 import           System.Exit (die)
 import           Utils.Conversion
@@ -43,7 +43,7 @@ import           Utils.Conversion
 
 data ServerOptions = ServerOptions
   { diskPath :: FilePath
-  , diskBadSector :: Integer
+  , diskBadBlock :: Integer
   , logCommands :: Bool }
 
 type ByteConduit m r = ConduitM BS.ByteString BS.ByteString m r
@@ -189,7 +189,7 @@ forkNbdServer e doLog =
 runServer :: ServerOptions -> IO ()
 runServer ServerOptions
   { diskPath=fn,
-    diskBadSector=bs,
+    diskBadBlock=bs,
     logCommands=doLog} = do
   e <- newEnv fn bs
   putStrLn "serving on localhost:10809"

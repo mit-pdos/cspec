@@ -8,7 +8,7 @@ CODE += $(wildcard src/Common/*.v)
 ## Lab 1: StatDB
 CODE += $(wildcard src/Lab1/*.v)
 
-## Lab 2: bad sector remapping
+## Lab 2: bad block remapping
 CODE += $(wildcard src/Lab2/*.v)
 
 ## Lab 3: atomic pair

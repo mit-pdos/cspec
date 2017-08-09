@@ -5,7 +5,7 @@ Things to clean up:
 
 - students need to install haskell-stack; document this better and tell them how to do it
 
-- minimal NBD client that reads/writes sectors, to test/demo remap-nbd with broken write
+- minimal NBD client that reads/writes blocks, to test/demo remap-nbd with broken write
 
 - see notes below from Perry Metzger about how to run stack on a Mac
 
@@ -15,7 +15,7 @@ Things to clean up:
 
 - change [recover] name conflict: both Hoare.recover and customary recovery procedure name
 
-- horizontal composition: compose NBD and TwoDisk/BadSectorDisk
+- horizontal composition: compose NBD and TwoDisk/BadBlockDisk
 
 - security with horizontal composition: make [proc_spec] a two-execution property
 
@@ -67,7 +67,7 @@ Notes for when we explain the labs to students:
 
 - remapped disk lab:
   + explain what's with None vs Some x: in-bounds vs out-of-bounds.
-  + what happens to the bad sector?  it's (Some x) for a garbage value x.
+  + what happens to the bad block?  it's (Some x) for a garbage value x.
 
 ===
 

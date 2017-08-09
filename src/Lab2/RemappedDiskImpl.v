@@ -1,12 +1,12 @@
 Require Import POCS.
 Require Import OneDiskAPI.
-Require Import BadSectorAPI.
+Require Import BadBlockAPI.
 
 
-Module RemappedDisk (bd : BadSectorAPI) <: OneDiskAPI.
+Module RemappedDisk (bd : BadBlockAPI) <: OneDiskAPI.
 
   Definition read (a : addr) : proc block :=
-    bs <- bd.getBadSector;
+    bs <- bd.getBadBlock;
     if a == bs then
       len <- bd.size;
       r <- bd.read (len-1);
@@ -20,7 +20,7 @@ Module RemappedDisk (bd : BadSectorAPI) <: OneDiskAPI.
     if a == (len-1) then
       Ret tt
     else
-      bs <- bd.getBadSector;
+      bs <- bd.getBadBlock;
       if a == bs then
         _ <- bd.write (len-1) b;
         Ret tt
@@ -37,7 +37,7 @@ Module RemappedDisk (bd : BadSectorAPI) <: OneDiskAPI.
     if len == 0 then
       Ret InitFailed
     else
-      bs <- bd.getBadSector;
+      bs <- bd.getBadBlock;
       if (lt_dec bs len) then
         Ret Initialized
       else
@@ -49,20 +49,20 @@ Module RemappedDisk (bd : BadSectorAPI) <: OneDiskAPI.
     bd.recover.
 
 
-  Inductive remapped_abstraction (bs_state : BadSectorAPI.State) (rd_disk : OneDiskAPI.State) : Prop :=
+  Inductive remapped_abstraction (bs_state : BadBlockAPI.State) (rd_disk : OneDiskAPI.State) : Prop :=
     | RemappedAbstraction :
       let bs_disk := stateDisk bs_state in
-      let bs_addr := stateBadSector bs_state in
+      let bs_addr := stateBadBlock bs_state in
       forall
         (* Fill in the rest of your abstraction here. *)
         (* Hint 0: Try to prove [Read]'s correctness to discover what you need from this abstraction *)
-        (* Hint 1: What should be true about the non-bad sectors?   Replace [True] with what needs to be true *)
-        (Hgoodsectors : True)
-        (* Hint 2: What should be true about the bad sector? *)
-        (Hbadsector : True)
-        (* Hint 3: What if the bad sector address is the last address? *)
+        (* Hint 1: What should be true about the non-bad blocks?   Replace [True] with what needs to be true *)
+        (Hgoodblocks : True)
+        (* Hint 2: What should be true about the bad block? *)
+        (Hbadblock : True)
+        (* Hint 3: What if the bad block address is the last address? *)
         (Hbadlast : True)
-        (* Hint 4: What if the bad sector address is past the end of the disk? *)
+        (* Hint 4: What if the bad block address is past the end of the disk? *)
         (* Hint 5: To refer to the contents of disk [d] at address [a], you can write [d a] *)
         (* Hint 6: To refer to the size of disk [d], you can write [size d] *)
         (* SOL *)
@@ -103,7 +103,7 @@ Module RemappedDisk (bd : BadSectorAPI) <: OneDiskAPI.
     case_eq (diskGet (stateDisk state) (diskSize (stateDisk state) - 1)); intros.
     2: exfalso; eapply disk_inbounds_not_none; [ | eauto ]; omega.
 
-    exists (diskUpd (shrink (stateDisk state)) (stateBadSector state) b).
+    exists (diskUpd (shrink (stateDisk state)) (stateBadBlock state) b).
     unfold inited_any. (intuition idtac); auto; intros; autorewrite with upd in *; intuition idtac.
     rewrite diskUpd_neq by omega.
     rewrite shrink_preserves; auto.
@@ -148,7 +148,7 @@ Module RemappedDisk (bd : BadSectorAPI) <: OneDiskAPI.
       rewrite Hsize in H7.
       replace (diskSize s + 1 - 1) with (diskSize s) in * by omega.
 
-      destruct (stateBadSector state == diskSize s).
+      destruct (stateBadBlock state == diskSize s).
       + rewrite disk_oob_eq by omega. constructor.
       + rewrite <- Hremap; auto.
 
@@ -176,7 +176,7 @@ Module RemappedDisk (bd : BadSectorAPI) <: OneDiskAPI.
     remapped_abstraction state s ->
     remapped_abstraction (mkState
       (diskUpd (stateDisk state) (diskSize (stateDisk state) - 1) v)
-      (stateBadSector state)) (diskUpd s (stateBadSector state) v).
+      (stateBadBlock state)) (diskUpd s (stateBadBlock state) v).
   Proof.
     intros.
     invert_abstraction.
@@ -191,10 +191,10 @@ Module RemappedDisk (bd : BadSectorAPI) <: OneDiskAPI.
   Lemma remapped_abstraction_diskUpd_noremap : forall state s a v,
     remapped_abstraction state s ->
     a <> diskSize (stateDisk state) - 1 ->
-    a <> stateBadSector state ->
+    a <> stateBadBlock state ->
     remapped_abstraction (mkState
       (diskUpd (stateDisk state) a v)
-      (stateBadSector state)) (diskUpd s a v).
+      (stateBadBlock state)) (diskUpd s a v).
   Proof.
     intros.
     invert_abstraction.
@@ -313,6 +313,6 @@ Module RemappedDisk (bd : BadSectorAPI) <: OneDiskAPI.
 End RemappedDisk.
 
 
-Require Import BadSectorImpl.
-Module x := RemappedDisk BadSectorDisk.
+Require Import BadBlockImpl.
+Module x := RemappedDisk BadBlockDisk.
 Print Assumptions x.write_ok.

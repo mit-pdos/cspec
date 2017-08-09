@@ -1,6 +1,6 @@
 module Utils.Conversion where
 
-import Sectors
+import Blocks
 
 -- size of a block in bytes
 blocksize :: Num a => a

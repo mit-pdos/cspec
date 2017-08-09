@@ -30,13 +30,13 @@ Your job is to implement the `mean` function in `src/StatDb/StatDbImpl.v`,
 and to prove that it is correct, by fixing up the proof at the bottom of
 that same file.
 
-## Exercise 2: bad sector remapping.
+## Exercise 2: bad block remapping.
 
-`src/RemappedDisk` contains a partial implementation of bad-sector
-remapping.  The idea is to take a disk that has a bad sector, and make
-it look like a fully working disk by remapping the bad sector to another
-sector (the last sector).  For simplicity, we assume there is exactly
-one bad sector.
+`src/RemappedDisk` contains a partial implementation of bad-block
+remapping.  The idea is to take a disk that has a bad block, and make
+it look like a fully working disk by remapping the bad block to another
+block (the last block).  For simplicity, we assume there is exactly
+one bad block.
 
 We provide an implementation of `read` in `src/RemappedDisk/RemappedDiskImpl.v`.
 Your job is to fill in several other parts of that file:
