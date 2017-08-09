@@ -52,7 +52,7 @@ Section AsyncReplicatedDisk.
                  d a |= curr_val_eq r /\
                  TD.disk0 state' |= covered d /\
                  TD.disk1 state' |= covered d;
-             recover :=
+             recovered :=
                fun _ state' =>
                  TD.disk0 state' |= crashesTo d /\
                  TD.disk1 state' |= crashesTo d;
@@ -81,7 +81,7 @@ Section AsyncReplicatedDisk.
                  r = tt /\
                  TD.disk0 state' |= covered (diskUpdF d a (buffer b)) /\
                  TD.disk1 state' |= covered (diskUpdF d a (buffer b));
-             recover :=
+             recovered :=
                fun _ state' =>
                  (TD.disk0 state' |= crashesTo d /\
                   TD.disk1 state' |= crashesTo d) \/

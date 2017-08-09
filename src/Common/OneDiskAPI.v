@@ -9,7 +9,7 @@ Definition read_spec (a : addr) : Specification _ block unit State :=
     post := fun r state' =>
       state' = state /\
       diskGet state a ?|= eq r;
-    recover := fun _ state' =>
+    recovered := fun _ state' =>
       state' = state
   |}.
 
@@ -18,7 +18,7 @@ Definition write_spec (a : addr) (v : block) : Specification _ _ unit State :=
     pre := True;
     post := fun r state' =>
       r = tt /\ state' = diskUpd state a v;
-    recover := fun _ state' =>
+    recovered := fun _ state' =>
       state' = state \/ state' = diskUpd state a v
   |}.
 
@@ -27,7 +27,7 @@ Definition size_spec : Specification _ nat unit State :=
     pre := True;
     post := fun r state' =>
       state' = state /\ r = diskSize state;
-    recover := fun _ state' =>
+    recovered := fun _ state' =>
       state' = state
   |}.
 

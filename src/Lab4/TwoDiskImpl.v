@@ -9,7 +9,7 @@ Module TwoDisk (b : TwoDiskBaseAPI) <: TwoDiskAPI.
   Definition read := b.read.
   Definition write := b.write.
   Definition size := b.size.
-  Definition recover := b.recover.
+  Definition recover:= b.recover.
 
   Definition abstr := b.abstr.
 

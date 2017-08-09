@@ -59,7 +59,7 @@ Definition getRequest_spec : Specification _ Request unit State :=
     pre := True;
     post := fun r state' =>
       state' = mkState (StateDisk state) (Some r);
-    recover := fun _ state' =>
+    recovered := fun _ state' =>
       state' = mkState (StateDisk state) None
   |}.
 
@@ -82,7 +82,7 @@ Definition sendResponse_spec (resp : Response) : Specification _ unit unit State
       end;
     post := fun r state' =>
       state' = mkState disk' None;
-    recover := fun _ state' =>
+    recovered := fun _ state' =>
       state' = mkState disk None \/ state' = mkState disk' None
   |}.
 

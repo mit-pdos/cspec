@@ -111,7 +111,7 @@ Module RD.
                    d a |= curr_val_eq r /\
                    TD.disk0 state' |= covered d /\
                    TD.disk1 state' |= covered d;
-               recover :=
+               recovered :=
                  fun _ state' =>
                    exists d',
                      TD.disk0 state' |= crashesTo d' /\
@@ -170,7 +170,7 @@ Module RD.
                    r = tt /\
                    TD.disk0 state' |= covered (diskUpdF d a (buffer b)) /\
                    TD.disk1 state' |= covered (diskUpdF d a (buffer b));
-               recover :=
+               recovered :=
                  fun _ state' =>
                    exists d',
                    TD.disk0 state' |= crashesTo d' /\
@@ -201,7 +201,7 @@ Module RD.
                  r = size d /\
                  TD.disk0 state' |= covered d /\
                  TD.disk1 state' |= covered d;
-             recover :=
+             recovered :=
                fun _ state' =>
                  exists d',
                    TD.disk0 state' |= crashesTo d' /\
@@ -251,7 +251,7 @@ Module RD.
                  r = tt /\
                  TD.disk0 state' |= then_flush (covered d) /\
                  TD.disk1 state' |= then_flush (covered d);
-             recover :=
+             recovered :=
                fun _ state' =>
                  exists d',
                  TD.disk0 state' |= crashesTo d' /\

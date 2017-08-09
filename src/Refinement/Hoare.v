@@ -25,7 +25,7 @@ Record Quadruple T R State :=
   Spec {
       pre: Prop;
       post: T -> State -> Prop;
-      recover: R -> State -> Prop;
+      recovered: R -> State -> Prop;
     }.
 
 Definition Specification A T R State := A -> State -> Quadruple T R State.
@@ -43,7 +43,7 @@ Definition proc_spec `(spec: Specification A T R State) `(p: proc T)
                             post (spec a state) v state'
          | Recovered v w' => exists state',
                             abstraction abs w' state' /\
-                            recover (spec a state) v state'
+                            recovered (spec a state) v state'
          end.
 
 Definition spec_impl
@@ -53,8 +53,8 @@ Definition spec_impl
          exists a', pre (spec1 a' state) /\
                (forall v state', post (spec1 a' state) v state' ->
                         post (spec2 a state) v state') /\
-               (forall rv state', recover (spec1 a' state) rv state' ->
-                         recover (spec2 a state) rv state').
+               (forall rv state', recovered (spec1 a' state) rv state' ->
+                         recovered (spec2 a state) rv state').
 
 Theorem proc_spec_weaken : forall `(spec1: Specification A T R State)
                               `(spec2: Specification A' T R State)
@@ -87,12 +87,12 @@ Theorem proc_spec_rx : forall `(spec: Specification A T R State)
                               post :=
                                 fun r state'' =>
                                   post (spec' a' state) r state'';
-                              recover :=
+                              recovered :=
                                 fun r state'' =>
-                                  recover (spec' a' state) r state'' |})
+                                  recovered (spec' a' state) r state'' |})
                         (rx r) rec abs) /\
-                  (forall r state', recover (spec a state) r state' ->
-                           recover (spec' a' state) r state')) ->
+                  (forall r state', recovered (spec a state) r state' ->
+                           recovered (spec' a' state) r state')) ->
     proc_spec spec' (Bind p rx) rec abs.
 Proof.
   unfold proc_spec at 3; intros.
@@ -148,8 +148,8 @@ Theorem spec_intros : forall `(spec: Specification A T R State)
              {| pre := state = state0;
                 post :=
                   fun r state' => post (spec a state) r state';
-                recover :=
-                  fun r state' => recover (spec a state) r state';
+                recovered :=
+                  fun r state' => recovered (spec a state) r state';
              |}) p rec abs) ->
     proc_spec spec p rec abs.
 Proof.
@@ -213,7 +213,7 @@ Definition prog_loopspec `(spec: Specification A unit unit State)
 Definition idempotent `(spec: Specification A T unit State) :=
   forall a state,
     pre (spec a state) ->
-    forall v state', recover (spec a state) v state' ->
+    forall v state', recovered (spec a state) v state' ->
             (* idempotency: crash invariant implies precondition to
                re-run on every crash *)
             exists a', pre (spec a' state') /\
@@ -262,11 +262,11 @@ Theorem compose_recovery : forall `(spec: Specification A'' T unit State)
                       pre (spec a'' state) /\
                       (forall v state', post (spec a'' state) v state' ->
                                post (spec' a state) v state') /\
-                      (forall v state', recover (spec a'' state) v state' ->
+                      (forall v state', recovered (spec a'' state) v state' ->
                                exists a', pre (rspec a' state') /\
                                      forall v' state'',
                                        post (rspec a' state') v' state'' ->
-                                       recover (spec' a state) v' state'')),
+                                       recovered (spec' a state) v' state'')),
       proc_spec spec' p (_ <- rec; rec') abs.
 Proof.
   intros.
@@ -316,10 +316,10 @@ Theorem spec_abstraction_compose :
                 exists state2',
                   post (spec a state2) v state2' /\
                   abstraction abs2 state' state2';
-            recover :=
+            recovered :=
               fun v state' =>
                 exists state2',
-                  recover (spec a state2) v state2' /\
+                  recovered (spec a state2) v state2' /\
                   abstraction abs2 state' state2'; |}) p rec abs1 ->
     proc_spec spec p rec (abstraction_compose abs1 abs2).
 Proof.
@@ -337,7 +337,7 @@ Definition rec_noop `(rec: proc R) `(abs: Abstraction State) (wipe: State -> Sta
          {| pre := True;
             post := fun r state' => r = v /\
                              state' = state;
-            recover := fun _ state' => wipe state state'; |})
+            recovered := fun _ state' => wipe state state'; |})
       (Ret v) rec abs.
 
 (* for recovery proofs about pure programs *)
@@ -351,7 +351,7 @@ Theorem ret_spec : forall `(abs: Abstraction State)
             post (spec a state) v state /\
             (* TODO: is it ok for this to be for all state'? *)
             forall state', wipe state state' ->
-                  forall r, recover (spec a state) r state') ->
+                  forall r, recovered (spec a state) r state') ->
     proc_spec spec (Ret v) rec abs.
 Proof.
   intros.
@@ -449,7 +449,7 @@ Definition op_spec `(sem: Semantics State T) : Specification unit T unit State :
       pre := True;
       post :=
         fun v state' => sem state v state';
-      recover :=
+      recovered :=
         fun r state' =>
           r = tt /\ (state' = state \/ exists v, sem state v state');
     |}.
@@ -487,7 +487,7 @@ Definition init_abstraction
                        exists state, abstraction abs w' state /\ init_sem state
                      | InitFailed => True
                      end;
-          recover :=
+          recovered :=
             fun _ w' => True;
        |}) init rec (IdAbstraction world).
 
@@ -520,7 +520,7 @@ Theorem then_init_compose : forall (init1 init2: proc InitResult)
                          exists state'', abstraction abs2 state' state'' /\ init2_sem state''
                        | InitFailed => True
                        end;
-            recover :=
+            recovered :=
               fun _ state' => True; |}) init2 rec abs1 ->
     init_abstraction (then_init init1 init2) rec' (abstraction_compose abs1 abs2) init2_sem.
 Proof.

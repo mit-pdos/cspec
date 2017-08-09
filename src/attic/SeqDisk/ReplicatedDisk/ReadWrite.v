@@ -50,7 +50,7 @@ Section ReplicatedDiskReadWrite.
                  d a |= eq r /\
                  TD.disk0 state' |= eq d /\
                  TD.disk1 state' |= eq d;
-             recover :=
+             recovered :=
                fun _ state' =>
                  TD.disk0 state' |= eq d /\
                  TD.disk1 state' |= eq d;
@@ -79,7 +79,7 @@ Section ReplicatedDiskReadWrite.
                  r = tt /\
                  TD.disk0 state' |= eq (diskUpd d a b) /\
                  TD.disk1 state' |= eq (diskUpd d a b);
-             recover :=
+             recovered :=
                fun _ state' =>
                  (TD.disk0 state' |= eq d /\
                   TD.disk1 state' |= eq d) \/

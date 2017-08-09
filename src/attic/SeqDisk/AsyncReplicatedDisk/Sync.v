@@ -59,7 +59,7 @@ Section ReplicatedDisk.
                r = tt /\
                TD.disk0 state' |= then_flush (covered d_0) /\
                TD.disk1 state' |= then_flush (covered d_1);
-           recover :=
+           recovered :=
              fun _ state' =>
                (TD.disk0 state' |= crashesTo d_0 /\
                 TD.disk1 state' |= crashesTo d_1) \/

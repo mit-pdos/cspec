@@ -32,7 +32,7 @@ Section ArrayDisk.
   Definition sync : proc unit :=
     Prim d (D.Sync).
 
-  Definition recover : proc unit :=
+  Definition recover: proc unit :=
     irec d.
 
   Definition init : proc InitResult :=

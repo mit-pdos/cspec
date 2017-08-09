@@ -35,7 +35,7 @@ Section ReplicatedDisk.
                r = tt /\
                TD.disk0 state' |= eq d_0 /\
                TD.disk1 state' |= eq d_1;
-           recover :=
+           recovered :=
              fun _ state' =>
                TD.disk0 state' |= eq d_0 /\
                TD.disk1 state' |= eq d_1;

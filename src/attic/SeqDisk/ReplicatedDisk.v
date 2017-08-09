@@ -55,7 +55,7 @@ Module RD.
                    d a |= eq r /\
                    TD.disk0 state' |= eq d /\
                    TD.disk1 state' |= eq d;
-               recover :=
+               recovered :=
                  fun _ state' =>
                    TD.disk0 state' |= eq d /\
                    TD.disk1 state' |= eq d;
@@ -81,7 +81,7 @@ Module RD.
                    r = tt /\
                    TD.disk0 state' |= eq (diskUpd d a b) /\
                    TD.disk1 state' |= eq (diskUpd d a b);
-               recover :=
+               recovered :=
                  fun _ state' =>
                    (TD.disk0 state' |= eq d /\
                     TD.disk1 state' |= eq d) \/
@@ -110,7 +110,7 @@ Module RD.
                  r = tt /\
                  TD.disk0 state' |= eq d /\
                  TD.disk1 state' |= eq d;
-             recover :=
+             recovered :=
                fun _ state' =>
                  TD.disk0 state' |= eq d /\
                  TD.disk1 state' |= eq d;
@@ -136,7 +136,7 @@ Module RD.
                  r = size d /\
                  TD.disk0 state' |= eq d /\
                  TD.disk1 state' |= eq d;
-             recover :=
+             recovered :=
                fun _ state' =>
                  TD.disk0 state' |= eq d /\
                  TD.disk1 state' |= eq d;

@@ -19,7 +19,7 @@ Definition read_spec v : Specification _ _ unit _ :=
       | VarCount => r = count
       | VarSum => r = sum
       end;
-    recover := fun _ _ => False
+    recovered := fun _ _ => False
   |}.
 
 Definition write_spec v val : Specification _ _ unit _ :=
@@ -31,7 +31,7 @@ Definition write_spec v val : Specification _ _ unit _ :=
       | VarCount => state' = mkState val sum
       | VarSum => state' = mkState count val
       end;
-    recover := fun _ _ => False
+    recovered := fun _ _ => False
   |}.
 
 

@@ -39,7 +39,7 @@ Module AtomicPair (d : OneDiskAPI) <: AtomicPairAPI.
 
   Definition init := then_init d.init init'.
 
-  Definition recover : proc unit :=
+  Definition recover: proc unit :=
     d.recover.
 
 

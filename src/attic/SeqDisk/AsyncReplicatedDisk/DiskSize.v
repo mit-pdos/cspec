@@ -46,7 +46,7 @@ Section ReplicatedDisk.
                  r = size d_1 /\
                  TD.disk0 state' |= covered d_0 /\
                  TD.disk1 state' |= covered d_1;
-             recover :=
+             recovered :=
                fun _ state' =>
                  TD.disk0 state' |= crashesTo d_0 /\
                  TD.disk1 state' |= crashesTo d_1;

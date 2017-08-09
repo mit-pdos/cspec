@@ -92,7 +92,7 @@ Section Init.
                     TD.disk0 state' |= eq d_0' /\
                     TD.disk1 state' |= eq d_1' /\
                     equal_after 0 d_0' d_1';
-              recover :=
+              recovered :=
                 fun _ state' => True;
            |})
         (init_at a)
@@ -138,7 +138,7 @@ Section Init.
                              size d_1' = sz
                   | inl _ => size d_0 <> size d_1
                   end;
-              recover :=
+              recovered :=
                 fun _ state' => True;
            |})
         (DiskSizes)
@@ -193,7 +193,7 @@ Section Init.
                     d_0' = d_1'
                   | InitFailed => (size d_0 <> size d_1)%type
                   end;
-              recover :=
+              recovered :=
                 fun _ state' => True;
            |})
         (Init)

@@ -23,7 +23,7 @@ Definition read_spec (i : diskId) (a : addr) : Specification _ _ unit _ :=
         get_disk i         state' ?|= missing /\
         get_disk (other i) state' ?|= F
       end;
-    recover := fun _ state' =>
+    recovered := fun _ state' =>
       get_disk i         state' ?|= eq d /\
       get_disk (other i) state' ?|= F;
   |}.
@@ -42,7 +42,7 @@ Definition write_spec (i : diskId) (a : addr) (b : block) : Specification _ (Dis
         get_disk i         state' ?|= missing /\
         get_disk (other i) state' ?|= F
       end;
-    recover := fun _ state' =>
+    recovered := fun _ state' =>
       (get_disk i state' ?|= eq d \/
        get_disk i state' ?|= eq (diskUpd d a b) /\ a < diskSize d) /\
       get_disk (other i) state' ?|= F;
@@ -63,7 +63,7 @@ Definition size_spec (i : diskId) : Specification _ _ unit _ :=
         get_disk i         state' ?|= missing /\
         get_disk (other i) state' ?|= F
       end;
-    recover := fun _ state' =>
+    recovered := fun _ state' =>
       get_disk i         state' ?|= eq d /\
       get_disk (other i) state' ?|= F;
   |}.

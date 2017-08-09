@@ -192,7 +192,7 @@ Module ReplicatedDisk (td : TwoDiskAPI) <: OneDiskAPI.
                  diskGet d a ?|= eq r /\
                  disk0 state' ?|= eq d /\
                  disk1 state' ?|= eq d;
-             recover :=
+             recovered :=
                fun _ state' =>
                  disk0 state' ?|= eq d /\
                  disk1 state' ?|= eq d;
@@ -225,7 +225,7 @@ Module ReplicatedDisk (td : TwoDiskAPI) <: OneDiskAPI.
                  r = tt /\
                  disk0 state' ?|= eq (diskUpd d a b) /\
                  disk1 state' ?|= eq (diskUpd d a b);
-             recover :=
+             recovered :=
                fun _ state' =>
                  (disk0 state' ?|= eq d /\
                   disk1 state' ?|= eq d) \/
@@ -273,7 +273,7 @@ Module ReplicatedDisk (td : TwoDiskAPI) <: OneDiskAPI.
                r = diskSize d_1 /\
                disk0 state' ?|= eq d_0 /\
                disk1 state' ?|= eq d_1;
-           recover :=
+           recovered :=
              fun _ state' =>
                disk0 state' ?|= eq d_0 /\
                disk1 state' ?|= eq d_1;
@@ -334,7 +334,7 @@ Module ReplicatedDisk (td : TwoDiskAPI) <: OneDiskAPI.
                     disk0 state' ?|= eq d_0' /\
                     disk1 state' ?|= eq d_1' /\
                     equal_after 0 d_0' d_1';
-              recover :=
+              recovered :=
                 fun _ state' => True;
            |})
         (init_at a)
@@ -374,7 +374,7 @@ Module ReplicatedDisk (td : TwoDiskAPI) <: OneDiskAPI.
                     | Some sz => diskSize d_0' = sz /\ diskSize d_1' = sz
                     | None => True
                     end;
-              recover :=
+              recovered :=
                 fun _ state' => True;
            |})
         (sizeInit)
@@ -438,7 +438,7 @@ Module ReplicatedDisk (td : TwoDiskAPI) <: OneDiskAPI.
                   | InitFailed =>
                     True
                   end;
-              recover :=
+              recovered :=
                 fun _ state' => True;
            |})
         (init')
@@ -552,7 +552,7 @@ Module ReplicatedDisk (td : TwoDiskAPI) <: OneDiskAPI.
                    disk0 state' ?|= eq d /\
                    disk1 state' ?|= eq d
                  end;
-             recover :=
+             recovered :=
                fun _ state' =>
                  disk0 state' ?|= eq d /\
                  disk1 state' ?|= eq d;
@@ -609,7 +609,7 @@ Module ReplicatedDisk (td : TwoDiskAPI) <: OneDiskAPI.
                    disk0 state' ?|= eq d /\
                    disk1 state' ?|= eq d
                  end;
-             recover :=
+             recovered :=
                fun _ state' =>
                  (disk0 state' ?|= eq (diskUpd d a b) /\
                   disk1 state' ?|= eq (diskUpd d a b)) \/
@@ -669,7 +669,7 @@ Module ReplicatedDisk (td : TwoDiskAPI) <: OneDiskAPI.
                    disk0 state' ?|= eq (diskUpd d a' b) /\
                    disk1 state' ?|= eq (diskUpd d a' b)
                  end;
-             recover :=
+             recovered :=
                fun _ state' =>
                  (disk0 state' ?|= eq (diskUpd d a' b) /\
                   disk1 state' ?|= eq d) \/
@@ -732,7 +732,7 @@ Module ReplicatedDisk (td : TwoDiskAPI) <: OneDiskAPI.
                       disk1 state' ?|= eq (diskUpd d a' b))
                    end
                  end;
-             recover :=
+             recovered :=
                fun _ state' =>
                  match s with
                  | FullySynced => disk0 state' ?|= eq d /\
@@ -798,7 +798,7 @@ Module ReplicatedDisk (td : TwoDiskAPI) <: OneDiskAPI.
                    (disk0 state' ?|= eq (diskUpd d a' b) /\
                     disk1 state' ?|= eq (diskUpd d a' b))
                  end;
-             recover :=
+             recovered :=
                fun _ state' =>
                  match s with
                  | FullySynced => disk0 state' ?|= eq d /\
@@ -863,7 +863,7 @@ Module ReplicatedDisk (td : TwoDiskAPI) <: OneDiskAPI.
                (disk0 state' ?|= eq (diskUpd d a b) /\
                 disk1 state' ?|= eq (diskUpd d a b))
              end;
-         recover :=
+         recovered :=
            fun (_:unit) state' =>
              match s with
              | FullySynced => disk0 state' ?|= eq d /\
@@ -925,7 +925,7 @@ Module ReplicatedDisk (td : TwoDiskAPI) <: OneDiskAPI.
   Hint Resolve Recover_ok.
 
 
-  Definition recover : proc unit :=
+  Definition recover: proc unit :=
     _ <- td.recover;
     Recover.
 
@@ -946,7 +946,7 @@ Module ReplicatedDisk (td : TwoDiskAPI) <: OneDiskAPI.
                    diskGet d a ?|= eq r /\
                    disk0 state' ?|= eq d /\
                    disk1 state' ?|= eq d;
-               Hoare.recover :=
+               recovered :=
                  fun _ state' =>
                    disk0 state' ?|= eq d /\
                    disk1 state' ?|= eq d;
@@ -972,7 +972,7 @@ Module ReplicatedDisk (td : TwoDiskAPI) <: OneDiskAPI.
                  r = tt /\
                  disk0 state' ?|= eq (diskUpd d a b) /\
                  disk1 state' ?|= eq (diskUpd d a b);
-             Hoare.recover :=
+             recovered :=
                fun _ state' =>
                  (disk0 state' ?|= eq d /\
                   disk1 state' ?|= eq d) \/
@@ -1003,7 +1003,7 @@ Module ReplicatedDisk (td : TwoDiskAPI) <: OneDiskAPI.
                r = diskSize d /\
                disk0 state' ?|= eq d /\
                disk1 state' ?|= eq d;
-           Hoare.recover :=
+           recovered :=
              fun _ state' =>
                disk0 state' ?|= eq d /\
                disk1 state' ?|= eq d;

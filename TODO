@@ -13,8 +13,6 @@ Things to clean up:
 
 - comments in the code should point to where various pieces are defined (e.g., Interface, API, etc)
 
-- change [recover] name conflict: both Hoare.recover and customary recovery procedure name
-
 - horizontal composition: compose NBD and TwoDisk/BadBlockDisk
 
 - security with horizontal composition: make [proc_spec] a two-execution property

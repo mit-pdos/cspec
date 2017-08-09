@@ -112,7 +112,7 @@ Section ReplicatedDiskRecovery.
                      TD.disk0 state' |= eq d /\
                      TD.disk1 state' |= eq d
                    end;
-               recover :=
+               recovered :=
                  fun _ state' =>
                    TD.disk0 state' |= eq d /\
                    TD.disk1 state' |= eq d;
@@ -171,7 +171,7 @@ Section ReplicatedDiskRecovery.
                             TD.disk1 state' |= eq (diskUpd d a b)
                      end
                    end;
-               recover :=
+               recovered :=
                  fun _ state' =>
                    (TD.disk0 state' |= eq (diskUpd d a b) /\
                     TD.disk1 state' |= eq (diskUpd d a b)) \/
@@ -229,7 +229,7 @@ Section ReplicatedDiskRecovery.
                             TD.disk1 state' |= eq (diskUpd d a' b)
                      end
                    end;
-               recover :=
+               recovered :=
                  fun _ state' =>
                    (TD.disk0 state' |= eq (diskUpd d a' b) /\
                     TD.disk1 state' |= eq d) \/
@@ -299,7 +299,7 @@ Section ReplicatedDiskRecovery.
                        end
                      end
                    end;
-               recover :=
+               recovered :=
                  fun _ state' =>
                    match s with
                    | FullySynced => TD.disk0 state' |= eq d /\
@@ -377,7 +377,7 @@ Section ReplicatedDiskRecovery.
                        end
                      end
                    end;
-               recover :=
+               recovered :=
                  fun _ state' =>
                    match s with
                    | FullySynced => TD.disk0 state' |= eq d /\
@@ -442,7 +442,7 @@ Section ReplicatedDiskRecovery.
                  (TD.disk0 state' |= eq (diskUpd d a b) /\
                   TD.disk1 state' |= eq (diskUpd d a b))
                end;
-           recover :=
+           recovered :=
              fun (_:unit) state' =>
                match s with
                | FullySynced => TD.disk0 state' |= eq d /\

@@ -27,7 +27,7 @@ Module NBDServer (d : OneDiskAPI).
   Theorem read_ok : forall n off, proc_spec (fun (_ : unit) state => {|
       pre := True;
       post := fun r state' => state' = state /\ read_match state off n r;
-      recover := fun _ state' => state' = state
+      recovered := fun _ state' => state' = state
     |}) (read off n) d.recover d.abstr.
   Proof.
     induction n; intros.
@@ -54,7 +54,7 @@ Module NBDServer (d : OneDiskAPI).
       pre := True;
       post := fun r state' =>
         r = tt /\ state' = write_upd state off blocks;
-      recover := fun _ state' =>
+      recovered := fun _ state' =>
         exists nwritten,
         state' = write_upd state off (firstn nwritten blocks)
     |}) (write off blocks) d.recover d.abstr.

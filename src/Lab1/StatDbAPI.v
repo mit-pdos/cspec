@@ -11,7 +11,7 @@ Definition add_spec v : Specification unit unit unit State :=
     pre := True;
     post := fun r state' =>
       r = tt /\ state' = v :: state;
-    recover := fun _ _ => False
+    recovered := fun _ _ => False
   |}.
 
 Definition mean_spec : Specification unit (option nat) unit State :=
@@ -21,7 +21,7 @@ Definition mean_spec : Specification unit (option nat) unit State :=
       state' = state /\
       (state = nil /\ r = None \/
        state <> nil /\ r = Some (fold_right plus 0 state / length state));
-    recover := fun _ _ => False
+    recovered := fun _ _ => False
   |}.
 
 

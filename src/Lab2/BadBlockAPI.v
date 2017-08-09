@@ -12,7 +12,7 @@ Definition read_spec a : Specification _ block unit State :=
     post := fun r state' =>
       state' = state /\
       diskGet (stateDisk state) a ?|= eq r;
-    recover := fun _ state' => state' = state
+    recovered := fun _ state' => state' = state
   |}.
 
 Definition write_spec a v : Specification _ _ unit State :=
@@ -20,7 +20,7 @@ Definition write_spec a v : Specification _ _ unit State :=
     pre := True;
     post := fun r state' =>
       r = tt /\ state' = mkState (diskUpd (stateDisk state) a v) (stateBadBlock state);
-    recover := fun _ state' =>
+    recovered := fun _ state' =>
       state' = state \/
       state' = mkState (diskUpd (stateDisk state) a v) (stateBadBlock state)
   |}.
@@ -30,7 +30,7 @@ Definition getBadBlock_spec : Specification _ addr unit State :=
     pre := True;
     post := fun r state' =>
       state' = state /\ r = stateBadBlock state;
-    recover := fun _ state' => state' = state
+    recovered := fun _ state' => state' = state
   |}.
 
 Definition size_spec : Specification _ nat unit State :=
@@ -38,7 +38,7 @@ Definition size_spec : Specification _ nat unit State :=
     pre := True;
     post := fun r state' =>
       state' = state /\ r = diskSize (stateDisk state);
-    recover := fun _ state' => state' = state
+    recovered := fun _ state' => state' = state
   |}.
 
 

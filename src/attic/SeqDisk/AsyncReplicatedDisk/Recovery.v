@@ -336,7 +336,7 @@ Section AsyncReplicatedDisk.
                      TD.disk1 state' |= missing /\
                      crashesTo_one_of' d0__i d1__i d_0'
                    end;
-               recover :=
+               recovered :=
                  fun (_:unit) state' =>
                    (* either disk could change due to failures *)
                    exists d_0' d_1',
@@ -433,7 +433,7 @@ Section AsyncReplicatedDisk.
                      TD.disk1 state' |= missing /\
                      crashesTo_one_of' d0__i d1__i d_0'
                    end;
-               recover :=
+               recovered :=
                  fun (_:unit) state' =>
                    (* either disk could change due to failures *)
                    exists d_0' d_1',
@@ -497,7 +497,7 @@ Section AsyncReplicatedDisk.
                  TD.disk1 state' |= crashesTo d /\
                  crashesTo_one_of d_0 d_1 d /\
                  histdisk_flushed d;
-           recover :=
+           recovered :=
              fun (_:unit) state' =>
                (* either disk could change due to failures *)
                exists d_0' d_1',

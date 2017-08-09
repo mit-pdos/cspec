@@ -45,7 +45,7 @@ Module RemappedDisk (bd : BadBlockAPI) <: OneDiskAPI.
 
   Definition init := then_init bd.init init'.
 
-  Definition recover : proc unit :=
+  Definition recover: proc unit :=
     bd.recover.
 
 
