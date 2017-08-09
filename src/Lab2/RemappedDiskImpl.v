@@ -103,14 +103,14 @@ Module RemappedDisk (bd : BadBlockAPI) <: OneDiskAPI.
     case_eq (diskGet (stateDisk state) (diskSize (stateDisk state) - 1)); intros.
     2: exfalso; eapply disk_inbounds_not_none; [ | eauto ]; omega.
 
-    exists (diskUpd (shrink (stateDisk state)) (stateBadBlock state) b).
+    exists (diskUpd (diskShrink (stateDisk state)) (stateBadBlock state) b).
     unfold inited_any. (intuition idtac); auto; intros; autorewrite with upd in *; intuition idtac.
     rewrite diskUpd_neq by omega.
-    rewrite shrink_preserves; auto.
-    rewrite shrink_size; omega.
+    rewrite diskShrink_preserves; auto.
+    rewrite diskShrink_size; omega.
 
     rewrite diskUpd_eq; auto.
-    rewrite shrink_size; omega.
+    rewrite diskShrink_size; omega.
     omega.
   Qed.
 
