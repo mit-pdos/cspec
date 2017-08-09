@@ -4,10 +4,15 @@ import Control.Monad.Reader (reader, liftIO)
 import Data.IORef
 import Variables.Env
 import VariablesAPI
+import Hoare
 
 getVar :: Coq_var -> TheProc (IORef Integer)
 getVar VarCount = reader varCount
 getVar VarSum = reader varSum
+
+init :: TheProc InitResult
+init = do
+  return Initialized
 
 read :: Coq_var -> TheProc Integer
 read v = do
