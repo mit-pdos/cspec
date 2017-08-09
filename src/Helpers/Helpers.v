@@ -115,9 +115,3 @@ Qed.
 Delimit Scope pred_scope with pred.
 
 Notation "m ?|= F" := (maybe_holds F%pred m) (at level 20, F at level 50).
-
-
-(* Our own version of [admit] that does not require closing the proof with [Admitted] *)
-
-Axiom pocs_false : False.
-Ltac pocs_admit := destruct pocs_false.
