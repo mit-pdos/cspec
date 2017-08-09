@@ -30,8 +30,6 @@ Record Quadruple T R State :=
 
 Definition Specification A T R State := A -> State -> Quadruple T R State.
 
-Generalizable Variable A.
-
 Definition proc_spec `(spec: Specification A T R State) `(p: proc T)
            `(rec: proc R)
            `(abs: Abstraction State) :=
@@ -173,7 +171,7 @@ Hint Constructors rexec.
 Hint Constructors exec.
 Hint Constructors exec_recover.
 
-Theorem clos_refl_trans_1n_unit_tuple : forall A (R: unit * A -> unit * A -> Prop) x y u u',
+Theorem clos_refl_trans_1n_unit_tuple : forall `(R: unit * A -> unit * A -> Prop) x y u u',
     Relation_Operators.clos_refl_trans_1n R (u, x) (u', y) ->
     Relation_Operators.clos_refl_trans_1n
       (fun x y =>

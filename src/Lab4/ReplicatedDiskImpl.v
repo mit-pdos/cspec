@@ -84,7 +84,7 @@ Module ReplicatedDisk (td : TwoDiskAPI) <: OneDiskAPI.
   operations, we prove recovery specs that include the replicated disk Recover
   function. *)
 
-  Theorem exists_tuple2 : forall A B (P: A * B -> Prop),
+  Theorem exists_tuple2 : forall `(P: A * B -> Prop),
       (exists a b, P (a, b)) ->
       (exists p, P p).
   Proof.

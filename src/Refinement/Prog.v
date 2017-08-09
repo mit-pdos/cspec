@@ -3,13 +3,12 @@ Require Import Automation.
 (* Modeling of programs. *)
 
 Global Set Implicit Arguments.
+Global Generalizable All Variables.
 
 (** The type of w that programs manipulate. Will vary depending on the
   operations involved,and the same operations could in principle operate on
   different types of w. *)
 Parameter world:Type.
-
-Implicit Type (w:world).
 
 (* As a technical detail, we let programs include arbitrary operations of types
 [opT T] (which will produce a T-typed result). *)
@@ -127,8 +126,6 @@ Notation "x <- p1 ; p2" := (Bind p1 (fun x => p2))
                             (at level 60, right associativity).
 
 Arguments Ret {T} v.
-
-Global Generalizable Variables T R State step.
 
 (** * Automation for inverting execution behavior. *)
 
