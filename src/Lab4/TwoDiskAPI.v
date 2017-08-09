@@ -71,11 +71,11 @@ Definition size_spec (i : diskId) : Specification _ _ unit _ :=
 
 Module Type TwoDiskAPI.
 
-  Parameter init : proc InitResult.
-  Parameter read : diskId -> addr -> proc (DiskResult block).
-  Parameter write : diskId -> addr -> block -> proc (DiskResult unit).
-  Parameter size : diskId -> proc (DiskResult nat).
-  Parameter recover : proc unit.
+  Axiom init : proc InitResult.
+  Axiom read : diskId -> addr -> proc (DiskResult block).
+  Axiom write : diskId -> addr -> block -> proc (DiskResult unit).
+  Axiom size : diskId -> proc (DiskResult nat).
+  Axiom recover : proc unit.
 
   Axiom abstr : Abstraction State.
 

@@ -20,12 +20,12 @@ Definition put_spec v : Specification unit unit unit State :=
 
 Module Type AtomicPairAPI.
 
-  Parameter init : proc InitResult.
-  Parameter get : proc (block*block).
-  Parameter put : block*block -> proc unit.
-  Parameter recover : proc unit.
+  Axiom init : proc InitResult.
+  Axiom get : proc (block*block).
+  Axiom put : block*block -> proc unit.
+  Axiom recover : proc unit.
 
-  Parameter abstr : Abstraction State.
+  Axiom abstr : Abstraction State.
 
   Axiom init_ok : init_abstraction init recover abstr inited_any.
   Axiom get_ok : proc_spec get_spec get recover abstr.

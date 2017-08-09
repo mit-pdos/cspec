@@ -1,7 +1,7 @@
 Require Import POCS.
 
 
-Parameter Handle : Type.
+Axiom Handle : Type.
 
 Inductive Request :=
 | Read (h:Handle) (off:addr) (blocks:nat)
@@ -92,10 +92,10 @@ Hint Unfold wipe_req.
 
 Module Type NbdAPI.
 
-  Parameter init : proc InitResult.
-  Parameter getRequest : proc Request.
-  Parameter sendResponse : Response -> proc unit.
-  Parameter recover : proc unit.
+  Axiom init : proc InitResult.
+  Axiom getRequest : proc Request.
+  Axiom sendResponse : Response -> proc unit.
+  Axiom recover : proc unit.
 
   Axiom abstr : Abstraction State.
 

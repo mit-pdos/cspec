@@ -8,11 +8,11 @@ Global Generalizable All Variables.
 (** The type of w that programs manipulate. Will vary depending on the
   operations involved,and the same operations could in principle operate on
   different types of w. *)
-Parameter world:Type.
+Axiom world:Type.
 
 (* As a technical detail, we let programs include arbitrary operations of types
 [opT T] (which will produce a T-typed result). *)
-Parameter opT: Type -> Type.
+Axiom opT: Type -> Type.
 
 (** Our minimal, generic programming language. This definition does not provide
 useful functionality (it will be assumed later when we introduce primitives).
@@ -48,7 +48,7 @@ Axiom world_crash: world -> world.
 
 (* Can crashes happen?  This is effectively a flag that we will use in early
 lab assignments to avoid having to reason about crashes. *)
-Parameter can_crash: Prop.
+Axiom can_crash: Prop.
 
 (** [exec] specifies the execution semantics of complete programs using [step]
   as the small-step semantics of the primitive operations.

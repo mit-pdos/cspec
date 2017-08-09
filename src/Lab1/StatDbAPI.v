@@ -27,12 +27,12 @@ Definition mean_spec : Specification unit (option nat) unit State :=
 
 Module Type StatDbAPI.
 
-  Parameter init : proc InitResult.
-  Parameter add : nat -> proc unit.
-  Parameter mean : proc (option nat).
-  Parameter recover : proc unit.
+  Axiom init : proc InitResult.
+  Axiom add : nat -> proc unit.
+  Axiom mean : proc (option nat).
+  Axiom recover : proc unit.
 
-  Parameter abstr : Abstraction State.
+  Axiom abstr : Abstraction State.
 
   Axiom init_ok : init_abstraction init recover abstr inited.
   Axiom add_ok : forall v, proc_spec (add_spec v) (add v) recover abstr.

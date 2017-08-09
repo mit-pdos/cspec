@@ -19,9 +19,9 @@ Instance bool_equal_dec : EqualDec bool := bool_dec.
 (* Bytes. *)
 
 (* bytes n is a byte string with length n. *)
-Parameter bytes : nat -> Type.
+Axiom bytes : nat -> Type.
 
-Parameter bytes_dec : forall n, EqualDec (bytes n).
+Axiom bytes_dec : forall n, EqualDec (bytes n).
 
 Axiom bytes0 : forall n, bytes n.
 Axiom bytes1 : forall n, bytes (S n).
