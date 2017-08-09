@@ -53,7 +53,7 @@ Section Init.
       | inl _ => Ret InitFailed
       end.
 
-  Lemma le_eq_or_S_le : forall n m,
+  Theorem le_eq_or_S_le : forall n m,
       n <= m ->
       n = m \/
       S n <= m /\ n <> m.
@@ -69,7 +69,7 @@ Section Init.
                    | _, _ => True
                    end.
 
-  Lemma equal_after_diskUpdF : forall a d_0 d_1 b,
+  Theorem equal_after_diskUpdF : forall a d_0 d_1 b,
       equal_after (S a) d_0 d_1 ->
       equal_after a (diskUpdF d_0 a (buffer b)) (diskUpdF d_1 a (buffer b)).
   Proof.
@@ -161,7 +161,7 @@ Section Init.
     destruct r; step.
   Qed.
 
-  Lemma equal_after_0_to_eq : forall d_0 d_1,
+  Theorem equal_after_0_to_eq : forall d_0 d_1,
       equal_after 0 d_0 d_1 ->
       forall a, match d_0 a, d_1 a with
            | Some b0, Some b1 => curr_val b0 = curr_val b1
@@ -175,7 +175,7 @@ Section Init.
       eauto using same_size_disks_not_different.
   Qed.
 
-  Lemma equal_after_size : forall d_0 d_1,
+  Theorem equal_after_size : forall d_0 d_1,
       size d_0 = size d_1 ->
       equal_after (size d_0) d_0 d_1.
   Proof.
@@ -188,7 +188,7 @@ Section Init.
   Hint Resolve equal_after_size.
   Hint Resolve equal_after_0_to_eq.
 
-  Lemma equal_curr_after_flush : forall d_0 d_1,
+  Theorem equal_curr_after_flush : forall d_0 d_1,
       equal_after 0 d_0 d_1 ->
       flush d_0 = flush d_1.
   Proof.

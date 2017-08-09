@@ -88,7 +88,7 @@ Proof.
 Qed.
 
 (** invert a bind execution *)
-Lemma exec_bind : forall T T' `(p: proc T) (p': T -> proc T')
+Theorem exec_bind : forall T T' `(p: proc T) (p': T -> proc T')
                     w r,
     exec (Bind p p') w r ->
     (exists v w', exec p w (Finished v w') /\
@@ -114,7 +114,7 @@ Proof.
 Qed.
 
 (* When a program finishes, its recovery procedure is irrelevant. *)
-Lemma rexec_finish_any_rec : forall `(p: proc T)
+Theorem rexec_finish_any_rec : forall `(p: proc T)
                                `(rec: proc R)
                                `(rec': proc R')
                                w v w',
@@ -125,7 +125,7 @@ Proof.
   inversion H; subst; eauto.
 Qed.
 
-Lemma rexec_recover_bind_inv : forall `(p: proc T)
+Theorem rexec_recover_bind_inv : forall `(p: proc T)
                                  `(p': T -> proc T')
                                  `(rec: proc R)
                                  w rv w'',
@@ -157,7 +157,7 @@ into three stages:
   from iteration to the next, initialized with the run of p in the first step.
 - Finally, the computer stops crashing and [p' rv] can run to completion.
  *)
-Lemma exec_recover_bind_inv : forall `(p: proc R)
+Theorem exec_recover_bind_inv : forall `(p: proc R)
                                 `(p': R -> proc R')
                                 w rv' w'',
     exec_recover (Bind p p') w rv' w'' ->

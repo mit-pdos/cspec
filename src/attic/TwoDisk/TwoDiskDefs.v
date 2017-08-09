@@ -36,13 +36,13 @@ Module TD.
       | d1 => disk1 state
       end.
 
-    Local Lemma d0_is_some {diskT} (d_0: diskT) (d_1: option diskT) :
+    Local Theorem d0_is_some {diskT} (d_0: diskT) (d_1: option diskT) :
       Some d_0 = None -> d_1 = None -> False.
     Proof.
       congruence.
     Qed.
 
-    Local Lemma d1_is_some {diskT} (d_0: option diskT) (d_1: diskT) :
+    Local Theorem d1_is_some {diskT} (d_0: option diskT) (d_1: diskT) :
       d_0 = None -> Some d_1 = None -> False.
     Proof.
       congruence.

@@ -31,7 +31,7 @@ Definition diskShrink (d : disk) : disk :=
   firstn (length d - 1) d.
 
 
-Lemma disk_inbounds_not_none : forall a d,
+Theorem disk_inbounds_not_none : forall a d,
     a < diskSize d ->
     diskGet d a = None ->
     False.
@@ -42,7 +42,7 @@ Proof.
   omega.
 Qed.
 
-Lemma disk_inbounds_exists : forall a d,
+Theorem disk_inbounds_exists : forall a d,
     a < diskSize d ->
     exists b,
     diskGet d a = Some b.
@@ -54,7 +54,7 @@ Proof.
   omega.
 Qed.
 
-Lemma disk_none_oob : forall a d,
+Theorem disk_none_oob : forall a d,
     diskGet d a = None ->
     ~a < diskSize d.
 Proof.
@@ -63,7 +63,7 @@ Proof.
   exfalso; eapply disk_inbounds_not_none; eauto.
 Qed.
 
-Lemma diskUpd_eq_some : forall d a b0 b,
+Theorem diskUpd_eq_some : forall d a b0 b,
     diskGet d a = Some b0 ->
     diskGet (diskUpd d a b) a = Some b.
 Proof.
@@ -72,7 +72,7 @@ Proof.
   - destruct a0; simpl; intros; eauto.
 Qed.
 
-Lemma diskUpd_eq : forall d a b,
+Theorem diskUpd_eq : forall d a b,
     a < diskSize d ->
     diskGet (diskUpd d a b) a = Some b.
 Proof.
@@ -84,7 +84,7 @@ Proof.
     omega.
 Qed.
 
-Lemma disk_oob_eq : forall d a,
+Theorem disk_oob_eq : forall d a,
     ~a < diskSize d ->
     diskGet d a = None.
 Proof.
@@ -96,7 +96,7 @@ Proof.
     + eapply IHd. omega.
 Qed.
 
-Lemma diskUpd_oob_eq : forall d a b,
+Theorem diskUpd_oob_eq : forall d a b,
     ~a < diskSize d ->
     diskGet (diskUpd d a b) a = None.
 Proof.
@@ -108,7 +108,7 @@ Proof.
     + eapply IHd. omega.
 Qed.
 
-Lemma diskUpd_neq : forall d a b a',
+Theorem diskUpd_neq : forall d a b a',
     a <> a' ->
     diskGet (diskUpd d a b) a' = diskGet d a'.
 Proof.
@@ -118,14 +118,14 @@ Proof.
   - destruct a'; simpl; auto.
 Qed.
 
-Lemma diskUpd_size : forall d a b,
+Theorem diskUpd_size : forall d a b,
     diskSize (diskUpd d a b) = diskSize d.
 Proof.
   induction d; simpl; eauto.
   destruct a0; simpl; intros; eauto.
 Qed.
 
-Lemma diskUpd_none : forall d a b,
+Theorem diskUpd_none : forall d a b,
     diskGet d a = None ->
     diskUpd d a b = d.
 Proof.
@@ -162,7 +162,7 @@ Proof.
   - rewrite IHd; eauto.
 Qed.
 
-Lemma diskUpd_twice : forall d a b b',
+Theorem diskUpd_twice : forall d a b b',
     diskUpd (diskUpd d a b) a b' = diskUpd d a b'.
 Proof.
   induction d; simpl; intros; auto.
@@ -171,7 +171,7 @@ Proof.
   - rewrite IHd; eauto.
 Qed.
 
-Lemma diskUpd_oob_noop : forall d a b,
+Theorem diskUpd_oob_noop : forall d a b,
     ~a < diskSize d ->
     diskUpd d a b = d.
 Proof.
@@ -181,7 +181,7 @@ Proof.
   - rewrite IHd; auto; omega.
 Qed.
 
-Lemma diskShrink_size : forall d,
+Theorem diskShrink_size : forall d,
     diskSize d <> 0 ->
     diskSize (diskShrink d) = diskSize d - 1.
 Proof.
@@ -190,7 +190,7 @@ Proof.
   rewrite min_l; omega.
 Qed.
 
-Lemma diskShrink_preserves : forall d a,
+Theorem diskShrink_preserves : forall d a,
     a <> diskSize (diskShrink d) ->
     diskGet (diskShrink d) a = diskGet d a.
 Proof.
@@ -204,7 +204,7 @@ Proof.
     rewrite <- IHd; auto.
 Qed.
 
-Lemma diskShrink_diskUpd_last : forall d a b,
+Theorem diskShrink_diskUpd_last : forall d a b,
     a >= diskSize d - 1 ->
     diskShrink (diskUpd d a b) = diskShrink d.
 Proof.
@@ -219,7 +219,7 @@ Proof.
   - rewrite diskUpd_oob_noop by omega; auto.
 Qed.
 
-Lemma diskShrink_diskUpd_notlast : forall d a b,
+Theorem diskShrink_diskUpd_notlast : forall d a b,
     a < diskSize d - 1 ->
     diskShrink (diskUpd d a b) = diskUpd (diskShrink d) a b.
 Proof.

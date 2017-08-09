@@ -173,7 +173,7 @@ Hint Constructors rexec.
 Hint Constructors exec.
 Hint Constructors exec_recover.
 
-Lemma clos_refl_trans_1n_unit_tuple : forall A (R: unit * A -> unit * A -> Prop) x y u u',
+Theorem clos_refl_trans_1n_unit_tuple : forall A (R: unit * A -> unit * A -> Prop) x y u u',
     Relation_Operators.clos_refl_trans_1n R (u, x) (u', y) ->
     Relation_Operators.clos_refl_trans_1n
       (fun x y =>
@@ -464,7 +464,7 @@ Hint Unfold no_wipe.
 Definition no_crash {State} (state state' : State) : Prop := False.
 Hint Unfold no_crash.
 
-(** Lemmas about initialization code. *)
+(** Theorems about initialization code. *)
 
 Inductive InitResult := Initialized | InitFailed.
 

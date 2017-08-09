@@ -98,7 +98,7 @@ Section AsyncReplicatedDisk.
 
     Hint Resolve pred_weaken.
 
-    Lemma equal_after_already_eq : forall a (d_0 d_1:histdisk) v,
+    Theorem equal_after_already_eq : forall a (d_0 d_1:histdisk) v,
         a <= size d_0 ->
         d_0 a |= curr_val_eq v ->
         d_1 a |= curr_val_eq v ->
@@ -117,7 +117,7 @@ Section AsyncReplicatedDisk.
 
     Hint Resolve equal_after_already_eq.
 
-    Lemma equal_after_upd : forall a (d_0 d_1:histdisk) v,
+    Theorem equal_after_upd : forall a (d_0 d_1:histdisk) v,
         d_0 a |= curr_val_eq v ->
         equal_after (S a) d_0 d_1 ->
         equal_after a d_0 (diskUpdF d_1 a (buffer v)).
@@ -153,7 +153,7 @@ Section AsyncReplicatedDisk.
 
     Hint Resolve equal_after_upd.
 
-    Lemma crashesTo_one'_curr_val : forall d0__i d1__i d a v,
+    Theorem crashesTo_one'_curr_val : forall d0__i d1__i d a v,
         crashesTo_one_of' d0__i d1__i d ->
         d a |= curr_val_eq v ->
         forall bs0 bs1, d0__i a = Some bs0 ->
@@ -169,7 +169,7 @@ Section AsyncReplicatedDisk.
       intuition (subst; eauto).
     Qed.
 
-    Lemma crashesTo_one_of'_upd:
+    Theorem crashesTo_one_of'_upd:
       forall (a : nat) (d0__i d1__i : histdisk) (d_0 : diskOf blockhist) (d_1 : histdisk),
         crashesTo_one_of' d0__i d1__i d_0 ->
         crashesTo_one_of' d0__i d1__i d_1 ->
@@ -212,14 +212,14 @@ Section AsyncReplicatedDisk.
     Definition covering (d:disk) : histdisk :=
       mapDisk state_hist d.
 
-    Lemma collapsesTo_state_hist : forall b,
+    Theorem collapsesTo_state_hist : forall b,
         collapsesTo (state_hist b) b.
     Proof.
       unfold state_hist; destruct b; simpl; intros.
       econstructor; simpl; eauto.
     Qed.
 
-    Lemma covered_covering : forall d,
+    Theorem covered_covering : forall d,
         covered (covering d) d.
     Proof.
       intros.
@@ -246,7 +246,7 @@ Section AsyncReplicatedDisk.
 
     Hint Resolve crashesTo_covering_flushed.
 
-    Lemma covering_flushed_flushed : forall d,
+    Theorem covering_flushed_flushed : forall d,
         disk_flushed d ->
         histdisk_flushed (covering d).
     Proof.
@@ -266,7 +266,7 @@ Section AsyncReplicatedDisk.
 
     Hint Resolve covering_flushed_flushed.
 
-    Lemma crashesTo_one_of'_covering : forall d0__i d1__i d d',
+    Theorem crashesTo_one_of'_covering : forall d0__i d1__i d d',
         crashesTo d d' ->
         crashesTo_one_of' d0__i d1__i d ->
         crashesTo_one_of' d0__i d1__i (covering d').
@@ -390,7 +390,7 @@ Section AsyncReplicatedDisk.
 
     Hint Resolve fixup_ok.
 
-    Lemma le_S_trans : forall a b,
+    Theorem le_S_trans : forall a b,
         S a <= b ->
         a <= b.
     Proof.
@@ -522,7 +522,7 @@ Section AsyncReplicatedDisk.
 
     Hint Resolve recover_at_ok.
 
-    Lemma crashesTo_to_covered : forall d d'',
+    Theorem crashesTo_to_covered : forall d d'',
         crashesTo d d'' ->
         exists d', wipeHist d d' /\
               covered d' d''.
@@ -536,7 +536,7 @@ Section AsyncReplicatedDisk.
       rewrite Add_element; auto.
     Qed.
 
-    Lemma maybe_holds_crashesTo_to_covered : forall d md,
+    Theorem maybe_holds_crashesTo_to_covered : forall d md,
         md |= crashesTo d ->
         exists d', wipeHist d d' /\
           md |= covered d'.
@@ -560,7 +560,7 @@ Section AsyncReplicatedDisk.
 
     Hint Resolve equal_after_size.
 
-    Lemma crashesTo_one_of'_eq0 : forall d_0 d_1,
+    Theorem crashesTo_one_of'_eq0 : forall d_0 d_1,
         size d_0 = size d_1 ->
         crashesTo_one_of' d_0 d_1 d_0.
     Proof.
@@ -571,7 +571,7 @@ Section AsyncReplicatedDisk.
       eauto using contains_Union_l, contains_Union_r.
     Qed.
 
-    Lemma crashesTo_one_of'_eq1 : forall d_0 d_1,
+    Theorem crashesTo_one_of'_eq1 : forall d_0 d_1,
         size d_0 = size d_1 ->
         crashesTo_one_of' d_0 d_1 d_1.
     Proof.
@@ -582,7 +582,7 @@ Section AsyncReplicatedDisk.
       eauto using contains_Union_l, contains_Union_r.
     Qed.
 
-    Lemma blockhist_eq : forall h h',
+    Theorem blockhist_eq : forall h h',
         current_val h = current_val h' ->
         durable_vals h = durable_vals h' ->
         h = h'.
@@ -680,7 +680,7 @@ Section AsyncReplicatedDisk.
     Hint Resolve crashesTo_one_of'_respects_wipeHist.
     Hint Resolve crashesTo_one_of'_respects_flushed.
 
-    Lemma crashesTo_one_of'_stable_flush : forall d0__i d1__i d,
+    Theorem crashesTo_one_of'_stable_flush : forall d0__i d1__i d,
         crashesTo_one_of' d0__i d1__i d ->
         crashesTo_one_of' d0__i d1__i (flush d).
     Proof.
@@ -908,7 +908,7 @@ Section AsyncReplicatedDisk.
                   crashesTo_one_of'_eq0, crashesTo_one_of'_eq1.
     Qed.
 
-    Lemma histblock_trans : forall h h',
+    Theorem histblock_trans : forall h h',
         In (curr_val h') (durable_vals h) ->
         hist_flushed h' ->
         forall h'', In (curr_val h'') (durable_vals h') ->
@@ -922,7 +922,7 @@ Section AsyncReplicatedDisk.
 
     Hint Resolve histblock_trans.
 
-    Lemma crashesTo_one_of_trans:
+    Theorem crashesTo_one_of_trans:
       forall d_0 d_1 d_0' d_1' : histdisk,
         crashesTo_one_of d_0 d_1 d_0' ->
         crashesTo_one_of d_0 d_1 d_1' ->

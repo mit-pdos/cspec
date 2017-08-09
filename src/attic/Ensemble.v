@@ -106,7 +106,7 @@ Section Ensembles.
             compute in *;
             try solve [ intuition (subst; eauto) ].
 
-  Lemma contains_Add : forall x A A',
+  Theorem contains_Add : forall x A A',
       contains A A' ->
       In x A' ->
       contains (Add x A) A'.
@@ -114,7 +114,7 @@ Section Ensembles.
     t.
   Qed.
 
-  Lemma contains_Add_inv : forall x A A',
+  Theorem contains_Add_inv : forall x A A',
       contains (Add x A) A' ->
       contains A A' /\
       In x A'.

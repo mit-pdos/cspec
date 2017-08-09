@@ -140,7 +140,7 @@ Module ReplicatedDisk.
         (interface_abs td)
         {| abstraction := rd_abstraction |}.
 
-    Lemma both_disks_not_missing : forall (state: TD.State),
+    Theorem both_disks_not_missing : forall (state: TD.State),
         TD.disk0 state = None ->
         TD.disk1 state = None ->
         False.
@@ -150,7 +150,7 @@ Module ReplicatedDisk.
       destruct disk0, disk1; simpl in *; eauto.
     Qed.
 
-    Lemma rd_abstraction_failure: forall s state state',
+    Theorem rd_abstraction_failure: forall s state state',
       rd_abstraction state s ->
       TD.bg_failure state state' ->
       rd_abstraction state' s.
@@ -163,7 +163,7 @@ Module ReplicatedDisk.
       intuition.
     Qed.
 
-    Lemma rd_abstraction_read: forall s d a v state state',
+    Theorem rd_abstraction_read: forall s d a v state state',
       rd_abstraction state s ->
       TD.op_step (TD.Read d a) state (Working v) state' ->
       rd_abstraction state' s.
@@ -174,7 +174,7 @@ Module ReplicatedDisk.
       TD.inv_step; simpl in *; eauto.
     Qed.
 
-    Lemma rd_abstraction_read_failure: forall s d a state state',
+    Theorem rd_abstraction_read_failure: forall s d a state state',
       rd_abstraction state s ->
       TD.op_step (TD.Read d a) state Failed state' ->
       rd_abstraction state' s.
@@ -185,7 +185,7 @@ Module ReplicatedDisk.
       TD.inv_step; simpl in *; eauto.
     Qed.
 
-    Lemma rd_abstraction_disksize: forall s d v state state',
+    Theorem rd_abstraction_disksize: forall s d v state state',
       rd_abstraction state s ->
       TD.op_step (TD.DiskSize d) state (Working v) state' ->
       rd_abstraction state' s.
@@ -196,7 +196,7 @@ Module ReplicatedDisk.
       TD.inv_step; simpl in *; eauto.
     Qed.
 
-    Lemma rd_abstraction_disksize_failure: forall s d state state',
+    Theorem rd_abstraction_disksize_failure: forall s d state state',
       rd_abstraction state s ->
       TD.op_step (TD.DiskSize d) state Failed state' ->
       rd_abstraction state' s.
@@ -233,7 +233,7 @@ Module ReplicatedDisk.
          | None => Working v = Failed
          end.
 
-    Lemma td_read_ok: forall state id a v s,
+    Theorem td_read_ok: forall state id a v s,
       rd_abstraction state s ->
       read_disk state id a v ->
       forall b : block, s a = Some b -> v = b.
@@ -264,7 +264,7 @@ Module ReplicatedDisk.
         + intuition; subst.
     Qed.
 
-    Lemma td_read0_ok: forall state' state'0 s a v,
+    Theorem td_read0_ok: forall state' state'0 s a v,
       rd_abstraction state' s -> 
       TD.op_step (TD.Read d0 a) state'0 (Working v) state' ->
       forall b : block, s a = Some b -> v = b.
@@ -274,7 +274,7 @@ Module ReplicatedDisk.
       eapply td_read_ok with (id := d0); eauto.
     Qed.
 
-    Lemma td_read1_ok: forall state' state'0 state'1 state'2  s a v,
+    Theorem td_read1_ok: forall state' state'0 state'1 state'2  s a v,
       rd_abstraction state'1 s ->
       TD.bg_failure state' state'2 ->
       TD.op_step (TD.Read d0 a) state'0 Failed state' ->
@@ -287,7 +287,7 @@ Module ReplicatedDisk.
       eapply td_read_ok with (id := d1) (state := state'1); eauto.
     Qed.
 
-    Lemma td_read_none_ok: forall s a state' state'0 state'2 state'1,
+    Theorem td_read_none_ok: forall s a state' state'0 state'2 state'1,
       TD.op_step (TD.Read d0 a) state'0 Failed state' ->
       TD.bg_failure state' state'2  ->
       TD.op_step (TD.Read d1 a) state'2 Failed state'1 ->
@@ -317,7 +317,7 @@ Module ReplicatedDisk.
     Qed.
 
     (* read without recovery *)
-    Lemma read_ok: forall a v w w' state s,
+    Theorem read_ok: forall a v w w' state s,
       abstraction (interface_abs td) w state ->
       rd_abstraction state s -> 
       exec (read a) w (Finished v w') ->
@@ -377,7 +377,7 @@ Module ReplicatedDisk.
       all: eauto.
     Qed.
 
-    Lemma bg_failure_disk_none: forall id (state:TD.State) state',
+    Theorem bg_failure_disk_none: forall id (state:TD.State) state',
       TD.get_disk id state = None ->
       TD.bg_failure state state' ->
       TD.get_disk id state' = None.
@@ -389,7 +389,7 @@ Module ReplicatedDisk.
       - destruct id; simpl in *; eauto.
     Qed.
 
-    Lemma bg_failure_disk_some: forall id (state:TD.State) state' d1 d2,
+    Theorem bg_failure_disk_some: forall id (state:TD.State) state' d1 d2,
       TD.get_disk id state = Some d1 ->
       TD.bg_failure state state' ->
       TD.get_disk id state' = Some d2 ->
@@ -408,7 +408,7 @@ Module ReplicatedDisk.
         + inversion H1.
     Qed.
 
-    Lemma bg_failure_disk_both: forall (state:TD.State) state' d1' d2',
+    Theorem bg_failure_disk_both: forall (state:TD.State) state' d1' d2',
       TD.disk0 state' = Some d1' ->
       TD.disk1 state' = Some d2' ->
       TD.bg_failure state state' ->
@@ -426,7 +426,7 @@ Module ReplicatedDisk.
     Qed.
 
 
-    Lemma td_bg_failure: forall (state:TD.State) state' d0 d1,
+    Theorem td_bg_failure: forall (state:TD.State) state' d0 d1,
       TD.bg_failure state state' ->
       TD.disk0 state = Some d0 ->
       TD.disk1 state = Some d1 ->
@@ -437,7 +437,7 @@ Module ReplicatedDisk.
       TD.inv_bg; split; eauto.
     Qed.
 
-    Lemma td_bg_failure1: forall (state:TD.State) state' d1,
+    Theorem td_bg_failure1: forall (state:TD.State) state' d1,
       TD.bg_failure state state' ->
       TD.disk0 state = None ->
       TD.disk1 state = Some d1 ->
@@ -448,7 +448,7 @@ Module ReplicatedDisk.
       TD.inv_bg; split; eauto.
     Qed.
 
-    Lemma td_bg_failure0: forall (state:TD.State) state' d,
+    Theorem td_bg_failure0: forall (state:TD.State) state' d,
         TD.bg_failure state state' ->
         TD.disk0 state = Some d ->
         TD.disk1 state = None ->
@@ -459,7 +459,7 @@ Module ReplicatedDisk.
       TD.inv_bg; split; eauto.
     Qed.
 
-    Lemma td_write0_ok: forall state state' a b d v,
+    Theorem td_write0_ok: forall state state' a b d v,
       TD.op_step (TD.Write d0 a b) state v state' ->
       TD.disk0 state = Some d ->
       match v with
@@ -484,7 +484,7 @@ Module ReplicatedDisk.
         intuition; try congruence.
     Qed.
 
-    Lemma td_write1_ok: forall state state' a b d v,
+    Theorem td_write1_ok: forall state state' a b d v,
       TD.op_step (TD.Write d1 a b) state v state' ->
       TD.disk1 state = Some d ->
       match v with
@@ -509,7 +509,7 @@ Module ReplicatedDisk.
         intuition; try congruence.
     Qed.
 
-    Lemma td_write_failure: forall d a b state state',
+    Theorem td_write_failure: forall d a b state state',
       TD.op_step (TD.Write d a b) state Failed state' ->
       state = state' /\ TD.get_disk d state = None.
     Proof.
@@ -543,7 +543,7 @@ Module ReplicatedDisk.
       intuition. inversion H1. auto.
     Qed.
 
-    Lemma td_write_none: forall d a b (state:TD.State) state' v,
+    Theorem td_write_none: forall d a b (state:TD.State) state' v,
       TD.get_disk d state = None ->
       TD.op_step (TD.Write d a b) state v state' ->
       state = state'.
@@ -554,7 +554,7 @@ Module ReplicatedDisk.
       intuition; auto.
     Qed.
 
-    Lemma td_write_both_ok: forall s state state' state'' state''' a b,
+    Theorem td_write_both_ok: forall s state state' state'' state''' a b,
       rd_abstraction state s ->
       TD.op_step (TD.Write d0 a b) state (Working tt) state' ->
       TD.bg_failure state' state'' ->
@@ -612,7 +612,7 @@ Module ReplicatedDisk.
       intuition; try congruence.
     Qed.
 
-    Lemma td_write_d0_ok: forall s state state' state'' state''' a b,
+    Theorem td_write_d0_ok: forall s state state' state'' state''' a b,
       rd_abstraction state s ->
       TD.op_step (TD.Write d0 a b) state (Working tt) state' ->
       TD.bg_failure state' state'' ->
@@ -648,7 +648,7 @@ Module ReplicatedDisk.
         rewrite H2 in H10. intuition. inversion H0.
     Qed.
 
-    Lemma td_write_d1_ok: forall s state state' state'' state''' a b,
+    Theorem td_write_d1_ok: forall s state state' state'' state''' a b,
       rd_abstraction state s ->
       TD.op_step (TD.Write d0 a b) state (Failed) state' ->
       TD.bg_failure state' state'' ->
@@ -684,7 +684,7 @@ Module ReplicatedDisk.
     Qed.
 
     (* write without recovery *)
-    Lemma write_ok: forall a b v w w' state s,
+    Theorem write_ok: forall a b v w w' state s,
       abstraction (interface_abs td) w state ->
       rd_abstraction state s -> 
       exec (write a b) w (Finished v w') ->
@@ -751,7 +751,7 @@ Module ReplicatedDisk.
       | None => Working v = Failed
       end.
 
-    Lemma td_disk_size_ok: forall s state id v,
+    Theorem td_disk_size_ok: forall s state id v,
       rd_abstraction state s ->
       disk_size state id v ->
       v = (@size block s).
@@ -781,7 +781,7 @@ Module ReplicatedDisk.
       | None => @Failed nat = Failed
       end.
 
-    Lemma td_disk_size_none_ok: forall state' state'2,
+    Theorem td_disk_size_none_ok: forall state' state'2,
       disk_size_failed state' d0 ->
       TD.bg_failure state' state'2  ->
       disk_size_failed state'2 d1 ->
@@ -798,7 +798,7 @@ Module ReplicatedDisk.
     Qed.
 
     (* disk size without recovery *)
-    Lemma disk_size_ok: forall v w w' state s,
+    Theorem disk_size_ok: forall v w w' state s,
       abstraction (interface_abs td) w state ->
       rd_abstraction state s -> 
       exec diskSize w (Finished v w') ->
@@ -869,7 +869,7 @@ Module ReplicatedDisk.
         | (_, _) => False  (* one disk must be working *)
         end ).
 
-    Lemma bg_failure_ok: forall id d (state:TD.State) state',
+    Theorem bg_failure_ok: forall id d (state:TD.State) state',
       TD.get_disk id state' = Some d ->
       TD.bg_failure state state' ->
       TD.get_disk id state = Some d.
@@ -882,7 +882,7 @@ Module ReplicatedDisk.
         + try congruence.
     Qed.
 
-    Lemma fixup_eq_ok: forall (state state' state'0 : TD.State) sold snew v b,
+    Theorem fixup_eq_ok: forall (state state' state'0 : TD.State) sold snew v b,
       recovery_pre state sold snew (S v) ->
       v < size sold ->
       TD.bg_failure state state' ->
@@ -992,7 +992,7 @@ Module ReplicatedDisk.
 
 
     (* fix up for v that isn't out of sync. keep repairing *)
-    Lemma fixup_continue_ok: forall v w w' (state: TD.State) sold snew,
+    Theorem fixup_continue_ok: forall v w w' (state: TD.State) sold snew,
       recovery_pre state sold snew (S v) ->
       v < size sold ->
       abstraction (interface_abs td) w state ->
@@ -1014,7 +1014,7 @@ Module ReplicatedDisk.
 
 
     (* fix up for v that is out of sync, repair and be done *)
-    Lemma fixup_repair_ok: forall v w w' (state: TD.State) sold snew,
+    Theorem fixup_repair_ok: forall v w w' (state: TD.State) sold snew,
       recovery_pre state sold snew (S v) ->
       v < size sold ->
       abstraction (interface_abs td) w state ->
@@ -1113,7 +1113,7 @@ Module ReplicatedDisk.
     Qed.
 
     (* fix up for v that is out of sync, repair and be done *)
-    Lemma fixup_repair_failure: forall v w w' (state: TD.State) sold snew i,
+    Theorem fixup_repair_failure: forall v w w' (state: TD.State) sold snew i,
        recovery_pre state sold snew (S v) ->
        v < size sold ->
        abstraction (interface_abs td) w state ->
@@ -1129,7 +1129,7 @@ Module ReplicatedDisk.
     Admitted.
 
 
-    Lemma recover_at_ok: forall v w w' state sold snew,
+    Theorem recover_at_ok: forall v w w' state sold snew,
       recovery_pre state sold snew v ->
       v <= size sold ->
       abstraction (interface_abs td) w state ->
@@ -1163,7 +1163,7 @@ Module ReplicatedDisk.
       | (None, None) => False
       end.
 
-    Lemma recovery_pre_failure: forall state state' sold snew n,
+    Theorem recovery_pre_failure: forall state state' sold snew n,
       recovery_pre state n sold snew ->
       TD.bg_failure state state' ->
       recovery_pre state' n sold snew.
@@ -1192,7 +1192,7 @@ Module ReplicatedDisk.
 
 
     (* disk size on post-crash, pre-recovery state *)
-    Lemma disk_size_ok': forall v w w' state sold snew,
+    Theorem disk_size_ok': forall v w w' state sold snew,
       abstraction (interface_abs td) w state ->
       recovery_pre state sold snew (size sold) ->
       exec diskSize w (Finished v w') ->
@@ -1246,7 +1246,7 @@ Module ReplicatedDisk.
       all: eauto.
     Qed.
 
-    Lemma recover_finish_ok: forall w w' sold snew state,
+    Theorem recover_finish_ok: forall w w' sold snew state,
       abstraction (interface_abs td) w state ->
       recovery_pre state sold snew (size sold) ->
       exec Recover w (Finished tt w') ->
@@ -1276,7 +1276,7 @@ Module ReplicatedDisk.
 
 
     (* read with recovery *)
-    Lemma read_recover_ok: forall s a w state w' w'' w''',
+    Theorem read_recover_ok: forall s a w state w' w'' w''',
       abstraction (interface_abs td) w state ->
       rd_abstraction state s ->
       exec (read a) w (Crashed w') -> 
@@ -1293,7 +1293,7 @@ Module ReplicatedDisk.
       intros.
     Admitted.
 
-    Lemma rd_abstraction_recovery_pre: forall state s,
+    Theorem rd_abstraction_recovery_pre: forall state s,
       rd_abstraction state s ->
       recovery_pre state s s (size s).
     Proof.
@@ -1336,7 +1336,7 @@ Module ReplicatedDisk.
       end.
 
 (*
-    Lemma write0_crash_ok: forall a b v state state' s,
+    Theorem write0_crash_ok: forall a b v state state' s,
       rd_abstraction state s ->
       TD.op_step (TD.Write d0 a b) state v state' ->
       recovery_pre state' s (size s).
@@ -1376,7 +1376,7 @@ Module ReplicatedDisk.
 *)
 
 (*
-    Lemma write_both_crash_ok: forall a b v v0 state state' state'0 state'1 s,
+    Theorem write_both_crash_ok: forall a b v v0 state state' state'0 state'1 s,
       rd_abstraction state s -> 
       TD.op_step (TD.Write d0 a b) state v state' ->
       TD.bg_failure state' state'1 ->
@@ -1443,7 +1443,7 @@ Module ReplicatedDisk.
 *)
 
     (* write with crash *)
-    Lemma write_crash_ok: forall a b w w' state sold,
+    Theorem write_crash_ok: forall a b w w' state sold,
       abstraction (interface_abs td) w state ->
       rd_abstraction state sold -> 
       rexec (write a b) (irec td) w (Recovered tt w') ->
@@ -1457,7 +1457,7 @@ unfold write in H1.
 
 Search proc_spec Bind.
 
-    Lemma rexec_bind_recovered : forall T T2 R (p1 : proc T) (p2 : T -> proc T2) (rec : proc R) w w' (res : R),
+    Theorem rexec_bind_recovered : forall T T2 R (p1 : proc T) (p2 : T -> proc T2) (rec : proc R) w w' (res : R),
       rexec (Bind p1 p2) rec w (Recovered res w') ->
       (rexec p1 rec w (Recovered res w')) \/
       (exists w'' res'',
@@ -1474,7 +1474,7 @@ Search proc_spec Bind.
       - left. econstructor; eauto.
     Qed.
 
-    Lemma rexec_bind : forall T T2 R (p1 : proc T) (p2 : T -> proc T2) (rec : proc R) w out,
+    Theorem rexec_bind : forall T T2 R (p1 : proc T) (p2 : T -> proc T2) (rec : proc R) w out,
       rexec (Bind p1 p2) rec w out ->
       exists out',
       rexec p1 rec w out' /\
@@ -1552,7 +1552,7 @@ Check impl_ok.
     Unshelve. all: auto.
     Admitted.
 
-    Lemma irec_recover_ok: forall w' w'',
+    Theorem irec_recover_ok: forall w' w'',
         exec (@irec TD.Op TD.State TD.API td) (world_crash w') (Finished tt w'') ->
         w' = w''.
     Proof.
@@ -1563,7 +1563,7 @@ Check impl_ok.
         (* XXX maybe need some composable recovery theorem. *)
     Admitted.
 
-    Lemma recovery_pre0_rd_abstraction: forall state s,
+    Theorem recovery_pre0_rd_abstraction: forall state s,
       recovery_pre state s 0 ->
       rd_abstraction state s.
     Proof.
@@ -1606,7 +1606,7 @@ Check impl_ok.
           intuition; subst; simpl in *.
     Qed.
 
-    Lemma write_recover_ok: forall s a b w state w''',
+    Theorem write_recover_ok: forall s a b w state w''',
       abstraction (interface_abs td) w state ->
       rd_abstraction state s ->
       rexec (write a b) (_ <- irec td; Recover) w (Recovered tt w''') ->

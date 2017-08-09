@@ -57,12 +57,12 @@ Section Predicates.
   Infix "===" := peq (no associativity, at level 70).
   Infix "===>" := pimpl (no associativity, at level 70).
 
-  Lemma pimpl_refl : forall p, p ===> p.
+  Theorem pimpl_refl : forall p, p ===> p.
   Proof.
     firstorder.
   Qed.
 
-  Lemma pimpl_trans : forall p q r, p ===> q -> q ===> r -> p ===> r.
+  Theorem pimpl_trans : forall p q r, p ===> q -> q ===> r -> p ===> r.
   Proof.
     firstorder.
   Qed.
@@ -73,12 +73,12 @@ Section Predicates.
       transitivity proved by pimpl_trans
         as pimpl_rel.
 
-  Lemma peq_refl : forall p, p === p.
+  Theorem peq_refl : forall p, p === p.
   Proof.
     firstorder.
   Qed.
 
-  Lemma peq_trans : forall p q r, p === q -> q === r -> p === r.
+  Theorem peq_trans : forall p q r, p === q -> q === r -> p === r.
   Proof.
     firstorder.
   Qed.
@@ -153,7 +153,7 @@ Section Predicates.
       descend; intuition eauto.
   Qed.
 
-  Lemma pimpl_apply : forall m F F',
+  Theorem pimpl_apply : forall m F F',
       pred_prop F m ->
       F ===> F' ->
       pred_prop F' m.

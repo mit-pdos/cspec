@@ -51,7 +51,7 @@ Section Init.
       | inl _ => Ret InitFailed
       end.
 
-  Lemma le_eq_or_S_le : forall n m,
+  Theorem le_eq_or_S_le : forall n m,
       n <= m ->
       n = m \/
       S n <= m /\ n <> m.
@@ -64,7 +64,7 @@ Section Init.
     size d_0 = size d_1 /\
     forall a', a <= a' -> d_0 a' = d_1 a'.
 
-  Lemma equal_after_diskUpd : forall a d_0 d_1 b,
+  Theorem equal_after_diskUpd : forall a d_0 d_1 b,
       equal_after (S a) d_0 d_1 ->
       equal_after a (diskUpd d_0 a b) (diskUpd d_1 a b).
   Proof.
@@ -152,7 +152,7 @@ Section Init.
     destruct r; step.
   Qed.
 
-  Lemma equal_after_0_to_eq : forall d_0 d_1,
+  Theorem equal_after_0_to_eq : forall d_0 d_1,
       equal_after 0 d_0 d_1 ->
       d_0 = d_1.
   Proof.
@@ -162,7 +162,7 @@ Section Init.
     eapply H1; omega.
   Qed.
 
-  Lemma equal_after_size : forall d_0 d_1,
+  Theorem equal_after_size : forall d_0 d_1,
       size d_0 = size d_1 ->
       equal_after (size d_0) d_0 d_1.
   Proof.

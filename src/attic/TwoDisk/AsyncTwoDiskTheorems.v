@@ -69,7 +69,7 @@ Proof.
   end; intuition eauto.
 Qed.
 
-Lemma disks_rel_stable' : forall F0 F1 state,
+Theorem disks_rel_stable' : forall F0 F1 state,
     TD.disk0 state |= F0 ->
     TD.disk1 state |= F1 ->
     forall R, Stable F0 R ->
@@ -128,7 +128,7 @@ Hint Resolve missing_stable.
 Definition curr_val_eq {B} {async:AsyncBlock B} (b:block) : B -> Prop :=
   fun bs => curr_val bs = b.
 
-Lemma covered_some_latest : forall (d: histdisk) (d': disk) a bs,
+Theorem covered_some_latest : forall (d: histdisk) (d': disk) a bs,
     d' a = Some bs ->
     covered d d' ->
     d a |= curr_val_eq (curr_val bs).
@@ -143,7 +143,7 @@ Qed.
 
 Hint Resolve covered_some_latest.
 
-Lemma covered_none : forall (d: histdisk) (d': disk) a F,
+Theorem covered_none : forall (d: histdisk) (d': disk) a F,
     d' a = None ->
     covered d d' ->
     d a |= F.
@@ -156,7 +156,7 @@ Qed.
 
 Hint Resolve covered_none.
 
-Lemma covered_curr_val:
+Theorem covered_curr_val:
   forall (a : addr) (d : histdisk) (d' : disk) (b : blockstate),
     d' a = Some b ->
     covered d d' ->
@@ -269,7 +269,7 @@ Qed.
 
 (* TODO: move proofs somewhere more appropriate *)
 
-Lemma pointwise_rel_indomain : forall B B' (rel: B -> B' -> Prop)
+Theorem pointwise_rel_indomain : forall B B' (rel: B -> B' -> Prop)
                                  (d: diskOf B) (d': diskOf B'),
     size d = size d' ->
     (forall a bs bs', a < size d ->
@@ -289,7 +289,7 @@ Qed.
 
 Hint Resolve collapsesTo_buffer.
 
-Lemma covered_diskUpd_buffer : forall d d' a b,
+Theorem covered_diskUpd_buffer : forall d d' a b,
     covered d d' ->
     covered (diskUpdF d a (buffer b)) (diskUpdF d' a (buffer b)).
 Proof.
@@ -396,7 +396,7 @@ Proof.
   right; eauto using pred_weaken.
 Qed.
 
-Lemma covered_size_eq' : forall d d',
+Theorem covered_size_eq' : forall d d',
     covered d d' ->
     size d' = size d.
 Proof.
@@ -495,7 +495,7 @@ Proof.
   unfold Ensemble.In; auto.
 Qed.
 
-Lemma maybe_holds_then_flush : forall F md d,
+Theorem maybe_holds_then_flush : forall F md d,
     md |= F ->
     md = Some d ->
     then_flush F (flush d).
@@ -507,7 +507,7 @@ Qed.
 
 Hint Resolve maybe_holds_then_flush.
 
-Lemma stable_then_flush_pflush : forall F,
+Theorem stable_then_flush_pflush : forall F,
     Stable (then_flush F) pflush.
 Proof.
   unfold Stable, then_flush; intros.
@@ -518,7 +518,7 @@ Qed.
 
 Hint Resolve stable_then_flush_pflush.
 
-Lemma pflush_blockstate_uncached : forall (bs bs': blockstate),
+Theorem pflush_blockstate_uncached : forall (bs bs': blockstate),
     cache_val bs = None ->
     pflush_blockstate bs bs' ->
     bs = bs'.
@@ -527,7 +527,7 @@ Proof.
   congruence.
 Qed.
 
-Lemma wipeBlockstate_cacheval_none : forall bs,
+Theorem wipeBlockstate_cacheval_none : forall bs,
     cache_val (wipeBlockstate bs) = None.
 Proof.
   destruct bs; auto.
@@ -608,7 +608,7 @@ Proof.
   eapply pred_weaken; eauto.
 Qed.
 
-Lemma then_wipe_missing : forall md,
+Theorem then_wipe_missing : forall md,
     md |= then_wipe missing ->
     md |= missing.
 Proof.

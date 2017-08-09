@@ -170,7 +170,7 @@ Definition covered (d:histdisk) (d':disk) :=
 
 Hint Unfold pflush wipeDisk covered : disk.
 
-Lemma collapsesTo_buffer : forall h bs b,
+Theorem collapsesTo_buffer : forall h bs b,
     collapsesTo h bs ->
     collapsesTo (buffer b h) (buffer b bs).
 Proof.
@@ -220,7 +220,7 @@ Proof.
   unfold block_flushed; simpl; auto.
 Qed.
 
-Lemma histcrash_block_flushed : forall h bs,
+Theorem histcrash_block_flushed : forall h bs,
     histcrash h bs ->
     block_flushed bs.
 Proof.
@@ -295,7 +295,7 @@ Definition hist_flushed (h:blockhist) : Prop :=
 Definition histdisk_flushed : histdisk -> Prop :=
   pointwise_prop hist_flushed.
 
-Lemma wipeBlockhist_eq : forall h h',
+Theorem wipeBlockhist_eq : forall h h',
     In (curr_val h') (durable_vals h) ->
     hist_flushed h' ->
     wipeBlockhist h h'.
@@ -367,7 +367,7 @@ Hint Resolve wipeHist_flushed.
 Definition then_wipe (F: disk -> Prop) : disk -> Prop :=
   fun d' => exists d, F d /\ d' = wipeDisk d.
 
-Lemma collapsesTo_wipe : forall h bs,
+Theorem collapsesTo_wipe : forall h bs,
     collapsesTo h bs ->
     histcrash h (wipeBlockstate bs).
 Proof.
@@ -375,7 +375,7 @@ Proof.
   econstructor; eauto.
 Qed.
 
-Lemma then_wipe_covered : forall d d',
+Theorem then_wipe_covered : forall d d',
     then_wipe (covered d) d' ->
     crashesTo d d'.
 Proof.
@@ -389,7 +389,7 @@ Qed.
 Definition then_flush (F: disk -> Prop) : disk -> Prop :=
   fun d' => exists d, F d /\ d' = flush d.
 
-Lemma then_flush_flushed : forall F d,
+Theorem then_flush_flushed : forall F d,
     then_flush F d ->
     disk_flushed d.
 Proof.

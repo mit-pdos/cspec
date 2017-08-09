@@ -67,7 +67,7 @@ Proof.
   inversion l.
 Qed.
 
-Lemma sized_domain_not_lt : forall `(m: mem _ V) sz sz',
+Theorem sized_domain_not_lt : forall `(m: mem _ V) sz sz',
     sized_domain m sz ->
     sized_domain m sz' ->
     sz < sz' ->
@@ -81,7 +81,7 @@ Proof.
   repeat deex; congruence.
 Qed.
 
-Lemma sized_domain_unique_sz : forall `(m: mem _ V) sz sz',
+Theorem sized_domain_unique_sz : forall `(m: mem _ V) sz sz',
     sized_domain m sz ->
     sized_domain m sz' ->
     sz = sz'.

@@ -135,7 +135,7 @@ Global Generalizable Variables T R State step.
 Ltac inv_exec' H :=
   inversion H; subst; clear H; repeat sigT_eq.
 
-Lemma exec_ret : forall T (v:T) w r,
+Theorem exec_ret : forall T (v:T) w r,
     exec (Ret v) w r ->
     match r with
     | Finished v' w' => v = v' /\ w = w'

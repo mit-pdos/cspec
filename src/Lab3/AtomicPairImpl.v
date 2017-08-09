@@ -140,7 +140,7 @@ Module AtomicPair (d : OneDiskAPI) <: AtomicPairAPI.
   Qed.
 
 
-  Lemma atomic_pair_abstraction_diskUpd12 : forall state s a v,
+  Theorem atomic_pair_abstraction_diskUpd12 : forall state s a v,
     (a = 1 \/ a = 2) ->
     atomic_pair_abstraction state s ->
     diskGet state 0 ?|= eq block1 ->
@@ -159,7 +159,7 @@ Module AtomicPair (d : OneDiskAPI) <: AtomicPairAPI.
     right. repeat rewrite diskUpd_neq by omega. auto.
   Qed.
 
-  Lemma atomic_pair_abstraction_diskUpd34 : forall state s a v,
+  Theorem atomic_pair_abstraction_diskUpd34 : forall state s a v,
     (a = 3 \/ a = 4) ->
     atomic_pair_abstraction state s ->
     diskGet state 0 ?|= eq block0 ->
@@ -177,7 +177,7 @@ Module AtomicPair (d : OneDiskAPI) <: AtomicPairAPI.
     rewrite H3 in *; congruence.
   Qed.
 
-  Lemma atomic_pair_abstraction_state0 : forall (state : State) F a v,
+  Theorem atomic_pair_abstraction_state0 : forall (state : State) F a v,
     a <> 0 ->
     diskGet state 0 ?|= F ->
     diskGet (diskUpd state a v) 0 ?|= F.
@@ -186,7 +186,7 @@ Module AtomicPair (d : OneDiskAPI) <: AtomicPairAPI.
     rewrite diskUpd_neq; auto.
   Qed.
 
-  Lemma atomic_pair_abstraction_diskUpd340 : forall state v0 v,
+  Theorem atomic_pair_abstraction_diskUpd340 : forall state v0 v,
     atomic_pair_abstraction state v0 ->
     atomic_pair_abstraction
       (diskUpd (diskUpd (diskUpd state 3 (fst v)) 4 (snd v)) 0 block1) v.
@@ -198,7 +198,7 @@ Module AtomicPair (d : OneDiskAPI) <: AtomicPairAPI.
     intuition auto.
   Qed.
 
-  Lemma atomic_pair_abstraction_diskUpd120 : forall state v0 v,
+  Theorem atomic_pair_abstraction_diskUpd120 : forall state v0 v,
     atomic_pair_abstraction state v0 ->
     atomic_pair_abstraction
       (diskUpd (diskUpd (diskUpd state 1 (fst v)) 2 (snd v)) 0 block0) v.

@@ -84,7 +84,7 @@ Module ReplicatedDisk (td : TwoDiskAPI) <: OneDiskAPI.
   operations, we prove recovery specs that include the replicated disk Recover
   function. *)
 
-  Lemma exists_tuple2 : forall A B (P: A * B -> Prop),
+  Theorem exists_tuple2 : forall A B (P: A * B -> Prop),
       (exists a b, P (a, b)) ->
       (exists p, P p).
   Proof.
@@ -150,7 +150,7 @@ Module ReplicatedDisk (td : TwoDiskAPI) <: OneDiskAPI.
    * without considering our recovery.
    *)
 
-  Lemma both_disks_not_missing : forall (state: TwoDiskBaseAPI.State),
+  Theorem both_disks_not_missing : forall (state: TwoDiskBaseAPI.State),
       disk0 state ?|= missing ->
       disk1 state ?|= missing ->
       False.
@@ -160,7 +160,7 @@ Module ReplicatedDisk (td : TwoDiskAPI) <: OneDiskAPI.
   Qed.
   Hint Resolve both_disks_not_missing : false.
 
-  Lemma missing0_implies_any : forall (state: TwoDiskBaseAPI.State) P,
+  Theorem missing0_implies_any : forall (state: TwoDiskBaseAPI.State) P,
       disk0 state ?|= missing ->
       disk0 state ?|= P.
   Proof.
@@ -169,7 +169,7 @@ Module ReplicatedDisk (td : TwoDiskAPI) <: OneDiskAPI.
     intuition.
   Qed.
 
-  Lemma missing1_implies_any : forall (state: TwoDiskBaseAPI.State) P,
+  Theorem missing1_implies_any : forall (state: TwoDiskBaseAPI.State) P,
       disk1 state ?|= missing ->
       disk1 state ?|= P.
   Proof.
@@ -298,7 +298,7 @@ Module ReplicatedDisk (td : TwoDiskAPI) <: OneDiskAPI.
     diskSize d_0 = diskSize d_1 /\
     forall a', a <= a' -> diskGet d_0 a' = diskGet d_1 a'.
 
-  Lemma le_eq_or_S_le : forall n m,
+  Theorem le_eq_or_S_le : forall n m,
       n <= m ->
       n = m \/
       S n <= m /\ n <> m.
@@ -307,7 +307,7 @@ Module ReplicatedDisk (td : TwoDiskAPI) <: OneDiskAPI.
     omega.
   Qed.
 
-  Lemma equal_after_diskUpd : forall a d_0 d_1 b,
+  Theorem equal_after_diskUpd : forall a d_0 d_1 b,
       equal_after (S a) d_0 d_1 ->
       equal_after a (diskUpd d_0 a b) (diskUpd d_1 a b).
   Proof.
@@ -399,7 +399,7 @@ Module ReplicatedDisk (td : TwoDiskAPI) <: OneDiskAPI.
   Hint Resolve sizeInit_ok.
 
 
-  Lemma equal_after_0_to_eq : forall d_0 d_1,
+  Theorem equal_after_0_to_eq : forall d_0 d_1,
       equal_after 0 d_0 d_1 ->
       d_0 = d_1.
   Proof.
@@ -408,7 +408,7 @@ Module ReplicatedDisk (td : TwoDiskAPI) <: OneDiskAPI.
     eapply H1; omega.
   Qed.
 
-  Lemma equal_after_size : forall d_0 d_1,
+  Theorem equal_after_size : forall d_0 d_1,
       diskSize d_0 = diskSize d_1 ->
       equal_after (diskSize d_0) d_0 d_1.
   Proof.
@@ -505,10 +505,10 @@ Module ReplicatedDisk (td : TwoDiskAPI) <: OneDiskAPI.
 
 
   (**
-   * Lemmas and recovery proofs.
+   * Theorems and recovery proofs.
    *)
 
-  Lemma if_lt_dec : forall A n m (a a':A),
+  Theorem if_lt_dec : forall A n m (a a':A),
       n < m ->
       (if lt_dec n m then a else a') = a.
   Proof.
@@ -517,7 +517,7 @@ Module ReplicatedDisk (td : TwoDiskAPI) <: OneDiskAPI.
     contradiction.
   Qed.
 
-  Lemma disks_eq_inbounds : forall (d: disk) a v v',
+  Theorem disks_eq_inbounds : forall (d: disk) a v v',
       a < diskSize d ->
       diskGet d a ?|= eq v ->
       diskGet d a ?|= eq v' ->
@@ -575,7 +575,7 @@ Module ReplicatedDisk (td : TwoDiskAPI) <: OneDiskAPI.
     simplify.
   Qed.
 
-  Lemma diskUpd_maybe_same : forall (d:disk) a b,
+  Theorem diskUpd_maybe_same : forall (d:disk) a b,
       diskGet d a ?|= eq b ->
       diskUpd d a b = d.
   Proof.
@@ -1055,21 +1055,21 @@ Module ReplicatedDisk (td : TwoDiskAPI) <: OneDiskAPI.
                    | _ => eauto
                    end.
 
-  Lemma invariant_to_disks_eq0 : forall state,
+  Theorem invariant_to_disks_eq0 : forall state,
       rd_invariant state ->
       disk0 state ?|= eq (abstraction_f state).
   Proof.
     crush.
   Qed.
 
-  Lemma invariant_to_disks_eq1 : forall state,
+  Theorem invariant_to_disks_eq1 : forall state,
       rd_invariant state ->
       disk1 state ?|= eq (abstraction_f state).
   Proof.
     crush.
   Qed.
 
-  Lemma disks_eq_to_invariant : forall state d,
+  Theorem disks_eq_to_invariant : forall state d,
       disk0 state ?|= eq d ->
       disk1 state ?|= eq d ->
       rd_invariant state.
@@ -1077,7 +1077,7 @@ Module ReplicatedDisk (td : TwoDiskAPI) <: OneDiskAPI.
     crush.
   Qed.
 
-  Lemma disks_eq_to_abstraction : forall state d,
+  Theorem disks_eq_to_abstraction : forall state d,
       disk0 state ?|= eq d ->
       disk1 state ?|= eq d ->
       d = abstraction_f state.
@@ -1086,7 +1086,7 @@ Module ReplicatedDisk (td : TwoDiskAPI) <: OneDiskAPI.
     solve_false.
   Qed.
 
-  Lemma disks_eq_to_abstraction' : forall state d,
+  Theorem disks_eq_to_abstraction' : forall state d,
       disk0 state ?|= eq d ->
       disk1 state ?|= eq d ->
       abstraction_f state = d.

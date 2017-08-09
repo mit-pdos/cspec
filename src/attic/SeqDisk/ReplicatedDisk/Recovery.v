@@ -66,7 +66,7 @@ Section ReplicatedDiskRecovery.
 
     Hint Unfold TD.wipe : rd.
 
-    Lemma if_lt_dec : forall A n m (a a':A),
+    Theorem if_lt_dec : forall A n m (a a':A),
         n < m ->
         (if lt_dec n m then a else a') = a.
     Proof.
@@ -75,7 +75,7 @@ Section ReplicatedDiskRecovery.
       contradiction.
     Qed.
 
-    Lemma disks_eq_inbounds : forall T (d: diskOf T) a v v',
+    Theorem disks_eq_inbounds : forall T (d: diskOf T) a v v',
         a < size d ->
         d a |= eq v ->
         d a |= eq v' ->
@@ -132,7 +132,7 @@ Section ReplicatedDiskRecovery.
       contradiction.
     Qed.
 
-    Lemma diskUpd_maybe_same : forall (d:disk) a b,
+    Theorem diskUpd_maybe_same : forall (d:disk) a b,
         d a |= eq b ->
         diskUpd d a b = d.
     Proof.

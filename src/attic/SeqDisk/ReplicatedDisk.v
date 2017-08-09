@@ -157,7 +157,7 @@ Module RD.
     (* First, we prove some lemmas that re-express the D.API semantics in more
     convenient terms (in some cases, just for the sake of the automation). *)
 
-    Lemma read_step : forall a (state state':D.State) b,
+    Theorem read_step : forall a (state state':D.State) b,
         state a |= eq b ->
         state' = state ->
         D.step (D.Read a) state b state'.
@@ -168,7 +168,7 @@ Module RD.
       replace (state a) in *; auto.
     Qed.
 
-    Lemma write_step : forall a b (state state':D.State) u,
+    Theorem write_step : forall a b (state state':D.State) u,
         state' = diskUpd state a b ->
         D.step (D.Write a b) state u state'.
     Proof.
@@ -177,7 +177,7 @@ Module RD.
       econstructor; eauto.
     Qed.
 
-    Lemma sync_step : forall (state state':D.State) u,
+    Theorem sync_step : forall (state state':D.State) u,
         state' = state ->
         D.step (D.Sync) state u state'.
     Proof.
@@ -186,7 +186,7 @@ Module RD.
       econstructor; eauto.
     Qed.
 
-    Lemma disk_size_step : forall (state state':D.State) r,
+    Theorem disk_size_step : forall (state state':D.State) r,
         r = size state ->
         state' = state ->
         D.step (D.DiskSize) state r state'.
@@ -229,21 +229,21 @@ Module RD.
                      | _ => eauto
                      end.
 
-    Lemma invariant_to_disks_eq0 : forall state,
+    Theorem invariant_to_disks_eq0 : forall state,
         rd_invariant state ->
         TD.disk0 state |= eq (abstraction_f state).
     Proof.
       crush.
     Qed.
 
-    Lemma invariant_to_disks_eq1 : forall state,
+    Theorem invariant_to_disks_eq1 : forall state,
         rd_invariant state ->
         TD.disk1 state |= eq (abstraction_f state).
     Proof.
       crush.
     Qed.
 
-    Lemma disks_eq_to_invariant : forall state d,
+    Theorem disks_eq_to_invariant : forall state d,
         TD.disk0 state |= eq d ->
         TD.disk1 state |= eq d ->
         rd_invariant state.
@@ -251,7 +251,7 @@ Module RD.
       crush.
     Qed.
 
-    Lemma disks_eq_to_abstraction : forall state d,
+    Theorem disks_eq_to_abstraction : forall state d,
         TD.disk0 state |= eq d ->
         TD.disk1 state |= eq d ->
         d = abstraction_f state.
@@ -260,7 +260,7 @@ Module RD.
       solve_false.
     Qed.
 
-    Lemma disks_eq_to_abstraction' : forall state d,
+    Theorem disks_eq_to_abstraction' : forall state d,
         TD.disk0 state |= eq d ->
         TD.disk1 state |= eq d ->
         abstraction_f state = d.

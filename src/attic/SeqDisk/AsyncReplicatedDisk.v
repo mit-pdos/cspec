@@ -47,7 +47,7 @@ Module RD.
 
     Implicit Type (state:TD.State).
 
-    Lemma histblock_histcrash_trans : forall h h' h'',
+    Theorem histblock_histcrash_trans : forall h h' h'',
         In (curr_val h') (durable_vals h) ->
         hist_flushed h' ->
         histcrash h' h'' ->
@@ -60,7 +60,7 @@ Module RD.
       econstructor; eauto.
     Qed.
 
-    Lemma crashesTo_one_of_same : forall d hd hd',
+    Theorem crashesTo_one_of_same : forall d hd hd',
         crashesTo hd d ->
         histdisk_flushed hd ->
         crashesTo_one_of hd' hd' hd ->
@@ -81,7 +81,7 @@ Module RD.
 
     Hint Resolve crashesTo_one_of_same.
 
-    Lemma crashesTo_one_of_same_wipeHist : forall hd hd',
+    Theorem crashesTo_one_of_same_wipeHist : forall hd hd',
         crashesTo_one_of hd' hd' hd ->
         histdisk_flushed hd ->
         wipeHist hd' hd.
@@ -128,7 +128,7 @@ Module RD.
       descend; intuition eauto.
     Qed.
 
-    Lemma histblock_buffer : forall h b' b,
+    Theorem histblock_buffer : forall h b' b,
         In b (durable_vals h) ->
         In b (durable_vals (buffer b' h)).
     Proof.
@@ -139,7 +139,7 @@ Module RD.
 
     Hint Resolve histblock_buffer.
 
-    Lemma crashesTo_upd_or_not : forall d a b d',
+    Theorem crashesTo_upd_or_not : forall d a b d',
         crashesTo_one_of (diskUpdF d a (buffer b)) d d' ->
         crashesTo_one_of (diskUpdF d a (buffer b)) (diskUpdF d a (buffer b)) d'.
     Proof.
@@ -219,7 +219,7 @@ Module RD.
     Qed.
 
     (* TODO: simplify this proof *)
-    Lemma then_flush_crashesTo : forall d d',
+    Theorem then_flush_crashesTo : forall d d',
         then_flush (covered d) d' ->
         crashesTo d d'.
     Proof.
@@ -279,7 +279,7 @@ Module RD.
     (* First, we prove some lemmas that re-express the D.API semantics in more
     convenient terms (in some cases, just for the sake of the automation). *)
 
-    Lemma read_step : forall a (state state':D.State) b,
+    Theorem read_step : forall a (state state':D.State) b,
         state a |= curr_val_eq b ->
         state' = state ->
         D.step (D.Read a) state b state'.
@@ -290,7 +290,7 @@ Module RD.
       replace (state a) in *; auto.
     Qed.
 
-    Lemma write_step : forall a b (state state':D.State) u,
+    Theorem write_step : forall a b (state state':D.State) u,
         state' = diskUpdF state a (buffer b) ->
         D.step (D.Write a b) state u state'.
     Proof.
@@ -299,7 +299,7 @@ Module RD.
       econstructor; eauto.
     Qed.
 
-    Lemma sync_step : forall (state state':D.State) u,
+    Theorem sync_step : forall (state state':D.State) u,
         state' = flush state ->
         D.step (D.Sync) state u state'.
     Proof.
@@ -308,7 +308,7 @@ Module RD.
       econstructor; eauto.
     Qed.
 
-    Lemma disk_size_step : forall (state state':D.State) r,
+    Theorem disk_size_step : forall (state state':D.State) r,
         r = size state ->
         state' = state ->
         D.step (D.DiskSize) state r state'.
@@ -347,14 +347,14 @@ Module RD.
     Definition covering (d:disk) : histdisk :=
       mapDisk state_hist d.
 
-    Lemma collapsesTo_state_hist : forall b,
+    Theorem collapsesTo_state_hist : forall b,
         collapsesTo (state_hist b) b.
     Proof.
       unfold state_hist; destruct b; simpl; intros.
       econstructor; simpl; eauto.
     Qed.
 
-    Lemma covered_covering : forall d,
+    Theorem covered_covering : forall d,
         covered (covering d) d.
     Proof.
       intros.
@@ -401,7 +401,7 @@ Module RD.
     Qed.
 
     (* TODO: move up to AsyncDisk. Might be useful elsewhere, too. *)
-    Lemma wipe_crashesTo : forall d d',
+    Theorem wipe_crashesTo : forall d d',
         covered d d' ->
         crashesTo d (wipeDisk d').
     Proof.
@@ -412,7 +412,7 @@ Module RD.
       eapply collapse_durable; eauto.
     Qed.
 
-    Lemma wipe_disk0_crashesTo : forall state d,
+    Theorem wipe_disk0_crashesTo : forall state d,
         TD.disk0 state |= covered d ->
         TD.disk0 (TD.disks_map wipeDisk state) |= crashesTo d.
     Proof.
@@ -424,7 +424,7 @@ Module RD.
       eapply wipe_crashesTo; eauto.
     Qed.
 
-    Lemma wipe_disk1_crashesTo : forall state d,
+    Theorem wipe_disk1_crashesTo : forall state d,
         TD.disk1 state |= covered d ->
         TD.disk1 (TD.disks_map wipeDisk state) |= crashesTo d.
     Proof.
@@ -437,7 +437,7 @@ Module RD.
 
     Hint Resolve wipe_disk0_crashesTo wipe_disk1_crashesTo.
 
-    Lemma crashesTo_synced_covered : forall d d',
+    Theorem crashesTo_synced_covered : forall d d',
         crashesTo d d' ->
         histdisk_flushed d ->
         covered d d'.
@@ -457,7 +457,7 @@ Module RD.
 
     Hint Resolve crashesTo_synced_covered.
 
-    Lemma wipeBlock_hist_flushed : forall h h',
+    Theorem wipeBlock_hist_flushed : forall h h',
         wipeBlockhist h h' ->
         hist_flushed h'.
     Proof.

@@ -172,7 +172,7 @@ Module RemappedDisk (bd : BadBlockAPI) <: OneDiskAPI.
       + rewrite <- Hgoodsec; auto.
   Qed.
 
-  Lemma remapped_abstraction_diskUpd_remap : forall state s v,
+  Theorem remapped_abstraction_diskUpd_remap : forall state s v,
     remapped_abstraction state s ->
     remapped_abstraction (mkState
       (diskUpd (stateDisk state) (diskSize (stateDisk state) - 1) v)
@@ -188,7 +188,7 @@ Module RemappedDisk (bd : BadBlockAPI) <: OneDiskAPI.
     repeat rewrite diskUpd_eq by omega; auto.
   Qed.
 
-  Lemma remapped_abstraction_diskUpd_noremap : forall state s a v,
+  Theorem remapped_abstraction_diskUpd_noremap : forall state s a v,
     remapped_abstraction state s ->
     a <> diskSize (stateDisk state) - 1 ->
     a <> stateBadBlock state ->

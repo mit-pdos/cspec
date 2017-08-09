@@ -8,7 +8,7 @@ Require Import MemState.Pred.Def.
 Definition singleton A V (a:A) (v:V) {AEQ:EqualDec A} : mem A V :=
   fun a' => if a == a' then Some v else None.
 
-Lemma ptsto_singleton : forall `{m: mem A V} {AEQ:EqualDec A} a v,
+Theorem ptsto_singleton : forall `{m: mem A V} {AEQ:EqualDec A} a v,
     m |= a |-> v ->
     m = singleton a v.
 Proof.
@@ -17,7 +17,7 @@ Proof.
   is_eq a a'; intuition.
 Qed.
 
-Lemma ptsto_singleton' : forall {A V} {AEQ:EqualDec A} (a:A) (v:V),
+Theorem ptsto_singleton' : forall {A V} {AEQ:EqualDec A} (a:A) (v:V),
     singleton a v |= a |-> v.
 Proof.
   unfold singleton; simpl; intros.
@@ -36,7 +36,7 @@ Proof.
   unfold mem_union; simpl_match; auto.
 Qed.
 
-Lemma mem_disjoint_singleton : forall `{m:mem A V} {AEQ:EqualDec A} a v0 v,
+Theorem mem_disjoint_singleton : forall `{m:mem A V} {AEQ:EqualDec A} a v0 v,
     mem_disjoint (singleton a v0) m ->
     mem_disjoint (singleton a v) m.
 Proof.
