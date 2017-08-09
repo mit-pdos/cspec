@@ -567,7 +567,7 @@ Module ReplicatedDisk (td : TwoDiskAPI) <: OneDiskAPI.
     destruct r; step.
 
     destruct r; try step.
-    is_eq v v0; try step.
+    destruct (v == v0); subst; try step.
     simplify.
     assert (v = v0) by eauto using disks_eq_inbounds.
     contradiction.
@@ -630,7 +630,7 @@ Module ReplicatedDisk (td : TwoDiskAPI) <: OneDiskAPI.
     destruct r; try step.
     match goal with
     | |- context[diskUpd _ _ ?b] =>
-      is_eq b v; try step
+      destruct (b == v); subst; try step
     end.
 
     simplify.
@@ -686,7 +686,7 @@ Module ReplicatedDisk (td : TwoDiskAPI) <: OneDiskAPI.
     destruct r; try step.
 
     destruct r; try step.
-    is_eq v v0; try step.
+    destruct (v == v0); subst; try step.
 
     simplify.
     simplify.

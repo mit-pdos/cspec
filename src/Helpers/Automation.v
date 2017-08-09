@@ -243,42 +243,6 @@ Ltac safe_intuition_then t :=
 Tactic Notation "safe_intuition" := safe_intuition_then ltac:(auto).
 Tactic Notation "safe_intuition" tactic(t) := safe_intuition_then t.
 
-Ltac hyp_intuition :=
-  repeat match goal with
-         | [ H: _ /\ _ |- _ ] =>
-           destruct H
-         | [ H: _ \/ _ |- _ ] =>
-           destruct H
-         end.
-
-(** * Hiding abstraction of lower levels *)
-
-Local Ltac hide_fn_call fn arg :=
-  generalize dependent (fn arg); clear arg; intros arg **.
-
-(** hide_fn abstraction will abstract [abstraction t] to an opaque term t; use
- to replace a lower-level abstraction that need not be unfolded. *)
-Tactic Notation "hide_fn" constr(fn) :=
-  repeat match goal with
-         | |- context[fn ?arg] => hide_fn_call fn arg
-         | H: context[fn ?arg] |- _ => hide_fn_call fn arg
-         end.
-
-(** * Handling == equivalences *)
-
-Ltac is_eq a a' :=
-  destruct (a == a'); subst.
-
-(** * Normalize systems of equality *)
-
-(* TODO: there are many possibilities to make this tactic more robust, for
-example by breaking rewrite cycles; as the need arises, add these features *)
-Ltac normalize_eq :=
-  repeat match goal with
-         | [ H: _ = _ |- _ ] =>
-           rewrite H
-         end.
-
 (** * Uncategorized *)
 
 Create HintDb false.
