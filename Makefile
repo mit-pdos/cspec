@@ -1,7 +1,6 @@
 ## Common library code
 CODE := $(wildcard src/POCS.v)
 CODE += $(wildcard src/Helpers/*.v)
-CODE += $(wildcard src/Disk/*.v)
 CODE += $(wildcard src/Refinement/*.v)
 CODE += $(wildcard src/Common/*.v)
 

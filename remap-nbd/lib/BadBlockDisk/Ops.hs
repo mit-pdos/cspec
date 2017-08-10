@@ -6,7 +6,7 @@ import                   Control.Monad.Reader (reader, liftIO)
 import qualified         Data.ByteString as BS
 import qualified         Data.Char
 import                   BadBlockDisk.Env
-import                   Blocks
+import                   Disk
 import                   System.IO (SeekMode(..))
 import "unix-bytestring" System.Posix.IO.ByteString
 import                   System.Posix.Types (Fd)

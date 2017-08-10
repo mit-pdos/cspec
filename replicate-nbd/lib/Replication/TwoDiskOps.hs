@@ -5,7 +5,7 @@ import                   Control.Monad (void)
 import                   Control.Monad.Reader (reader, liftIO)
 import qualified         Data.ByteString as BS
 import                   Replication.TwoDiskEnvironment
-import                   Blocks
+import                   Disk
 import                   System.IO (SeekMode(..))
 import "unix-bytestring" System.Posix.IO.ByteString
 import                   System.Posix.Types (Fd)
