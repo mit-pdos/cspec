@@ -164,12 +164,12 @@ Qed.
 (** To reflect the expected usage of this primitive, we define
     two notations:
 
-    - [mv ?|= p] states that p holds on mv, if mv is present.
+    - [mv ?|= p] states that [p] holds on [mv], if [mv] is present.
       This notation simply translates to [maybe_holds p mv].
 
     - To state that an optional value is definitely missing,
       we provide a predicate [missing], so that [mv ?|= missing]
-      implies that mv is None.  The [missing] predicate is simply
+      implies that [mv] is [None].  The [missing] predicate is simply
       [False], which allows us to conclude by contradiction that
       there's no way the optional value could be [Some x].
   *)
