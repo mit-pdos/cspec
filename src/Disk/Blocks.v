@@ -16,6 +16,8 @@ Definition block1 : block := bytes1 _.
 Theorem block0_block1_differ : block0 <> block1.
 Proof.
   apply bytes_differ.
+  unfold blockbytes.
+  omega.
 Qed.
 
 Hint Resolve block0_block1_differ.
