@@ -2,13 +2,83 @@ Require Import Automation.
 Require Import Omega.
 Require Import RelationClasses.
 Require Import List.
+Require Import Helpers.
 
-Require Export Blocks.
 
+(** * Disk model.
+
+    This file defines our model of a disk.  The first thing to
+    do is to define the two basic types: an address and a block.
+    For us, an address [addr] is simply a [nat], and a block is
+    an array of bytes (the size being the block size).
+  *)
+
+Definition addr := nat.
+
+(** We define the block size as a separate constant, [blockbytes],
+    so that we can later make it opaque.  This helps avoid Coq
+    expanding out [blockbytes] into the literal constant [1024],
+    which helps with performance.
+  *)
+
+Definition blockbytes := 1024.
+
+Definition block := bytes blockbytes.
+Definition block0 : block := bytes0 _.
+Definition block1 : block := bytes1 _.
+
+Theorem block0_block1_differ : block0 <> block1.
+Proof.
+  apply bytes_differ.
+  unfold blockbytes.
+  omega.
+Qed.
+
+Hint Resolve block0_block1_differ.
+
+(** Coq v8.6 has a minor bug in the [omega] tactic, which is helpful
+    in solving simple arithmetic goals.  In particular, when we have
+    arithmetic expressions that involve the [addr] type, [omega] gets
+    confused because it doesn't see that [addr] is simply a wrapper
+    for [nat].  This works around the bug, which should eventually be
+    fixed by https://github.com/coq/coq/pull/876
+  *)
+
+Local Ltac omega_orig := omega.
+Ltac omega := unfold addr in *; omega_orig.
+
+(** Mark [blockbytes] as opaque so that Coq doesn't expand it too eagerly.
+  *)
+
+Opaque blockbytes.
+
+
+(** * Disk as a list of blocks.
+
+    Now we can define our model of a disk: a list of blocks.
+    A disk with zero blocks is an empty list, [nil].
+  *)
 
 Definition disk := list block.
 
 Definition empty_disk : disk := nil.
+
+(** We define three main operations on disks:
+
+    - [diskGet d a] gets the contents of an address [a] in disk [d].
+      It returns an [option block], which is either a block value [b]
+      (represented by [Some b]), or [None] if [a] is past the end of
+      the disk.
+
+    - [diskSize] returns the size of the disk, which is just the length
+      of the list representing the disk.
+
+    - [diskUpd] writes to a disk.  Since Gallina is a functional language,
+      we cannot update a disk "in-place", so instead [diskUpd] returns a
+      new disk reflecting the write.  Specifically, [diskUpd d a b] returns
+      a new disk with address [a] updated to block value [b], if [a] is
+      in-bounds, or no changes if [a] is out-of-bounds.
+  *)
 
 Definition diskGet (d : disk) (a : addr) : option block :=
   nth_error d a.
@@ -25,11 +95,17 @@ Fixpoint diskUpd d (a: addr) b : disk :=
     end
   end.
 
-(* Shrink a disk by one block. *)
+(** We also define another helper operation, [diskShrink], which takes
+    a disk and drops the last block.  This will be helpful in the
+    bad-block-remapping lab assignment.
+  *)
 
 Definition diskShrink (d : disk) : disk :=
   firstn (length d - 1) d.
 
+(** Finally, we prove a variety of lemmas about the behavior of these
+    disk operations.
+  *)
 
 Theorem disk_inbounds_not_none : forall a d,
     a < diskSize d ->
@@ -233,6 +309,17 @@ Proof.
     destruct a0; simpl; try rewrite diskUpd_size; unfold diskSize;
       replace (length d - 0) with (length d) by omega; auto.
 Qed.
+
+(** We combine all of the above lemmas into a hint database called "upd".
+    This means that, when you type [autorewrite with upd] in some Coq proof,
+    Coq will try to rewrite using all of the hints in that database.
+
+    The [using] part of the hint tells Coq that all of the side conditions
+    associated with the rewrite must be solved using the tactic specified
+    in the [using] clause.  This prevents Coq from applying a rewrite rule
+    if some side condition (like an address being out-of-bounds) cannot be
+    immediately proven.
+  *)
 
 Hint Rewrite diskUpd_eq using (solve [ auto ]) : upd.
 Hint Rewrite disk_oob_eq using (solve [ auto ]) : upd.
