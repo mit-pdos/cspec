@@ -9,7 +9,7 @@ import os, sys
 import_modules = {
     "import qualified Data.ByteString as BS":
     [
-        "Helpers",
+        "Disk",
     ],
 
     "import qualified Variables.Ops as Variables":

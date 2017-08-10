@@ -4,18 +4,88 @@ Require Import RelationClasses.
 Require Import List.
 Require Import Helpers.
 
+Set Implicit Arguments.
+
 
 (** * Disk model.
 
     This file defines our model of a disk.  The first thing to
-    do is to define the two basic types: an address and a block.
-    For us, an address [addr] is simply a [nat], and a block is
-    an array of bytes (the size being the block size).
+    do is to define the type of an address.  For us, an address
+    [addr] is simply a [nat].
   *)
 
 Definition addr := nat.
 
-(** We define the block size as a separate constant, [blockbytes],
+
+(** * Model of bytes.
+
+    In our lab assignments, we will model disks as consisting of
+    blocks, which are in turn composed of bytes.  Here, we define
+    a notion of a byte array: the type of an array of [n] bytes
+    will be [bytes n].
+
+    There's one unusual aspect of how we model bytes: instead of
+    defining the bytes themselves in Coq, we simply state them as
+    an [Axiom].  This means we are not providing a Coq (Gallina)
+    implementation of bytes, and instead we are telling Coq to
+    assume that there exists something called [bytes], and there
+    exist other functions that manipulate bytes that we define here
+    as well (like [bytes_dec] to decide if two byte arrays are equal).
+
+    When we generate executable code by extracting our Coq (Gallina)
+    code into Haskell, we will be required to provide a Haskell
+    implementation of any such [Axiom].  This correspondence is
+    made below, using [Extract Constant], and we (as developers)
+    are responsible for making sure any axioms we state (like
+    [bsplit_bappend]) are true of our Haskell implementations.
+  *)
+
+Axiom bytes : nat -> Type.
+
+Axiom bytes_dec : forall n, EqualDec (bytes n).
+
+(**
+    Two "initial" byte values: an all-zero array, [bytes0], and
+    an all-ones array, [bytes1].  We also promise that all-zero
+    and all-ones arrays are different, as long as there's at least
+    one element.
+  *)
+
+Axiom bytes0 : forall n, bytes n.
+Axiom bytes1 : forall n, bytes n.
+Axiom bytes_differ : forall n, n > 0 -> bytes0 n <> bytes1 n.
+
+Definition bnull : bytes 0 := bytes0 0.
+
+Axiom bappend : forall n1 n2, bytes n1 -> bytes n2 -> bytes (n1+n2).
+Axiom bsplit : forall n1 n2, bytes (n1+n2) -> bytes n1 * bytes n2.
+Arguments bsplit {n1 n2} bs.
+
+Axiom bsplit_bappend : forall n1 n2 (b1 : bytes n1) (b2 : bytes n2), bsplit (bappend b1 b2) = (b1, b2).
+
+Fixpoint bsplit_list {n} {m} : bytes (n * m) -> list (bytes m) :=
+  match n with
+  | O => fun _ => nil
+  | S n' => fun (bs : bytes ((S n') * m)) =>
+    let (this, rest) := bsplit bs in
+    this :: bsplit_list rest
+  end.
+
+Extraction Language Haskell.
+
+Extract Constant bytes => "BS.ByteString".
+Extract Constant bytes_dec => "(\n b1 b2 -> b1 Prelude.== b2)".
+Extract Constant bytes0 => "(\n -> BS.replicate (Prelude.fromIntegral n) 0)".
+
+Extract Constant bappend => "(\_ _ bs1 bs2 -> BS.append bs1 bs2)".
+Extract Constant bsplit => "(\n1 _ bs -> BS.splitAt (Prelude.fromIntegral n1) bs)".
+
+
+(** * Model of blocks.
+
+    We represent blocks as a byte array of a fixed size.
+
+    We define the block size as a separate constant, [blockbytes],
     so that we can later make it opaque.  This helps avoid Coq
     expanding out [blockbytes] into the literal constant [1024],
     which helps with performance.
