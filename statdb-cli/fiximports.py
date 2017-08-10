@@ -7,6 +7,11 @@ import re
 import os, sys
 
 import_modules = {
+    "import qualified Data.ByteString as BS":
+    [
+        "Helpers",
+    ],
+
     "import qualified Variables.Ops as Variables":
     [
         "VariablesImpl",

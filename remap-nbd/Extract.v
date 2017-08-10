@@ -2,7 +2,6 @@ Cd "remap-nbd/extract/".
 
 Require Import ExtrHaskellBasic.
 Require Import ExtrHaskellNatInteger.
-Require Import Helpers.ExtrBytes.
 Require Import Refinement.ExtrProg.
 
 Extraction Language Haskell.

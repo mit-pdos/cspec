@@ -52,9 +52,9 @@ Instance bool_equal_dec : EqualDec bool := bool_dec.
     When we generate executable code by extracting our Coq (Gallina)
     code into Haskell, we will be required to provide a Haskell
     implementation of any such [Axiom].  This correspondence is
-    made in [ExtrBytes.v], and we (as developers) are responsible for
-    making sure any axioms we state (like [bsplit_bappend]) are true
-    of our Haskell implementations.
+    made below, using [Extract Constant], and we (as developers)
+    are responsible for making sure any axioms we state (like
+    [bsplit_bappend]) are true of our Haskell implementations.
   *)
 
 Axiom bytes : nat -> Type.
@@ -87,6 +87,15 @@ Fixpoint bsplit_list {n} {m} : bytes (n * m) -> list (bytes m) :=
     let (this, rest) := bsplit bs in
     this :: bsplit_list rest
   end.
+
+Extraction Language Haskell.
+
+Extract Constant bytes => "BS.ByteString".
+Extract Constant bytes_dec => "(\n b1 b2 -> b1 Prelude.== b2)".
+Extract Constant bytes0 => "(\n -> BS.replicate (Prelude.fromIntegral n) 0)".
+
+Extract Constant bappend => "(\_ _ bs1 bs2 -> BS.append bs1 bs2)".
+Extract Constant bsplit => "(\n1 _ bs -> BS.splitAt (Prelude.fromIntegral n1) bs)".
 
 
 (** * [maybe_holds] predicate.
