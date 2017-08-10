@@ -48,7 +48,7 @@ docs: coq
 	coqdoc $(COQRFLAGS) -d doc $(patsubst src/%.v,build/%.v,$(CODE))
 
 .PHONY: %/extract
-%/extract: %/Extract.v %/fiximports.py build/Refinement/ExtrProg.vo
+%/extract: %/Extract.v %/fiximports.py
 	@mkdir -p $@
 	coqtop $(COQRFLAGS) -batch -noglob -load-vernac-source $<
 	./scripts/add-preprocess.sh $@/*.hs

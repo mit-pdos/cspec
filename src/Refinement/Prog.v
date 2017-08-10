@@ -28,6 +28,16 @@ CoInductive proc : forall T:Type, Type :=
 | Ret : forall T, T -> proc T
 | Bind : forall T T', proc T -> (T -> proc T') -> proc T'.
 
+Extraction Language Haskell.
+
+Extract Constant opT "a" => "()".
+Extract Constant world => "()".
+
+Extract Inductive proc => "TheProc"
+                           ["prim_error" "return" "(>>=)"]
+                           "(\fprim fret fbind -> error 'pattern match on proc')".
+
+
 (** A Semantics is a transition relation for a particular program, relating an
 initial state to a return value and final state. *)
 Definition Semantics world T := world -> T -> world -> Prop.

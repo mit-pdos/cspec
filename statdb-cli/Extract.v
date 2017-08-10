@@ -2,7 +2,6 @@ Cd "statdb-cli/extract/".
 
 Require Import ExtrHaskellBasic.
 Require Import ExtrHaskellNatInteger.
-Require Import Refinement.ExtrProg.
 
 Extraction Language Haskell.
 
