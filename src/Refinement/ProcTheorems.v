@@ -2,7 +2,7 @@ Require Import Relations.Relation_Operators.
 Require Import RelationClasses.
 
 Require Import Automation.
-Require Import Prog.
+Require Import Proc.
 
 
 (** * Automation for inverting execution behavior. *)

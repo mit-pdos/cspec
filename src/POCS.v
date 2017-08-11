@@ -5,5 +5,5 @@ Require Export Helpers.Automation.
 Require Export Helpers.Helpers.
 Require Export Helpers.Disk.
 
-Require Export Refinement.Prog.
+Require Export Refinement.Proc.
 Require Export Refinement.Hoare.

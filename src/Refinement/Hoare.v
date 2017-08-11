@@ -1,6 +1,6 @@
 Require Import Automation.
-Require Import Prog.
-Require Import ProgTheorems.
+Require Import Proc.
+Require Import ProcTheorems.
 
 (* TODO: document how specifications are structured *)
 
