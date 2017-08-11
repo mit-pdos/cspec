@@ -86,10 +86,6 @@ Extract Inductive proc => "TheProc"
                            "(\fprim fret fbind -> error 'pattern match on proc')".
 
 
-(** A Semantics is a transition relation for a particular program, relating an
-initial state to a return value and final state. *)
-Definition Semantics world T := world -> T -> world -> Prop.
-
 (** The outcome of an execution, including intermediate crash points. *)
 Inductive Result T :=
 | Finished (v:T) (w:world)
@@ -97,16 +93,12 @@ Inductive Result T :=
 Arguments Crashed {T} w.
 
 (* Programs may have arbitrary behavior for each primitive. *)
-Axiom step:forall T, opT T -> Semantics world T.
+Axiom step : forall T, opT T -> world -> T -> world -> Prop.
 
 (* On crash, the world state is modified to remove mutable data according to
 [world_crash]. Note that this is a function; it should be a deterministic
 process to replace in-memory state with default values. *)
 Axiom world_crash: world -> world.
-
-(* Can crashes happen?  This is effectively a flag that we will use in early
-lab assignments to avoid having to reason about crashes. *)
-Axiom can_crash: Prop.
 
 (** [exec] specifies the execution semantics of complete programs using [step]
   as the small-step semantics of the primitive operations.
@@ -118,16 +110,13 @@ Inductive exec : forall T, proc T -> world -> Result T -> Prop :=
     step op w v w' ->
     exec (BaseOp op) w (Finished v w')
 | ExecOpCrashEnd : forall T (op: opT T) w v w',
-    can_crash ->
     step op w v w' ->
     exec (BaseOp op) w (Crashed w')
 | ExecCrashBegin : forall T (p: proc T) w,
-    can_crash ->
     exec p w (Crashed w)
 | ExecRet : forall T (v:T) w,
     exec (Ret v) w (Finished v w)
 | ExecRetCrash : forall T (v:T) w,
-    can_crash ->
     exec (Ret v) w (Crashed w)
 | ExecBindFinished : forall T T' (p: proc T) (p': T -> proc T')
                        w v w' r,
@@ -194,7 +183,7 @@ Theorem exec_ret : forall T (v:T) w r,
     exec (Ret v) w r ->
     match r with
     | Finished v' w' => v = v' /\ w = w'
-    | Crashed w' => w = w' /\ can_crash
+    | Crashed w' => w = w'
     end.
 Proof.
   intros.

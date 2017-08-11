@@ -9,14 +9,12 @@ Require Import Prog.
 Local Hint Constructors exec.
 
 Theorem can_crash_at_begin : forall `(p: proc T) w,
-    can_crash ->
     exec p w (Crashed w).
 Proof.
   eauto.
 Qed.
 
 Theorem can_crash_at_end : forall `(p: proc T) w v w',
-    can_crash ->
     exec p w (Finished v w') ->
     exec p w (Crashed w').
 Proof.
@@ -24,7 +22,7 @@ Proof.
   more straightforward), but this proof doesn't require finite programs! *)
   intros.
   remember (Finished v w').
-  induction H0;
+  induction H;
     try match goal with
         | [ H: _ = Finished _ _ |- _ ] =>
           inversion H; subst; clear H

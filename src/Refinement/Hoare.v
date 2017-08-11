@@ -427,6 +427,8 @@ Ltac step_prog :=
 
 (** Helpers for defining step-based semantics. *)
 
+Definition Semantics State T := State -> T -> State -> Prop.
+
 Definition pre_step {opT State}
            (bg_step: State -> State -> Prop)
            (step: forall `(op: opT T), Semantics State T) :
