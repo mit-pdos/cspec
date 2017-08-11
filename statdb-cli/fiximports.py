@@ -7,18 +7,18 @@ import re
 import os, sys
 
 import_modules = {
-    "import qualified Data.ByteString as BS":
+    "import qualified Data.ByteString":
     [
         "Disk",
     ],
 
-    "import qualified Variables.Ops as Variables":
+    "import qualified Variables.Ops":
     [
         "VariablesImpl",
         "StatDbCli",
     ],
 
-    "import qualified CLI.Stubs as CLI":
+    "import qualified CLI.Stubs":
     [
         "StatDbCli",
     ],

@@ -7,12 +7,12 @@ import re
 import os, sys
 
 import_modules = {
-    "import qualified Data.ByteString as BS":
+    "import qualified Data.ByteString":
     [
         "Disk",
     ],
 
-    "import qualified Replication.TwoDiskOps as TD":
+    "import qualified Replication.TwoDiskOps":
     [
         "TwoDiskBaseImpl",
     ],
@@ -32,7 +32,7 @@ import_modules = {
         "NbdAPI",
     ],
 
-    "import Network.ServerOps as Server":
+    "import qualified Network.ServerOps":
     [
         "NbdImpl",
     ],

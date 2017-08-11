@@ -21,7 +21,7 @@ Module NbdImpl <: NbdAPI.
 End NbdImpl.
 
 Extract Constant Handle => "Data.Word.Word64".
-Extract Constant NbdImpl.init => "Server.init".
-Extract Constant NbdImpl.getRequest => "Server.getRequestFromQueue".
-Extract Constant NbdImpl.sendResponse => "Server.sendResponseOnQueue".
-Extract Constant NbdImpl.recover => "Server.recover".
+Extract Constant NbdImpl.init => "Network.ServerOps.init".
+Extract Constant NbdImpl.getRequest => "Network.ServerOps.getRequestFromQueue".
+Extract Constant NbdImpl.sendResponse => "Network.ServerOps.sendResponseOnQueue".
+Extract Constant NbdImpl.recover => "Network.ServerOps.recover".

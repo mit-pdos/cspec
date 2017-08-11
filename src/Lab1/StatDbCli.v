@@ -25,5 +25,5 @@ Definition cli : proc unit :=
     Ret tt
   end.
 
-Extract Constant get_new_item => "CLI.getNewItem".
-Extract Constant report_mean => "CLI.reportMean".
+Extract Constant get_new_item => "CLI.Stubs.getNewItem".
+Extract Constant report_mean => "CLI.Stubs.reportMean".

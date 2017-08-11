@@ -20,6 +20,6 @@ Module Vars <: VarsAPI.
 
 End Vars.
 
-Extract Constant Vars.init => "Variables.init".
-Extract Constant Vars.read => "Variables.read".
-Extract Constant Vars.write => "Variables.write".
+Extract Constant Vars.init => "Variables.Ops.init".
+Extract Constant Vars.read => "Variables.Ops.read".
+Extract Constant Vars.write => "Variables.Ops.write".
