@@ -116,8 +116,6 @@ Inductive exec : forall T, proc T -> world -> Result T -> Prop :=
     exec p w (Crashed w)
 | ExecRet : forall T (v:T) w,
     exec (Ret v) w (Finished v w)
-| ExecRetCrash : forall T (v:T) w,
-    exec (Ret v) w (Crashed w)
 | ExecBindFinished : forall T T' (p: proc T) (p': T -> proc T')
                        w v w' r,
     exec p w (Finished v w') ->
