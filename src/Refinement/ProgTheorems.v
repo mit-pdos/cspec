@@ -135,9 +135,9 @@ Proof.
   intros.
   inversion H; subst.
   inv_exec.
-  - left; eauto.
   - right.
     descend; intuition eauto.
+  - left; eauto.
   - left; eauto.
 Qed.
 

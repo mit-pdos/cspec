@@ -61,6 +61,11 @@ Axiom opT: Type -> Type.
     [BaseOp] represents opaque Haskell code, and it's important here
     because in its absence, Coq could prove that the programming language
     never does anything other than return a constant expression with [Ret].
+
+    Procedures are parametrized by type [T], which is the type of value
+    that will be returned by the procedure.  For example, a procedure
+    that returns a [nat] has type [proc nat], and a procedure that returns
+    nothing ("void", in C terminology) has type [proc unit].
   *)
 
 CoInductive proc : forall T:Type, Type :=
@@ -86,34 +91,53 @@ Extract Inductive proc => "TheProc"
                            "(\fprim fret fbind -> error 'pattern match on proc')".
 
 
-(** The outcome of an execution, including intermediate crash points. *)
+(** * Execution model.
+
+    Finally, we define our model of execution.  We start by defining
+    the possible outcomes of executing a procedure [proc T]: either
+    the procedure finishes and returns something of type T, or the
+    procedure crashes.  Because we are explicitly modeling the effect
+    of procedures on the state of our system, both of these outcomes
+    also include the resulting world state.
+  *)
+
 Inductive Result T :=
 | Finished (v:T) (w:world)
 | Crashed (w:world).
+
 Arguments Crashed {T} w.
 
-(* Programs may have arbitrary behavior for each primitive. *)
+(** To define the execution of programs, we need to state an axiom
+    about how our opaque [BaseOp] Haskell procedures will execute.
+    This axiom is [step].  For every [opT T], it relates a starting
+    world state to the return value of that [BaseOp] and the resulting
+    world state.  This is largely just a technicality.
+  *)
+
 Axiom step : forall T, opT T -> world -> T -> world -> Prop.
 
-(* On crash, the world state is modified to remove mutable data according to
-[world_crash]. Note that this is a function; it should be a deterministic
-process to replace in-memory state with default values. *)
-Axiom world_crash: world -> world.
+(** We also need to model what happens to the state of our system on
+    a crash.  Our model is that, on a crash, the world state is modified
+    according to the opaque [world_crash] function, which we define as an
+    axiom.  This is meant to represent the computer losing volatile state,
+    such as memory contents or disk write buffers.
+  *)
 
-(** [exec] specifies the execution semantics of complete programs using [step]
-  as the small-step semantics of the primitive operations.
+Axiom world_crash : world -> world.
 
-   Note that crashing is entirely modeled here: operations are always atomic,
-   but otherwise crashes can occur before or after any operation. *)
+(** Finally, we define the [exec] relation to represent the execution
+    semantics of a procedure, leveraging the [step] and [world_crash]
+    definitions from above.
+  *)
+
 Inductive exec : forall T, proc T -> world -> Result T -> Prop :=
-| ExecOp : forall T (op: opT T) w v w',
-    step op w v w' ->
-    exec (BaseOp op) w (Finished v w')
-| ExecOpCrashEnd : forall T (op: opT T) w v w',
-    step op w v w' ->
-    exec (BaseOp op) w (Crashed w')
-| ExecCrashBegin : forall T (p: proc T) w,
-    exec p w (Crashed w)
+
+(** There are three interesting aspects of this definition:
+
+    - First, it defines how [Bind] and [Ret] work, in the [ExecRet]
+      and [ExecBindFinished] constructors.
+  *)
+
 | ExecRet : forall T (v:T) w,
     exec (Ret v) w (Finished v w)
 | ExecBindFinished : forall T T' (p: proc T) (p': T -> proc T')
@@ -121,12 +145,49 @@ Inductive exec : forall T, proc T -> world -> Result T -> Prop :=
     exec p w (Finished v w') ->
     exec (p' v) w' r ->
     exec (Bind p p') w r
+
+(** - Second, it defines how Haskell code runs, by referring back to
+      the [step] relation that we introduced above.
+  *)
+
+| ExecOp : forall T (op: opT T) w v w',
+    step op w v w' ->
+    exec (BaseOp op) w (Finished v w')
+
+(** - And finally, it defines how procedures can crash.  Any procedure
+      can crash just before it starts running.  [BaseOp] procedures
+      can also crash just after they finish.  And [Bind] can crash in
+      the middle of running the first sub-procedure.  Crashes during the
+      second sub-procedure of a [Bind] are covered by [ExecBindFinished]
+      above.
+  *)
+
+| ExecCrashBegin : forall T (p: proc T) w,
+    exec p w (Crashed w)
+| ExecOpCrashEnd : forall T (op: opT T) w v w',
+    step op w v w' ->
+    exec (BaseOp op) w (Crashed w')
 | ExecBindCrashed : forall T T' (p: proc T) (p': T -> proc T')
                       w w',
     exec p w (Crashed w') ->
     exec (Bind p p') w (Crashed w').
 
-(** analogous to [Result] for recovery *)
+
+(** * Execution model with recovery.
+
+    We also define a model of how our system executes procedures in the
+    presence of recovery after a crash.  What we want to model is a system
+    that, after a crash, reboots and starts running some recovery procedure
+    (like [fsck] in a Unix system to fix up the state of a file system).
+    If the system crashes again while running the recovery procedure, it
+    starts running the same recovery procedure again after reboot.
+
+    The outcome of running a procedure with recovery is similar to the
+    [Result] type defined above, except that in the case of a crash, we
+    run a recovery procedure and get both a final state _and_ a return
+    value from the recovery procedure.
+  *)
+
 Inductive RResult T R :=
 | RFinished (v:T) (w:world)
 | Recovered (v:R) (w:world).
@@ -134,30 +195,46 @@ Inductive RResult T R :=
 Arguments RFinished {T R} v w.
 Arguments Recovered {T R} v w.
 
-(** Run rec in w until it finishes, restarting whenever it crashes.
+(** To help us talk about repeated recovery attempts (in the face of
+    repeated crashes during recovery), we use [exec_recover] to model
+    these repeated executions of some recovery procedure [rec].
+  *)
 
-   This models running rec in an infinite retry loop.
- *)
 Inductive exec_recover R (rec:proc R) (w:world) : R -> world -> Prop :=
+
+(** The first constructor, [ExecRecoverExec], says that if the recovery
+    procedure [rec] executes and finishes normally, then that's a possible
+    outcome for [exec_recover].
+  *)
+
 | ExecRecoverExec : forall v w',
     exec rec w (Finished v w') ->
     exec_recover rec w v w'
+
+(** The second constructor, [ExecRecoverCrashDuringRecovery], says that
+    if [rec] started in some state [w] and crashed in state [w'], and
+    we then recursively ran [rec] on every crash starting with [world_crash w']
+    (by recursively referring to the [exec_recover] relation), then the
+    outcome of this recursive call to [exec_recover] is an outcome for
+    this constructor too.  This models repeated recovery attempts.
+  *)
+
 | ExecRecoverCrashDuringRecovery : forall w' v w'',
     exec rec w (Crashed w') ->
     exec_recover rec (world_crash w') v w'' ->
     exec_recover rec w v w''.
 
-(** [rexec] gives semantics for running a program and using some recovery
-      procedure on crashes, including crashes during recovery.
+(** Finally, [rexec] defines what it means to run a procedure and use
+    some recovery procedure on crashes, including crashes during recovery.
+    [rexec] says that:
 
-     Similar to [exec] above, behavior for recovery is specified entirely here.
-     In particular, note that we (currently) recovery from exactly the crash
-     w - in practice, some semantics record mutable w as some subset of
-     [world]s, which should be discarded before recovery.
+    - either the original procedure [p] finishes and returns a [RFinished]
+      outcome, or
+    - [p] crashes, and after running the recovery procedure [rec] one or
+      more times, the system eventually stops crashing, [rec] finishes,
+      and produces a [Recovered] outcome.
+  *)
 
-     Note that this is a thin wrapper that chains execution and recovery
-     self-execution - the constructors are not recursive.
- *)
 Inductive rexec T R : proc T -> proc R -> world -> RResult T R -> Prop :=
 | RExec : forall (p:proc T) (rec:proc R) w v w',
     exec p w (Finished v w') ->
@@ -166,6 +243,32 @@ Inductive rexec T R : proc T -> proc R -> world -> RResult T R -> Prop :=
     exec p w (Crashed w') ->
     exec_recover rec (world_crash w') rv w'' ->
     rexec p rec w (Recovered rv w'').
+
+(** * Notation for composing procedures.
+
+    To help us write procedures in our [proc] language, we define the
+    following Haskell-like notation for [Bind].  This allows us to say:
+
+      [[
+      x <- firstProcedure;
+      secondProcedure (x+1)
+      ]]
+
+    to assign the result of [firstProcedure] to [x], and then use [x]
+    in an argument to [secondProcedure].  We can even use [x] inside of
+    a Gallina expression before passing it to [secondProcedure], such as
+    adding 1 in the example above.
+
+    This notation does not allow us to silently discard the result of a
+    procedure, so in order to run two procedures where the first one returns
+    nothing (e.g., [unit]), or we want to otherwise ignore the result of the
+    first procedure, we have to write:
+
+      [[
+      _ <- firstProcedure;
+      secondProcedure
+      ]]
+  *)
 
 Notation "x <- p1 ; p2" := (Bind p1 (fun x => p2))
                             (at level 60, right associativity).

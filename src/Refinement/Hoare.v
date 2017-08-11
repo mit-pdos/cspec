@@ -110,11 +110,6 @@ Proof.
         eapply H3 in Hexec; eauto
     end.
   - inv_exec.
-    + (* p crashed before running *)
-      assert (exec p w' (Crashed w')) as Hexec by ( constructor; eauto ).
-      eapply RExecCrash in Hexec; eauto.
-      eapply H0 in H2; repeat deex.
-      eapply H in Hexec; simpl in *; safe_intuition (repeat deex; eauto).
     + (* p finished, rx crashed *)
       match goal with
       | [ Hexec: exec p _ _ |- _ ] =>
@@ -127,6 +122,11 @@ Proof.
         eapply RExecCrash in Hexec; eauto;
           eapply H3 in Hexec; eauto
       end.
+    + (* p crashed before running *)
+      assert (exec p w' (Crashed w')) as Hexec by ( constructor; eauto ).
+      eapply RExecCrash in Hexec; eauto.
+      eapply H0 in H2; repeat deex.
+      eapply H in Hexec; simpl in *; safe_intuition (repeat deex; eauto).
     + (* p itself crashed *)
       match goal with
       | [ Hexec: exec p _ _ |- _ ] =>
