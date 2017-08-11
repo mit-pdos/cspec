@@ -1,40 +1,88 @@
 Require Import Automation.
 
-(* Modeling of programs. *)
+(** * Modeling of programs and their execution. *)
 
 Global Set Implicit Arguments.
 Global Generalizable All Variables.
 
-(** The type of w that programs manipulate. Will vary depending on the
-  operations involved,and the same operations could in principle operate on
-  different types of w. *)
-Axiom world:Type.
+(** * Model of state.
 
-(* As a technical detail, we let programs include arbitrary operations of types
-[opT T] (which will produce a T-typed result). *)
+    In our labs, we want to reason about programs that have side-effects,
+    such as modifying the contents of memory or writing to disk.  This is
+    in contrast to the kinds of programs that one can naturally write in
+    Coq's Gallina language, which are purely functional; they have no
+    built-in notion of mutable state.
+
+    To reason about programs that manipulate mutable state,
+    we need to construct an explicit Coq model of:
+
+    - What the mutable state looks like.
+    - What a program looks like.
+    - How a program executes (and modifies the mutable state).
+
+    Our programs will eventually be extracted from Coq into Haskell, and
+    execute as Haskell programs (by compiling their Coq-generated Haskell
+    source code using a Haskell compiler to produce an executable binary).
+
+    We reflect this in our model of the world, by representing the state
+    of the world with an opaque type called [world], which is defined in
+    Coq as an [Axiom].
+  *)
+
+Axiom world : Type.
+
+(** * Model of programs.
+
+    To go along with our opaque model of the world, we similarly have an
+    opaque type of programs (represented by a procedure, [proc]).  This
+    represents real Haskell programs that will eventually run with the
+    help of a Haskell compiler.
+
+    To write programs in Coq, we will eventually state axioms about the
+    existence of some basic procedures, implemented outside of Coq (i.e.,
+    in Haskell), along with axioms about what happens when we run one of
+    those basic procedures.  But that will show up later on.
+
+    The only detail we expose about our opaque procedures is that it's
+    possible to combine procedures together, using [Ret] and [Bind], as
+    with monadic programs in Haskell.
+  *)
+
+(** As a technical detail, we let programs include arbitrary operations
+    of types [opT T] (which will produce a T-typed result).  This represents
+    the opaque execution of Haskell procedures, which Coq should not be able
+    to peek inside.
+  *)
+
 Axiom opT: Type -> Type.
 
-(** Our minimal, generic programming language. This definition does not provide
-useful functionality (it will be assumed later when we introduce primitives).
-Programs can be combined with [Bind] and [Ret].
+(** Our minimal, generic programming language.
+    Programs can be combined with [Bind] and [Ret].
+    [BaseOp] represents opaque Haskell code, and it's important here
+    because in its absence, Coq could prove that the programming language
+    never does anything other than return a constant expression with [Ret].
+  *)
 
- Why do we even have BaseOp? The intention here is that programs should have
- opaque behavior, so we make sure that one of the constructors of [proc] allows
- arbitrary additional behavior. Otherwise, we would know that [Bind] and [Ret]
- are only enough for pure programs that do not have side effects.
- *)
 CoInductive proc : forall T:Type, Type :=
 | BaseOp : forall T, opT T -> proc T
 | Ret : forall T, T -> proc T
 | Bind : forall T T', proc T -> (T -> proc T') -> proc T'.
 
+
+(** Here we connect our definition of the procedure language, [proc],
+    to Haskell's built-in implementations of [Bind] and [Ret], which are
+    [return] and [(>>=)] respectively.  We instruct Coq to extract any
+    use of [BaseOp] to an error expression, since we do not expect any
+    legitimate use of [BaseOp] in Gallina.  We also instruct Coq to
+    extract any attempts to pattern-match a procedure to an error, since
+    we do not expect any legitimate code to pattern-match the contents of
+    a [proc] procedure.
+  *)
+
 Extraction Language Haskell.
 
-Extract Constant opT "a" => "()".
-Extract Constant world => "()".
-
 Extract Inductive proc => "TheProc"
-                           ["prim_error" "return" "(>>=)"]
+                           ["error 'accessing BaseOp'" "return" "(>>=)"]
                            "(\fprim fret fbind -> error 'pattern match on proc')".
 
 
