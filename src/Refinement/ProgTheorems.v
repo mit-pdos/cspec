@@ -4,6 +4,47 @@ Require Import RelationClasses.
 Require Import Automation.
 Require Import Prog.
 
+
+(** * Automation for inverting execution behavior. *)
+
+Ltac inv_exec' H :=
+  inversion H; subst; clear H; repeat sigT_eq.
+
+Theorem exec_ret : forall T (v:T) w r,
+    exec (Ret v) w r ->
+    match r with
+    | Finished v' w' => v = v' /\ w = w'
+    | Crashed w' => w = w'
+    end.
+Proof.
+  intros.
+  inv_exec' H; intuition.
+Qed.
+
+Ltac inv_ret :=
+  match goal with
+  | [ H: exec (Ret _) _ _ |- _ ] =>
+    apply exec_ret in H; safe_intuition; subst
+  end.
+
+Ltac inv_exec :=
+  match goal with
+  | _ => inv_ret
+  | [ H: exec (Bind _ _) _ _ |- _ ] =>
+    inv_exec' H; repeat inv_ret
+  | [ H: exec _ _ _ |- _ ] =>
+    inv_exec' H; repeat inv_ret
+  end.
+
+Ltac inv_rexec :=
+  match goal with
+  | [ H: rexec (Ret _) _ _ _ |- _ ] =>
+    inv_exec' H
+  | [ H: rexec _ _ _ _ |- _ ] =>
+    inv_exec' H
+  end.
+
+
 (** Here we prove some basic sanity checks on proc and its semantics. *)
 
 Local Hint Constructors exec.
