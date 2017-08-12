@@ -70,7 +70,6 @@ Proof.
         end; eauto.
 Qed.
 
-Local Hint Resolve can_crash_at_begin can_crash_at_end.
 
 (** These are the monad laws
 
@@ -108,14 +107,6 @@ Proof.
   - eapply ExecBindFinished; eauto.
 Qed.
 
-Theorem monad_right_id : forall `(p: proc T),
-    exec_equiv (Bind p (fun v => Ret v)) p.
-Proof.
-  unfold exec_equiv; split; intros.
-  - destruct r; inv_exec; try cleanup_exec; eauto.
-  - destruct r; eauto.
-Qed.
-
 Theorem monad_assoc : forall `(p1: proc T)
                         `(p2: T -> proc T')
                         `(p3: T' -> proc T''),
@@ -124,19 +115,6 @@ Proof.
   unfold exec_equiv; split; intros.
   - destruct r; repeat (inv_exec; eauto).
   - destruct r; repeat (inv_exec; eauto).
-Qed.
-
-(** invert a bind execution *)
-Theorem exec_bind : forall T T' `(p: proc T) (p': T -> proc T')
-                    w r,
-    exec (Bind p p') w r ->
-    (exists v w', exec p w (Finished v w') /\
-             exec (p' v) w' r) \/
-    (exists w', exec p w (Crashed w') /\
-           r = Crashed w').
-Proof.
-  intros.
-  inv_exec; eauto.
 Qed.
 
 Local Hint Constructors rexec.
@@ -162,24 +140,6 @@ Theorem rexec_finish_any_rec : forall `(p: proc T)
 Proof.
   intros.
   inversion H; subst; eauto.
-Qed.
-
-Theorem rexec_recover_bind_inv : forall `(p: proc T)
-                                 `(p': T -> proc T')
-                                 `(rec: proc R)
-                                 w rv w'',
-    rexec (Bind p p') rec w (Recovered rv w'') ->
-    rexec p rec w (Recovered rv w'') \/
-    exists v w', rexec p rec w (RFinished v w') /\
-            rexec (p' v) rec w' (Recovered rv w'').
-Proof.
-  intros.
-  inversion H; subst.
-  inv_exec.
-  - right.
-    descend; intuition eauto.
-  - left; eauto.
-  - left; eauto.
 Qed.
 
 Local Hint Constructors exec_recover.

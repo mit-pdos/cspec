@@ -1,6 +1,7 @@
 Require Import Arith.
 Require Import Bool.
 Require Import List.
+Require Import EquivDec.
 
 Set Implicit Arguments.
 
@@ -133,9 +134,8 @@ Qed.
     [auto], [eauto], [autorewrite], and so on.
   *)
 
-Require EquivDec.
-
 (** * Simplify matches when possible. *)
+
 Ltac simpl_match :=
   let repl_match_goal d d' :=
       replace d with d';
@@ -210,6 +210,7 @@ Module SimplMatchTests.
 End SimplMatchTests.
 
 (** * Find and destruct matches *)
+
 Ltac destruct_matches_in e :=
   lazymatch e with
   | context[match ?d with | _ => _ end] =>
@@ -300,6 +301,25 @@ Tactic Notation "destruct" "matches" "in" "*" := destruct_all_matches.
 Tactic Notation "destruct" "matches" "in" "*|-" := destruct_nongoal_matches.
 Tactic Notation "destruct" "matches" := destruct_goal_matches.
 
+
+(** * Variants of intuition that do not split the goal. *)
+
+Ltac safe_intuition_then t :=
+  repeat match goal with
+         | [ H: _ /\ _ |- _ ] =>
+           destruct H
+         | [ H: ?P -> _ |- _ ] =>
+           lazymatch type of P with
+           | Prop => specialize (H ltac:(t))
+           | _ => fail
+           end
+         | _ => progress t
+         end.
+
+Tactic Notation "safe_intuition" := safe_intuition_then ltac:(auto).
+Tactic Notation "safe_intuition" tactic(t) := safe_intuition_then t.
+
+
 (** * Instantiate existentials (deex) *)
 
 Ltac destruct_ands :=
@@ -355,27 +375,11 @@ Ltac sigT_eq :=
 
 (* substitute variables that are let bindings (these can be created with [set
 (x:=value)] and appear in the context as v := def) *)
+
 Ltac subst_var :=
   repeat match goal with
   | [ v := _ |- _ ] => subst v
   end.
-
-(** * Variants of intuition that do not split the goal. *)
-
-Ltac safe_intuition_then t :=
-  repeat match goal with
-         | [ H: _ /\ _ |- _ ] =>
-           destruct H
-         | [ H: ?P -> _ |- _ ] =>
-           lazymatch type of P with
-           | Prop => specialize (H ltac:(t))
-           | _ => fail
-           end
-         | _ => progress t
-         end.
-
-Tactic Notation "safe_intuition" := safe_intuition_then ltac:(auto).
-Tactic Notation "safe_intuition" tactic(t) := safe_intuition_then t.
 
 (** * Uncategorized *)
 
