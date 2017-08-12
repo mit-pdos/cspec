@@ -1,7 +1,9 @@
 Require Import POCS.
 
 
-Inductive diskId := d0 | d1.
+Inductive diskId :=
+| d0
+| d1.
 
 Inductive DiskResult T :=
 | Working (v:T)

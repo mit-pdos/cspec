@@ -466,7 +466,9 @@ Hint Unfold no_crash.
 
 (** Theorems about initialization code. *)
 
-Inductive InitResult := Initialized | InitFailed.
+Inductive InitResult :=
+| Initialized
+| InitFailed.
 
 Definition then_init (init1 init2: proc InitResult) : proc InitResult :=
   r <- init1;

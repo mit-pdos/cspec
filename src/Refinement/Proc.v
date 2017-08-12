@@ -52,7 +52,7 @@ Axiom world : Type.
     to peek inside.
   *)
 
-Axiom opT: Type -> Type.
+Axiom opT : Type -> Type.
 
 (** Our minimal, generic programming language.
     Programs can be combined with [Bind] and [Ret].
@@ -66,10 +66,10 @@ Axiom opT: Type -> Type.
     nothing ("void", in C terminology) has type [proc unit].
   *)
 
-CoInductive proc : forall T:Type, Type :=
-| BaseOp : forall T, opT T -> proc T
-| Ret : forall T, T -> proc T
-| Bind : forall T T', proc T -> (T -> proc T') -> proc T'.
+CoInductive proc (T : Type) : Type :=
+| BaseOp (op : opT T)
+| Ret (v : T)
+| Bind (T1 : Type) (p1 : proc T1) (p2 : T1 -> proc T).
 
 
 (** Here we connect our definition of the procedure language, [proc],
