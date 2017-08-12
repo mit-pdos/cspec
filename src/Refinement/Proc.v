@@ -47,12 +47,12 @@ Axiom world : Type.
   *)
 
 (** As a technical detail, we let programs include arbitrary operations
-    of types [opT T] (which will produce a T-typed result).  This represents
+    of types [baseOpT T] (which will produce a T-typed result).  This represents
     the opaque execution of Haskell procedures, which Coq should not be able
     to peek inside.
   *)
 
-Axiom opT : Type -> Type.
+Axiom baseOpT : Type -> Type.
 
 (** Our minimal, generic programming language.
     Programs can be combined with [Bind] and [Ret].
@@ -67,7 +67,7 @@ Axiom opT : Type -> Type.
   *)
 
 CoInductive proc (T : Type) : Type :=
-| BaseOp (op : opT T)
+| BaseOp (op : baseOpT T)
 | Ret (v : T)
 | Bind (T1 : Type) (p1 : proc T1) (p2 : T1 -> proc T).
 
@@ -107,12 +107,12 @@ Arguments Crashed {T} w.
 
 (** To define the execution of programs, we need to state an axiom
     about how our opaque [BaseOp] Haskell procedures will execute.
-    This axiom is [step].  For every [opT T], it relates a starting
+    This axiom is [step].  For every [baseOpT T], it relates a starting
     world state to the return value of that [BaseOp] and the resulting
     world state.  This is largely just a technicality.
   *)
 
-Axiom step : forall T, opT T -> world -> T -> world -> Prop.
+Axiom step : forall T, baseOpT T -> world -> T -> world -> Prop.
 
 (** We also need to model what happens to the state of our system on
     a crash.  Our model is that, on a crash, the world state is modified
@@ -148,23 +148,22 @@ Inductive exec : forall T, proc T -> world -> Result T -> Prop :=
       the [step] relation that we introduced above.
   *)
 
-| ExecOp : forall T (op: opT T) w v w',
+| ExecOp : forall T (op: baseOpT T) w v w',
     step op w v w' ->
     exec (BaseOp op) w (Finished v w')
 
 (** - And finally, it defines how procedures can crash.  Any procedure
-      can crash just before it starts running.  [BaseOp] procedures
-      can also crash just after they finish.  And [Bind] can crash in
-      the middle of running the first sub-procedure.  Crashes during the
-      second sub-procedure of a [Bind] are covered by [ExecBindFinished]
-      above.
+      can crash just before it starts running or just after it finishes.
+      And [Bind] can crash in the middle of running the first sub-procedure.
+      Crashes during the second sub-procedure of a [Bind] are covered by
+      [ExecBindFinished] above.
   *)
 
 | ExecCrashBegin : forall T (p: proc T) w,
     exec p w (Crashed w)
-| ExecOpCrashEnd : forall T (op: opT T) w v w',
-    step op w v w' ->
-    exec (BaseOp op) w (Crashed w')
+| ExecCrashEnd : forall T (p: proc T) w v w',
+    exec p w (Finished v w') ->
+    exec p w (Crashed w')
 | ExecBindCrashed : forall T T' (p: proc T) (p': T -> proc T')
                       w w',
     exec p w (Crashed w') ->

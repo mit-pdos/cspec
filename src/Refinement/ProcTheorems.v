@@ -19,6 +19,7 @@ Theorem exec_ret : forall T (v:T) w r,
 Proof.
   intros.
   inv_exec' H; intuition.
+  inv_exec' H4; intuition.
 Qed.
 
 Ltac inv_ret :=
@@ -45,31 +46,7 @@ Ltac inv_rexec :=
   end.
 
 
-(** Here we prove some basic sanity checks on proc and its semantics. *)
-
 Local Hint Constructors exec.
-
-Theorem can_crash_at_begin : forall `(p: proc T) w,
-    exec p w (Crashed w).
-Proof.
-  eauto.
-Qed.
-
-Theorem can_crash_at_end : forall `(p: proc T) w v w',
-    exec p w (Finished v w') ->
-    exec p w (Crashed w').
-Proof.
-  (* This is a slightly harder proof strategy (induction over the programs is
-  more straightforward), but this proof doesn't require finite programs! *)
-  intros.
-  remember (Finished v w').
-  induction H;
-    try match goal with
-        | [ H: _ = Finished _ _ |- _ ] =>
-          inversion H; subst; clear H
-        end; eauto.
-Qed.
-
 
 (** These are the monad laws
 
@@ -92,18 +69,12 @@ Proof.
            end; intuition.
 Qed.
 
-Ltac cleanup_exec :=
-  match goal with
-  | [ H: exec (Ret _) _ ?r |- _ ] =>
-    first [ is_var r |
-            apply exec_ret in H; safe_intuition; subst ]
-  end.
-
 Theorem monad_left_id : forall T T' (p: T' -> proc T) v,
     exec_equiv (Bind (Ret v) p) (p v).
 Proof.
   unfold exec_equiv; split; intros.
-  - inv_exec; try cleanup_exec; eauto.
+  - inv_exec; eauto.
+    inv_exec; eauto.
   - eapply ExecBindFinished; eauto.
 Qed.
 
@@ -172,8 +143,13 @@ Proof.
   - inv_exec; eauto 10 using rt1n_refl.
   - repeat deex.
     inv_exec; eauto 10.
-    descend; intuition eauto.
-    descend; intuition eauto.
-    eapply rt1n_trans; eauto.
-    simpl; eauto.
+    + descend; intuition eauto.
+      descend; intuition eauto.
+      eapply rt1n_trans; eauto.
+      simpl; eauto.
+    + inv_exec; eauto 10.
+      descend; intuition eauto.
+      descend; intuition eauto.
+      eapply rt1n_trans; eauto.
+      simpl; eauto.
 Qed.

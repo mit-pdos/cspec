@@ -127,6 +127,20 @@ Proof.
       eapply RExecCrash in Hexec; eauto.
       eapply H0 in H2; repeat deex.
       eapply H in Hexec; simpl in *; safe_intuition (repeat deex; eauto).
+    + (* p crashed immediately after finishing *)
+      inv_exec.
+      match goal with
+      | [ Hexec: exec p _ _ |- _ ] =>
+        eapply RExec in Hexec
+      end.
+      eapply H0 in H2; repeat deex.
+      eapply H in H10; simpl in *; safe_intuition (repeat deex; eauto).
+      match goal with
+      | [ Hexec: exec (rx _) _ _ |- _ ] =>
+        apply ExecCrashEnd in Hexec;
+          eapply RExecCrash in Hexec; eauto;
+          eapply H3 in Hexec; eauto
+      end.
     + (* p itself crashed *)
       match goal with
       | [ Hexec: exec p _ _ |- _ ] =>
