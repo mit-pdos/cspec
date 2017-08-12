@@ -1,5 +1,3 @@
-Require Import Automation.
-
 (** * Modeling of programs and their execution. *)
 
 Global Set Implicit Arguments.
