@@ -85,22 +85,22 @@ Definition mean_spec : Specification unit (option nat) unit State :=
 
 Module Type StatDbAPI.
 
-  (* The implementation must provide the following methods: *)
+  (** The implementation must provide the following methods: *)
   Axiom init : proc InitResult.
   Axiom add : nat -> proc unit.
   Axiom mean : proc (option nat).
   Axiom recover : proc unit.
 
-  (* The abstraction relation between spec and code state *)
+  (** The abstraction relation between spec and code state *)
   Axiom abstr : Abstraction State.
 
-  (* The proofs that the implementation methods meet their specs: *)
+  (** The proofs that the implementation methods meet their specs: *)
   Axiom init_ok : init_abstraction init recover abstr inited.
   Axiom add_ok : forall v, proc_spec (add_spec v) (add v) recover abstr.
   Axiom mean_ok : proc_spec mean_spec mean recover abstr.
   Axiom recover_noop : rec_noop recover abstr no_crash.
 
-  (* Hints to proof automation to apply the following proofs. The implementation
+  (** Hints to proof automation to apply the following proofs. The implementation
   doesn't have to be concerned with these hints. *)
   Hint Resolve init_ok.
   Hint Resolve add_ok.

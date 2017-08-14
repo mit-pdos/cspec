@@ -1,14 +1,28 @@
 Require Import POCS.
 
+(** * Specification of Variables.
 
+  There are only two variables: [VarCount] and [VarSum], which can be
+  initialized, read, and written.  The specification for [read] and [write] are
+  given by [read_spec] and [write_spec], respectively. 
+
+ *)
+
+(** There are two variables, named as follows: *)
 Inductive var :=
 | VarCount
 | VarSum.
 
+(** The values of these variables are the spec state: *)
 Record State := mkState {
   StateCount : nat;
   StateSum : nat;
 }.
+
+(** An implementation of [read] has the precondition that the value of
+  [StateCount state] = count and [StateSum state] = sum. The postcondition
+  states the value returned by [read] is either count or sum, depending on which
+  variable is read. *)
 
 Definition read_spec v : Specification _ _ unit _ :=
   fun '(count, sum) state => {|
@@ -22,6 +36,11 @@ Definition read_spec v : Specification _ _ unit _ :=
     recovered := fun _ _ => False
   |}.
 
+(** An implementation of [write] has the same precondition as [read].  The
+  postcondition states that new spec is a new state in which either [StateCount]
+  or [StateSum] is updated, depending on which variable [write] writes. The
+  return value is tt. *)
+
 Definition write_spec v val : Specification _ _ unit _ :=
   fun '(count, sum) state => {|
     pre := StateCount state = count /\ StateSum state = sum;
@@ -34,6 +53,13 @@ Definition write_spec v val : Specification _ _ unit _ :=
     recovered := fun _ _ => False
   |}.
 
+
+(** * Variables module
+
+   An implementation (the code) of Variables must implement the following
+   Variables module (the spec).
+
+  *)
 
 Module Type VarsAPI.
 
