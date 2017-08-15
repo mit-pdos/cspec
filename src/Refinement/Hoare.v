@@ -4,7 +4,7 @@ Require Import ProcTheorems.
 
 (* TODO: document how specifications are structured *)
 
-(** * abstraction composition *)
+(** * Abstraction composition *)
 
 (** A LayerAbstraction is a record with one field: [abstraction], which is a
 function that returns a proposition between State1 (implementation) and State2
@@ -52,7 +52,37 @@ Quadruple. *)
 Definition Specification A T R State := A -> State -> Quadruple T R State.
 
 
-(** This function defines when a specification holds. *)
+(** * Correctness of a program
+
+  [prog_spec] defines when a specification holds for a procedure [p] and a
+  recovery procedure [rec]. The correctness is defined in a backwards-simulation
+  style.  [prog_spec] states that forall precondition arguments ([a]), code
+  states ([w]), and spec states ([state]):
+
+  - if the abstraction relation holds between code state [w] and spec state
+    [state]
+
+  - if the precondition holds for [a] and [state]
+
+  - if the procedure [p] starts from code state [w] and perhaps running the
+    recovery procedure one mor more times (if there is a crash), then one of the
+    following two must be true:
+
+  - 1) if execution finishes without crashes in code state [w'] and returning
+    [v], then there exists a spec [state'] in which the abstraction
+    relationholds between [w'] and [state'] and the postcondition holds in
+    [state'], OR
+
+  - 2) if execution finishes in code state [w'] and returning [v] after perhaps
+    several crashes and running the recovery procedure [r] several times , then
+    there exists a spec [state'] in which the abstraction relation holds between
+    [w'] and [state'] and the recovered condition holds in [state'].
+
+  The [rexecution] relationship describes what a valid execution is and is
+  defined in [Refinement.Proc].
+
+ *)
+
 Definition proc_spec `(spec: Specification A T R State) `(p: proc T)
            `(rec: proc R)
            `(abs: Abstraction State) :=
@@ -69,6 +99,7 @@ Definition proc_spec `(spec: Specification A T R State) `(p: proc T)
                             recovered (spec a state) v state'
          end.
 
+(** Hoare-style implication: correctness condition in terms of Specifications for P => Q. *)
 Definition spec_impl
            `(spec1: Specification A' T R State)
            `(spec2: Specification A T R State) :=
@@ -79,6 +110,7 @@ Definition spec_impl
                (forall rv state', recovered (spec1 a' state) rv state' ->
                          recovered (spec2 a state) rv state').
 
+(** Hoare-style weakening rule: if P holds and P => R, then R holds. *)
 Theorem proc_spec_weaken : forall `(spec1: Specification A T R State)
                               `(spec2: Specification A' T R State)
                               `(p: proc T) `(rec: proc R)
@@ -95,6 +127,7 @@ Qed.
 
 Hint Resolve tt.
 
+(** Hoare-style rule to process Bind statements (;) *)
 Theorem proc_spec_rx : forall `(spec: Specification A T R State)
                          `(p: proc T) `(rec: proc R)
                          `(rx: T -> proc T')
