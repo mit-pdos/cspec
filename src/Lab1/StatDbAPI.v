@@ -36,9 +36,9 @@ Definition inited (s : State) : Prop :=
   The specifications are of type [Specification], which is defined in
   [POCS.Refinement.Hoare]. A specificatoin is a record with 3 fields: [pre],
   [post], and [recovered] (which we will ignore in this lab).  For both
-  operations the precondition is just [True] (i.e., the operations can be always
-  invoked).  The postconditions describe the effects of the operations [add] and
-  [mean]:
+  operations the precondition is just [True] (i.e., we have to make no
+  assumptions to be able to prove its postcondition.  The postconditions
+  describe the effects of the operations [add] and [mean]:
 
   - [add_spec]'s post condition states that [add v] adds [v] to the spec state
     of StatDB and that [add] returns [tt].
@@ -71,14 +71,14 @@ Definition mean_spec : Specification unit (option nat) unit State :=
 
 (** * StatDB module
 
-   An implementation (the code) of StatDB must implement the StatDB module (the
-   spec).  The module must provide implementation for [init], [add], [mean], and
-   [recovery] (which will be a NOOP).  In addition, the module must provide
-   proofs showing, for example, that its [add] implementation meets the
-   [add_spec].  The proof approach POCS uses is based on backwards simulation
-   and this approach requires the implementation to define [abstr], which
-   abstracts the code state to the spec state (the list of integers that StatDB
-   maintains).  [abstr] is of type [Refinement.Hoare.Abstraction].
+   An implementation of StatDB must implement the StatDB module (the spec).  The
+   implementation must provide code for [init], [add], [mean], and [recovery]
+   (which will be a NOOP).  In addition, the module must provide proofs showing,
+   for example, that its implementation for [add] meets the [add_spec].  The
+   proof approach POCS uses is based on backwards simulation and this approach
+   requires the implementation to define [abstr], which abstracts the code state
+   to the spec state (the list of integers that StatDB maintains).  [abstr] is
+   of type [Refinement.Hoare.Abstraction].
 
 *)
 

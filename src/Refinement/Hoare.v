@@ -6,21 +6,37 @@ Require Import ProcTheorems.
 
 (** * abstraction composition *)
 
-(* A LayerAbstraction goes between State1 (implementation) and State2 (spec) *)
+(** A LayerAbstraction is a record with one field: [abstraction], which is a
+function that returns a proposition between State1 (implementation) and State2
+(spec).  It specifies for which State1's and State2's the proposition holds. For
+example, in StatDB lab, the spec state is a list of integers and the
+implementation state is is a pair of variables.  The [abstraction] function
+states what must be true of the relationship between list of integers and the
+pair of variables. *)
 Record LayerAbstraction State1 State2 :=
   { abstraction : State1 -> State2 -> Prop; }.
 
+(** The constructor for [LayerAbstraction]. *)
 Definition Abstraction State := LayerAbstraction world State.
 
+(** The identity [LayerAbstraction] constructor *)
 Definition IdAbstraction State : LayerAbstraction State State :=
   {| abstraction := fun state state' => state' = state; |}.
 
+(** The following function is a constructor to compose two
+[LayerAbstraction]'s. It returns an abstraction function that is the composition
+of [abs1], a relation between the state of the lower layer and the state of a
+middle layer, and [abs2], the relation between the state of the middle layer and
+the state of the top layer. *)
 Definition abstraction_compose
            `(abs1: Abstraction State1)
            `(abs2: LayerAbstraction State1 State2) :=
   {| abstraction := fun w state' => exists state, abstraction abs2 state state' /\
                                   abstraction abs1 w state; |}.
 
+(** A crash hoare logic (CHL) record to express the specification of
+procedures. The record has fields for the precondition, postcondition, and
+recovered condition of a procedure. *)
 Record Quadruple T R State :=
   Spec {
       pre: Prop;
@@ -28,8 +44,15 @@ Record Quadruple T R State :=
       recovered: R -> State -> Prop;
     }.
 
+(** This function is a constructor for a spec [Quadruple].  It takes as arguments a
+type [A] (to be used in the precondition), a result type [T] (the type returned
+by the procedure when no crashes) and a recovered type [R] (the type returned by
+the recovery procedure), and a spec state ([state]), and returns a Hoare
+Quadruple. *)
 Definition Specification A T R State := A -> State -> Quadruple T R State.
 
+
+(** This function defines when a specification holds. *)
 Definition proc_spec `(spec: Specification A T R State) `(p: proc T)
            `(rec: proc R)
            `(abs: Abstraction State) :=

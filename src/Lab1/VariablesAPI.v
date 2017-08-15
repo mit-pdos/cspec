@@ -19,10 +19,13 @@ Record State := mkState {
   StateSum : nat;
 }.
 
-(** An implementation of [read] has the precondition that the value of
-  [StateCount state] = count and [StateSum state] = sum. The postcondition
-  states the value returned by [read] is either count or sum, depending on which
-  variable is read. *)
+(** An implementation of [read] has the precondition.  The precondition is a
+  function that takes two arguments: a pair [[count,sum)] and a spec state
+  [state] and asserts a proposition about them. The way to read this is that he
+  precondition states that there exists a pair [(count,sum]) and a [state] such
+  that the value of [StateCount state] = count and [StateSum state] = sum.  The
+  postcondition states the value returned by [read] is either count or sum,
+  depending on which variable is read. *)
 
 Definition read_spec v : Specification _ _ unit _ :=
   fun '(count, sum) state => {|
@@ -56,8 +59,10 @@ Definition write_spec v val : Specification _ _ unit _ :=
 
 (** * Variables module
 
-   An implementation (the code) of Variables must implement the following
-   Variables module (the spec).
+   An implementation of Variables must implement the following module and must
+   prove that that its code implements the spec correctly using backwards
+   simulation.  Our implementation of the module, [VariablesImpl], is in Haskell
+   and take that the Haskell code implements the spec correctly as an axiom.
 
   *)
 
