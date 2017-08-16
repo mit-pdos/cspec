@@ -4,9 +4,8 @@ Require Import ProcTheorems.
 
 (** * Proof style: Refinementand Hoare Logic
 
- In POCS you will often use refinement to prove that an implementation
- (code) meets its specification (spec), which puts the following obligations on
- you:
+ In POCS you will often use refinement to prove that an implementation (code)
+ meets its specification (spec), which puts the following obligations on you:
 
  - You need to define one abstraction relationship between code states and spec
    states;
@@ -30,9 +29,23 @@ Require Import ProcTheorems.
  postcondition.  This style of reasoning gives us Hoare-style specification for
  [s1;s2].
 
- The rest of this file defines the infrustructure for refinement and
- Hoare reasoning. We require that each [BaseOp] in [Refinement.Proc] comes with
- a Hoare-style specification that we then chain with rules for [Bind] and [Ret],
+ To support reasing about crashes, the spec of each procedure must also have a
+ recovered condition, in addition to the traditional Hoare precondition and
+ postcondition.  The recovered condition describes the state of the computer
+ after it reboots.  Other than specifying the recovered condition for each
+ procedure, the infrastructure mostly separates reasoning about crash-free
+ execution from reasoning about crashes and recovery (i.e., repairing the system
+ after a crash).  The support for reasoning about recovery is in
+ [Refinement.HoareRecovery].  In [Lab1.StatDB], we ignore crashes, and thus you
+ don't have to specificy a meaningful recovered condition and implement a
+ recovery procedure.  For labs 2 and lab 3, you can find solutions that don't
+ require any repair after a crash, and the recovery procedure is trivial (i.e.,
+ do nothing).  The last lab requires repair after a crash, which will require
+ understanding [Refinement.HoareRecovery].
+
+ The rest of this file defines the infrustructure for refinement and Hoare
+ reasoning. We require that each [BaseOp] in [Refinement.Proc] comes with a
+ Hoare-style specification that we then chain with rules for [Bind] and [Ret],
  the two operators that [Refinement.Proc] defines to combine [BaseOp]s into
  procedure. Once we have Hoare-style spec for a procedure, we can use the same
  Hoare reasoning to chain procedures.
@@ -43,13 +56,6 @@ Require Import ProcTheorems.
  repeatedly invoking [step_prog].  [Lab1/StatDBAPI] also adds [add_ok] to the
  Hint database so that "[step_prog]" can "step" through procedures that invoke
  [add].
-
- Crash Hoare Logic also defines how to reason about crashes and recovery
- procedures.  A key requirement for a recovery procedure is that the crashed
- condition of a recovery procedure implies its precondition.  If so, then the
- recovery procedure is *idempotent* and we can run the recovery procedure
- several times (e.g., when a crash happens during recovery and we run recovery
- again after reboot).
 
  As a final detail, you need to reason about initialization, and, in particular,
  show that the abstraction relationship between the initial code state w and the
@@ -424,276 +430,6 @@ Ltac step_prog :=
   end.
 
 
-(** ** Reasoning about crashes and recovery
-
-  [Refinement.Proc] defines the execution of a computer that can crash: after a
-  crash, the computer stops executing, then reboots, and then runs recovery.
-  The computer may crash during recovery.  To support reasoning about crashes,
-  [prog_spec] above uses recovered condidition: each [prog_spec] must describe
-  in which condition the computer may reboot and proofs of [prog_spec] must
-  proof that an implementation won't recover in any other recovered condition.
-
-  One of the virtuaes of Crash Hoare Logic is that it splits reasoning about
-  crashes and recovery from crash-free execution.  In [Lab1.StatDB], we ignore
-  crashes, and thus you don't have to specificy a meaningful
-  recovered_conditions and implement a recovery procedure.  In later labs you
-  must provide meaningful recovered conditions and implement a recovery
-  procedure, and prove its correctness.  That is, you will have to show that for
-  every code state in which your implementation may end up in after a crash,
-  your recovery procedure repairs the code state in which it crashed correctly
-  and the repaired state corresponds to a correct spec state. Since [rexec]
-  allows crashes during recovery, you must show that invoking recovery several
-  times is ok.  This means you have to show that recovered condition of your
-  recovery procedure implies its precondition and that the recovery procedure is
-  idempotent.
-
-  Fortunately, you can come up with solutions to lab 2 and lab 3, which don't
-  require any repair after a crash, and the recovery procedure is trivial (i.e.,
-  do nothing).  Doing nothing is idempotent, so the proofs dealing crashes for
-  these labs are trivial.  The last lab requires repair after a crash.
-
-  XXX maybe move this section to a separate file since it isn't relevant for a
-   while in the labs.
- *)
-
-
-
-Hint Constructors rexec.
-Hint Constructors exec.
-Hint Constructors exec_recover.
-
-Theorem clos_refl_trans_1n_unit_tuple : forall `(R: unit * A -> unit * A -> Prop) x y u u',
-    Relation_Operators.clos_refl_trans_1n R (u, x) (u', y) ->
-    Relation_Operators.clos_refl_trans_1n
-      (fun x y =>
-         R (tt, x) (tt, y)) x y.
-Proof.
-  intros.
-  destruct u, u'.
-  remember (tt, x).
-  remember (tt, y).
-  generalize dependent x.
-  generalize dependent y.
-  induction H; intuition subst.
-  - inversion Heqp0; subst.
-    inversion Heqp; subst.
-    constructor.
-  - destruct y.
-    destruct u.
-    especialize IHclos_refl_trans_1n; safe_intuition.
-    especialize IHclos_refl_trans_1n; safe_intuition.
-    econstructor; eauto.
-Qed.
-
-(** Define what it means to run recovery in recovered state : *)
-Definition prog_loopspec `(spec: Specification A unit unit State)
-           `(rec': proc unit) `(rec: proc unit)
-           (abs: Abstraction State) :=
-  forall a w state,
-    abstraction abs w state ->
-    pre (spec a state) ->
-    forall rv rv' w',
-      Relation_Operators.clos_refl_trans_1n
-        (fun '(_, w) '(rv', w') => rexec rec' rec w (Recovered rv' w'))
-        (rv, w) (rv', w') ->
-      forall rv'' w'',
-        exec rec' w' (Finished rv'' w'') ->
-        exists state'',
-          abstraction abs w'' state'' /\
-          post (spec a state) rv'' state''.
-
-(** Define what it means for a spec to be idempotent: *)
-Definition idempotent `(spec: Specification A T unit State) :=
-  forall a state,
-    pre (spec a state) ->
-    forall v state', recovered (spec a state) v state' ->
-            (** idempotency: recovered condition implies precondition to
-               re-run on every crash *)
-            exists a', pre (spec a' state') /\
-                  (** postcondition transitivity: establishing the
-                     postcondition from a recovered state is sufficient to
-                     establish it with respect to the original initial
-                     state (note all with the same ghost state) *)
-                  forall rv state'', post (spec a' state') rv state'' ->
-                                post (spec a state) rv state''.
-
-(* Idempotents theorem: *)
-Theorem idempotent_loopspec : forall `(rec: proc unit) `(rec': proc unit)
-                                     `(spec: Specification A unit unit State)
-                                     (abs: Abstraction State),
-    forall (Hspec: proc_spec spec rec' rec abs),
-      idempotent spec ->
-      prog_loopspec spec rec' rec abs.
-Proof.
-  unfold prog_loopspec; intros.
-  apply clos_refl_trans_1n_unit_tuple in H2.
-  repeat match goal with
-         | [ u: unit |- _ ] => destruct u
-         end.
-
-  generalize dependent a.
-  generalize dependent state.
-  induction H2; intros.
-  - eapply RExec in H3.
-    eapply Hspec in H3; eauto.
-  - eapply Hspec in H0; simpl in *; safe_intuition (repeat deex; eauto).
-    eapply H in H4; eauto; repeat deex.
-    specialize (H4 _ _ ltac:(eauto)); repeat deex; intuition.
-    specialize (IHclos_refl_trans_1n _ ltac:(eauto) _ ltac:(eauto)).
-    safe_intuition (repeat deex; eauto).
-Qed.
-
-Theorem compose_recovery : forall `(spec: Specification A'' T unit State)
-                             `(rspec: Specification A' unit unit State)
-                             `(spec': Specification A T unit State)
-                             `(p: proc T) `(rec: proc unit) `(rec': proc unit)
-                             `(abs: Abstraction State),
-    forall (Hspec: proc_spec spec p rec abs)
-      (Hrspec: prog_loopspec rspec rec' rec abs)
-      (Hspec_spec':
-         forall (a:A) state, pre (spec' a state) ->
-                    exists (a'':A''),
-                      pre (spec a'' state) /\
-                      (forall v state', post (spec a'' state) v state' ->
-                               post (spec' a state) v state') /\
-                      (forall v state', recovered (spec a'' state) v state' ->
-                               exists a', pre (rspec a' state') /\
-                                     forall v' state'',
-                                       post (rspec a' state') v' state'' ->
-                                       recovered (spec' a state) v' state'')),
-      proc_spec spec' p (_ <- rec; rec') abs.
-Proof.
-  intros.
-  unfold proc_spec; intros.
-  eapply Hspec_spec' in H0; safe_intuition;
-    repeat deex.
-  clear Hspec_spec'.
-  destruct r.
-  - match goal with
-    | [ Hexec: rexec p _ _ _ |- _ ] =>
-      eapply rexec_finish_any_rec in Hexec;
-        eapply Hspec in Hexec
-    end; simpl in *; intuition (repeat deex; eauto).
-  - inv_rexec.
-    match goal with
-    | [ Hexec: exec_recover _ _ _ _ |- _ ] =>
-      eapply exec_recover_bind_inv in Hexec
-    end; repeat deex.
-    match goal with
-    | [ Hexec: exec_recover rec _ _ _ |- _ ] =>
-      eapply RExecCrash in Hexec; eauto
-    end; repeat deex.
-    match goal with
-    | [ Hexec: rexec p _ _ _ |- _ ] =>
-      eapply Hspec in Hexec
-    end; simpl in *; safe_intuition (repeat deex; eauto).
-    (* H3: recover -> exists a' *)
-    (* H6: recover *)
-    eapply H3 in H6; repeat deex.
-    match goal with
-    | [ Hexec: exec rec' _ _ |- _ ] =>
-      eapply Hrspec in Hexec
-    end; simpl in *; safe_intuition (repeat deex; eauto).
-Qed.
-
-Theorem spec_abstraction_compose :
-  forall `(spec: Specification A T R State2)
-    `(p: proc T) `(rec: proc R)
-    `(abs2: LayerAbstraction State1 State2)
-    `(abs1: Abstraction State1),
-    proc_spec
-      (fun '(a, state2) state =>
-         {| pre := pre (spec a state2) /\
-                   abstraction abs2 state state2;
-            post :=
-              fun v state' =>
-                exists state2',
-                  post (spec a state2) v state2' /\
-                  abstraction abs2 state' state2';
-            recovered :=
-              fun v state' =>
-                exists state2',
-                  recovered (spec a state2) v state2' /\
-                  abstraction abs2 state' state2'; |}) p rec abs1 ->
-    proc_spec spec p rec (abstraction_compose abs1 abs2).
-Proof.
-  intros.
-  unfold proc_spec, abstraction_compose;
-    simpl; intros; safe_intuition (repeat deex).
-  eapply (H (a, state)) in H2; simpl in *; eauto.
-  destruct r; intuition (repeat deex; eauto).
-Qed.
-
-
-Theorem rec_noop_compose : forall `(rec: proc unit) `(rec2: proc unit)
-                             `(abs1: Abstraction State1)
-                             (wipe1: State1 -> State1 -> Prop)
-                             `(spec: Specification A unit unit State1)
-                             `(abs2: LayerAbstraction State1 State2)
-                             (wipe2: State2 -> State2 -> Prop),
-    rec_noop rec abs1 wipe1 ->
-    prog_loopspec spec rec2 rec abs1 ->
-    forall (Hspec: forall state0 state0' state,
-          abstraction abs2 state0 state0' ->
-          wipe1 state0 state ->
-          exists a, pre (spec a state) /\
-               forall state' r state'',
-                 post (spec a state') r state'' ->
-                 exists state2', wipe2 state0' state2' /\
-                            abstraction abs2 state'' state2'),
-    rec_noop (_ <- rec; rec2) (abstraction_compose abs1 abs2) wipe2.
-Proof.
-  unfold rec_noop; intros.
-  eapply spec_abstraction_compose; simpl.
-  eapply compose_recovery; eauto.
-  simpl; intuition idtac.
-  simpl in *.
-  descend; intuition (subst; eauto).
-  specialize (Hspec _ _ _ ltac:(eauto) ltac:(eauto)).
-  repeat deex.
-  descend; intuition (repeat deex; eauto).
-Qed.
-
-
-
-(** Helpers for defining step-based semantics. *)
-
-Definition Semantics State T := State -> T -> State -> Prop.
-
-Definition pre_step {opT State}
-           (bg_step: State -> State -> Prop)
-           (step: forall `(op: opT T), Semantics State T) :
-  forall T (op: opT T), Semantics State T :=
-  fun T (op: opT T) state v state'' =>
-    exists state', bg_step state state' /\
-          step op state' v state''.
-
-Definition post_step {opT State}
-           (step: forall `(op: opT T), Semantics State T)
-           (bg_step: State -> State -> Prop) :
-  forall T (op: opT T), Semantics State T :=
-  fun T (op: opT T) state v state'' =>
-    exists state', step op state v state' /\
-          bg_step state' state''.
-
-Definition op_spec `(sem: Semantics State T) : Specification unit T unit State :=
-  fun (_:unit) state =>
-    {|
-      pre := True;
-      post :=
-        fun v state' => sem state v state';
-      recovered :=
-        fun r state' =>
-          r = tt /\ (state' = state \/ exists v, sem state v state');
-    |}.
-
-(** Helpers for defining wipe relations after a crash. *)
-
-Definition no_wipe {State} (state state' : State) : Prop := state' = state.
-Hint Unfold no_wipe.
-
-Definition no_crash {State} (state state' : State) : Prop := False.
-Hint Unfold no_crash.
 
 (** ** Initialization *)
 
@@ -777,3 +513,4 @@ Proof.
     inv_rexec; inv_exec.
     congruence.
 Qed.
+

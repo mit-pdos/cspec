@@ -29,3 +29,4 @@ Require Export Helpers.Disk.
 
 Require Export Refinement.Proc.
 Require Export Refinement.Hoare.
+Require Export Refinement.HoareRecovery.
