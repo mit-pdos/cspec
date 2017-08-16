@@ -598,7 +598,7 @@ Hint Unfold no_wipe.
 Definition no_crash {State} (state state' : State) : Prop := False.
 Hint Unfold no_crash.
 
-(** Theorems about initialization code. *)
+(** ** Initialization *)
 
 Inductive InitResult :=
 | Initialized
