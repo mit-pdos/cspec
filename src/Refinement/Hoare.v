@@ -27,15 +27,22 @@ Require Import ProcTheorems.
  [s1;s2], we need to show that the postcondition of [s1] implies the
  precondition of [s2]. If you can prove that, then you can conclude that if the
  precondition of [s1] holds, then the postcondition of [s1;s2] is [s2]'s
- postcondition.  This style of reasoning gives us Crash-Hoare-Logic
- specification for [s1;s2].
+ postcondition.  This style of reasoning gives us Hoare-style specification for
+ [s1;s2].
 
- The rest of the file defines the infrustructure for backwards simulation and
+ The rest of this file defines the infrustructure for backwards simulation and
  Hoare reasoning. We require that each [BaseOp] in [Refinement.Proc] comes with
  a Hoare-style specification that we then chain with rules for [Bind] and [Ret],
  the two operators that [Refinement.Proc] defines to combine [BaseOp]s into
  procedure. Once we have Hoare-style spec for a procedure, we can use the same
  Hoare reasoning to chain procedures.
+
+ This reasoning is partially automated.  Assuming there are "ok" theorems for
+ [BaseOp]s and procedures, then the Ltac [step_prog] "steps" through procedures.
+ For example, the proof of [add_ok] in [Lab1/StatDBImpl] consists mostly of
+ repeatedly invoking [step_prog].  [Lab1/StatDBAPI] also adds [add_ok] to the
+ Hint database so that "[step_prog]" can "step" through procedures that invoke
+ [add].
 
  Crash Hoare Logic also defines how to reason about crashes and recovery
  procedures.  A key requirement for a recovery procedure is that the crashed
@@ -44,7 +51,7 @@ Require Import ProcTheorems.
  several times (e.g., when a crash happens during recovery and we run recovery
  again after reboot).
 
- As a final detail, we need to reason about initialization, and, in particular,
+ As a final detail, you need to reason about initialization, and, in particular,
  show that the abstraction relationship between the initial code state w and the
  initial spec state [state] holds.
 
@@ -294,9 +301,96 @@ Ltac spec_intros := intros; eapply spec_intros; intros.
 
 Ltac spec_case pf :=
   eapply proc_spec_weaken; [ solve [ apply pf ] |
-                               unfold spec_impl ].
+                             unfold spec_impl ].
 
-(** * Reasoning about crashes and recovery *)
+Theorem spec_exec_equiv : forall `(spec: Specification A T R State)
+                            (p p': proc T) `(rec: proc R)
+                            `(abs: Abstraction State),
+    exec_equiv p p' ->
+    proc_spec spec p' rec abs ->
+    proc_spec spec p rec abs.
+Proof.
+  unfold proc_spec; intros.
+  eapply H0; eauto.
+  eapply rexec_equiv; eauto.
+  symmetry; auto.
+Qed.
+
+Definition rec_noop `(rec: proc R) `(abs: Abstraction State) (wipe: State -> State -> Prop) :=
+  forall T (v:T),
+    proc_spec
+      (fun (_:unit) state =>
+         {| pre := True;
+            post := fun r state' => r = v /\
+                             state' = state;
+            recovered := fun _ state' => wipe state state'; |})
+      (Ret v) rec abs.
+
+(* for recovery proofs about pure programs *)
+
+Theorem ret_spec : forall `(abs: Abstraction State)
+                     (wipe: State -> State -> Prop)
+                     `(spec: Specification A T R State)
+                     (v:T) (rec: proc R),
+    rec_noop rec abs wipe ->
+    (forall a state, pre (spec a state) ->
+            post (spec a state) v state /\
+            (* TODO: is it ok for this to be for all state'? *)
+            forall state', wipe state state' ->
+                  forall r, recovered (spec a state) r state') ->
+    proc_spec spec (Ret v) rec abs.
+Proof.
+  intros.
+  unfold proc_spec; intros.
+  eapply H in H3; simpl in *; eauto.
+  eapply H0 in H2.
+  destruct r; safe_intuition (repeat deex; eauto).
+Qed.
+
+Ltac monad_simpl :=
+  repeat match goal with
+         | |- proc_spec _ (Bind (Ret _) _) _ _ =>
+           eapply spec_exec_equiv; [ apply monad_left_id | ]
+         | |- proc_spec _ (Bind (Bind _ _) _) _ _ =>
+           eapply spec_exec_equiv; [ apply monad_assoc | ]
+         end.
+
+(** ** Automation: step_prog
+
+  This Ltac attempts to step through procedures.  It compares Coq's current goal
+  to:
+  
+  - [forall]: if so, intro the variables, and invoke [step_prog] again
+  
+  - a proc_spec with a procedure that invokes a [Ret] operation: if so, apply
+    the [ret_spec] theorem to consume the [Ret].
+
+  - a proc_spec with a procedure that sequences two operations (with [Bind]): if
+    so, apply the proc_spec_rx theorem to consume the [Bind]. If an "ok" theorem
+    exists for the two operations, then "eauto" will try to apply the two
+    theorems and dismiss the obligrations, if successful.
+
+  - a proc_spec that is implied by a proc_spec that is in context: if so, apply
+    the [proc_spec_weaken] theorem
+
+ *)
+
+
+Ltac step_prog :=
+  match goal with
+  | |- forall _, _ => intros; step_prog
+  | |- proc_spec _ (Ret _) _ _ =>
+    eapply ret_spec
+  | |- proc_spec _ _ _ _ =>
+    monad_simpl;
+    eapply proc_spec_rx; [ solve [ eauto ] | ]
+  | [ H: proc_spec _ ?p _ _
+      |- proc_spec _ ?p _ _ ] =>
+    eapply proc_spec_weaken; [ eapply H | unfold spec_impl ]
+  end.
+
+
+(** ** Reasoning about crashes and recovery *)
 
 Hint Constructors rexec.
 Hint Constructors exec.
@@ -325,7 +419,7 @@ Proof.
     econstructor; eauto.
 Qed.
 
-(* Define what it means to run recovery in recovered state : *)
+(** Define what it means to run recovery in recovered state : *)
 Definition prog_loopspec `(spec: Specification A unit unit State)
            `(rec': proc unit) `(rec: proc unit)
            (abs: Abstraction State) :=
@@ -464,36 +558,6 @@ Proof.
   destruct r; intuition (repeat deex; eauto).
 Qed.
 
-Definition rec_noop `(rec: proc R) `(abs: Abstraction State) (wipe: State -> State -> Prop) :=
-  forall T (v:T),
-    proc_spec
-      (fun (_:unit) state =>
-         {| pre := True;
-            post := fun r state' => r = v /\
-                             state' = state;
-            recovered := fun _ state' => wipe state state'; |})
-      (Ret v) rec abs.
-
-(* for recovery proofs about pure programs *)
-
-Theorem ret_spec : forall `(abs: Abstraction State)
-                     (wipe: State -> State -> Prop)
-                     `(spec: Specification A T R State)
-                     (v:T) (rec: proc R),
-    rec_noop rec abs wipe ->
-    (forall a state, pre (spec a state) ->
-            post (spec a state) v state /\
-            (* TODO: is it ok for this to be for all state'? *)
-            forall state', wipe state state' ->
-                  forall r, recovered (spec a state) r state') ->
-    proc_spec spec (Ret v) rec abs.
-Proof.
-  intros.
-  unfold proc_spec; intros.
-  eapply H in H3; simpl in *; eauto.
-  eapply H0 in H2.
-  destruct r; safe_intuition (repeat deex; eauto).
-Qed.
 
 Theorem rec_noop_compose : forall `(rec: proc unit) `(rec2: proc unit)
                              `(abs1: Abstraction State1)
@@ -524,39 +588,6 @@ Proof.
   descend; intuition (repeat deex; eauto).
 Qed.
 
-Theorem spec_exec_equiv : forall `(spec: Specification A T R State)
-                            (p p': proc T) `(rec: proc R)
-                            `(abs: Abstraction State),
-    exec_equiv p p' ->
-    proc_spec spec p' rec abs ->
-    proc_spec spec p rec abs.
-Proof.
-  unfold proc_spec; intros.
-  eapply H0; eauto.
-  eapply rexec_equiv; eauto.
-  symmetry; auto.
-Qed.
-
-Ltac monad_simpl :=
-  repeat match goal with
-         | |- proc_spec _ (Bind (Ret _) _) _ _ =>
-           eapply spec_exec_equiv; [ apply monad_left_id | ]
-         | |- proc_spec _ (Bind (Bind _ _) _) _ _ =>
-           eapply spec_exec_equiv; [ apply monad_assoc | ]
-         end.
-
-Ltac step_prog :=
-  match goal with
-  | |- forall _, _ => intros; step_prog
-  | |- proc_spec _ (Ret _) _ _ =>
-    eapply ret_spec
-  | |- proc_spec _ _ _ _ =>
-    monad_simpl;
-    eapply proc_spec_rx; [ solve [ eauto ] | ]
-  | [ H: proc_spec _ ?p _ _
-      |- proc_spec _ ?p _ _ ] =>
-    eapply proc_spec_weaken; [ eapply H | unfold spec_impl ]
-  end.
 
 
 (** Helpers for defining step-based semantics. *)

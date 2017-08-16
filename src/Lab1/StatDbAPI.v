@@ -100,8 +100,10 @@ Module Type StatDbAPI.
   Axiom mean_ok : proc_spec mean_spec mean recover abstr.
   Axiom recover_noop : rec_noop recover abstr no_crash.
 
-  (** Hints to proof automation to apply the following proofs. The implementation
-  doesn't have to be concerned with these hints. *)
+  (** Hints to proof automation to apply the following proofs when "stepping"
+  through a procedure: e.g., if Coq has a [add] goal, it will try to apply
+  [add_ok] to resolve that goal. The implementation doesn't have to be concerned
+  with these hints. *)
   Hint Resolve init_ok.
   Hint Resolve add_ok.
   Hint Resolve mean_ok.
