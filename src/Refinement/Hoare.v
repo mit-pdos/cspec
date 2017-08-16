@@ -2,7 +2,7 @@ Require Import Helpers.Helpers.
 Require Import Proc.
 Require Import ProcTheorems.
 
-(** * Proof style: Refinementand Hoare Logic
+(** * Proof style: Refinement and Hoare Logic
 
  In POCS you will often use refinement to prove that an implementation (code)
  meets its specification (spec), which puts the following obligations on you:
@@ -466,7 +466,7 @@ Definition init_abstraction
        |}) init rec (IdAbstraction world).
 
 
-(** recovery is irrelevant for initialization: we only consider systems that
+(** Recovery is irrelevant for initialization: we only consider systems that
 successfully initialize. *)
 Theorem init_abstraction_any_rec : forall (init: proc InitResult)
                                    (rec rec': proc unit)
