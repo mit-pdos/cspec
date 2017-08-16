@@ -424,9 +424,36 @@ Ltac step_prog :=
   end.
 
 
-(** ** Reasoning about crashes and recovery *)
+(** ** Reasoning about crashes and recovery
 
-(* XXX doesn't show up in StatDB. recovered condition, separate reasoning about crashes from crash-free execution . *)
+  [Refinement.Proc] defines the execution of a computer that can crash: after a
+  crash, the computer stops executing, then reboots, and then runs recovery.
+  The computer may crash during recovery.  To support reasoning about crashes,
+  [prog_spec] above uses recovered condidition: each [prog_spec] must describe
+  in which condition the computer may reboot and proofs of [prog_spec] must
+  proof that an implementation won't recover in any other recovered condition.
+
+  One of the virtuaes of Crash Hoare Logic is that it splits reasoning about
+  crashes and recovery from crash-free execution.  In [Lab1.StatDB], we ignore
+  crashes, and thus you don't have to specificy a meaningful
+  recovered_conditions and implement a recovery procedure.  In later labs you
+  must provide meaningful recovered conditions and implement a recovery
+  procedure, and prove its correctness.  That is, you will have to show that for
+  every code state in which your implementation may end up in after a crash,
+  your recovery procedure repairs the code state in which it crashed correctly
+  and the repaired state corresponds to a correct spec state. Since [rexec]
+  allows crashes during recovery, you must show that invoking recovery several
+  times is ok.  This means you have to show that recovered condition of your
+  recovery procedure implies its precondition and that the recovery procedure is
+  idempotent.
+
+  Fortunately, you can come up with solutions to lab 2 and lab 3, which don't
+  require any repair after a crash, and the recovery procedure is trivial (i.e.,
+  do nothing).  Doing nothing is idempotent, so the proofs dealing crashes for
+  these labs are trivial.  The last lab requires repair after a crash.
+
+*)
+
 
 Hint Constructors rexec.
 Hint Constructors exec.
