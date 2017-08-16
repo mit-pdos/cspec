@@ -2,9 +2,52 @@ Require Import Helpers.Helpers.
 Require Import Proc.
 Require Import ProcTheorems.
 
-(* TODO: document how specifications are structured *)
+(** * Proof style: backwards simulation and Hoare Logic
 
-(** * Abstraction composition *)
+ In POCS you will often use backwards simulation to prove that an implementation
+ (code) meets its specification (spec), which puts the following obligations on
+ you:
+
+ - You need to define one abstraction relationship between code states and spec
+   states;
+
+ - You must show what code state [w'] is produced after running a procedure that
+   implements a spec operation, starting from code state [w];
+
+ - You must show that there exists a spec state [state'] for which the
+   abstraction relationship holds between [w'] and [state'], and that the spec
+   operation could have reached [state'] from state [state].
+
+ - You must show that the abstraction relationship between the initial code
+   state w and the initial spec state [state];
+
+ The procedure that implements the spec operation may be a program that makes
+ several steps. To reason about the behavior of this procedure we use
+ Hoare-style reasoning.  We require that each individual program step has a
+ Crash-Hoare-Logic specification, consisting of a precondition, a post
+ condition, and recovered condition.  We then chain the steps of the program
+ using Hoare reasoning.  For example, to reason about a program with two steps:
+ [s1;s2], we need to show that the postcondition of [s1] implies the
+ precondition of [s2]. If you can prove that, then you can conclude that if the
+ precondition of [s1] holds, then the postcondition of [s1;s2] is [s2]'s
+ postcondition.  This style of reasoning gives us Crash-Hoare-Logic
+ specification for [s1;s2].
+
+ The rest of the file defines our infrustructure for backwards simulation and
+ Hoare reasoning. We require that each [BaseOp] in [Refinement.Proc] comes with
+ a Hoare-style specification that we then chain with rules for [Bind] and [Ret],
+ the two operators that [Refinement.Proc] defines to combine [BaseOp]s into
+ procedure. Once we have Hoare-style spec for a procedure, we can use the same
+ Hoare reasoning to chain procedures.
+
+ Crash Hoare Logic also defines how to reason about crashes and recovery
+ procedures.  A key requirement is that the crashed condition of a recovery
+ procedure implies its precondition.  If so, then the recovery procedure is
+ idempotent and we can run it several times.
+
+ *)
+
+(** ** Abstraction relation and composition *)
 
 (** A LayerAbstraction is a record with one field: [abstraction], which is a
 function that returns a proposition between State1 (implementation) and State2
@@ -34,9 +77,9 @@ Definition abstraction_compose
   {| abstraction := fun w state' => exists state, abstraction abs2 state state' /\
                                   abstraction abs1 w state; |}.
 
-(** A crash hoare logic (CHL) record to express the specification of
-procedures. The record has fields for the precondition, postcondition, and
-recovered condition of a procedure. *)
+(** A Crash Hoare Logic record to express the specification of procedures. The
+record has fields for the precondition, postcondition, and recovered condition
+of a procedure. *)
 Record Quadruple T R State :=
   Spec {
       pre: Prop;
@@ -52,7 +95,7 @@ Quadruple. *)
 Definition Specification A T R State := A -> State -> Quadruple T R State.
 
 
-(** * Correctness of a program
+(** ** Correctness of a program
 
   [prog_spec] defines when a specification holds for a procedure [p] and a
   recovery procedure [rec]. The correctness is defined in a backwards-simulation
@@ -99,7 +142,21 @@ Definition proc_spec `(spec: Specification A T R State) `(p: proc T)
                             recovered (spec a state) v state'
          end.
 
-(** Hoare-style implication: correctness condition in terms of Specifications for P => Q. *)
+(** Hoare-style implication: [spec1] implies [spec2] if:
+
+   - forall arguments and all states [state] for which [spec2]'s precondition
+     holds
+
+   - there exists an argument for which [spec1]'s precondition holds in [state]
+
+   - for all states [state'] in which the postcondition of [spec1] holds, then
+     the post condition of [spec2] also holds
+
+   - for all states [state'] in which the recovered condition of [spec1] holds,
+     then the recovered condition of [spec2] also holds
+
+  *)
+
 Definition spec_impl
            `(spec1: Specification A' T R State)
            `(spec2: Specification A T R State) :=
@@ -110,7 +167,9 @@ Definition spec_impl
                (forall rv state', recovered (spec1 a' state) rv state' ->
                          recovered (spec2 a state) rv state').
 
-(** Hoare-style weakening rule: if P holds and P => R, then R holds. *)
+(** Theorem for Hoare-style weakening: if [spec1] holds and [spec1] implies
+[spec2], then [spec2] also holds. *)
+
 Theorem proc_spec_weaken : forall `(spec1: Specification A T R State)
                               `(spec2: Specification A' T R State)
                               `(p: proc T) `(rec: proc R)
@@ -127,7 +186,7 @@ Qed.
 
 Hint Resolve tt.
 
-(** Hoare-style rule to process Bind statements (;) *)
+(** Theorem for the [Bind] operation: *)
 Theorem proc_spec_rx : forall `(spec: Specification A T R State)
                          `(p: proc T) `(rec: proc R)
                          `(rx: T -> proc T')
@@ -206,8 +265,7 @@ Proof.
       eapply H in H10; simpl in *; safe_intuition (repeat deex; eauto).
 Qed.
 
-(** * splitting spec into multiple cases *)
-
+(** Theorem to split a spec into the RFinished and Recovered cases: *)
 Theorem spec_intros : forall `(spec: Specification A T R State)
                        `(p: proc T) `(rec: proc R)
                        `(abs: Abstraction State),
@@ -235,7 +293,7 @@ Ltac spec_case pf :=
   eapply proc_spec_weaken; [ solve [ apply pf ] |
                                unfold spec_impl ].
 
-(** * Proving a higher-level recovery procedure correct. *)
+(** * Reasoning about crashes and recovery *)
 
 Hint Constructors rexec.
 Hint Constructors exec.
