@@ -433,10 +433,12 @@ Ltac step_prog :=
 
 (** ** Initialization *)
 
+(** Initialization can succeed or fail. If it fails, the computer stops. *)
 Inductive InitResult :=
 | Initialized
 | InitFailed.
 
+(** Run a low-level initialization first, followed by higher-level initialization. *)
 Definition then_init (init1 init2: proc InitResult) : proc InitResult :=
   r <- init1;
   match r with
@@ -446,6 +448,7 @@ Definition then_init (init1 init2: proc InitResult) : proc InitResult :=
 
 Definition inited_any {State} (s : State) : Prop := True.
 
+(** The spec for initialization: *)
 Definition init_abstraction
            (init: proc InitResult) (rec: proc unit)
            `(abs: Abstraction State) (init_sem: State -> Prop) :=
@@ -462,6 +465,9 @@ Definition init_abstraction
             fun _ w' => True;
        |}) init rec (IdAbstraction world).
 
+
+(** recovery is irrelevant for initialization: we only consider systems that
+successfully initialize. *)
 Theorem init_abstraction_any_rec : forall (init: proc InitResult)
                                    (rec rec': proc unit)
                                    `(abs: Abstraction State)
@@ -475,6 +481,7 @@ Proof.
   eapply H in H2; eauto.
 Qed.
 
+(** Spec and proof for then_init *)
 Theorem then_init_compose : forall (init1 init2: proc InitResult)
                               (rec rec': proc unit)
                               `(abs1: Abstraction State1)
