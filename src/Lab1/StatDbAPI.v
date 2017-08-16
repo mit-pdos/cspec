@@ -75,10 +75,10 @@ Definition mean_spec : Specification unit (option nat) unit State :=
    implementation must provide code for [init], [add], [mean], and [recovery]
    (which will be a NOOP).  In addition, the module must provide proofs showing,
    for example, that its implementation for [add] meets the [add_spec].  The
-   proof approach POCS uses is based on backwards simulation and this approach
-   requires the implementation to define [abstr], which abstracts the code state
-   to the spec state (the list of integers that StatDB maintains).  [abstr] is
-   of type [Refinement.Hoare.Abstraction].
+   proof approach POCS uses is based on refinement. This approach requires the
+   implementation to define [abstr], which abstracts the code state to the spec
+   state (the list of integers that StatDB maintains).  [abstr] is of type
+   [Refinement.Hoare.Abstraction].
 
 *)
 

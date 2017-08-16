@@ -2,9 +2,9 @@ Require Import Helpers.Helpers.
 Require Import Proc.
 Require Import ProcTheorems.
 
-(** * Proof style: backwards simulation and Hoare Logic
+(** * Proof style: Refinementand Hoare Logic
 
- In POCS you will often use backwards simulation to prove that an implementation
+ In POCS you will often use refinement to prove that an implementation
  (code) meets its specification (spec), which puts the following obligations on
  you:
 
@@ -30,7 +30,7 @@ Require Import ProcTheorems.
  postcondition.  This style of reasoning gives us Hoare-style specification for
  [s1;s2].
 
- The rest of this file defines the infrustructure for backwards simulation and
+ The rest of this file defines the infrustructure for refinement and
  Hoare reasoning. We require that each [BaseOp] in [Refinement.Proc] comes with
  a Hoare-style specification that we then chain with rules for [Bind] and [Ret],
  the two operators that [Refinement.Proc] defines to combine [BaseOp]s into
@@ -109,7 +109,7 @@ Definition Specification A T R State := A -> State -> Quadruple T R State.
 
   [prog_spec] defines when a specification holds for a procedure [p] and a
   recovery procedure [rec].  The correctness is defined in a
-  backwards-simulation style.
+  refinement style.
 
   The general shape of what [proc_spec] says is as follows: 
 
@@ -135,7 +135,9 @@ Definition Specification A T R State := A -> State -> Quadruple T R State.
 
   - if the precondition holds for [a] and [state]
 
-  - if the procedure [p] starts from code state [w] and perhaps running the recovery procedure one mor more times (if there is a crash), then one of the following two must be true:
+  - if the procedure [p] starts from code state [w] and perhaps running the recovery 
+    procedure one mor more times (if there is a crash), then one of the following two 
+    must be true: 
 
   - 1) if execution finishes without crashes in code state [w'] and returning [v],
     then there exists a spec [state'] in which the abstraction relationholds
@@ -423,6 +425,8 @@ Ltac step_prog :=
 
 
 (** ** Reasoning about crashes and recovery *)
+
+(* XXX doesn't show up in StatDB. recovered condition, separate reasoning about crashes from crash-free execution . *)
 
 Hint Constructors rexec.
 Hint Constructors exec.

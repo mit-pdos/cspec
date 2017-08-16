@@ -60,9 +60,9 @@ Definition write_spec v val : Specification _ _ unit _ :=
 (** * Variables module
 
    An implementation of Variables must implement the following module and must
-   prove that that its code implements the spec correctly using backwards
-   simulation.  Our implementation of the module, [VariablesImpl], is in Haskell
-   and take that the Haskell code implements the spec correctly as an axiom.
+   prove that that its code implements the spec correctly using refinement.  Our
+   implementation of the module, [VariablesImpl], is in Haskell and take that
+   the Haskell code implements the spec correctly as an axiom.
 
   *)
 
