@@ -18,9 +18,6 @@ Require Import ProcTheorems.
    abstraction relationship holds between [w'] and [state'], and that the spec
    operation could have reached [state'] from state [state].
 
- - You must show that the abstraction relationship between the initial code
-   state w and the initial spec state [state];
-
  The procedure that implements the spec operation may be a program that makes
  several steps. To reason about the behavior of this procedure we use
  Hoare-style reasoning.  We require that each individual program step has a
@@ -33,7 +30,7 @@ Require Import ProcTheorems.
  postcondition.  This style of reasoning gives us Crash-Hoare-Logic
  specification for [s1;s2].
 
- The rest of the file defines our infrustructure for backwards simulation and
+ The rest of the file defines the infrustructure for backwards simulation and
  Hoare reasoning. We require that each [BaseOp] in [Refinement.Proc] comes with
  a Hoare-style specification that we then chain with rules for [Bind] and [Ret],
  the two operators that [Refinement.Proc] defines to combine [BaseOp]s into
@@ -41,9 +38,15 @@ Require Import ProcTheorems.
  Hoare reasoning to chain procedures.
 
  Crash Hoare Logic also defines how to reason about crashes and recovery
- procedures.  A key requirement is that the crashed condition of a recovery
- procedure implies its precondition.  If so, then the recovery procedure is
- idempotent and we can run it several times.
+ procedures.  A key requirement for a recovery procedure is that the crashed
+ condition of a recovery procedure implies its precondition.  If so, then the
+ recovery procedure is *idempotent* and we can run the recovery procedure
+ several times (e.g., when a crash happens during recovery and we run recovery
+ again after reboot).
+
+ As a final detail, we need to reason about initialization, and, in particular,
+ show that the abstraction relationship between the initial code state w and the
+ initial spec state [state] holds.
 
  *)
 
@@ -142,7 +145,7 @@ Definition proc_spec `(spec: Specification A T R State) `(p: proc T)
                             recovered (spec a state) v state'
          end.
 
-(** Hoare-style implication: [spec1] implies [spec2] if:
+(** Hoare-style implication: [spec1] implies [spec2] if
 
    - forall arguments and all states [state] for which [spec2]'s precondition
      holds
@@ -322,6 +325,7 @@ Proof.
     econstructor; eauto.
 Qed.
 
+(* Define what it means to run recovery in recovered state : *)
 Definition prog_loopspec `(spec: Specification A unit unit State)
            `(rec': proc unit) `(rec: proc unit)
            (abs: Abstraction State) :=
@@ -338,20 +342,22 @@ Definition prog_loopspec `(spec: Specification A unit unit State)
           abstraction abs w'' state'' /\
           post (spec a state) rv'' state''.
 
+(** Define what it means for a spec to be idempotent: *)
 Definition idempotent `(spec: Specification A T unit State) :=
   forall a state,
     pre (spec a state) ->
     forall v state', recovered (spec a state) v state' ->
-            (* idempotency: crash invariant implies precondition to
+            (** idempotency: recovered condition implies precondition to
                re-run on every crash *)
             exists a', pre (spec a' state') /\
-                  (* postcondition transitivity: establishing the
-                     postcondition from a crash state is sufficient to
+                  (** postcondition transitivity: establishing the
+                     postcondition from a recovered state is sufficient to
                      establish it with respect to the original initial
                      state (note all with the same ghost state) *)
                   forall rv state'', post (spec a' state') rv state'' ->
                                 post (spec a state) rv state''.
 
+(* Idempotents theorem: *)
 Theorem idempotent_loopspec : forall `(rec: proc unit) `(rec': proc unit)
                                      `(spec: Specification A unit unit State)
                                      (abs: Abstraction State),
