@@ -108,23 +108,38 @@ Definition Specification A T R State := A -> State -> Quadruple T R State.
 (** ** Correctness of a program
 
   [prog_spec] defines when a specification holds for a procedure [p] and a
-  recovery procedure [rec]. The correctness is defined in a backwards-simulation
-  style.  [prog_spec] states that forall precondition arguments ([a]), code
-  states ([w]), and spec states ([state]):
+  recovery procedure [rec].  The correctness is defined in a
+  backwards-simulation style.
 
-  - if the abstraction relation holds between code state [w] and spec state
-    [state]
+  The general shape of what [proc_spec] says is as follows: 
+
+<<
+            pre                      post 
+             |                         | 
+             V                         V 
+          code state --[procedure]--> state'
+>>
+          
+  The top-level [proc_spec] statement has a precondition that maps the
+  starting code state to the starting spec state, and postcondition that maps
+  the final code state to the correspoding final spec state.
+
+  The precondition takes additional argument as input, which can appear in
+  postcondition.  useful for saying "if exists some abstract state in the
+  precondition, then..."
+
+  In more detail, [prog_spec] states that forall precondition arguments ([a]),
+  code states ([w]), and spec states ([state]):
+
+  - if the abstraction relation holds between code state [w] and spec state [state]
 
   - if the precondition holds for [a] and [state]
 
-  - if the procedure [p] starts from code state [w] and perhaps running the
-    recovery procedure one mor more times (if there is a crash), then one of the
-    following two must be true:
+  - if the procedure [p] starts from code state [w] and perhaps running the recovery procedure one mor more times (if there is a crash), then one of the following two must be true:
 
-  - 1) if execution finishes without crashes in code state [w'] and returning
-    [v], then there exists a spec [state'] in which the abstraction
-    relationholds between [w'] and [state'] and the postcondition holds in
-    [state'], OR
+  - 1) if execution finishes without crashes in code state [w'] and returning [v],
+    then there exists a spec [state'] in which the abstraction relationholds
+    between [w'] and [state'] and the postcondition holds in [state'], OR
 
   - 2) if execution finishes in code state [w'] and returning [v] after perhaps
     several crashes and running the recovery procedure [r] several times , then
@@ -357,17 +372,34 @@ Ltac monad_simpl :=
 
 (** ** Automation: step_prog
 
-  This Ltac attempts to step through procedures.  It compares Coq's current goal
-  to:
+  To simplify proofs, we automate reasoning about [proc_spec]. Consider a proof
+  for a [proc_spec] about "a ; b". What do we need to prove?
+
+<<
+      pre                             post 
+       |                               | 
+       V                               V 
+     state0 --[a]--> state1 --[b]--> state2
+>>
+
+  We need to find a [proc_spec] for [a] and line up our precondition with that spec's then
+  reduce to proving a [proc_spec] for b, with [a]'s post as the new pre.  Keep
+  doing this repeatedly.
+
+  There are requirements to make this plan work: 
+    - can find a [proc_spec] for the [a] program 
+    - can line up our current state precondition with [a]'s [proc_spec] pre
+
+  This Ltac implements this plan.  It compares Coq's current goal  to:
   
   - [forall]: if so, intro the variables, and invoke [step_prog] again
   
   - a proc_spec with a procedure that invokes a [Ret] operation: if so, apply
     the [ret_spec] theorem to consume the [Ret].
 
-  - a proc_spec with a procedure that sequences two operations (with [Bind]): if
+  - a proc_spec with a procedure that sequences two operations [a] and [b] (with [Bind]): if
     so, apply the proc_spec_rx theorem to consume the [Bind]. If an "ok" theorem
-    exists for the two operations, then "eauto" will try to apply the two
+    exists for the two operations [a] and [b], then "eauto" will try to apply the two
     theorems and dismiss the obligrations, if successful.
 
   - a proc_spec that is implied by a proc_spec that is in context: if so, apply
