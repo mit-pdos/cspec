@@ -55,6 +55,10 @@ Module StatDB (v : VarsAPI) <: StatDbAPI.
       {| abstraction := statdb_abstraction |}.
 
 
+  (* XXX a few exercises for students to prove that their abstraction relation
+  is in/correct for a few spec and code states. *)
+
+  
   Theorem init_ok : init_abstraction init recover abstr inited.
   Proof.
     eapply then_init_compose; eauto.

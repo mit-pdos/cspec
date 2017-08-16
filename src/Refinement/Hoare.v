@@ -452,7 +452,10 @@ Ltac step_prog :=
   do nothing).  Doing nothing is idempotent, so the proofs dealing crashes for
   these labs are trivial.  The last lab requires repair after a crash.
 
-*)
+  XXX maybe move this section to a separate file since it isn't relevant for a
+   while in the labs.
+ *)
+
 
 
 Hint Constructors rexec.
