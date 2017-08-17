@@ -1,3 +1,5 @@
+# Lab0
+
 Finish these files; the exercises are marked.
 
 compare.v: mostly warmup, some tactics.
