@@ -12,7 +12,7 @@ CLASSREPO=git@github.com:/mit-pdos/6.826-2017-labs
 
 # include only these src/ directories 
 SRCS="src/Helpers src/Disk src/Refinement src/NBD \
-      src/Lab0 src/Lab1"
+      src/Lab1"
 
 # files/directories to copy
 TOPLEVELS="Makefile README.md LICENSE _CoqProject .gitignore scripts/add-preprocess.sh src/POCS.v statdb-cli"
