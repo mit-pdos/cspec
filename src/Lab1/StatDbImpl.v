@@ -59,7 +59,7 @@ Module StatDB (v : VarsAPI) <: StatDbAPI.
   Example abstr_1_ok : statdb_abstraction (VariablesAPI.mkState 0 0) nil.
   Proof. unfold statdb_abstraction; auto. Qed.
 
-  Example abstr_2_ok : statdb_abstraction (VariablesAPI.mkState 1 0) nil -> False.
+  Example abstr_2_nok : ~ statdb_abstraction (VariablesAPI.mkState 1 0) nil.
   Proof. unfold statdb_abstraction; simpl. omega. Qed.
 
   Example abstr_3_ok : statdb_abstraction (VariablesAPI.mkState 2 3) [1; 2].
