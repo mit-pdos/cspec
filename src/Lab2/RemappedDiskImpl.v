@@ -79,7 +79,7 @@ Module RemappedDisk (bd : BadBlockAPI) <: OneDiskAPI.
     abstraction_compose bd.abstr {| abstraction := remapped_abstraction |}.
 
   Example abst_1_ok : remapped_abstraction
-                         (BadBlockAPI.mkState [block0;block0] 0) [block0].
+                         (BadBlockAPI.mkState [block1;block0] 0) [block0].
   Proof.
     constructor; try auto.
     simpl. intros.
@@ -89,7 +89,7 @@ Module RemappedDisk (bd : BadBlockAPI) <: OneDiskAPI.
       rewrite disk_oob_eq; auto.
     - simpl. omega.
   Qed.
-    
+
   Ltac invert_abstraction :=
     match goal with
     | H : remapped_abstraction _ _ |- _ => inversion H; clear H; subst_var; simpl in *
