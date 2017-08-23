@@ -5,6 +5,8 @@ Require Import BadBlockAPI.
 
 Module RemappedDisk (bd : BadBlockAPI) <: OneDiskAPI.
 
+  Import ListNotations.
+  
   Definition read (a : addr) : proc block :=
     bs <- bd.getBadBlock;
     if a == bs then
@@ -76,6 +78,18 @@ Module RemappedDisk (bd : BadBlockAPI) <: OneDiskAPI.
   Definition abstr : Abstraction OneDiskAPI.State :=
     abstraction_compose bd.abstr {| abstraction := remapped_abstraction |}.
 
+  Example abst_1_ok : remapped_abstraction
+                         (BadBlockAPI.mkState [block0;block0] 0) [block0].
+  Proof.
+    constructor; try auto.
+    simpl. intros.
+    - destruct (lt_dec a 2).
+      omega.
+      rewrite disk_oob_eq; auto.
+      rewrite disk_oob_eq; auto.
+    - simpl. omega.
+  Qed.
+    
   Ltac invert_abstraction :=
     match goal with
     | H : remapped_abstraction _ _ |- _ => inversion H; clear H; subst_var; simpl in *
