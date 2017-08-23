@@ -19,6 +19,8 @@ Require Import StatDbAPI.
 
 Module StatDB (v : VarsAPI) <: StatDbAPI.
 
+  Import ListNotations.
+
   Definition add (v : nat) : proc unit :=
     sum <- v.read VarSum;
     count <- v.read VarCount;
@@ -54,11 +56,15 @@ Module StatDB (v : VarsAPI) <: StatDbAPI.
       v.abstr
       {| abstraction := statdb_abstraction |}.
 
+  Example abstr_1_ok : statdb_abstraction (VariablesAPI.mkState 0 0) nil.
+  Proof. unfold statdb_abstraction; auto. Qed.
 
-  (* XXX a few exercises for students to prove that their abstraction relation
-  is in/correct for a few spec and code states. *)
+  Example abstr_2_ok : statdb_abstraction (VariablesAPI.mkState 1 0) nil -> False.
+  Proof. unfold statdb_abstraction; simpl. omega. Qed.
 
-  
+  Example abstr_3_ok : statdb_abstraction (VariablesAPI.mkState 2 3) [1; 2].
+  Proof. unfold statdb_abstraction; simpl. omega. Qed.
+
   Theorem init_ok : init_abstraction init recover abstr inited.
   Proof.
     eapply then_init_compose; eauto.
