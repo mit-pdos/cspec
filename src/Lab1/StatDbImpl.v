@@ -28,13 +28,17 @@ Module StatDB (v : VarsAPI) <: StatDbAPI.
     _ <- v.write VarCount (count + 1);
     Ret tt.
 
+  (** ** Exercise : complete the implementation of mean *)
   Definition mean : proc (option nat) :=
+  (* SOL *)
     count <- v.read VarCount;
     if count == 0 then
       Ret None
     else
       sum <- v.read VarSum;
       Ret (Some (sum / count)).
+  (* END *)
+  (* STUB: Ret None. *)
 
   Definition init' : proc InitResult :=
     _ <- v.write VarCount 0;
@@ -46,10 +50,13 @@ Module StatDB (v : VarsAPI) <: StatDbAPI.
   Definition recover : proc unit :=
     v.recover.
 
-
+  (** ** Exercise : complete the implementation of the abstraction function: *)
   Definition statdb_abstraction (vars_state : VariablesAPI.State) (statdb_state : StatDbAPI.State) : Prop :=
+  (* SOL *)
     StateCount vars_state = length statdb_state /\
     StateSum vars_state = fold_right plus 0 statdb_state.
+  (* END *)
+  (* STUB: True. *)
 
   Definition abstr : Abstraction StatDbAPI.State :=
     abstraction_compose
@@ -59,11 +66,24 @@ Module StatDB (v : VarsAPI) <: StatDbAPI.
   Example abstr_1_ok : statdb_abstraction (VariablesAPI.mkState 0 0) nil.
   Proof. unfold statdb_abstraction; auto. Qed.
 
+  (** ** Exercise : complete the proof for the following admitted examples *)
   Example abstr_2_nok : ~ statdb_abstraction (VariablesAPI.mkState 1 0) nil.
-  Proof. unfold statdb_abstraction; simpl. omega. Qed.
+  Proof.
+    unfold statdb_abstraction; simpl.
+  (* SOL *)
+   omega.
+   Qed.
+  (* END *)
+  (* STUB: Admitted. *)
 
   Example abstr_3_ok : statdb_abstraction (VariablesAPI.mkState 2 3) [1; 2].
-  Proof. unfold statdb_abstraction; simpl. omega. Qed.
+  Proof.
+    unfold statdb_abstraction; simpl.
+  (* SOL *)
+    omega.
+    Qed.
+  (* END *)
+  (* STUB: Admitted. *)    
 
   Theorem init_ok : init_abstraction init recover abstr inited.
   Proof.
@@ -85,13 +105,14 @@ Module StatDB (v : VarsAPI) <: StatDbAPI.
     intuition auto.
   Qed.
 
+  (** ** Exercise : complete the proof of [add] *)
   Theorem add_ok : forall v, proc_spec (add_spec v) (add v) recover abstr.
   Proof.
     unfold add.
     intros.
 
     apply spec_abstraction_compose; simpl.
-
+  (* SOL *)
     step_prog; intros.
     destruct a'; simpl in *; intuition idtac.
     eexists (_, _); simpl; intuition idtac.
@@ -116,7 +137,10 @@ Module StatDB (v : VarsAPI) <: StatDbAPI.
 
     autounfold in *; intuition.
   Qed.
+  (* END *)
+  (* STUB: Admitted. *)    
 
+  (** ** Exercise : complete the proof of [mean] *)
   Theorem mean_ok : proc_spec mean_spec mean recover abstr.
   Proof.
     unfold mean.
@@ -124,6 +148,7 @@ Module StatDB (v : VarsAPI) <: StatDbAPI.
 
     apply spec_abstraction_compose; simpl.
 
+  (* SOL *)
     step_prog; intros.
     destruct a'; simpl in *; intuition idtac.
     eexists (_, _); simpl; intuition idtac.
@@ -156,6 +181,9 @@ Module StatDB (v : VarsAPI) <: StatDbAPI.
       right.
       intuition ( try congruence ).
   Qed.
+  (* END *)
+  (* STUB: Admitted. *)    
+
 
   Theorem recover_noop : rec_noop recover abstr no_crash.
   Proof.
