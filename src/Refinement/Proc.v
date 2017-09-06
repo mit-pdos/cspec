@@ -82,6 +82,7 @@ CoInductive proc (T : Type) : Type :=
     a [proc] procedure.
   *)
 
+Require Extraction.
 Extraction Language Haskell.
 
 Extract Inductive proc => "TheProc"
