@@ -1,9 +1,7 @@
-(** * Modeling of programs and their execution. *)
-
 Global Set Implicit Arguments.
 Global Generalizable All Variables.
 
-(** * Model of state.
+(** * Model of sequential programs with mutable state.
 
     In our labs, we want to reason about programs that have side-effects,
     such as modifying the contents of memory or writing to disk.  This is
@@ -14,55 +12,42 @@ Global Generalizable All Variables.
     To reason about programs that manipulate mutable state,
     we need to construct an explicit Coq model of:
 
-    - What the mutable state looks like.
     - What a program looks like.
-    - How a program executes (and modifies the mutable state).
+    - How a program executes.
 
     Our programs will eventually be extracted from Coq into Haskell, and
     execute as Haskell programs (by compiling their Coq-generated Haskell
     source code using a Haskell compiler to produce an executable binary).
 
-    We reflect this in our model of the world, by representing the state of the
-    world with an opaque type called [world]. This type is assumed in Coq as an
-    [Axiom].
+    First, we need a type to represent programs, which will be an inductive type
+    [proc] after some preliminaries. This type is a generic model of sequential
+    programs, allowing chaining programs together. We will implement some basic
+    operations in Haskell to do I/O where needed and, using extraction, link our programs with the
+    Haskell primitives and run them.
+
   *)
 
-Axiom world : Type.
+(** As a technical detail, we let programs include arbitrary operations of types
+    [baseOpT T] (which will produce a T-typed result). These will tell Coq that
+    a [proc] can contain outside code that we don't care to represent here.
+  *)
+Axiom baseOpT : Type -> Type.
 
-(** * Model of programs.
-
-    To go along with our opaque model of the world, we similarly have an opaque
-    type of programs (represented by a procedure, [proc]). This type is a
-    generic model of sequential programs. We will implement some basic
-    operations in Haskell to do I/O where needed, assume that these have the
-    expected behavior, and then prove our own programs correct using these
-    primitives. Using Coq extraction we'll be able to link our programs with the
-    Haskell primitives and run them. We'll get to how the primitives are added
-    later on, first talking about the generic aspects of [proc].
+(** Our minimal, generic model of sequential procedures.
 
     The only detail we expose about our opaque procedures is that it's possible
     to combine procedures together, using [Ret] and [Bind]. If you're familiar
     with Haskell, these are the same as [return] and [(>>=)] for the [IO] monad.
-  *)
-
-(** As a technical detail, we let programs include arbitrary operations
-    of types [baseOpT T] (which will produce a T-typed result).  This represents
-    the opaque execution of Haskell procedures, which Coq should not be able
-    to peek inside.
-  *)
-
-Axiom baseOpT : Type -> Type.
-
-(** Our minimal, generic programming language.
-    Programs can be combined with [Bind] and [Ret].
-    [BaseOp] represents opaque Haskell code, and it's important here
-    because in its absence, Coq could prove that the programming language
-    never does anything other than return a constant expression with [Ret].
 
     Procedures are parametrized by type [T], which is the type of value
     that will be returned by the procedure.  For example, a procedure
     that returns a [nat] has type [proc nat], and a procedure that returns
     nothing ("void", in C terminology) has type [proc unit].
+
+    As a technical detail, we include a constructor [BaseOp] to include
+    arbitrary external operations. Without this constructor, Coq would think
+    that every [proc] consists only of [Ret] and [Bind] and thus can't have side
+    effects.
   *)
 
 CoInductive proc (T : Type) : Type :=
@@ -91,41 +76,49 @@ Extract Inductive proc => "TheProc"
 
 (** * Execution model.
 
-    Finally, we define our model of execution.  We start by defining
-    the possible outcomes of executing a procedure [proc T]: either
-    the procedure finishes and returns something of type T, or the
-    procedure crashes.  Because we are explicitly modeling the effect
-    of procedures on the state of our system, both of these outcomes
-    also include the resulting world state.
+    Next, we define our model of execution.
+
+    The model will specify how Bind chains operations together. Importantly, our
+    semantics will allow a [proc] to execute to a crashed state at any any
+    intermediate point in its execution. Later we'll also bring recovery
+    execution into this picture.
+
   *)
 
+(** When we define how programs execute, we will say they manipulate some state
+    of this opaque type [world]. We won't ever define this type in Coq, but it will
+    show up later to capture idea that programs move from one world state to
+    another in sequence.
+
+ *)
+Axiom world : Type.
+
+
+(** We start by defining the possible outcomes of executing a procedure [proc
+    T]: either the procedure finishes and returns something of type T, or the
+    procedure crashes. Because we are explicitly modeling the effect of
+    procedures on the state of our system, both of these outcomes also include
+    the resulting world state.
+*)
 Inductive Result T :=
 | Finished (v:T) (w:world)
 | Crashed (w:world).
 
 Arguments Crashed {T} w.
 
-(** To define the execution of programs, we need to state an axiom
-    about how our opaque [BaseOp] Haskell procedures will execute.
-    This axiom is [step].  For every [baseOpT T], it relates a starting
-    world state to the return value of that [BaseOp] and the resulting
-    world state.  This is largely just a technicality.
+(** To define the execution of programs, we need to state an axiom about how our
+    opaque [baseOpT] primitives execute. This axiom is [base_step]. This is
+    largely just a technicality.
   *)
 
-Axiom step : forall T, baseOpT T -> world -> T -> world -> Prop.
+Axiom base_step : forall T, baseOpT T -> world -> T -> world -> Prop.
 
-(** We also need to model what happens to the state of our system on
-    a crash.  Our model is that, on a crash, the world state is modified
-    according to the opaque [world_crash] function, which we define as an
-    axiom.  This is meant to represent the computer losing volatile state,
-    such as memory contents or disk write buffers.
-  *)
-
-Axiom world_crash : world -> world.
-
-(** Finally, we define the [exec] relation to represent the execution
-    semantics of a procedure, leveraging the [step] and [world_crash]
-    definitions from above.
+(** Finally, we define the [exec] relation to represent the execution semantics
+    of a procedure, leveraging the [step] and [world_crash] definitions from
+    above. The interpretation is that when [exec p w r] holds, procedure [p]
+    when executed in state [w] can end up with the result [r]. Recall that the
+    [Result T] type always includes the final world state, and includes a return
+    value of type [T] if the execution finishes successfully without crashing.
   *)
 
 Inductive exec : forall T, proc T -> world -> Result T -> Prop :=
@@ -144,12 +137,11 @@ Inductive exec : forall T, proc T -> world -> Result T -> Prop :=
     exec (p' v) w' r ->
     exec (Bind p p') w r
 
-(** - Second, it defines how Haskell code runs, by referring back to
-      the [step] relation that we introduced above.
+(** - Second, it incorporates the opaque way base operations step.
   *)
 
 | ExecOp : forall T (op: baseOpT T) w v w',
-    step op w v w' ->
+    base_step op w v w' ->
     exec (BaseOp op) w (Finished v w')
 
 (** - And finally, it defines how procedures can crash.  Any procedure
@@ -179,22 +171,25 @@ Inductive exec : forall T, proc T -> world -> Result T -> Prop :=
     If the system crashes again while running the recovery procedure, it
     starts running the same recovery procedure again after reboot.
 
-    The outcome of running a procedure with recovery is similar to the
-    [Result] type defined above, except that in the case of a crash, we
-    run a recovery procedure and get both a final state _and_ a return
-    value from the recovery procedure.
   *)
 
-Inductive RResult T R :=
-| RFinished (v:T) (w:world)
-| Recovered (v:R) (w:world).
+(** When we talk about recovery, we need to capture one more property of
+    crashes. Above, a crash just stops execution. In practice, however, some
+    parts of the state are volatile and are lost after a crash, such as memory
+    contents or disk write buffers. Our model is that, on a crash, the world
+    state is modified according to the opaque [world_crash] function, which we
+    define as an axiom. This is meant to represent the computer losing volatile
+    state, such as memory contents or disk write buffers.
+ *)
 
-Arguments RFinished {T R} v w.
-Arguments Recovered {T R} v w.
+Axiom world_crash : world -> world.
 
-(** To help us talk about repeated recovery attempts (in the face of
-    repeated crashes during recovery), we use [exec_recover] to model
-    these repeated executions of some recovery procedure [rec].
+(** Before we talk about the whole execution, we first just model executing the
+    recovery procedure, including repeated attempts in the case of a crash
+    during recovery. The interpretation of [exec_recover rec w rv w'] is that it
+    means the procedure [rec] can execute from [w] to [w'], ultimately returning
+    [rv] (a "recovery value"), and possibly crashing and restarting multiple
+    times along the way.
   *)
 
 Inductive exec_recover R (rec:proc R) (w:world) : R -> world -> Prop :=
@@ -220,6 +215,20 @@ Inductive exec_recover R (rec:proc R) (w:world) : R -> world -> Prop :=
     exec rec w (Crashed w') ->
     exec_recover rec (world_crash w') v w'' ->
     exec_recover rec w v w''.
+
+(** * Chaining normal execution with recovery *)
+
+(** The outcome of running a procedure with recovery is similar to the [Result]
+    type defined above, except that in the case of a crash, we run a recovery
+    procedure and get both a final state _and_ a return value from the recovery
+    procedure.
+*)
+Inductive RResult T R :=
+| RFinished (v:T) (w:world)
+| Recovered (v:R) (w:world).
+
+Arguments RFinished {T R} v w.
+Arguments Recovered {T R} v w.
 
 (** Finally, [rexec] defines what it means to run a procedure and use
     some recovery procedure on crashes, including crashes during recovery.
