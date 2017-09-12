@@ -84,10 +84,8 @@ Extract Constant bsplit => "(\n1 _ bs -> Data.ByteString.splitAt (Prelude.fromIn
 
     We represent blocks as a byte array of a fixed size.
 
-    We define the block size as a separate constant, [blockbytes],
-    so that we can later make it opaque.  This helps avoid Coq
-    expanding out [blockbytes] into the literal constant [1024],
-    which helps with performance.
+    We define the block size as a separate constant, [blockbytes], to avoid the
+    literal constant [1024] reducing performance of proofs.
   *)
 
 Definition blockbytes := 1024.
@@ -146,7 +144,7 @@ Definition empty_disk : disk := nil.
       we cannot update a disk "in-place", so instead [diskUpd] returns a
       new disk reflecting the write.  Specifically, [diskUpd d a b] returns
       a new disk with address [a] updated to block value [b], if [a] is
-      in-bounds, or no changes if [a] is out-of-bounds.
+      in-bounds, or the original disk unchanged if [a] is out-of-bounds.
   *)
 
 Definition diskGet (d : disk) (a : addr) : option block :=
