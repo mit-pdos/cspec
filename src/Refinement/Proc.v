@@ -22,28 +22,27 @@ Global Generalizable All Variables.
     execute as Haskell programs (by compiling their Coq-generated Haskell
     source code using a Haskell compiler to produce an executable binary).
 
-    We reflect this in our model of the world, by representing the state
-    of the world with an opaque type called [world], which is defined in
-    Coq as an [Axiom].
+    We reflect this in our model of the world, by representing the state of the
+    world with an opaque type called [world]. This type is assumed in Coq as an
+    [Axiom].
   *)
 
 Axiom world : Type.
 
 (** * Model of programs.
 
-    To go along with our opaque model of the world, we similarly have an
-    opaque type of programs (represented by a procedure, [proc]).  This
-    represents real Haskell programs that will eventually run with the
-    help of a Haskell compiler.
+    To go along with our opaque model of the world, we similarly have an opaque
+    type of programs (represented by a procedure, [proc]). This type is a
+    generic model of sequential programs. We will implement some basic
+    operations in Haskell to do I/O where needed, assume that these have the
+    expected behavior, and then prove our own programs correct using these
+    primitives. Using Coq extraction we'll be able to link our programs with the
+    Haskell primitives and run them. We'll get to how the primitives are added
+    later on, first talking about the generic aspects of [proc].
 
-    To write programs in Coq, we will eventually state axioms about the
-    existence of some basic procedures, implemented outside of Coq (i.e.,
-    in Haskell), along with axioms about what happens when we run one of
-    those basic procedures.  But that will show up later on.
-
-    The only detail we expose about our opaque procedures is that it's
-    possible to combine procedures together, using [Ret] and [Bind], as
-    with monadic programs in Haskell.
+    The only detail we expose about our opaque procedures is that it's possible
+    to combine procedures together, using [Ret] and [Bind]. If you're familiar
+    with Haskell, these are the same as [return] and [(>>=)] for the [IO] monad.
   *)
 
 (** As a technical detail, we let programs include arbitrary operations

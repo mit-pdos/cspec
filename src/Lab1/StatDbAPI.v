@@ -20,7 +20,8 @@ Require Import POCS.
 
 (** ** The state of StatDB
    
-  We will often refer to the state that specification maintains as the spec state.
+  We will often refer to the abstract state the specification refers to as the
+  "spec state".
  *)
 
 Definition State := list nat.
@@ -34,11 +35,11 @@ Definition inited (s : State) : Prop :=
 (** ** The specification of the StatDB operations
 
   The specifications are of type [Specification], which is defined in
-  [POCS.Refinement.Hoare]. A specificatoin is a record with 3 fields: [pre],
-  [post], and [recovered] (which we will ignore in this lab).  For both
-  operations the precondition is just [True] (i.e., we have to make no
-  assumptions to be able to prove its postcondition.  The postconditions
-  describe the effects of the operations [add] and [mean]:
+  [POCS.Refinement.Hoare]. A specification is a record with 3 fields: [pre],
+  [post], and [recovered] (which we will ignore in this lab). For both
+  operations the precondition is just [True] (i.e., we prove the postconditions in
+  any initial state). The postconditions describe the effects of the operations
+  [add] and [mean]:
 
   - [add_spec]'s post condition states that [add v] adds [v] to the spec state
     of StatDB and that [add] returns [tt].
@@ -71,14 +72,14 @@ Definition mean_spec : Specification unit (option nat) unit State :=
 
 (** * StatDB module
 
-   An implementation of StatDB must implement the StatDB module (the spec).  The
-   implementation must provide code for [init], [add], [mean], and [recovery]
-   (which will be a NOOP).  In addition, the module must provide proofs showing,
-   for example, that its implementation for [add] meets the [add_spec].  The
-   proof approach POCS uses is based on refinement. This approach requires the
-   implementation to define [abstr], which abstracts the code state to the spec
-   state (the list of integers that StatDB maintains).  [abstr] is of type
-   [Refinement.Hoare.Abstraction].
+   An implementation of StatDB is a Coq Module that implements the StatDbAPI
+   module type. The implementation must provide code for [init], [add], [mean],
+   and [recovery] (which will be a NOOP). In addition, the module must provide
+   proofs showing, for example, that its implementation for [add] meets the
+   [add_spec]. The proof approach POCS uses is based on refinement. This
+   approach requires the implementation to define [abstr], which abstracts the
+   code state to the spec state (the list of integers that StatDB maintains).
+   [abstr] is of type [Refinement.Hoare.Abstraction].
 
 *)
 

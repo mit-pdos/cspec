@@ -10,56 +10,70 @@ Require Import ProcTheorems.
  - You need to define one abstraction relationship between code states and spec
    states;
 
- - You must show what code state [w'] is produced after running a procedure that
-   implements a spec operation, starting from code state [w];
+ - Whenever the code runs from state [w] to state [w'] and the abstraction
+   relation initially holds between [w] and [state], you must show that there exists
+   a spec state [state'] for which the abstraction relationship holds between [w']
+   and [state'], and that the spec operation could have reached [state'] from state [state].
+   Here's a picture:
 
- - You must show that there exists a spec state [state'] for which the
-   abstraction relationship holds between [w'] and [state'], and that the spec
-   operation could have reached [state'] from state [state].
+<<
+                     spec semantics
+     forall state -------------------> exists state'
+              ^                                 ^
+         absR |                            absR |
+              V   semantics of code             V
+       forall w  --------------------> forall state
+>>
 
  The procedure that implements the spec operation may be a program that makes
  several steps. To reason about the behavior of this procedure we use
- Hoare-style reasoning.  We require that each individual program step has a
+ Hoare-style reasoning. We require that each individual program step has a
  Crash-Hoare-Logic specification, consisting of a precondition, a post
- condition, and recovered condition.  We then chain the steps of the program
- using Hoare reasoning.  For example, to reason about a program with two steps:
+ condition, and recovered condition. We then chain the steps of the program
+ using Hoare reasoning. For example, to reason about a program with two steps:
  [s1;s2], we need to show that the postcondition of [s1] implies the
  precondition of [s2]. If you can prove that, then you can conclude that if the
  precondition of [s1] holds, then the postcondition of [s1;s2] is [s2]'s
- postcondition.  This style of reasoning gives us Hoare-style specification for
- [s1;s2].
+ postcondition. This style of reasoning gives us a proof for [s1;s2]'s
+ Hoare-style specification.
 
- To support reasing about crashes, the spec of each procedure must also have a
+ To support reasoning about crashes, the spec of each procedure must also have a
  recovered condition, in addition to the traditional Hoare precondition and
- postcondition.  The recovered condition describes the state of the computer
- after it reboots.  Other than specifying the recovered condition for each
+ postcondition. The recovered condition describes the state of the computer
+ after it reboots. Other than specifying the recovered condition for each
  procedure, the infrastructure mostly separates reasoning about crash-free
  execution from reasoning about crashes and recovery (i.e., repairing the system
- after a crash).  The support for reasoning about recovery is in
- [Refinement.HoareRecovery].  In [Lab1.StatDB], we ignore crashes, and thus you
- don't have to specificy a meaningful recovered condition and implement a
- recovery procedure.  For labs 2 and lab 3, you can find solutions that don't
- require any repair after a crash, and the recovery procedure is trivial (i.e.,
- do nothing).  The last lab requires repair after a crash, which will require
+ after a crash). The support for reasoning about recovery is in
+ [Refinement.HoareRecovery]. In [Lab1.StatDB], we ignore crashes, and thus you
+ don't have to specify a meaningful recovered condition and implement a recovery
+ procedure. For labs 2 and lab 3, you can find solutions that don't require any
+ repair after a crash, and the recovery procedure is trivial (i.e., it does
+ nothing). The last lab requires repair after a crash, which will require
  understanding [Refinement.HoareRecovery].
 
- The rest of this file defines the infrustructure for refinement and Hoare
- reasoning. We require that each [BaseOp] in [Refinement.Proc] comes with a
- Hoare-style specification that we then chain with rules for [Bind] and [Ret],
- the two operators that [Refinement.Proc] defines to combine [BaseOp]s into
- procedure. Once we have Hoare-style spec for a procedure, we can use the same
- Hoare reasoning to chain procedures.
+ The rest of this file defines the infrastructure for refinement and Hoare
+ reasoning. At a high level, it includes the following:
 
- This reasoning is partially automated.  Assuming there are "ok" theorems for
- [BaseOp]s and procedures, then the Ltac [step_prog] "steps" through procedures.
- For example, the proof of [add_ok] in [Lab1/StatDBImpl] consists mostly of
- repeatedly invoking [step_prog].  [Lab1/StatDBAPI] also adds [add_ok] to the
- Hint database so that "[step_prog]" can "step" through procedures that invoke
- [add].
+ - A definition [Abstraction], which formalizes our notion of abstract state on
+   top of the opaque world state.
+ - A syntax for Crash Hoare Logic specifications, bundling together the
+   precondition, postcondition, and recovered condition.
+ - A definition of when a program meets a Crash Hoare Logic specification.
+ - Theorems about general specifications (especially the chaining for [s1;s2]
+   described above).
+
+ This reasoning is partially automated. Assuming there are "ok" theorems all the
+ procedures used in a particular implementation, then the Ltac [step_prog]
+ "steps" through them, generating an obligation that each postcondition implies
+ the next precondition. Many of these obligations are trivial and [step_prog]
+ automatically solves them. For example, the proof of [add_ok] in
+ [Lab1/StatDBImpl] consists mostly of repeatedly invoking [step_prog].
+ [Lab1/StatDBAPI] also registers [add_ok] in a Hint database so that
+ "[step_prog]" can "step" through procedures that invoke [add].
 
  As a final detail, you need to reason about initialization, and, in particular,
- show that the abstraction relationship between the initial code state w and the
- initial spec state [state] holds.
+ show that the abstraction relationship holds between the initial code state [w]
+ and a valid initial spec state [state].
 
  *)
 

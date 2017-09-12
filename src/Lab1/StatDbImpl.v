@@ -4,15 +4,10 @@ Require Import StatDbAPI.
 
 (** * An implementation of StatDB
 
-   It maintains two variables: [VarCount] and [VarSum]. [VarCount] stores the
-   number of integers that [VarSum] sums up.  The mean is just
-   [VarSum]/[VarCount].
-
-   Since StatDB must maintain state, which is hard to do in a purely functional
-   language like Coq's Gallina, we use [Refinement.Proc] to express programs and
-   their state.  The [baseOpT] we use here are [init], [read], and [write] of
-   variables, whose specification and implementation are provided in
-   [VariablesAPI] and [VariablesImpl], respectively.
+   StatDB is built on top of the Variables API, which maintains two variables
+   [VarCount] and [VarSum]. StatDB reads and writes these two variables using
+   the API provided in the VarsAPI module. [VarCount] stores the number of
+   integers that [VarSum] sums up. The mean is just [VarSum]/[VarCount].
 
   *)
 
