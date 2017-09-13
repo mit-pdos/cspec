@@ -111,7 +111,7 @@ Module RemappedDisk (bd : BadBlockAPI) <: OneDiskAPI.
     - intuition.
       destruct a; simpl; auto.
       destruct a; simpl; try omega.
-      induction a; simpl; eauto.
+      destruct a; simpl; eauto.
     - congruence.
   Qed.
 
