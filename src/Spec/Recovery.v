@@ -1,11 +1,11 @@
 Require Import Helpers.Helpers.
 Require Import Proc.
 Require Import ProcTheorems.
-Require Import Hoare.
+Require Import Abstraction.
 
 (** * Reasoning about crashes and recovery
 
-  [Refinement.Proc] defines the execution of a computer that can crash: after a
+  [Spec.Proc] defines the execution of a computer that can crash: after a
   crash, the computer stops executing, then reboots, and then runs recovery.
   The computer may crash during recovery.  To support reasoning about crashes,
   [prog_spec] above uses recovered condidition: each [prog_spec] must describe

@@ -4,7 +4,7 @@ import NbdAPI
 import Control.Monad.Reader (reader, liftIO)
 import Control.Concurrent.MVar (takeMVar, putMVar)
 import BadBlockDisk.Env
-import Hoare
+import Abstraction
 
 init :: TheProc InitResult
 init = do

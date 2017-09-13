@@ -23,7 +23,7 @@ import_modules = {
         "NbdImpl",
         "NbdServer",
         "BadBlockImpl",
-        "Hoare",
+        "Abstraction",
     ],
 
     "import qualified Data.Word":

@@ -35,7 +35,7 @@ Definition inited (s : State) : Prop :=
 (** ** The specification of the StatDB operations
 
   The specifications are of type [Specification], which is defined in
-  [POCS.Refinement.Hoare]. A specification is a record with 3 fields: [pre],
+  [POCS.Spec.Abstraction]. A specification is a record with 3 fields: [pre],
   [post], and [recovered] (which we will ignore in this lab). For both
   operations the precondition is just [True] (i.e., we prove the postconditions in
   any initial state). The postconditions describe the effects of the operations
@@ -79,7 +79,7 @@ Definition mean_spec : Specification unit (option nat) unit State :=
    [add_spec]. The proof approach POCS uses is based on refinement. This
    approach requires the implementation to define [abstr], which abstracts the
    code state to the spec state (the list of integers that StatDB maintains).
-   [abstr] is of type [Refinement.Hoare.Abstraction].
+   [abstr] is of type [Spec.Abstraction.Abstraction].
 
 *)
 

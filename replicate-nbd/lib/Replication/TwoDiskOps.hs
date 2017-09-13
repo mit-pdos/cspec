@@ -12,7 +12,7 @@ import                   System.Posix.Types (Fd)
 import                   System.Posix.Unistd (fileSynchronise)
 import                   TwoDiskBaseAPI
 import                   Utils.Conversion
-import                   Hoare
+import                   Abstraction
 
 getDisk :: Coq_diskId -> TheProc (Maybe Fd)
 getDisk Coq_d0 = reader disk0 >>= liftIO

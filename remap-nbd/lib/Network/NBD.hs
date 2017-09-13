@@ -12,7 +12,7 @@ import qualified Data.ByteString as BS
 import           Data.Conduit.Cereal
 import           Data.Conduit.Network
 import           Data.Serialize
-import           Hoare (InitResult(..))
+import           Abstraction (InitResult(..))
 import           NbdAPI
 import           Network.NBD.Data
 import           BadBlockDisk.Env

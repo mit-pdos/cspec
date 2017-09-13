@@ -24,7 +24,7 @@ import_modules = {
         "NbdServer",
         "ReplicatedServer",
         "TwoDiskBaseImpl",
-        "Hoare",
+        "Abstraction",
     ],
 
     "import qualified Data.Word":

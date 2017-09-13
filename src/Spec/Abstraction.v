@@ -2,7 +2,7 @@ Require Import Helpers.Helpers.
 Require Import Proc.
 Require Import ProcTheorems.
 
-(** * Proof style: Refinement and Hoare Logic
+(** * Proof style: Abstractions with pre- and post-conditions
 
  In POCS you will often use refinement to prove that an implementation (code)
  meets its specification (spec), which puts the following obligations on you:
@@ -44,12 +44,12 @@ Require Import ProcTheorems.
  procedure, the infrastructure mostly separates reasoning about crash-free
  execution from reasoning about crashes and recovery (i.e., repairing the system
  after a crash). The support for reasoning about recovery is in
- [Refinement.HoareRecovery]. In [Lab1.StatDB], we ignore crashes, and thus you
+ [Spec.HoareRecovery]. In [Lab1.StatDB], we ignore crashes, and thus you
  don't have to specify a meaningful recovered condition and implement a recovery
  procedure. For labs 2 and lab 3, you can find solutions that don't require any
  repair after a crash, and the recovery procedure is trivial (i.e., it does
  nothing). The last lab requires repair after a crash, which will require
- understanding [Refinement.HoareRecovery].
+ understanding [Spec.HoareRecovery].
 
  The rest of this file defines the infrastructure for refinement and Hoare
  reasoning. At a high level, it includes the following:
@@ -169,7 +169,7 @@ Definition Specification A T R State := A -> State -> Quadruple T R State.
     [w'] and [state'] and the recovered condition holds in [state'].
 
   The [rexecution] relationship describes what a valid execution is and is
-  defined in [Refinement.Proc].
+  defined in [Spec.Proc].
 
  *)
 

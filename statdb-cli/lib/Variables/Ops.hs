@@ -4,7 +4,7 @@ import Control.Monad.Reader (reader, liftIO)
 import Data.IORef
 import Variables.Env
 import VariablesAPI
-import Hoare
+import Abstraction
 
 getVar :: Coq_var -> TheProc (IORef Integer)
 getVar VarCount = reader varCount

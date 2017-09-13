@@ -12,7 +12,7 @@ import "unix-bytestring" System.Posix.IO.ByteString
 import                   System.Posix.Types (Fd)
 import                   System.Posix.Unistd (fileSynchronise)
 import                   Utils.Conversion
-import                   Hoare
+import                   Abstraction
 
 init :: TheProc InitResult
 init = do

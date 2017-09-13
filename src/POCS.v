@@ -27,6 +27,6 @@ Require Export Helpers.Disk.
 
 (** XXX *)
 
-Require Export Refinement.Proc.
-Require Export Refinement.Hoare.
-Require Export Refinement.HoareRecovery.
+Require Export Spec.Proc.
+Require Export Spec.Abstraction.
+Require Export Spec.Recovery.

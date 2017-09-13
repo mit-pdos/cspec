@@ -1,7 +1,7 @@
 ## Common library code
 CODE := $(wildcard src/POCS.v)
 CODE += $(wildcard src/Helpers/*.v)
-CODE += $(wildcard src/Refinement/*.v)
+CODE += $(wildcard src/Spec/*.v)
 CODE += $(wildcard src/Common/*.v)
 
 ## Lab 1: StatDB
