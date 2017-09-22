@@ -16,6 +16,12 @@ CODE += $(wildcard src/Lab3/*.v)
 ## Lab 4: disk mirroring
 CODE += $(wildcard src/Lab4/*.v)
 
+## FS experiment
+CODE += $(wildcard src/FS/SepLogic/Mem/*.v)
+CODE += $(wildcard src/FS/SepLogic/Pred/*.v)
+CODE += $(wildcard src/FS/SepLogic/*.v)
+CODE += $(wildcard src/FS/*.v)
+
 COQRFLAGS := -R build POCS
 
 BINS	:= statdb-cli remap-nbd replicate-nbd
