@@ -15,7 +15,10 @@ SRCS="src/Common src/Helpers src/Spec \
       src/Lab1"
 
 # files/directories to copy
-TOPLEVELS="Makefile README.md LICENSE _CoqProject .gitignore scripts/add-preprocess.sh src/POCS.v statdb-cli"
+TOPLEVELS="README.md LICENSE _CoqProject .gitignore scripts/add-preprocess.sh src/POCS.v statdb-cli"
+
+# current Makefile
+MAKEFILE_NAME=Makefile.lab1
 
 SD=$(cd $(dirname $0)/.. && /bin/pwd)
 CD=/tmp/pocs.$$
@@ -30,9 +33,10 @@ mkdir -p $CD/scripts
 ## Run "make clean" to clear out crud from the extraction directory (like statdb-cli)
 ( cd $SD && make clean )
 
+cp $SD/$MAKEFILE_NAME $CD/Makefile
+
 for F in $TOPLEVELS; do
   cp -r $SD/$F $CD/$F
-  (cd $CD/ && git add $F 2> /dev/null )
 done
 
 for D in `echo $SRCS`
@@ -70,10 +74,11 @@ do
       echo "ignore $F"
     else
       $SD/scripts/mklab.pl $CD/$D $F
-      (cd $CD/$D && git add $F 2> /dev/null )
     fi
   done)
 done
+
+(cd $CD && git add .)
 
 (cd $CD ; git commit -am 'update')
 
