@@ -3,7 +3,7 @@ Require Import VariablesAPI.
 
 (** * An implementation of Variables.
 
-  This implementation is in done in Haskell and we assume it is correct.
+  This implementation is in Haskell and we assume it is correct.
  *)
 
 Extraction Language Haskell.

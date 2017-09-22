@@ -15,8 +15,9 @@ data Vars =
 
 type Proc = StateT Vars IO
 
+-- the Coq model of Variables assumes nothing about the initial values
 initialEnv :: Vars
-initialEnv = Vars 0 0
+initialEnv = Vars (-1) (-1)
 
 runVars :: Proc a -> IO a
 runVars m = evalStateT m initialEnv
