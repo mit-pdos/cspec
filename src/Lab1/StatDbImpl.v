@@ -78,7 +78,7 @@ Module StatDB (v : VarsAPI) <: StatDbAPI.
     omega.
     Qed.
   (* END *)
-  (* STUB: Admitted. *)    
+  (* STUB: Admitted. *)
 
   Theorem init_ok : init_abstraction init recover abstr inited.
   Proof.
@@ -133,7 +133,7 @@ Module StatDB (v : VarsAPI) <: StatDbAPI.
     autounfold in *; intuition.
   Qed.
   (* END *)
-  (* STUB: Admitted. *)    
+  (* STUB: Admitted. *)
 
   (** ** Exercise : complete the proof of [mean] *)
   Theorem mean_ok : proc_spec mean_spec mean recover abstr.
@@ -177,7 +177,7 @@ Module StatDB (v : VarsAPI) <: StatDbAPI.
       intuition ( try congruence ).
   Qed.
   (* END *)
-  (* STUB: Admitted. *)    
+  (* STUB: Admitted. *)
 
 
   Theorem recover_noop : rec_noop recover abstr no_crash.

@@ -19,7 +19,7 @@ Require Import POCS.
 
 
 (** ** The state of StatDB
-   
+
   We will often refer to the abstract state the specification refers to as the
   "spec state".
  *)

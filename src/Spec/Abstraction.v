@@ -131,15 +131,15 @@ Definition Specification A T R State := A -> State -> Quadruple T R State.
   recovery procedure [rec].  The correctness is defined in a
   refinement style.
 
-  The general shape of what [proc_spec] says is as follows: 
+  The general shape of what [proc_spec] says is as follows:
 
 <<
-            pre                      post 
-             |                         | 
-             V                         V 
+            pre                      post
+             |                         |
+             V                         V
           code state --[procedure]--> state'
 >>
-          
+
   The top-level [proc_spec] statement has a precondition that maps the
   starting code state to the starting spec state, and postcondition that maps
   the final code state to the correspoding final spec state.
@@ -155,9 +155,9 @@ Definition Specification A T R State := A -> State -> Quadruple T R State.
 
   - if the precondition holds for [a] and [state]
 
-  - if the procedure [p] starts from code state [w] and perhaps running the recovery 
-    procedure one mor more times (if there is a crash), then one of the following two 
-    must be true: 
+  - if the procedure [p] starts from code state [w] and perhaps running the recovery
+    procedure one mor more times (if there is a crash), then one of the following two
+    must be true:
 
   - 1) if execution finishes without crashes in code state [w'] and returning [v],
     then there exists a spec [state'] in which the abstraction relationholds
@@ -398,9 +398,9 @@ Ltac monad_simpl :=
   for a [proc_spec] about "a ; b". What do we need to prove?
 
 <<
-      pre                             post 
-       |                               | 
-       V                               V 
+      pre                             post
+       |                               |
+       V                               V
      state0 --[a]--> state1 --[b]--> state2
 >>
 
@@ -408,14 +408,14 @@ Ltac monad_simpl :=
   reduce to proving a [proc_spec] for b, with [a]'s post as the new pre.  Keep
   doing this repeatedly.
 
-  There are requirements to make this plan work: 
-    - can find a [proc_spec] for the [a] program 
+  There are requirements to make this plan work:
+    - can find a [proc_spec] for the [a] program
     - can line up our current state precondition with [a]'s [proc_spec] pre
 
   This Ltac implements this plan.  It compares Coq's current goal  to:
-  
+
   - [forall]: if so, intro the variables, and invoke [step_prog] again
-  
+
   - a proc_spec with a procedure that invokes a [Ret] operation: if so, apply
     the [ret_spec] theorem to consume the [Ret].
 

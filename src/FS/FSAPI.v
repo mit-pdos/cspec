@@ -6,46 +6,21 @@ Require Import String.
 Require Import FS.SepLogic.Mem.
 Require Import FS.SepLogic.Pred.
 
-
-Definition pointed_set (T : Type) : Type := T * list T.
-
-Definition set_add {T} (s : pointed_set T) (v : T) := (v, fst s :: snd s).
-
-Definition set_latest {T} (s : pointed_set T) := fst s.
-
-Definition set_older {T} (s : pointed_set T) := snd s.
-
-Definition set_transform {T} (s s' : pointed_set T) (rel : T -> T -> Prop) :=
-  rel (fst s) (fst s') /\
-  Forall2 rel (snd s) (snd s').
-
-Definition set_in {T} (v : T) (s : pointed_set T) :=
-  v = fst s \/
-  In v (snd s).
-
-
 Record file := mk_file {
-  FileData : string;
+  FileData : list nat;
 }.
 
-Definition empty_file := 
-  mk_file "".
+Definition empty_file :=
+  mk_file nil.
 
 Inductive tree_node :=
 | Missing
 | Dir : forall (inum : nat), tree_node
-| File : forall (handle : nat) (f : file), tree_node.
+| File : forall (inum : nat) (f : file), tree_node.
 
 Definition pathname := list string.
 
-
-Definition State := pointed_set (mem pathname tree_node).
-
-(* One interesting difference from FSCQ's DirSep: the memory contains
-  [Some Missing] entries for files that do not exist in an existing directory,
-  but the memory contains [None] for entries in non-existant directories,
-  children of files, etc.
-*)
+Definition State := mem pathname tree_node.
 
 Definition empty_dir : pred pathname tree_node :=
   mkPred (fun m => forall fn, m [fn] = Some Missing).
@@ -73,144 +48,80 @@ Instance pathname_eq : EquivDec.EqDec pathname eq.
 Qed.
 
 Definition inited (s : State) : Prop :=
-  set_older s = nil /\
-  set_latest s |= nil |-> Dir 0 * empty_dir.
+  s |= nil |-> Dir 0 * empty_dir.
 
 Definition create_spec dir name : Specification _ _ unit State :=
   fun '(F, dirnum) state => {|
     pre :=
-      set_latest state |= F * dir |-> Dir dirnum * (dir ++ [name]) |-> Missing;
+      state |= F * dir |-> Dir dirnum * (dir ++ [name]) |-> Missing;
     post := fun r state' =>
-      exists handle m,
-      r = handle /\
-      m |= F * dir |-> Dir dirnum * (dir ++ [name]) |-> File handle empty_file /\
-      (forall mold,
-       set_in mold state ->
-       ~ exists F' pn f', mold |= F' * pn |-> File handle f') /\
-      state' = set_add state m;
+      exists filenum,
+      r = filenum /\
+      state' |= F * dir |-> Dir dirnum * (dir ++ [name]) |-> File filenum empty_file;
     recovered := fun _ _ => False
   |}.
 
 Definition mkdir_spec dir name : Specification _ _ unit State :=
   fun '(F, dirnum) state => {|
     pre :=
-      set_latest state |= F * dir |-> Dir dirnum * (dir ++ [name]) |-> Missing;
+      state |= F * dir |-> Dir dirnum * (dir ++ [name]) |-> Missing;
     post := fun r state' =>
-      exists newdirnum m,
+      exists newdirnum,
       r = newdirnum /\
-      m |= F * dir |-> Dir dirnum * (dir ++ [name]) |-> Dir newdirnum *
-           subtree_pred (dir ++ [name]) empty_dir /\
-      state' = set_add state m;
+      state' |= F * dir |-> Dir dirnum * (dir ++ [name]) |-> Dir newdirnum *
+                subtree_pred (dir ++ [name]) empty_dir;
     recovered := fun _ _ => False
   |}.
 
 Definition delete_spec pn : Specification _ _ unit State :=
-  fun '(F, handle, f) state => {|
+  fun '(F, filenum, f) state => {|
     pre :=
-      set_latest state |= F * pn |-> File handle f;
+      state |= F * pn |-> File filenum f;
     post := fun r state' =>
-      exists m,
       r = tt /\
-      m |= F * pn |-> Missing /\
-      state' = set_add state m;
+      state' |= F * pn |-> Missing;
     recovered := fun _ _ => False
   |}.
 
 Definition rmdir_spec pn : Specification _ _ unit State :=
   fun '(F, dirnum) state => {|
     pre :=
-      set_latest state |= F * pn |-> Dir dirnum * subtree_pred pn empty_dir;
+      state |= F * pn |-> Dir dirnum * subtree_pred pn empty_dir;
     post := fun r state' =>
-      exists m,
       r = tt /\
-      m |= F * pn |-> Missing /\
-      state' = set_add state m;
-    recovered := fun _ _ => False
-  |}.
-
-Inductive stat_result :=
-| StatMissing
-| StatFile
-| StatDir.
-
-Definition stat_spec dirpn name : Specification _ _ unit State :=
-  fun '(F, dirnum) state => {|
-    pre :=
-      set_latest state |= F * dirpn |-> Dir dirnum;
-    post := fun r state' =>
-      state' = state /\
-      ((r = StatFile /\ exists F' handle f,
-        F' * (dirpn ++ [name]) |-> File handle f ===> F) \/
-       (r = StatDir /\ exists F' dirinum,
-        F' * (dirpn ++ [name]) |-> Dir dirinum ===> F) \/
-       (r = StatMissing /\ exists F',
-        F' * (dirpn ++ [name]) |-> Missing ===> F));
-    recovered := fun _ _ => False
-  |}.
-
-Definition readdir_spec dirpn : Specification _ _ unit State :=
-  fun '(F, dirnum) state => {|
-    pre :=
-      set_latest state |= F * dirpn |-> Dir dirnum;
-    post := fun r state' =>
-      state' = state /\
-      forall fn,
-      ((In fn r /\ exists F' handle f,
-        F' * (dirpn ++ [fn]) |-> File handle f ===> F) \/
-       (In fn r /\ exists F' dirinum,
-        F' * (dirpn ++ [fn]) |-> Dir dirinum ===> F) \/
-       (~ In fn r /\ exists F',
-        F' * (dirpn ++ [fn]) |-> Missing ===> F));
+      state' |= F * pn |-> Missing;
     recovered := fun _ _ => False
   |}.
 
 Definition rename_file_spec pn dstdir dstname : Specification _ _ unit State :=
-  fun '(F, handle, f, dirnum) state => {|
+  fun '(F, filenum, f, dirnum) state => {|
     pre :=
-      set_latest state |= F * pn |-> File handle f *
+      state |= F * pn |-> File filenum f *
                dstdir |-> Dir dirnum * (dstdir ++ [dstname]) |-> Missing;
     post := fun r state' =>
-      exists m,
       r = tt /\
-      m |= F * pn |-> Missing *
-           dstdir |-> Dir dirnum * (dstdir ++ [dstname]) |-> File handle f /\
-      state' = set_add state m;
+      state' |= F * pn |-> Missing *
+                dstdir |-> Dir dirnum * (dstdir ++ [dstname]) |-> File filenum f;
     recovered := fun _ _ => False
   |}.
 
 Definition read_spec pn : Specification _ _ unit State :=
-  fun '(F, handle, f) state => {|
+  fun '(F, filenum, f) state => {|
     pre :=
-      set_latest state |= F * pn |-> File handle f;
+      state |= F * pn |-> File filenum f;
     post := fun r state' =>
-      r = FileData f /\
-      state' = state;
+      r = f /\
+      state' |= F * pn |-> File filenum f;
     recovered := fun _ _ => False
   |}.
 
-Definition write_logged_spec pn data : Specification _ _ unit State :=
-  fun '(F, handle, f0) state => {|
-    pre :=
-      set_latest state |= F * pn |-> File handle f0;
-    post := fun r state' =>
-      exists m,
-      r = tt /\
-      m |= F * pn |-> File handle (mk_file data) /\
-      state' = set_add state m;
-    recovered := fun _ _ => False
-  |}.
-
-Definition write_bypass_relation (handle : nat) (f : file) (m m' : mem pathname tree_node) : Prop :=
-  (forall F pn f0, m |= F * pn |-> File handle f0 -> m' |= F * pn |-> File handle f) /\
-  ((~ exists F pn f0, m |= F * pn |-> File handle f0) -> m' = m).
-
-Definition write_bypass_spec pn data : Specification _ _ unit State :=
+Definition write_spec pn f : Specification _ _ unit State :=
   fun '(F, filenum, f0) state => {|
     pre :=
-      set_latest state |= F * pn |-> File filenum f0;
+      state |= F * pn |-> File filenum f0;
     post := fun r state' =>
       r = tt /\
-      set_transform state state' (write_bypass_relation filenum (mk_file data));
+      state' |= F * pn |-> File filenum f;
     recovered := fun _ _ => False
   |}.
 
@@ -223,11 +134,8 @@ Module Type FSAPI.
   Axiom delete : pathname -> proc unit.
   Axiom rmdir : pathname -> proc unit.
   Axiom rename_file : pathname -> pathname -> string -> proc unit.
-  Axiom read : pathname -> proc string.
-  Axiom write_logged : pathname -> string -> proc unit.
-  Axiom write_bypass : pathname -> string -> proc unit.
-  Axiom stat : pathname -> string -> proc stat_result.
-  Axiom readdir : pathname -> proc (list string).
+  Axiom read : pathname -> proc file.
+  Axiom write : pathname -> file -> proc unit.
   Axiom recover : proc unit.
 
   Axiom abstr : Abstraction State.
@@ -239,10 +147,7 @@ Module Type FSAPI.
   Axiom rmdir_ok : forall pn, proc_spec (rmdir_spec pn) (rmdir pn) recover abstr.
   Axiom rename_file_ok : forall pn newdir newname, proc_spec (rename_file_spec pn newdir newname) (rename_file pn newdir newname) recover abstr.
   Axiom read_ok : forall pn, proc_spec (read_spec pn) (read pn) recover abstr.
-  Axiom write_logged_ok : forall pn f, proc_spec (write_logged_spec pn f) (write_logged pn f) recover abstr.
-  Axiom write_bypass_ok : forall pn f, proc_spec (write_bypass_spec pn f) (write_bypass pn f) recover abstr.
-  Axiom stat_ok : forall pn n, proc_spec (stat_spec pn n) (stat pn n) recover abstr.
-  Axiom readdir_ok : forall pn, proc_spec (readdir_spec pn) (readdir pn) recover abstr.
+  Axiom write_ok : forall pn f, proc_spec (write_spec pn f) (write pn f) recover abstr.
   Axiom recover_noop : rec_noop recover abstr no_crash.
 
   Hint Resolve init_ok.
@@ -252,10 +157,7 @@ Module Type FSAPI.
   Hint Resolve rmdir_ok.
   Hint Resolve rename_file_ok.
   Hint Resolve read_ok.
-  Hint Resolve write_logged_ok.
-  Hint Resolve write_bypass_ok.
-  Hint Resolve stat_ok.
-  Hint Resolve readdir_ok.
+  Hint Resolve write_ok.
   Hint Resolve recover_noop.
 
 End FSAPI.

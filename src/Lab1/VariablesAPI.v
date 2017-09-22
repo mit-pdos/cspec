@@ -4,7 +4,7 @@ Require Import POCS.
 
   There are only two variables: [VarCount] and [VarSum], which can be
   initialized, read, and written.  The specification for [read] and [write] are
-  given by [read_spec] and [write_spec], respectively. 
+  given by [read_spec] and [write_spec], respectively.
 
  *)
 

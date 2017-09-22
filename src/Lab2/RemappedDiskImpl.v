@@ -6,7 +6,7 @@ Require Import BadBlockAPI.
 Module RemappedDisk (bd : BadBlockAPI) <: OneDiskAPI.
 
   Import ListNotations.
-  
+
   Definition read (a : addr) : proc block :=
     bs <- bd.getBadBlock;
     if a == bs then
