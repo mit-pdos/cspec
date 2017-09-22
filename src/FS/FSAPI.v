@@ -128,6 +128,27 @@ Definition rmdir_spec pn : Specification _ _ unit State :=
     recovered := fun _ _ => False
   |}.
 
+Inductive stat_result :=
+| StatMissing
+| StatFile
+| StatDir.
+
+Definition stat_spec dirpn name : Specification _ _ unit State :=
+  fun '(F, dirnum) state => {|
+    pre :=
+      set_latest state |= F * dirpn |-> Dir dirnum;
+    post := fun r state' =>
+      state' = state /\
+      ((r = StatFile /\ exists F' handle f,
+        F' * (dirpn ++ [name]) |-> File handle f ===> F) \/
+       (r = StatDir /\ exists F' dirinum,
+        F' * (dirpn ++ [name]) |-> Dir dirinum ===> F) \/
+       (r = StatMissing /\ exists F',
+        F' * (dirpn ++ [name]) |-> Missing ===> F));
+    recovered := fun _ _ => False
+  |}.
+
+
 Definition rename_file_spec pn dstdir dstname : Specification _ _ unit State :=
   fun '(F, handle, f, dirnum) state => {|
     pre :=
