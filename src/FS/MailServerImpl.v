@@ -127,83 +127,72 @@ Module MailServer (fs : FSAPI) <: MailServerAPI.
     firstorder.
   Qed.
 
-  Theorem add_ok : forall v, proc_spec (add_spec v) (add v) recover abstr.
+  Definition find_available_name_spec dirpn : Specification _ _ unit FSAPI.State :=
+    fun '(F, dirnum) state => {|
+      pre :=
+        set_latest state |= F * dirpn |-> Dir dirnum;
+      post := fun r state' =>
+        state' = state /\
+        exists F',
+        F' * (dirpn ++ [r]) |-> Missing ===> F;
+      recovered := fun _ _ => False
+    |}.
+
+  Axiom find_available_name_ok :
+    forall dirpn,
+    proc_spec (find_available_name_spec dirpn) (find_available_name dirpn) fs.recover fs.abstr.
+  Hint Resolve find_available_name_ok.
+
+  Lemma extract_user : forall s F uid m users_and_mailboxes,
+    s |= F * uid |-> m ->
+    s |= user_mailbox_pred_m users_and_mailboxes ->
+    exists um0 um1,
+    users_and_mailboxes = um0 ++ (uid, m) :: um1.
+  Admitted.
+
+  Lemma extract_user_fs : forall um0 um1 uid m missingF,
+    user_mailbox_pred_fs (um0 ++ (uid, m) :: um1) missingF ===>
+    user_mailbox_pred_fs (um0 ++ um1) (pred_except missingF [uid] Missing) *
+    user_pred uid m.
+  Admitted.
+
+  Theorem deliver_ok :
+    forall uid msg, proc_spec (deliver_spec uid msg) (deliver uid msg) recover abstr.
   Proof.
-    unfold add.
-    intros.
-
-    apply spec_abstraction_compose; simpl.
-  (* SOL *)
-    step_prog; intros.
-    destruct a'; simpl in *; intuition idtac.
-    eexists (_, _); simpl; intuition idtac.
-
-    step_prog; intros.
-    eexists (_, _); simpl; intuition idtac.
-
-    step_prog; intros.
-    eexists (_, _); simpl; intuition idtac.
-
-    step_prog; intros.
-    eexists (_, _); simpl; intuition idtac.
-
-    step_prog; intros.
-    eauto.
-
-    simpl in *; intuition subst.
-
-    eexists; intuition auto.
-    unfold statdb_abstraction in *; simpl in *.
-    intuition omega.
-
-    autounfold in *; intuition.
-  Qed.
-  (* END *)
-  (* STUB: Admitted. *)    
-
-  (** ** Exercise : complete the proof of [mean] *)
-  Theorem mean_ok : proc_spec mean_spec mean recover abstr.
-  Proof.
-    unfold mean.
+    unfold deliver.
     intros.
 
     apply spec_abstraction_compose; simpl.
 
-  (* SOL *)
+    spec_intros.
+    destruct a. destruct p. simpl in *.
+    intuition.
+    unfold mail_abstraction in *.
+    intuition.
+    deex.
+
+    eapply (extract_user _ H0) in H1.
+    repeat deex.
+
+(*
+    rewrite extract_user_fs in H2.
+*)
+
     step_prog; intros.
-    destruct a'; simpl in *; intuition idtac.
+    simpl in *; intuition idtac; subst.
     eexists (_, _); simpl; intuition idtac.
 
-    destruct (r == 0).
+    admit.
 
-    - step_prog; intros.
-      eauto.
+    step_prog; intros. simpl in *. intuition. deex.
+    eexists (_, _); simpl; intuition idtac.
 
-      simpl in *; intuition subst.
-      2: autounfold in *; intuition.
+    admit.
 
-      unfold statdb_abstraction in *.
-      destruct s; intuition; simpl in *; try congruence.
-      exists nil; intuition auto.
+    step_prog; intros. simpl in *. repeat deex.
+    eexists (_, _); simpl; intuition idtac.
 
-    - step_prog; intros.
-      eexists (_, _); simpl; intuition idtac.
-
-      step_prog; intros.
-      eauto.
-
-      simpl in *; intuition subst.
-      2: autounfold in *; intuition.
-
-      unfold statdb_abstraction in *.
-      destruct s; intuition.
-
-      eexists; intuition auto.
-      right.
-      intuition ( try congruence ).
-  Qed.
-  (* END *)
-  (* STUB: Admitted. *)    
+  Admitted.
 
 
   Theorem recover_noop : rec_noop recover abstr no_crash.
