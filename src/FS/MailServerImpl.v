@@ -209,6 +209,18 @@ Module MailServer (fs : FSAPI) <: MailServerAPI.
     eauto.
   Qed.
 
+  Theorem read_ok : forall uid, proc_spec (read_spec uid) (read uid) recover abstr.
+  Proof.
+  Admitted.
+
+  Theorem delete_ok : forall uid i, proc_spec (delete_spec uid i) (delete uid i) recover abstr.
+  Proof.
+  Admitted.
+
+  Theorem newuser_ok : proc_spec newuser_spec newuser recover abstr.
+  Proof.
+  Admitted.
+
   (*
     TODO / future directions:
 
