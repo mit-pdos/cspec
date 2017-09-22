@@ -209,4 +209,21 @@ Module MailServer (fs : FSAPI) <: MailServerAPI.
     eauto.
   Qed.
 
+  (*
+    TODO / future directions:
+
+    - Finish a simple mail server.
+      -- fix up separation logic (rewrite)
+      -- extraction of real code
+      -- crash safety: temp file rename, fsync, valuset model,
+         recovery specs for FS and MailServer
+
+    - Top-level security theorem.
+    - Experiment with different security plans (Atalay's two plans).
+
+    - Concurrency at the spec level using stable predicates.
+      -- will require changing [find_available_name] to [create_available_name]
+      -- test-and-set semantics; get logical ownership when create succeeds
+    *)
+
 End MailServer.
