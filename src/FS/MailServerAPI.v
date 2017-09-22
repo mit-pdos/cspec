@@ -8,13 +8,11 @@ Require Import FS.SepLogic.Pred.
 Require Import FS.FSAPI.
 
 
-Record message := mk_message {
-  MessageData : list nat;
-}.
+Definition message := string.
 
 Definition mailbox := list message.
 
-Definition user := nat.
+Definition user := string.
 
 Definition State := mem user mailbox.
 
@@ -43,13 +41,13 @@ Definition read_spec user : Specification _ _ unit State :=
     recovered := fun _ _ => False
   |}.
 
-Definition delete_spec user idx : Specification _ _ unit State :=
+Definition delete_spec user m : Specification _ _ unit State :=
   fun '(F, mbox) state => {|
     pre :=
       state |= F * user |-> mbox;
     post := fun r state' =>
       r = tt /\
-      state' |= F * user |-> (firstn idx mbox ++ (skipn (S idx) mbox));
+      state' |= F * user |-> filter (fun m' => if (string_dec m m') then true else false) mbox;
     recovered := fun _ _ => False
   |}.
 
@@ -70,7 +68,7 @@ Module Type MailServerAPI.
   Axiom init : proc InitResult.
   Axiom deliver : user -> message -> proc unit.
   Axiom read : user -> proc mailbox.
-  Axiom delete : user -> nat -> proc unit.
+  Axiom delete : user -> string -> proc unit.
   Axiom newuser : proc user.
   Axiom recover : proc unit.
 

@@ -1,6 +1,7 @@
 Require Import POCS.
 Require Import FSAPI.
 Require Import MailServerAPI.
+Require Import String.
 Import ListNotations.
 
 
@@ -8,7 +9,14 @@ Module MailServer (fs : FSAPI) <: MailServerAPI.
 
 
   Definition mail_abstraction (fs_state : FSAPI.State) (mail_state : MailServerAPI.State) : Prop :=
-    True.
+    let fs := set_latest fs_state in
+    set_older fs_state = nil /\
+    forall uid mailbox, mail_state uid = Some mailbox ->
+    exists dirnum,
+    fs [uid] = Some (Dir dirnum) /\
+    forall msg, In msg mailbox ->
+    exists fn handle,
+    fs [uid; fn] = Some (File handle (mk_file msg)).
 
   Definition abstr : Abstraction MailServerAPI.State :=
     abstraction_compose
@@ -16,17 +24,49 @@ Module MailServer (fs : FSAPI) <: MailServerAPI.
       {| abstraction := mail_abstraction |}.
 
 
-  Definition deliver (user : nat) (m : message) : proc unit :=
+  Axiom find_available_name : pathname -> proc string.
+
+  Definition deliver (user : string) (m : message) : proc unit :=
+    fn <- find_available_name [user];
+    _ <- fs.create [user] fn;
+    _ <- fs.write_logged [user; fn] m;
     Ret tt.
 
-  Definition read (user : nat) : proc mailbox :=
-    Ret nil.
+  Fixpoint read' (user : string) (files : list string) : proc mailbox :=
+    match files with
+    | nil => Ret nil
+    | fn :: files' =>
+      msg <- fs.read [user; fn];
+      others <- read' user files';
+      Ret (msg :: others)
+    end.
 
-  Definition delete (user : nat) (idx : nat) : proc unit :=
+  Definition read (user : string) : proc mailbox :=
+    fns <- fs.readdir [user];
+    mbox <- read' user fns;
+    Ret mbox.
+
+  Fixpoint delete' (user : string) (victim : string) (files : list string) : proc unit :=
+    match files with
+    | nil => Ret tt
+    | fn :: files' =>
+      _ <- delete' user victim files';
+      msg <- fs.read [user; fn];
+      if string_dec msg victim then
+        fs.delete [user; fn]
+      else
+        Ret tt
+    end.
+
+  Definition delete (user : string) (m : string) : proc unit :=
+    fns <- fs.readdir [user];
+    _ <- delete' user m fns;
     Ret tt.
 
-  Definition newuser : proc nat :=
-    Ret 0.
+  Definition newuser : proc string :=
+    fn <- find_available_name [];
+    _ <- fs.mkdir [] fn;
+    Ret fn.
 
 
   Definition init' : proc InitResult :=
