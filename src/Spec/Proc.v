@@ -69,7 +69,7 @@ CoInductive proc (T : Type) : Type :=
 Require Extraction.
 Extraction Language Haskell.
 
-Extract Inductive proc => "TheProc"
+Extract Inductive proc => "Proc"
                            ["error 'accessing BaseOp'" "return" "(>>=)"]
                            "(\fprim fret fbind -> error 'pattern match on proc')".
 

@@ -1,6 +1,6 @@
 module Variables.Env
   (
-    TheProc
+    Proc
   , varCount
   , varSum
   , newEnv
@@ -16,7 +16,7 @@ data Env =
   Env { varCount :: IORef Integer
       , varSum   :: IORef Integer }
 
-type TheProc = ReaderT Env IO
+type Proc = ReaderT Env IO
 
 newEnv :: IO Env
 newEnv = do
@@ -24,5 +24,5 @@ newEnv = do
   vs <- newIORef 1
   return $ Env vc vs
 
-runVars :: Env -> TheProc a -> IO a
+runVars :: Env -> Proc a -> IO a
 runVars e m = runReaderT m e

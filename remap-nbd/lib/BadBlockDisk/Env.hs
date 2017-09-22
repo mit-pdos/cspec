@@ -1,6 +1,6 @@
 module BadBlockDisk.Env
   (
-    TheProc
+    Proc
   , Env
   , diskHandle
   , badBlock
@@ -26,7 +26,7 @@ data Env =
       , requests :: MVar Request
       , responses :: MVar Response }
 
-type TheProc = ReaderT Env IO
+type Proc = ReaderT Env IO
 
 newEnv :: FilePath -> Integer -> IO Env
 newEnv fn badBlockArg = pure Env
@@ -36,5 +36,5 @@ newEnv fn badBlockArg = pure Env
   where openFile :: FilePath -> IO Fd
         openFile path = openFd path ReadWrite Nothing defaultFileFlags
 
-runBS :: Env -> TheProc a -> IO a
+runBS :: Env -> Proc a -> IO a
 runBS e m = runReaderT m e

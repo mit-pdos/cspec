@@ -4,7 +4,7 @@ import Control.Monad.Reader (liftIO)
 import Variables.Env
 import System.IO
 
-getNewItem :: TheProc Integer
+getNewItem :: Proc Integer
 getNewItem = do
   liftIO $ putStr "Enter a number to add: "
   liftIO $ hFlush stdout
@@ -15,6 +15,6 @@ getNewItem = do
   else
     return $ read x
 
-reportMean :: Maybe Integer -> TheProc ()
+reportMean :: Maybe Integer -> Proc ()
 reportMean m = do
   liftIO $ putStrLn $ "Mean: " ++ (show m)

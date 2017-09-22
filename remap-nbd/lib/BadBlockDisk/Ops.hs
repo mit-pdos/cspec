@@ -14,11 +14,11 @@ import                   System.Posix.Unistd (fileSynchronise)
 import                   Utils.Conversion
 import                   Abstraction
 
-init :: TheProc InitResult
+init :: Proc InitResult
 init = do
   return Initialized
 
-read :: Coq_addr -> TheProc BS.ByteString
+read :: Coq_addr -> Proc BS.ByteString
 read a = do
   fd <- reader diskHandle
   bs <- reader badBlock
@@ -27,7 +27,7 @@ read a = do
   else
     liftIO $ fdPread fd blocksize (fromIntegral $ addrToOffset a)
 
-write :: Coq_addr -> BS.ByteString -> TheProc ()
+write :: Coq_addr -> BS.ByteString -> Proc ()
 write a b = do
   fd <- reader diskHandle
   liftIO $ fdPwrite fd b (fromIntegral $ addrToOffset a)
@@ -35,17 +35,17 @@ write a b = do
 
 -- |implementation of two disk DiskSize operation - note that this size is
 -- reported to Coq in blocks
-size :: TheProc Integer
+size :: Proc Integer
 size = do
   fd <- reader diskHandle
   off <- liftIO $ fdSeek fd SeekFromEnd 0
   return (fromIntegral off `div` blocksize)
 
-getBadBlock :: TheProc Integer
+getBadBlock :: Proc Integer
 getBadBlock = do
   bs <- reader badBlock
   return bs
 
-recover :: TheProc ()
+recover :: Proc ()
 recover = do
   return ()

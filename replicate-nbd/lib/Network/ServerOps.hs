@@ -6,20 +6,20 @@ import Control.Concurrent.MVar (takeMVar, putMVar)
 import Replication.TwoDiskEnvironment
 import Abstraction
 
-init :: TheProc InitResult
+init :: Proc InitResult
 init = do
   return Initialized
 
-getRequestFromQueue :: TheProc Request
+getRequestFromQueue :: Proc Request
 getRequestFromQueue = do
   m <- reader requests
   liftIO $ takeMVar m
 
-sendResponseOnQueue :: Response -> TheProc ()
+sendResponseOnQueue :: Response -> Proc ()
 sendResponseOnQueue r = do
   m <- reader responses
   liftIO $ putMVar m r
 
-recover :: TheProc ()
+recover :: Proc ()
 recover = do
   return ()
