@@ -23,7 +23,7 @@ import_modules = {
         "StatDbCli",
     ],
 
-    "import Variables.Env":
+    "import Variables.State":
     [
         "Interface",
         "VariablesImpl",

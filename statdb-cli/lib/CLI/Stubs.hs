@@ -1,20 +1,20 @@
 module CLI.Stubs (getNewItem, reportMean) where
 
-import Control.Monad.Reader (liftIO)
-import Variables.Env
+import Control.Monad.Trans (liftIO)
+import Variables.State
 import System.IO
 
 getNewItem :: Proc Integer
 getNewItem = do
-  liftIO $ putStr "Enter a number to add: "
-  liftIO $ hFlush stdout
-  x <- liftIO $ getLine
-  if read x < 0 then do
+  x <- liftIO $ do
+    putStr "Enter a number to add: "
+    hFlush stdout
+    getLine
+  if (read x :: Integer) < 0 then do
     liftIO $ putStrLn "Negative numbers not supported"
     getNewItem
   else
     return $ read x
 
 reportMean :: Maybe Integer -> Proc ()
-reportMean m = do
-  liftIO $ putStrLn $ "Mean: " ++ (show m)
+reportMean m = liftIO $ putStrLn $ "Mean: " ++ show m

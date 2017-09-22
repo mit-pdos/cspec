@@ -19,7 +19,7 @@ executable statdb-cli
                      , Proc
                      , StatDbAPI
                      , StatDbCli
-                     , Variables.Env
+                     , Variables.State
                      , Variables.Ops
                      , VariablesAPI
                      , VariablesImpl
