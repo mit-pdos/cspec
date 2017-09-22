@@ -198,5 +198,8 @@ End StatDB.
 
 
 Require Import VariablesImpl.
-Module x := StatDB Vars.
-Print Assumptions x.add_ok.
+Module StatDBImpl := StatDB Vars.
+Print Assumptions StatDBImpl.abstr_2_nok.
+Print Assumptions StatDBImpl.abstr_3_ok.
+Print Assumptions StatDBImpl.add_ok.
+Print Assumptions StatDBImpl.mean_ok.
