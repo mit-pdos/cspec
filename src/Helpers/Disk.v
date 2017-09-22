@@ -8,13 +8,11 @@ Set Implicit Arguments.
 
 (** * Disk model.
 
-    This file defines our model of a disk.  The first thing to
-    do is to define the type of an address.  For us, an address
-    [addr] is simply a [nat].
-  *)
-
-Definition addr := nat.
-
+    This file defines our model of a disk. We represent a disk as a list
+    of 1KB blocks and provide functions to read and update disks, as
+    well as theorems about these operations. In order to describe disks,
+    we first provide a model of byte sequences.
+ *)
 
 (** * Model of bytes.
 
@@ -24,12 +22,12 @@ Definition addr := nat.
     will be [bytes n].
 
     There's one unusual aspect of how we model bytes: instead of
-    defining the bytes themselves in Coq, we simply state them as
-    an [Axiom].  This means we are not providing a Coq (Gallina)
-    implementation of bytes, and instead we are telling Coq to
-    assume that there exists something called [bytes], and there
-    exist other functions that manipulate bytes that we define here
-    as well (like [bytes_dec] to decide if two byte arrays are equal).
+    defining the bytes type in Coq, we simply add it as an [Axiom]. This
+    means we are not providing a Coq (Gallina) implementation of bytes,
+    and instead we are telling Coq to assume that there exists something
+    called [bytes], and there exist other functions that manipulate
+    bytes that we define here as well (like [bytes_dec] to decide if two
+    byte arrays are equal).
 
     When we generate executable code by extracting our Coq (Gallina)
     code into Haskell, we will be required to provide a Haskell
@@ -103,17 +101,6 @@ Qed.
 
 Hint Resolve block0_block1_differ.
 
-(** Coq v8.6 has a minor bug in the [omega] tactic, which is helpful
-    in solving simple arithmetic goals.  In particular, when we have
-    arithmetic expressions that involve the [addr] type, [omega] gets
-    confused because it doesn't see that [addr] is simply a wrapper
-    for [nat].  This works around the bug, which should eventually be
-    fixed by https://github.com/coq/coq/pull/876
-  *)
-
-Local Ltac omega_orig := omega.
-Ltac omega := unfold addr in *; omega_orig.
-
 (** Mark [blockbytes] as opaque so that Coq doesn't expand it too eagerly.
   *)
 
@@ -147,6 +134,20 @@ Definition empty_disk : disk := nil.
       in-bounds, or the original disk unchanged if [a] is out-of-bounds.
   *)
 
+(** We address into disks with [addr], which is simply a [nat]. *)
+Definition addr := nat.
+
+(** Coq v8.6 has a minor bug in the [omega] tactic, which is helpful
+    in solving simple arithmetic goals.  In particular, when we have
+    arithmetic expressions that involve the [addr] type, [omega] gets
+    confused because it doesn't see that [addr] is simply a wrapper
+    for [nat].  This works around the bug, which should eventually be
+    fixed by https://github.com/coq/coq/pull/876
+  *)
+
+Local Ltac omega_orig := omega.
+Ltac omega := unfold addr in *; omega_orig.
+
 Definition diskGet (d : disk) (a : addr) : option block :=
   nth_error d a.
 
@@ -174,6 +175,19 @@ Definition diskShrink (d : disk) : disk :=
     disk operations.
   *)
 
+(** ** Theorems about diskGet *)
+
+Theorem disk_inbounds_exists : forall a d,
+    a < diskSize d ->
+    exists b, diskGet d a = Some b.
+Proof.
+  unfold diskSize.
+  intros.
+  case_eq (diskGet d a); intros; eauto.
+  apply nth_error_None in H0.
+  omega.
+Qed.
+
 Theorem disk_inbounds_not_none : forall a d,
     a < diskSize d ->
     diskGet d a = None ->
@@ -181,18 +195,6 @@ Theorem disk_inbounds_not_none : forall a d,
 Proof.
   unfold diskSize.
   intros.
-  apply nth_error_None in H0.
-  omega.
-Qed.
-
-Theorem disk_inbounds_exists : forall a d,
-    a < diskSize d ->
-    exists b,
-    diskGet d a = Some b.
-Proof.
-  unfold diskSize.
-  intros.
-  case_eq (diskGet d a); intros; eauto.
   apply nth_error_None in H0.
   omega.
 Qed.
@@ -206,27 +208,6 @@ Proof.
   exfalso; eapply disk_inbounds_not_none; eauto.
 Qed.
 
-Theorem diskUpd_eq_some : forall d a b0 b,
-    diskGet d a = Some b0 ->
-    diskGet (diskUpd d a b) a = Some b.
-Proof.
-  induction d; simpl; eauto.
-  - destruct a; simpl; intros; congruence.
-  - destruct a0; simpl; intros; eauto.
-Qed.
-
-Theorem diskUpd_eq : forall d a b,
-    a < diskSize d ->
-    diskGet (diskUpd d a b) a = Some b.
-Proof.
-  unfold diskSize.
-  induction d; simpl; intros.
-  - omega.
-  - destruct a0; simpl; intros; eauto.
-    eapply IHd.
-    omega.
-Qed.
-
 Theorem disk_oob_eq : forall d a,
     ~a < diskSize d ->
     diskGet d a = None.
@@ -237,44 +218,6 @@ Proof.
   - destruct a0; simpl.
     + omega.
     + eapply IHd. omega.
-Qed.
-
-Theorem diskUpd_oob_eq : forall d a b,
-    ~a < diskSize d ->
-    diskGet (diskUpd d a b) a = None.
-Proof.
-  unfold diskSize.
-  induction d; simpl; intros.
-  - induction a; eauto.
-  - destruct a0; simpl.
-    + omega.
-    + eapply IHd. omega.
-Qed.
-
-Theorem diskUpd_neq : forall d a b a',
-    a <> a' ->
-    diskGet (diskUpd d a b) a' = diskGet d a'.
-Proof.
-  induction d; simpl; intros; auto.
-  destruct a0; simpl.
-  - destruct a'; simpl; try omega; auto.
-  - destruct a'; simpl; auto.
-Qed.
-
-Theorem diskUpd_size : forall d a b,
-    diskSize (diskUpd d a b) = diskSize d.
-Proof.
-  induction d; simpl; eauto.
-  destruct a0; simpl; intros; eauto.
-Qed.
-
-Theorem diskUpd_none : forall d a b,
-    diskGet d a = None ->
-    diskUpd d a b = d.
-Proof.
-  induction d; simpl; intros; auto.
-  destruct a0; simpl in *; try congruence.
-  rewrite IHd; eauto.
 Qed.
 
 Theorem disk_ext_eq : forall d d',
@@ -293,6 +236,72 @@ Proof.
       eapply IHd; intros.
       specialize (H (S a0)); simpl in H.
       eauto.
+Qed.
+
+Theorem disk_ext_inbounds_eq : forall d d',
+    diskSize d = diskSize d' ->
+    (forall a, a < diskSize d -> diskGet d a = diskGet d' a) ->
+    d = d'.
+Proof.
+  intros.
+  apply disk_ext_eq; intros.
+  destruct (lt_dec a (diskSize d)); eauto.
+  rewrite ?disk_oob_eq by congruence; auto.
+Qed.
+
+(** ** Theorems about diskUpd *)
+
+Theorem diskUpd_eq_some : forall d a b0 b,
+    diskGet d a = Some b0 ->
+    diskGet (diskUpd d a b) a = Some b.
+Proof.
+  induction d; simpl; eauto.
+  - destruct a; simpl; intros; congruence.
+  - destruct a0; simpl; intros; eauto.
+Qed.
+
+Theorem diskUpd_eq : forall d a b,
+    a < diskSize d ->
+    diskGet (diskUpd d a b) a = Some b.
+Proof.
+  intros.
+  apply disk_inbounds_exists in H; deex.
+  eauto using diskUpd_eq_some.
+Qed.
+
+Theorem diskUpd_size : forall d a b,
+    diskSize (diskUpd d a b) = diskSize d.
+Proof.
+  induction d; simpl; eauto.
+  destruct a0; simpl; intros; eauto.
+Qed.
+
+Theorem diskUpd_oob_eq : forall d a b,
+    ~a < diskSize d ->
+    diskGet (diskUpd d a b) a = None.
+Proof.
+  intros.
+  apply disk_oob_eq.
+  rewrite diskUpd_size; auto.
+Qed.
+
+Theorem diskUpd_neq : forall d a b a',
+    a <> a' ->
+    diskGet (diskUpd d a b) a' = diskGet d a'.
+Proof.
+  induction d; simpl; intros; auto.
+  destruct a0; simpl.
+  - destruct a'; simpl; try omega; auto.
+  - destruct a'; simpl; auto.
+Qed.
+
+Theorem diskUpd_none : forall d a b,
+    diskGet d a = None ->
+    diskUpd d a b = d.
+Proof.
+  induction d; simpl; intros; auto.
+  destruct a0; simpl in *; try congruence.
+  rewrite IHd; eauto.
 Qed.
 
 Theorem diskUpd_same : forall d a b,
@@ -323,6 +332,8 @@ Proof.
   - omega.
   - rewrite IHd; auto; omega.
 Qed.
+
+(** ** Theorems about diskShrink *)
 
 Theorem diskShrink_size : forall d,
     diskSize d <> 0 ->

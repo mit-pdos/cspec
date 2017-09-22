@@ -69,9 +69,9 @@ Require Import ProcTheorems.
  automatically solves them. For example, the proof of [add_ok] in
  [Lab1/StatDBImpl] consists mostly of repeatedly invoking [step_prog].
  [Lab1/StatDBAPI] also registers [add_ok] in a Hint database so that
- "[step_prog]" can "step" through procedures that invoke [add].
+ [step_prog] can "step" through procedures that invoke [add].
 
- As a final detail, you need to reason about initialization, and, in particular,
+ As a final detail, you need to reason about initialization, and in particular
  show that the abstraction relationship holds between the initial code state [w]
  and a valid initial spec state [state].
 
@@ -79,13 +79,14 @@ Require Import ProcTheorems.
 
 (** ** Abstraction relation and composition *)
 
-(** A LayerAbstraction is a record with one field: [abstraction], which is a
-function that returns a proposition between State1 (implementation) and State2
-(spec).  It specifies for which State1's and State2's the proposition holds. For
-example, in StatDB lab, the spec state is a list of integers and the
-implementation state is is a pair of variables.  The [abstraction] function
-states what must be true of the relationship between list of integers and the
-pair of variables. *)
+(** A LayerAbstraction is a record with one field: [abstraction], an abstraction
+relation between states of types [State1] and [State2]. Think of [State1] as
+being type which gives code states whereas [State2] is the type for
+specification states; the abstraction relation links these two states together.
+For example, in StatDB lab, the spec state is a list of integers and the
+implementation state is is a pair of variables. The [abstraction] function
+states what must be true of the relationship between the list of integers and
+the pair of variables. *)
 Record LayerAbstraction State1 State2 :=
   { abstraction : State1 -> State2 -> Prop; }.
 
@@ -144,9 +145,9 @@ Definition Specification A T R State := A -> State -> Quadruple T R State.
   starting code state to the starting spec state, and postcondition that maps
   the final code state to the correspoding final spec state.
 
-  The precondition takes additional argument as input, which can appear in
-  postcondition.  useful for saying "if exists some abstract state in the
-  precondition, then..."
+  The precondition takes an additional argument as input, which can appear in
+  the postcondition. This helps write more general specifications; examples will
+  help make clear how to use this argument.
 
   In more detail, [prog_spec] states that forall precondition arguments ([a]),
   code states ([w]), and spec states ([state]):
@@ -155,21 +156,20 @@ Definition Specification A T R State := A -> State -> Quadruple T R State.
 
   - if the precondition holds for [a] and [state]
 
-  - if the procedure [p] starts from code state [w] and perhaps running the recovery
-    procedure one mor more times (if there is a crash), then one of the following two
+  - if the procedure [p] starts from code state [w], then one of the following two
     must be true:
 
-  - 1) if execution finishes without crashes in code state [w'] and returning [v],
-    then there exists a spec [state'] in which the abstraction relationholds
+  - 1) if execution finishes without crashes in code state [w'] and returns [v],
+    then there exists a spec state [state'] in which the abstraction relationholds
     between [w'] and [state'] and the postcondition holds in [state'], OR
 
-  - 2) if execution finishes in code state [w'] and returning [v] after perhaps
-    several crashes and running the recovery procedure [r] several times , then
-    there exists a spec [state'] in which the abstraction relation holds between
-    [w'] and [state'] and the recovered condition holds in [state'].
+  - 2) if execution finishes in code state [w'] and returns [v] after perhaps
+    several crashes and running the recovery procedure [r] several times, then
+    there exists a spec state [state'] in which the abstraction relation holds
+    between [w'] and [state'] and the recovered condition holds in [state'].
 
-  The [rexecution] relationship describes what a valid execution is and is
-  defined in [Spec.Proc].
+  The [rexecution] relationship describes how programs execute and is defined in
+  [Spec.Proc].
 
  *)
 
@@ -214,8 +214,8 @@ Definition spec_impl
                (forall rv state', recovered (spec1 a' state) rv state' ->
                          recovered (spec2 a state) rv state').
 
-(** Theorem for Hoare-style weakening: if [spec1] holds and [spec1] implies
-[spec2], then [spec2] also holds. *)
+(** Theorem for Hoare-style weakening: if the program satisfies [spec1] and
+[spec1] implies [spec2], then the program also satisfies [spec2]. *)
 
 Theorem proc_spec_weaken : forall `(spec1: Specification A T R State)
                               `(spec2: Specification A' T R State)
@@ -408,9 +408,9 @@ Ltac monad_simpl :=
   reduce to proving a [proc_spec] for b, with [a]'s post as the new pre.  Keep
   doing this repeatedly.
 
-  There are requirements to make this plan work:
-    - can find a [proc_spec] for the [a] program
-    - can line up our current state precondition with [a]'s [proc_spec] pre
+  There are two requirements to make this plan work:
+    - a [proc_spec] for the [a] program
+    - a way to line up our current state precondition with [a]'s [proc_spec] pre
 
   This Ltac implements this plan.  It compares Coq's current goal  to:
 

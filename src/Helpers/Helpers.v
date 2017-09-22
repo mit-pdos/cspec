@@ -134,7 +134,7 @@ Qed.
     [auto], [eauto], [autorewrite], and so on.
   *)
 
-(** * Simplify matches when possible. *)
+(** ** Simplify matches when possible *)
 
 Ltac simpl_match :=
   let repl_match_goal d d' :=
@@ -162,7 +162,7 @@ Ltac simpl_match :=
 
 Module SimplMatchTests.
 
-  (* test simpl_match failure when match does not go away *)
+  (** test simpl_match failure when match does not go away *)
   Theorem fails_if_match_not_removed :
     forall (vd m: nat -> option nat) a,
       vd a = m a ->
@@ -191,7 +191,7 @@ Module SimplMatchTests.
     simpl_match; now auto.
   Qed.
 
-  (* hypothesis replacement should remove the match or fail *)
+  (** hypothesis replacement should remove the match or fail *)
   Theorem fails_on_hyp_if_match_not_removed :
     forall (vd m: nat -> option nat) a,
       vd a = m a ->
@@ -209,7 +209,7 @@ Module SimplMatchTests.
 
 End SimplMatchTests.
 
-(** * Find and destruct matches *)
+(** ** Find and destruct matches *)
 
 Ltac destruct_matches_in e :=
   lazymatch e with
@@ -302,7 +302,7 @@ Tactic Notation "destruct" "matches" "in" "*|-" := destruct_nongoal_matches.
 Tactic Notation "destruct" "matches" := destruct_goal_matches.
 
 
-(** * Variants of intuition that do not split the goal. *)
+(** ** Variants of intuition that do not split the goal. *)
 
 Ltac safe_intuition_then t :=
   repeat match goal with
@@ -360,7 +360,7 @@ Module DeexTests.
 
 End DeexTests.
 
-(** * Helpers *)
+(** ** Other proof automation helpers *)
 
 Ltac descend :=
   repeat match goal with
@@ -373,15 +373,12 @@ Ltac sigT_eq :=
     apply Eqdep.EqdepTheory.inj_pair2 in H; subst
   end.
 
-(* substitute variables that are let bindings (these can be created with [set
-(x:=value)] and appear in the context as v := def) *)
-
+(** substitute variables that are let bindings (these can be created with [set
+(x:=value)] and appear in the context as [v := def]) *)
 Ltac subst_var :=
   repeat match goal with
   | [ v := _ |- _ ] => subst v
   end.
-
-(** * Uncategorized *)
 
 Create HintDb false.
 
