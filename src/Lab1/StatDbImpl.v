@@ -33,7 +33,7 @@ Module StatDB (v : VarsAPI) <: StatDbAPI.
       sum <- v.read VarSum;
       Ret (Some (sum / count)).
   (* END *)
-  (* STUB: Ret None. *)
+  (* STUB:   Ret None. *)
 
   Definition init' : proc InitResult :=
     _ <- v.write VarCount 0;
@@ -51,7 +51,7 @@ Module StatDB (v : VarsAPI) <: StatDbAPI.
     StateCount vars_state = length statdb_state /\
     StateSum vars_state = fold_right plus 0 statdb_state.
   (* END *)
-  (* STUB: True. *)
+  (* STUB:   True. *)
 
   Definition abstr : Abstraction StatDbAPI.State :=
     abstraction_compose
@@ -66,8 +66,8 @@ Module StatDB (v : VarsAPI) <: StatDbAPI.
   Proof.
     unfold statdb_abstraction; simpl.
   (* SOL *)
-   omega.
-   Qed.
+    omega.
+  Qed.
   (* END *)
   (* STUB: Admitted. *)
 
@@ -76,7 +76,7 @@ Module StatDB (v : VarsAPI) <: StatDbAPI.
     unfold statdb_abstraction; simpl.
   (* SOL *)
     omega.
-    Qed.
+  Qed.
   (* END *)
   (* STUB: Admitted. *)
 
