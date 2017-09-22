@@ -8,10 +8,10 @@
 umask 2
 
 # update this repository:
-CLASSREPO=git@github.com:/mit-pdos/6.826-2017-labs
+CLASSREPO=git@github.com:mit-pdos/6.826-2017-labs
 
 # include only these src/ directories 
-SRCS="src/Helpers src/Disk src/Refinement src/NBD \
+SRCS="src/Common src/Helpers src/Spec \
       src/Lab1"
 
 # files/directories to copy
