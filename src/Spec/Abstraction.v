@@ -505,7 +505,7 @@ Theorem then_init_compose : forall (init1 init2: proc InitResult)
     init_abstraction init1 rec abs1 init1_sem ->
     proc_spec
       (fun (_:unit) state =>
-         {| pre := True;
+         {| pre := init1_sem state;
             post :=
               fun r state' => match r with
                        | Initialized =>
@@ -534,4 +534,3 @@ Proof.
     inv_rexec; inv_exec.
     congruence.
 Qed.
-
