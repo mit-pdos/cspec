@@ -5,3 +5,4 @@ Require Export
         FS.SepLogic.Pred.Except
         FS.SepLogic.Pred.MemIs
         FS.SepLogic.Pred.MemIsExcept.
+Global Opaque pred_prop.

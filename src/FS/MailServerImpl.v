@@ -1,22 +1,52 @@
 Require Import POCS.
+
+Import ListNotations.
+Require Import String.
+Require Import FS.SepLogic.Mem.
+Require Import FS.SepLogic.Pred.
+
 Require Import FSAPI.
 Require Import MailServerAPI.
-Require Import String.
-Import ListNotations.
 
 
 Module MailServer (fs : FSAPI) <: MailServerAPI.
 
 
+  Fixpoint mailbox_pred (mbox : mailbox) (missing_pred : pred pathname tree_node) : pred pathname tree_node :=
+    match mbox with
+    | nil => missing_pred
+    | m :: mbox' =>
+      (exists pn handle,
+       [pn] |-> File handle (mk_file m) *
+       mailbox_pred mbox' (pred_except missing_pred [pn] Missing))%pred
+    end.
+
+  Definition user_pred (uid : string) (mbox : mailbox) : pred pathname tree_node :=
+    (exists dirnum, [uid] |-> Dir dirnum *
+     subtree_pred [uid] (mailbox_pred mbox empty_dir))%pred.
+
+  Fixpoint user_mailbox_pred_m (users_and_mailboxes : list (user * mailbox)) : pred user mailbox :=
+    match users_and_mailboxes with
+    | nil => emp
+    | (u, mbox) :: rest =>
+      (u |-> mbox * user_mailbox_pred_m rest)%pred
+    end.
+
+  Fixpoint user_mailbox_pred_fs (users_and_mailboxes : list (user * mailbox)) (missing_users : pred pathname tree_node) : pred pathname tree_node :=
+    match users_and_mailboxes with
+    | nil => missing_users
+    | (u, mbox) :: rest =>
+      (user_pred u mbox * user_mailbox_pred_fs rest (pred_except missing_users [u] Missing))%pred
+    end.
+
+
   Definition mail_abstraction (fs_state : FSAPI.State) (mail_state : MailServerAPI.State) : Prop :=
     let fs := set_latest fs_state in
     set_older fs_state = nil /\
-    forall uid mailbox, mail_state uid = Some mailbox ->
-    exists dirnum,
-    fs [uid] = Some (Dir dirnum) /\
-    forall msg, In msg mailbox ->
-    exists fn handle,
-    fs [uid; fn] = Some (File handle (mk_file msg)).
+    exists users_and_mailboxes,
+    mail_state |= user_mailbox_pred_m users_and_mailboxes /\
+    fs |= [] |-> Dir 0 * user_mailbox_pred_fs users_and_mailboxes empty_dir.
+
 
   Definition abstr : Abstraction MailServerAPI.State :=
     abstraction_compose
@@ -83,13 +113,20 @@ Module MailServer (fs : FSAPI) <: MailServerAPI.
     eapply then_init_compose; eauto.
     unfold init'.
 
-    step_prog; intros.
-    eauto.
-
+    step_prog; eauto; intros.
     simpl in *; intuition.
+
+    exists (empty_mem).
+    unfold inited; intuition.
+    unfold FSAPI.inited in *.
+    unfold mail_abstraction.
+    intuition.
+
+    exists nil; simpl.
+    intuition.
+    firstorder.
   Qed.
 
-  (** ** Exercise : complete the proof of [add] *)
   Theorem add_ok : forall v, proc_spec (add_spec v) (add v) recover abstr.
   Proof.
     unfold add.
