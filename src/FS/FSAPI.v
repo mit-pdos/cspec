@@ -25,11 +25,11 @@ Definition set_in {T} (v : T) (s : pointed_set T) :=
 
 
 Record file := mk_file {
-  FileData : list nat;
+  FileData : string;
 }.
 
 Definition empty_file := 
-  mk_file nil.
+  mk_file "".
 
 Inductive tree_node :=
 | Missing
@@ -148,6 +148,21 @@ Definition stat_spec dirpn name : Specification _ _ unit State :=
     recovered := fun _ _ => False
   |}.
 
+Definition readdir_spec dirpn : Specification _ _ unit State :=
+  fun '(F, dirnum) state => {|
+    pre :=
+      set_latest state |= F * dirpn |-> Dir dirnum;
+    post := fun r state' =>
+      state' = state /\
+      forall fn,
+      ((In fn r /\ exists F' handle f,
+        F' * (dirpn ++ [fn]) |-> File handle f ===> F) \/
+       (In fn r /\ exists F' dirinum,
+        F' * (dirpn ++ [fn]) |-> Dir dirinum ===> F) \/
+       (~ In fn r /\ exists F',
+        F' * (dirpn ++ [fn]) |-> Missing ===> F));
+    recovered := fun _ _ => False
+  |}.
 
 Definition rename_file_spec pn dstdir dstname : Specification _ _ unit State :=
   fun '(F, handle, f, dirnum) state => {|
@@ -168,19 +183,19 @@ Definition read_spec pn : Specification _ _ unit State :=
     pre :=
       set_latest state |= F * pn |-> File handle f;
     post := fun r state' =>
-      r = f /\
+      r = FileData f /\
       state' = state;
     recovered := fun _ _ => False
   |}.
 
-Definition write_logged_spec pn f : Specification _ _ unit State :=
+Definition write_logged_spec pn data : Specification _ _ unit State :=
   fun '(F, handle, f0) state => {|
     pre :=
       set_latest state |= F * pn |-> File handle f0;
     post := fun r state' =>
       exists m,
       r = tt /\
-      m |= F * pn |-> File handle f /\
+      m |= F * pn |-> File handle (mk_file data) /\
       state' = set_add state m;
     recovered := fun _ _ => False
   |}.
@@ -189,13 +204,13 @@ Definition write_bypass_relation (handle : nat) (f : file) (m m' : mem pathname 
   (forall F pn f0, m |= F * pn |-> File handle f0 -> m' |= F * pn |-> File handle f) /\
   ((~ exists F pn f0, m |= F * pn |-> File handle f0) -> m' = m).
 
-Definition write_bypass_spec pn f : Specification _ _ unit State :=
+Definition write_bypass_spec pn data : Specification _ _ unit State :=
   fun '(F, filenum, f0) state => {|
     pre :=
       set_latest state |= F * pn |-> File filenum f0;
     post := fun r state' =>
       r = tt /\
-      set_transform state state' (write_bypass_relation filenum f);
+      set_transform state state' (write_bypass_relation filenum (mk_file data));
     recovered := fun _ _ => False
   |}.
 
@@ -208,9 +223,11 @@ Module Type FSAPI.
   Axiom delete : pathname -> proc unit.
   Axiom rmdir : pathname -> proc unit.
   Axiom rename_file : pathname -> pathname -> string -> proc unit.
-  Axiom read : pathname -> proc file.
-  Axiom write_logged : pathname -> file -> proc unit.
-  Axiom write_bypass : pathname -> file -> proc unit.
+  Axiom read : pathname -> proc string.
+  Axiom write_logged : pathname -> string -> proc unit.
+  Axiom write_bypass : pathname -> string -> proc unit.
+  Axiom stat : pathname -> string -> proc stat_result.
+  Axiom readdir : pathname -> proc (list string).
   Axiom recover : proc unit.
 
   Axiom abstr : Abstraction State.
@@ -224,6 +241,8 @@ Module Type FSAPI.
   Axiom read_ok : forall pn, proc_spec (read_spec pn) (read pn) recover abstr.
   Axiom write_logged_ok : forall pn f, proc_spec (write_logged_spec pn f) (write_logged pn f) recover abstr.
   Axiom write_bypass_ok : forall pn f, proc_spec (write_bypass_spec pn f) (write_bypass pn f) recover abstr.
+  Axiom stat_ok : forall pn n, proc_spec (stat_spec pn n) (stat pn n) recover abstr.
+  Axiom readdir_ok : forall pn, proc_spec (readdir_spec pn) (readdir pn) recover abstr.
   Axiom recover_noop : rec_noop recover abstr no_crash.
 
   Hint Resolve init_ok.
@@ -235,6 +254,8 @@ Module Type FSAPI.
   Hint Resolve read_ok.
   Hint Resolve write_logged_ok.
   Hint Resolve write_bypass_ok.
+  Hint Resolve stat_ok.
+  Hint Resolve readdir_ok.
   Hint Resolve recover_noop.
 
 End FSAPI.
