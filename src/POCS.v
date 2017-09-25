@@ -37,6 +37,6 @@ Require Export Spec.Proc.
 abstraction relations. *)
 Require Export Spec.Abstraction.
 
-(** [Spec.Recovery] proves a number of theorems for reasoning about proving
-recovery correct across abstraction layers. *)
+(** [Spec.Recovery] proves a number of theorems for reasoning about recovery
+across abstraction layers. *)
 Require Export Spec.Recovery.

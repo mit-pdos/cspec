@@ -87,7 +87,7 @@ Extract Inductive proc => "Proc"
 
 (** When we define how programs execute, we will say they manipulate some state
     of this opaque type [world]. We won't ever define this type in Coq, but it will
-    show up later to capture idea that programs move from one world state to
+    show up later to capture the idea that programs move from one world state to
     another in sequence.
 
  *)
@@ -108,7 +108,7 @@ Arguments Crashed {T} w.
 
 (** To define the execution of programs, we need to state an axiom about how our
     opaque [baseOpT] primitives execute. This axiom is [base_step]. This is
-    largely just a technicality.
+    just another technicality.
   *)
 
 Axiom base_step : forall T, baseOpT T -> world -> T -> world -> Prop.
@@ -146,9 +146,9 @@ Inductive exec : forall T, proc T -> world -> Result T -> Prop :=
 
 (** - And finally, it defines how procedures can crash.  Any procedure
       can crash just before it starts running or just after it finishes.
-      And [Bind] can crash in the middle of running the first sub-procedure.
+      [Bind] can crash in the middle of running the first sub-procedure.
       Crashes during the second sub-procedure of a [Bind] are covered by
-      [ExecBindFinished] above.
+      the [ExecBindFinished] constructor above.
   *)
 
 | ExecCrashBegin : forall T (p: proc T) w,
@@ -162,7 +162,7 @@ Inductive exec : forall T, proc T -> world -> Result T -> Prop :=
     exec (Bind p p') w (Crashed w').
 
 
-(** * Execution model with recovery.
+(** * Execution model with recovery
 
     We also define a model of how our system executes procedures in the
     presence of recovery after a crash.  What we want to model is a system
@@ -178,18 +178,17 @@ Inductive exec : forall T, proc T -> world -> Result T -> Prop :=
     parts of the state are volatile and are lost after a crash, such as memory
     contents or disk write buffers. Our model is that, on a crash, the world
     state is modified according to the opaque [world_crash] function, which we
-    define as an axiom. This is meant to represent the computer losing volatile
-    state, such as memory contents or disk write buffers.
+    define as an axiom. This relation is meant to capture the computer losing
+    volatile state, such as memory contents or disk write buffers.
  *)
 
 Axiom world_crash : world -> world.
 
 (** Before we talk about the whole execution, we first just model executing the
     recovery procedure, including repeated attempts in the case of a crash
-    during recovery. The interpretation of [exec_recover rec w rv w'] is that it
-    means the procedure [rec] can execute from [w] to [w'], ultimately returning
-    [rv] (a "recovery value"), and possibly crashing and restarting multiple
-    times along the way.
+    during recovery. [exec_recover rec w rv w'] means the procedure [rec] can
+    execute from [w] to [w'], ultimately returning [rv] (a "recovery value"),
+    and possibly crashing and restarting multiple times along the way.
   *)
 
 Inductive exec_recover R (rec:proc R) (w:world) : R -> world -> Prop :=
@@ -203,12 +202,9 @@ Inductive exec_recover R (rec:proc R) (w:world) : R -> world -> Prop :=
     exec rec w (Finished v w') ->
     exec_recover rec w v w'
 
-(** The second constructor, [ExecRecoverCrashDuringRecovery], says that
-    if [rec] started in some state [w] and crashed in state [w'], and
-    we then recursively ran [rec] on every crash starting with [world_crash w']
-    (by recursively referring to the [exec_recover] relation), then the
-    outcome of this recursive call to [exec_recover] is an outcome for
-    this constructor too.  This models repeated recovery attempts.
+(** The second constructor, [ExecRecoverCrashDuringRecovery], allows repeated
+    crashes by referring to [exec_recover] recursively. In between crashes, the
+    world state is transformed according to [world_crash].
   *)
 
 | ExecRecoverCrashDuringRecovery : forall w' v w'',
@@ -218,10 +214,10 @@ Inductive exec_recover R (rec:proc R) (w:world) : R -> world -> Prop :=
 
 (** * Chaining normal execution with recovery *)
 
-(** The outcome of running a procedure with recovery is similar to the [Result]
-    type defined above, except that in the case of a crash, we run a recovery
-    procedure and get both a final state _and_ a return value from the recovery
-    procedure.
+(** [RResult] ("recovery result") is the outcome of running a procedure with
+    recovery. It is similar to the [Result] type defined above, except that in
+    the case of a crash, we run a recovery procedure and get both a final state
+    _and_ a return value from the recovery procedure.
 *)
 Inductive RResult T R :=
 | RFinished (v:T) (w:world)
@@ -239,6 +235,10 @@ Arguments Recovered {T R} v w.
     - [p] crashes, and after running the recovery procedure [rec] one or
       more times, the system eventually stops crashing, [rec] finishes,
       and produces a [Recovered] outcome.
+
+    Note that there is no recursion in this definition; it merely combines
+    normal execution with crash execution followed by recovery execution, each
+    of which is defined above.
   *)
 
 Inductive rexec T R : proc T -> proc R -> world -> RResult T R -> Prop :=
@@ -265,10 +265,10 @@ Inductive rexec T R : proc T -> proc R -> world -> RResult T R -> Prop :=
     a Gallina expression before passing it to [secondProcedure], such as
     adding 1 in the example above.
 
-    This notation does not allow us to silently discard the result of a
-    procedure, so in order to run two procedures where the first one returns
+    This notation does not permit silently discarding the return value of the
+    first procedure. In order to run two procedures where the first one returns
     nothing (e.g., [unit]), or we want to otherwise ignore the result of the
-    first procedure, we have to write:
+    first procedure, we have to explicitly discard the return value by writing:
 
       [[
       _ <- firstProcedure;
