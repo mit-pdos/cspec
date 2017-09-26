@@ -4,6 +4,7 @@
 /.lia.cache
 /*/.stack-work
 /*/extract
+/lab*-handin.tar.gz
 
 # emacs
 *.aux

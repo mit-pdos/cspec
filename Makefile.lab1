@@ -56,3 +56,8 @@ clean:
 	rm -rf $(foreach d,$(BINS),$(d)/extract)
 	rm -rf $(foreach d,$(BINS),$(d)/.stack-work)
 	rm -f $(foreach b,$(BINS),bin/$(b))
+
+lab%-handin.tar.gz: clean
+	tar cf - `find . -type f | grep -v '^\.*$$' | grep -v '/\.git/' | grep -v 'lab[0-9].*\.tar\.gz'` | gzip > $@
+
+prepare-submit: lab1-handin.tar.gz
