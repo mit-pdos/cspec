@@ -34,13 +34,13 @@ Record State := mkState {
   [sum], depending on which variable is read. *)
 
 Definition read_spec v : Specification _ _ unit _ :=
-  fun '(count, sum) state => {|
-    pre := StateCount state = count /\ StateSum state = sum;
+  fun (_ : unit) state => {|
+    pre := True;
     post := fun r state' =>
       state' = state /\
       match v with
-      | VarCount => r = count
-      | VarSum => r = sum
+      | VarCount => r = StateCount state
+      | VarSum => r = StateSum state
       end;
     recovered := fun _ _ => False
   |}.
@@ -51,13 +51,13 @@ Definition read_spec v : Specification _ _ unit _ :=
   return value is tt. *)
 
 Definition write_spec v val : Specification _ _ unit _ :=
-  fun '(count, sum) state => {|
-    pre := StateCount state = count /\ StateSum state = sum;
+  fun (_ : unit) state => {|
+    pre := True;
     post := fun r state' =>
       r = tt /\
       match v with
-      | VarCount => state' = mkState val sum
-      | VarSum => state' = mkState count val
+      | VarCount => state' = mkState val (StateSum state)
+      | VarSum => state' = mkState (StateCount state) val
       end;
     recovered := fun _ _ => False
   |}.

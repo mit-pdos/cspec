@@ -86,10 +86,12 @@ Module StatDB (v : VarsAPI) <: StatDbAPI.
     unfold init'.
 
     step_proc; intros.
-    exists (StateCount state, StateSum state); simpl; intuition idtac.
+    exists tt.
+    simpl; intuition idtac.
 
     step_proc; intros.
-    exists (StateCount state0, StateSum state0); simpl; intuition idtac.
+    exists tt.
+    simpl; intuition idtac.
 
     step_proc; intros.
     eauto.
@@ -110,16 +112,16 @@ Module StatDB (v : VarsAPI) <: StatDbAPI.
   (* SOL *)
     step_proc; intros.
     destruct a'; simpl in *; intuition idtac.
-    eexists (_, _); simpl; intuition idtac.
+    exists tt; simpl; intuition idtac.
 
     step_proc; intros.
-    eexists (_, _); simpl; intuition idtac.
+    exists tt; simpl; intuition idtac.
 
     step_proc; intros.
-    eexists (_, _); simpl; intuition idtac.
+    exists tt; simpl; intuition idtac.
 
     step_proc; intros.
-    eexists (_, _); simpl; intuition idtac.
+    exists tt; simpl; intuition idtac.
 
     step_proc; intros.
     eauto.
@@ -146,7 +148,7 @@ Module StatDB (v : VarsAPI) <: StatDbAPI.
   (* SOL *)
     step_proc; intros.
     destruct a'; simpl in *; intuition idtac.
-    eexists (_, _); simpl; intuition idtac.
+    exists tt; simpl; intuition idtac.
 
     destruct (r == 0).
 
@@ -161,7 +163,7 @@ Module StatDB (v : VarsAPI) <: StatDbAPI.
       exists nil; intuition auto.
 
     - step_proc; intros.
-      eexists (_, _); simpl; intuition idtac.
+      exists tt; simpl; intuition idtac.
 
       step_proc; intros.
       eauto.
