@@ -394,7 +394,7 @@ Qed.
 
 (** In some situations, the precondition of a specification
   may define variables or facts that you want to [intros].
-  Here we define several helper lemmas and an Ltac tactic, [spec_intros],
+  Here we define several helper theorems and an Ltac tactic, [spec_intros],
   that does so.  This is done by changing the specification's precondition
   from an arbitrary Prop (i.e., [pre]) into a statement that there's
   some state [state0] such that [state = state0], and [intros]ing the
@@ -477,7 +477,7 @@ Definition rec_noop `(rec: proc R) `(abs: Abstraction State) (wipe: State -> Sta
             recovered := fun _ state' => wipe state state'; |})
       (Ret v) rec abs.
 
-(** A more general lemma about specifications for [Ret], which
+(** A more general theorem about specifications for [Ret], which
   we will use as part of our proof automation, says
   that [Ret v] meets a specification [spec] if the [rec_noop]
   theorem holds (i.e., the recovery procedure is correctly
@@ -513,7 +513,7 @@ Qed.
 
   This tactic, [monad_simpl], makes use of the [monad_left_id]
   and [monad_assoc] theorems to manipulate procedures, simplifying
-  their return statements and semicolons, together with the lemma
+  their return statements and semicolons, together with the theorem
   we proved above, [spec_exec_equiv], about specifications of
   equivalent procedures.
  *)
@@ -677,7 +677,7 @@ Proof.
   eapply H in H2; eauto.
 Qed.
 
-(** Finally, we prove a specialized lemma about how to compose
+(** Finally, we prove a specialized theorem about how to compose
   two initialization procedures using the [then_init] composition
   operator defined above:
  *)

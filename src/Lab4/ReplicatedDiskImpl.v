@@ -77,7 +77,7 @@ Module ReplicatedDisk (td : TwoDiskAPI) <: OneDiskAPI.
 
 
   (**
-   * Helper lemmas and tactics for proofs.
+   * Helper theorems and tactics for proofs.
    *)
 
   (* As the final step in giving the correctness of the replicated disk

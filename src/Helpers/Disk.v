@@ -171,7 +171,7 @@ Fixpoint diskUpd d (a: addr) b : disk :=
 Definition diskShrink (d : disk) : disk :=
   firstn (length d - 1) d.
 
-(** Finally, we prove a variety of lemmas about the behavior of these
+(** Finally, we prove a variety of theorems about the behavior of these
     disk operations.
   *)
 
@@ -388,7 +388,7 @@ Proof.
       replace (length d - 0) with (length d) by omega; auto.
 Qed.
 
-(** We combine all of the above lemmas into a hint database called "upd".
+(** We combine all of the above theorems into a hint database called "upd".
     This means that, when you type [autorewrite with upd] in some Coq proof,
     Coq will try to rewrite using all of the hints in that database.
 
