@@ -51,8 +51,8 @@ Local Hint Constructors exec.
 (** These are the monad laws
 
 TODO: explain what the monad is and what these monad laws mean (specifically,
-we're proving that exec treats programs up to the monad laws as equivalences
-between programs).
+we're proving that exec treats procedures up to the monad laws as equivalences
+between procedures).
  *)
 
 Definition exec_equiv T (p: proc T) p' :=
@@ -101,7 +101,7 @@ Proof.
   apply H in H1; eauto.
 Qed.
 
-(* When a program finishes, its recovery procedure is irrelevant. *)
+(* When a procedure finishes, its recovery procedure is irrelevant. *)
 Theorem rexec_finish_any_rec : forall `(p: proc T)
                                `(rec: proc R)
                                `(rec': proc R')

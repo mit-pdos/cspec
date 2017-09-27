@@ -51,7 +51,7 @@ coq: $(patsubst src/%.v,build/%.vo,$(CODE))
 .PHONY: docs
 docs: coq
 	@mkdir -p doc
-	coqdoc $(COQRFLAGS) -d doc $(patsubst src/%.v,build/%.v,$(CODE))
+	coqdoc $(COQRFLAGS) -g --interpolate -d doc $(patsubst src/%.v,build/%.v,$(CODE))
 
 .PHONY: %/extract
 %/extract: %/Extract.v %/fiximports.py

@@ -8,9 +8,9 @@ Require Import Abstraction.
   [Spec.Proc] defines the execution of a computer that can crash: after a
   crash, the computer stops executing, then reboots, and then runs recovery.
   The computer may crash during recovery.  To support reasoning about crashes,
-  [prog_spec] above uses recovered condidition: each [prog_spec] must describe
+  [proc_spec] above uses recovered condidition: each [proc_spec] must describe
   in which condition the computer may reboot through a recovered condition, and
-  proofs of [prog_spec] must show that an implementation won't recover in any
+  proofs of [proc_spec] must show that an implementation won't recover in any
   other recovered condition.
 
   You will also have to show that for every code state in which your
@@ -51,7 +51,7 @@ Proof.
 Qed.
 
 (** Define what it means to run recovery in recovered state : *)
-Definition prog_loopspec `(spec: Specification A unit unit State)
+Definition proc_loopspec `(spec: Specification A unit unit State)
            `(rec': proc unit) `(rec: proc unit)
            (abs: Abstraction State) :=
   forall a w state,
@@ -88,9 +88,9 @@ Theorem idempotent_loopspec : forall `(rec: proc unit) `(rec': proc unit)
                                      (abs: Abstraction State),
     forall (Hspec: proc_spec spec rec' rec abs),
       idempotent spec ->
-      prog_loopspec spec rec' rec abs.
+      proc_loopspec spec rec' rec abs.
 Proof.
-  unfold prog_loopspec; intros.
+  unfold proc_loopspec; intros.
   apply clos_refl_trans_1n_unit_tuple in H2.
   repeat match goal with
          | [ u: unit |- _ ] => destruct u
@@ -114,7 +114,7 @@ Theorem compose_recovery : forall `(spec: Specification A'' T unit State)
                              `(p: proc T) `(rec: proc unit) `(rec': proc unit)
                              `(abs: Abstraction State),
     forall (Hspec: proc_spec spec p rec abs)
-      (Hrspec: prog_loopspec rspec rec' rec abs)
+      (Hrspec: proc_loopspec rspec rec' rec abs)
       (Hspec_spec':
          forall (a:A) state, pre (spec' a state) ->
                     exists (a'':A''),
@@ -197,7 +197,7 @@ Theorem rec_noop_compose : forall `(rec: proc unit) `(rec2: proc unit)
                              `(abs2: LayerAbstraction State1 State2)
                              (wipe2: State2 -> State2 -> Prop),
     rec_noop rec abs1 wipe1 ->
-    prog_loopspec spec rec2 rec abs1 ->
+    proc_loopspec spec rec2 rec abs1 ->
     forall (Hspec: forall state0 state0' state,
           abstraction abs2 state0 state0' ->
           wipe1 state0 state ->

@@ -149,17 +149,17 @@ Module RemappedDisk (bd : BadBlockAPI) <: OneDiskAPI.
   Proof.
     eapply then_init_compose; eauto.
 
-    step_prog; intros.
+    step_proc; intros.
     exists tt; simpl; intuition idtac.
 
     destruct (r == 0).
-    step_prog; intros; eauto.
+    step_proc; intros; eauto.
 
-    step_prog; intros.
+    step_proc; intros.
     exists tt; simpl; intuition idtac.
 
     destruct (lt_dec r0 r).
-    all: step_prog; intros; eauto.
+    all: step_proc; intros; eauto.
 
     simpl in *; intuition subst.
 
@@ -184,21 +184,21 @@ Module RemappedDisk (bd : BadBlockAPI) <: OneDiskAPI.
 
     apply spec_abstraction_compose; simpl.
 
-    step_prog; intros.
+    step_proc; intros.
     destruct a'; simpl in *; intuition idtac.
     exists tt; simpl; intuition idtac.
     2: autounfold in *; simpl in *; intuition subst; eauto.
 
     destruct (a == r).
-    - step_prog; intros.
+    - step_proc; intros.
       exists tt; simpl; intuition idtac.
       2: autounfold in *; simpl in *; intuition subst; eauto.
 
-      step_prog; intros.
+      step_proc; intros.
       exists tt; simpl; intuition idtac.
       2: autounfold in *; simpl in *; intuition subst; eauto.
 
-      step_prog; intros.
+      step_proc; intros.
       eauto.
 
       simpl in *; intuition subst.
@@ -215,11 +215,11 @@ Module RemappedDisk (bd : BadBlockAPI) <: OneDiskAPI.
       + rewrite disk_oob_eq by omega. constructor.
       + rewrite <- Hremap; auto.
 
-    - step_prog; intros.
+    - step_proc; intros.
       exists tt; simpl; intuition idtac.
       2: autounfold in *; simpl in *; intuition subst; eauto.
 
-      step_prog; intros.
+      step_proc; intros.
       eauto.
 
       simpl in *; intuition subst.
@@ -284,13 +284,13 @@ Module RemappedDisk (bd : BadBlockAPI) <: OneDiskAPI.
 
     apply spec_abstraction_compose; simpl.
 
-    step_prog; intros.
+    step_proc; intros.
     destruct a'; simpl in *; intuition idtac.
     exists tt; simpl; intuition idtac.
     2: autounfold in *; simpl in *; intuition subst; eauto.
 
     destruct (a == r-1); subst.
-    - step_prog; intros.
+    - step_proc; intros.
       eauto.
 
       simpl in *; intuition subst.
@@ -303,17 +303,17 @@ Module RemappedDisk (bd : BadBlockAPI) <: OneDiskAPI.
       invert_abstraction.
       omega.
 
-    - step_prog; intros.
+    - step_proc; intros.
       exists tt; simpl; intuition idtac.
       2: autounfold in *; simpl in *; intuition subst; eauto.
 
       destruct (a == r0).
-      + step_prog; intros.
+      + step_proc; intros.
         exists tt; simpl; intuition idtac.
         2: autounfold in *; simpl in *; intuition subst; eauto.
         2: autounfold in *; simpl in *; intuition subst; eauto.
 
-        step_prog; intros.
+        step_proc; intros.
         eauto.
 
         simpl in *; intuition subst.
@@ -321,12 +321,12 @@ Module RemappedDisk (bd : BadBlockAPI) <: OneDiskAPI.
 
         eauto.
 
-      + step_prog; intros.
+      + step_proc; intros.
         exists tt; simpl; intuition idtac.
         2: autounfold in *; simpl in *; intuition subst; eauto.
         2: autounfold in *; simpl in *; intuition subst; eauto.
 
-        step_prog; intros.
+        step_proc; intros.
         eauto.
 
         simpl in *; intuition subst.
@@ -341,12 +341,12 @@ Module RemappedDisk (bd : BadBlockAPI) <: OneDiskAPI.
 
     apply spec_abstraction_compose; simpl.
 
-    step_prog; intros.
+    step_proc; intros.
     destruct a'; simpl in *; intuition idtac.
     exists tt; simpl; intuition idtac.
     2: autounfold in *; simpl in *; intuition subst; eauto.
 
-    step_prog; intros.
+    step_proc; intros.
     eauto.
 
     simpl in *; intuition subst.
@@ -365,7 +365,7 @@ Module RemappedDisk (bd : BadBlockAPI) <: OneDiskAPI.
     intros.
 
     apply spec_abstraction_compose; simpl.
-    step_prog; intros.
+    step_proc; intros.
     eauto.
 
     destruct a; simpl in *.

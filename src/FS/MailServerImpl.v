@@ -113,7 +113,7 @@ Module MailServer (fs : FSAPI) <: MailServerAPI.
     eapply then_init_compose; eauto.
     unfold init'.
 
-    step_prog; eauto; intros.
+    step_proc; eauto; intros.
     simpl in *; intuition.
 
     exists (empty_mem).
@@ -178,18 +178,18 @@ Module MailServer (fs : FSAPI) <: MailServerAPI.
     rewrite extract_user_fs in H2.
 *)
 
-    step_prog; intros.
+    step_proc; intros.
     simpl in *; intuition idtac; subst.
     eexists (_, _); simpl; intuition idtac.
 
     admit.
 
-    step_prog; intros. simpl in *. intuition. deex.
+    step_proc; intros. simpl in *. intuition. deex.
     eexists (_, _); simpl; intuition idtac.
 
     admit.
 
-    step_prog; intros. simpl in *. repeat deex.
+    step_proc; intros. simpl in *. repeat deex.
     eexists (_, _); simpl; intuition idtac.
 
   Admitted.
@@ -201,7 +201,7 @@ Module MailServer (fs : FSAPI) <: MailServerAPI.
     intros.
 
     apply spec_abstraction_compose; simpl.
-    step_prog; intros.
+    step_proc; intros.
     eauto.
 
     destruct a; simpl in *.

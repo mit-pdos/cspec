@@ -1,36 +1,37 @@
 Global Set Implicit Arguments.
 Global Generalizable All Variables.
 
-(** * Model of sequential programs with mutable state.
+(** * Model of sequential procedures with mutable state.
 
-    In our labs, we want to reason about programs that have side-effects,
+    In our labs, we want to reason about procedures that have side-effects,
     such as modifying the contents of memory or writing to disk.  This is
-    in contrast to the kinds of programs that one can naturally write in
+    in contrast to the kinds of procedures that one can naturally write in
     Coq's Gallina language, which are purely functional; they have no
     built-in notion of mutable state.
 
-    To reason about programs that manipulate mutable state,
+    To reason about procedures that manipulate mutable state,
     we need to construct an explicit Coq model of:
 
-    - What a program looks like.
-    - How a program executes.
+    - What a procedure looks like.
+    - How a procedure executes.
 
-    Our programs will eventually be extracted from Coq into Haskell, and
+    Our procedures will eventually be extracted from Coq into Haskell, and
     execute as Haskell programs (by compiling their Coq-generated Haskell
     source code using a Haskell compiler to produce an executable binary).
 
-    First, we need a type to represent programs, which will be an inductive type
+    First, we need a type to represent procedures, which will be an inductive type
     [proc] after some preliminaries. This type is a generic model of sequential
-    programs, allowing chaining programs together. We will implement some basic
-    operations in Haskell to do I/O where needed and, using extraction, link our programs with the
+    procedures, allowing chaining procedures together. We will implement some basic
+    operations in Haskell to do I/O where needed and, using extraction, link our procedures with the
     Haskell primitives and run them.
 
   *)
 
-(** As a technical detail, we let programs include arbitrary operations of types
+(** As a technical detail, we let procedures include arbitrary operations of types
     [baseOpT T] (which will produce a T-typed result). These will tell Coq that
     a [proc] can contain outside code that we don't care to represent here.
   *)
+
 Axiom baseOpT : Type -> Type.
 
 (** Our minimal, generic model of sequential procedures.
@@ -85,12 +86,13 @@ Extract Inductive proc => "Proc"
 
   *)
 
-(** When we define how programs execute, we will say they manipulate some state
+(** When we define how procedures execute, we will say they manipulate some state
     of this opaque type [world]. We won't ever define this type in Coq, but it will
-    show up later to capture the idea that programs move from one world state to
+    show up later to capture the idea that procedures move from one world state to
     another in sequence.
 
  *)
+
 Axiom world : Type.
 
 
@@ -100,13 +102,14 @@ Axiom world : Type.
     procedures on the state of our system, both of these outcomes also include
     the resulting world state.
 *)
+
 Inductive Result T :=
 | Finished (v:T) (w:world)
 | Crashed (w:world).
 
 Arguments Crashed {T} w.
 
-(** To define the execution of programs, we need to state an axiom about how our
+(** To define the execution of procedures, we need to state an axiom about how our
     opaque [baseOpT] primitives execute. This axiom is [base_step]. This is
     just another technicality.
   *)

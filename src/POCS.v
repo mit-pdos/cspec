@@ -16,27 +16,33 @@
     [List] provides linked lists, and [Omega] provides a tactic for
     proving simple arithmetic facts.
   *)
+
 Require Export List.
 Require Export Omega.
 
 (** [Helpers.Helpers] has some definitions to augment the standard library, as well as a
 variety of proof automation (Ltac) used to simplify writing proofs with the POCS
 infrastructure. *)
+
 Require Export Helpers.Helpers.
 
 (** [Helpers.Disk] defines our disk model. Disks are defined as lists of blocks,
 with many helper functions and theorems. *)
+
 Require Export Helpers.Disk.
 
 (** [Spec.Proc] defines [proc], the type of the programs you'll write in 6.826.
 We also describe how these programs run, including how programs can crash and
 how the system can run a recovery procedure afterward. *)
+
 Require Export Spec.Proc.
 
 (** [Spec.Abstraction] defines how we write specifications in terms of
 abstraction relations. *)
+
 Require Export Spec.Abstraction.
 
 (** [Spec.Recovery] proves a number of theorems for reasoning about recovery
 across abstraction layers. *)
+
 Require Export Spec.Recovery.

@@ -2,175 +2,231 @@ Require Import Helpers.Helpers.
 Require Import Proc.
 Require Import ProcTheorems.
 
-(** * Proof style: Abstractions with pre- and post-conditions
+(** * Specification style: Abstractions with pre- and post-conditions
 
- In POCS you will often use refinement to prove that an implementation (code)
- meets its specification (spec), which puts the following obligations on you:
+ In POCS you will often write specifications that abstract away
+ the state manipulated by the lower-level code into a higher-level
+ representation of the state, which we will call a "spec state".
+ This style of specification, for a given procedure, consists of
+ two parts: (1) the type of the abstract state, and (2) a description
+ of how this abstract state can change as a result of running a procedure.
 
- - You need to define one abstraction relationship between code states and spec
-   states;
+ To prove that an implementation (code) meets its specification
+ (spec), which puts the following obligations on you:
+
+ - You need to define an abstraction relation that connects code
+   states and spec states;
 
  - Whenever the code runs from state [w] to state [w'] and the abstraction
-   relation initially holds between [w] and [state], you must show that there exists
-   a spec state [state'] for which the abstraction relationship holds between [w']
-   and [state'], and that the spec operation could have reached [state'] from state [state].
-   Here's a picture:
+   relation holds between [w] and [state], you must show that there exists
+   a spec state [state'] for which the abstraction relation holds between
+   [w'] and [state'], and that the specification allows the procedure to
+   change the abstract state from [state] to [state'].
+
+ Here's a picture representing these proof obligations:
 
 <<
                      spec semantics
-     forall state -------------------> exists state'
-              ^                                 ^
-         absR |                            absR |
-              V   semantics of code             V
-       forall w  --------------------> forall state
+     forall state ===================> exists state'
+              ^                                 ^^
+         absR |                            absR ||
+              V   semantics of code             VV
+       forall w  -----------------------> forall w'
 >>
 
- The procedure that implements the spec operation may be a program that makes
- several steps. To reason about the behavior of this procedure we use
- Hoare-style reasoning. We require that each individual program step has a
- Crash-Hoare-Logic specification, consisting of a precondition, a post
- condition, and recovered condition. We then chain the steps of the program
- using Hoare reasoning. For example, to reason about a program with two steps:
- [s1;s2], we need to show that the postcondition of [s1] implies the
- precondition of [s2]. If you can prove that, then you can conclude that if the
- precondition of [s1] holds, then the postcondition of [s1;s2] is [s2]'s
- postcondition. This style of reasoning gives us a proof for [s1;s2]'s
- Hoare-style specification.
+ Single lines are what the proof assumes, and double lines are what you
+ must show in your proof.
 
- To support reasoning about crashes, the spec of each procedure must also have a
- recovered condition, in addition to the traditional Hoare precondition and
- postcondition. The recovered condition describes the state of the computer
- after it reboots. Other than specifying the recovered condition for each
- procedure, the infrastructure mostly separates reasoning about crash-free
- execution from reasoning about crashes and recovery (i.e., repairing the system
- after a crash). The support for reasoning about recovery is in
- [Spec.HoareRecovery]. In [Lab1.StatDB], we ignore crashes, and thus you
- don't have to specify a meaningful recovered condition and implement a recovery
- procedure. For labs 2 and lab 3, you can find solutions that don't require any
- repair after a crash, and the recovery procedure is trivial (i.e., it does
- nothing). The last lab requires repair after a crash, which will require
- understanding [Spec.HoareRecovery].
-
- The rest of this file defines the infrastructure for refinement and Hoare
- reasoning. At a high level, it includes the following:
-
- - A definition [Abstraction], which formalizes our notion of abstract state on
-   top of the opaque world state.
- - A syntax for Crash Hoare Logic specifications, bundling together the
-   precondition, postcondition, and recovered condition.
- - A definition of when a program meets a Crash Hoare Logic specification.
- - Theorems about general specifications (especially the chaining for [s1;s2]
-   described above).
-
- This reasoning is partially automated. Assuming there are "ok" theorems all the
- procedures used in a particular implementation, then the Ltac [step_prog]
- "steps" through them, generating an obligation that each postcondition implies
- the next precondition. Many of these obligations are trivial and [step_prog]
- automatically solves them. For example, the proof of [add_ok] in
- [Lab1/StatDBImpl] consists mostly of repeatedly invoking [step_prog].
- [Lab1/StatDBAPI] also registers [add_ok] in a Hint database so that
- [step_prog] can "step" through procedures that invoke [add].
-
- As a final detail, you need to reason about initialization, and in particular
- show that the abstraction relationship holds between the initial code state [w]
- and a valid initial spec state [state].
-
+ The rest of this file defines what it means to construct an abstraction
+ relation between code states and spec states, what it means to define a
+ specification, and how we can structure these proofs.
  *)
 
 (** ** Abstraction relation and composition *)
 
-(** A LayerAbstraction is a record with one field: [abstraction], an abstraction
-relation between states of types [State1] and [State2]. Think of [State1] as
-being type which gives code states whereas [State2] is the type for
-specification states; the abstraction relation links these two states together.
-For example, in StatDB lab, the spec state is a list of integers and the
-implementation state is is a pair of variables. The [abstraction] function
-states what must be true of the relationship between the list of integers and
-the pair of variables. *)
+(** A LayerAbstraction is a record with one field, [abstraction],
+  which relates two states: one of type [State1] and another of type [State2].
+  Think of [State1] as being the type of code states whereas [State2] is the
+  type for specification states.  The abstraction relation links these two
+  states together.
+
+  For example, in StatDB lab, the spec state is a list of
+  integers and the implementation state is is a pair of variables.  In the
+  StatDB lab, the
+  [abstraction] function must state what must be true of the relationship between
+  the list of integers and the pair of variables.
+ *)
+
 Record LayerAbstraction State1 State2 :=
   { abstraction : State1 -> State2 -> Prop; }.
 
-(** The constructor for [LayerAbstraction]. *)
+(**
+  The above definition of [LayerAbstraction] helps us connect two
+  layers, such as the layer of variables and the layer of the StatDB
+  specification.
+
+  A particular kind of abstraction is one that connects the bottom-most
+  type of state, [world], with some abstract state above the world.
+  (Recall that our model of execution is that, at the lowest level,
+  procedures (code) always manipulates the "real world", whose state
+  is of type [world].)
+
+  We define [Abstraction] to be this particular kind of abstraction:
+  it is a relation between [world] states and some other type of states,
+  [State].
+ *)
+
 Definition Abstraction State := LayerAbstraction world State.
 
-(** The identity [LayerAbstraction] constructor *)
-Definition IdAbstraction State : LayerAbstraction State State :=
-  {| abstraction := fun state state' => state' = state; |}.
+(**
+  We can compose abstractions, by layering one abstraction on top
+  of another.  In our case, since everything is ultimately connected
+  to [world] states at the bottom, we define a composition of two
+  kinds of abstraction: one that goes from [world] states to [State1],
+  and another that goes from [State1] to [State2], to produce an
+  abstraction from [world] to [State2].
 
-(** The following function is a constructor to compose two
-[LayerAbstraction]'s. It returns an abstraction function that is the composition
-of [abs1], a relation between the state of the lower layer and the state of a
-middle layer, and [abs2], the relation between the state of the middle layer and
-the state of the top layer. *)
+  [abstraction_compose] makes this connection precise, by saying
+  that [world] and [State2] states are connected by the fact that
+  there exists some intermediate [State1] state that matches the
+  two abstractions being composed.
+  *)
+
 Definition abstraction_compose
            `(abs1: Abstraction State1)
            `(abs2: LayerAbstraction State1 State2) :=
   {| abstraction := fun w state' => exists state, abstraction abs2 state state' /\
                                   abstraction abs1 w state; |}.
 
-(** A Crash Hoare Logic record to express the specification of procedures. The
-record has fields for the precondition, postcondition, and recovered condition
-of a procedure. *)
-Record Quadruple T R State :=
+(**
+  In some situations, we will want to keep the same level of abstraction
+  (i.e., have the code and spec states be the same).  [IdAbstraction]
+  defines this "identity" kind of abstraction: it is a relation between
+  states of the same type [State], and the relation says that the two
+  states must be equal.
+ *)
+
+Definition IdAbstraction State : LayerAbstraction State State :=
+  {| abstraction := fun state state' => state' = state; |}.
+
+
+(** ** Specification *)
+
+(** Our specifications describe how a procedure can change the
+  state of the system, at some level of abstraction.  We describe
+  the allowed state changes using pre- and post-conditions, as
+  captured by the following structure, [SpecProps].
+
+  [SpecProps] is parametrized by three types: [T], [R], and [State].
+
+  [State] is the type of states that this specification uses.
+  For instance, in the StatDB example, [State] would be [list nat].
+
+  [T] is the type of the return value of the procedure being
+  specified.  Note that the [post] condition is a function of
+  two arguments: one of type [T] (the returned value), and another
+  of type [State] (the resulting state).
+
+  In addition to pre- and post-conditions, our specifications include
+  recovery conditions, which help reason about crashes during the
+  execution of a procedure.  After a crash, a recovery procedure will
+  run to recover any state from the crash.  The recovery procedure may
+  also return some result; this result's type is [R], and the recovery
+  condition, [recovered], takes two arguments: the return value from
+  recovery, [R], and the state after recovery, [State].
+ *)
+
+Record SpecProps T R State :=
   Spec {
-      pre: Prop;
-      post: T -> State -> Prop;
-      recovered: R -> State -> Prop;
-    }.
+    pre: Prop;
+    post: T -> State -> Prop;
+    recovered: R -> State -> Prop;
+  }.
 
-(** This function is a constructor for a spec [Quadruple].  It takes as arguments a
-type [A] (to be used in the precondition), a result type [T] (the type returned
-by the procedure when no crashes) and a recovered type [R] (the type returned by
-the recovery procedure), and a spec state ([state]), and returns a Hoare
-Quadruple. *)
-Definition Specification A T R State := A -> State -> Quadruple T R State.
+(**
+  One obvious part missing from the [SpecProps] specification is any
+  reference to the starting state.  The reason we didn't pass it as
+  an argument to the precondition, [pre], is that it's useful to refer
+  to the starting state inside the [post] and [recovered] conditions
+  as well, in order to connect the final state to the starting state.
+
+  Another part which is not so obviously missing is a way to talk about
+  existential variables in the specification (sometimes called "ghost
+  variables" in the PL literature).  This is a bit hard to
+  grasp in an abstract sense; we will use this in lab 4, and it's safe
+  to ignore it until then.
+
+  We add these two missing parts to a specification by defining the
+  actual type of specifications, [Specification], as a function from
+  a ghost variable [A] and a starting state [State] to a [SpecProps].
+  This allows the pre-, post-, and recovered conditions in [SpecProps]
+  to refer to the starting state (and the ghost variable).
+ *)
+
+Definition Specification A T R State := A -> State -> SpecProps T R State.
 
 
-(** ** Correctness of a program
+(** ** Correctness of a procedure
 
-  [prog_spec] defines when a specification holds for a procedure [p] and a
-  recovery procedure [rec].  The correctness is defined in a
-  refinement style.
+  [proc_spec] defines when a specification holds for a procedure
+  [p] and a recovery procedure [rec].  (The recovery procedure
+  will become important in labs 3 and 4, when we reason about
+  crashes.)  [proc_spec] formalizes our intuition of what it
+  might mean to satisfy a pre- and post-condition specification.
 
-  The general shape of what [proc_spec] says is as follows:
+  The general shape of what [proc_spec] says, ignoring recovery
+  for now, is:
 
 <<
             pre                      post
-             |                         |
-             V                         V
-          code state --[procedure]--> state'
+             |                        ||
+             V                        VV
+           state                    state'
+             ^                        ^^
+        absR |                   absR ||
+             V                        VV
+             w ---[procedure p]-----> w'
 >>
 
-  The top-level [proc_spec] statement has a precondition that maps the
-  starting code state to the starting spec state, and postcondition that maps
-  the final code state to the correspoding final spec state.
+  The single arrows indicate the assumptions (that there exists
+  some starting abstract state [state], corresponding to a world
+  state [w], where the precondition [pre] holds, and that running
+  the procedure [p] gives us state [w'].)
 
-  The precondition takes an additional argument as input, which can appear in
-  the postcondition. This helps write more general specifications; examples will
-  help make clear how to use this argument.
+  The double arrows indicate what [proc_spec] concludes: that there
+  is an abstract state [state'] corresponding to [w'], and that the
+  postcondition holds in that resulting state [state'].
 
-  In more detail, [prog_spec] states that forall precondition arguments ([a]),
-  code states ([w]), and spec states ([state]):
+  This picture should look familiar; it is quite similar to the
+  proof obligations described at the top of this file, with the
+  extra detail of how we describe the allowed transitions (namely,
+  using pre- and post-conditions).
 
-  - if the abstraction relation holds between code state [w] and spec state [state]
+  In more detail, [proc_spec] states that for all ghost variables
+  [a], starting states [w], and spec states [state]:
 
-  - if the precondition holds for [a] and [state]
+  - assume that the abstraction relation holds between [w] and [state]
 
-  - if the procedure [p] starts from code state [w], then one of the following two
-    must be true:
+  - assume that the precondition holds for [a] and [state]
 
-  - 1) if execution finishes without crashes in code state [w'] and returns [v],
-    then there exists a spec state [state'] in which the abstraction relationholds
-    between [w'] and [state'] and the postcondition holds in [state'], OR
+  - if the procedure [p] starts from code state [w], then one of the
+    following must be true:
 
-  - 2) if execution finishes in code state [w'] and returns [v] after perhaps
-    several crashes and running the recovery procedure [r] several times, then
-    there exists a spec state [state'] in which the abstraction relation holds
-    between [w'] and [state'] and the recovered condition holds in [state'].
+    - (1) if execution finishes without crashes in code state [w'] and
+      returns [v], then there exists a spec state [state'] in which the
+      abstraction relation holds between [w'] and [state'] and the
+      postcondition holds in [state'] with return value [v], OR
 
-  The [rexecution] relationship describes how programs execute and is defined in
-  [Spec.Proc].
+    - (2) if execution finishes in code state [w'] and returns [v]
+      (after perhaps several crashes and running the recovery
+      procedure [r] on each crash), then there exists a spec state
+      [state'] and some return value [v] from the recovery procedure,
+      in which the abstraction relation holds
+      between [w'] and [state'] and the recovered condition holds in [state']
+      with return value [v].
 
+  The [rexec] relation describes how procedures execute, and
+  is defined in [Spec.Proc].
  *)
 
 Definition proc_spec `(spec: Specification A T R State) `(p: proc T)
@@ -189,19 +245,26 @@ Definition proc_spec `(spec: Specification A T R State) `(p: proc T)
                             recovered (spec a state) v state'
          end.
 
-(** Hoare-style implication: [spec1] implies [spec2] if
+(** ** Proving correctness *)
 
-   - forall arguments and all states [state] for which [spec2]'s precondition
-     holds
+(** To help us construct proofs about procedures satisfying
+  a specification, it helps to have a notion of when one
+  specification implies another specification.  Here, we
+  define what it means for [spec1] to imply [spec2] (the
+  two specifications must be at the same level of abstraction
+  and must talk about the same types of return values):
 
-   - there exists an argument for which [spec1]'s precondition holds in [state]
+   - for all ghost variables and all states [state] for which [spec2]'s
+     precondition holds,
 
-   - for all states [state'] in which the postcondition of [spec1] holds, then
-     the post condition of [spec2] also holds
+   - there exists a ghost variable for which [spec1]'s precondition
+     holds in [state]
 
-   - for all states [state'] in which the recovered condition of [spec1] holds,
-     then the recovered condition of [spec2] also holds
+   - for all states [state'] in which the postcondition of [spec1]
+     holds, then the post condition of [spec2] also holds
 
+   - for all states [state'] in which the recovered condition of
+     [spec1] holds, then the recovered condition of [spec2] also holds.
   *)
 
 Definition spec_impl
@@ -214,8 +277,11 @@ Definition spec_impl
                (forall rv state', recovered (spec1 a' state) rv state' ->
                          recovered (spec2 a state) rv state').
 
-(** Theorem for Hoare-style weakening: if the program satisfies [spec1] and
-[spec1] implies [spec2], then the program also satisfies [spec2]. *)
+(** We now prove that the above definition of what it means for
+  one specification to imply another one is actually correct.
+  This means that, if a procedure satisfies [spec1], and [spec1]
+  implies [spec2], then the same procedure must also satisfy [spec2].
+ *)
 
 Theorem proc_spec_weaken : forall `(spec1: Specification A T R State)
                               `(spec2: Specification A' T R State)
@@ -233,7 +299,21 @@ Qed.
 
 Hint Resolve tt.
 
-(** Theorem for the [Bind] operation: *)
+(** This is a crucial step for constructing proofs of correctness.
+  We will decompose proofs about a [Bind] operation (i.e.,
+  combining two procedures, [p] and [rx], with a semicolon) into
+  smaller proofs about the individual procedures [p] and [rx].
+
+  Specifically, in order to prove that [p; rx] satisfies [spec'],
+  it suffices to have some specification [spec] for [p], and to
+  prove that the precondition of [spec'] implies the precondition
+  of [spec], and that [rx] meets a specification that, informally,
+  fixes up the postcondition of [spec] to match the postcondition
+  of [spec'].
+
+  More precisely:
+ *)
+
 Theorem proc_spec_rx : forall `(spec: Specification A T R State)
                          `(p: proc T) `(rec: proc R)
                          `(rx: T -> proc T')
@@ -312,7 +392,15 @@ Proof.
       eapply H in H10; simpl in *; safe_intuition (repeat deex; eauto).
 Qed.
 
-(** Theorem to split a spec into the RFinished and Recovered cases: *)
+(** In some situations, the precondition of a specification
+  may define variables or facts that you want to [intros].
+  Here we define several helper lemmas and an Ltac tactic, [spec_intros],
+  that does so.  This is done by changing the specification's precondition
+  from an arbitrary Prop (i.e., [pre]) into a statement that there's
+  some state [state0] such that [state = state0], and [intros]ing the
+  arbitrary Prop in question as a hypothesis about [state0].
+*)
+
 Theorem spec_intros : forall `(spec: Specification A T R State)
                        `(p: proc T) `(rec: proc R)
                        `(abs: Abstraction State),
@@ -340,6 +428,14 @@ Ltac spec_case pf :=
   eapply proc_spec_weaken; [ solve [ apply pf ] |
                              unfold spec_impl ].
 
+(** Finally, we prove that our notion of equivalent procedures,
+  [exec_equiv], is actually correct: if [p] and [p'] are equivalent,
+  then they meet the same specifications.
+
+  We will use this next to reason about procedure transformations
+  that shouldn't change the behavior of a procedure.
+ *)
+
 Theorem spec_exec_equiv : forall `(spec: Specification A T R State)
                             (p p': proc T) `(rec: proc R)
                             `(abs: Abstraction State),
@@ -353,6 +449,24 @@ Proof.
   symmetry; auto.
 Qed.
 
+(** ** Reasoning about the [Ret] return operation.
+
+  The simplest procedure we can construct in our model is
+  the return operation, [Ret].  Writing a specification for
+  [Ret] should be intuitively straightforward, but turns out
+  to be slightly complicated by the possibility of crashes.
+  The [rec_noop] definition below captures this notion: a
+  [Ret v] procedure has no precondition, and has a simple
+  postcondition (the state does not change and the return
+  value is [v]), but in case of a crash, the state is wiped
+  according to some [wipe] relation.
+
+  [rec_noop] is a theorem that states that [Ret v] actually
+  meets this specification.  Proving [rec_noop] will be a
+  proof obligation, and boils down to showing that the recovery
+  procedure [rec] corresponds to the wipe relation [wipe].
+ *)
+
 Definition rec_noop `(rec: proc R) `(abs: Abstraction State) (wipe: State -> State -> Prop) :=
   forall T (v:T),
     proc_spec
@@ -363,7 +477,13 @@ Definition rec_noop `(rec: proc R) `(abs: Abstraction State) (wipe: State -> Sta
             recovered := fun _ state' => wipe state state'; |})
       (Ret v) rec abs.
 
-(* for recovery proofs about pure programs *)
+(** A more general lemma about specifications for [Ret], which
+  we will use as part of our proof automation, says
+  that [Ret v] meets a specification [spec] if the [rec_noop]
+  theorem holds (i.e., the recovery procedure is correctly
+  described by a wipe relation [wipe]), and the specification
+  [spec] matches the [wipe] relation:
+ *)
 
 Theorem ret_spec : forall `(abs: Abstraction State)
                      (wipe: State -> State -> Prop)
@@ -372,7 +492,6 @@ Theorem ret_spec : forall `(abs: Abstraction State)
     rec_noop rec abs wipe ->
     (forall a state, pre (spec a state) ->
             post (spec a state) v state /\
-            (* TODO: is it ok for this to be for all state'? *)
             forall state', wipe state state' ->
                   forall r, recovered (spec a state) r state') ->
     proc_spec spec (Ret v) rec abs.
@@ -384,6 +503,21 @@ Proof.
   destruct r; safe_intuition (repeat deex; eauto).
 Qed.
 
+(** ** Proof automation
+
+  We will now define some Ltac tactics to help us prove
+  the correctness of procedures.  We start with a simple
+  tactic that will eliminate unnecessary [Ret] return
+  statements and will re-order semicolons into a consistent
+  order.
+
+  This tactic, [monad_simpl], makes use of the [monad_left_id]
+  and [monad_assoc] theorems to manipulate procedures, simplifying
+  their return statements and semicolons, together with the lemma
+  we proved above, [spec_exec_equiv], about specifications of
+  equivalent procedures.
+ *)
+
 Ltac monad_simpl :=
   repeat match goal with
          | |- proc_spec _ (Bind (Ret _) _) _ _ =>
@@ -392,10 +526,11 @@ Ltac monad_simpl :=
            eapply spec_exec_equiv; [ apply monad_assoc | ]
          end.
 
-(** ** Automation: step_prog
+(** ** step_proc
 
-  To simplify proofs, we automate reasoning about [proc_spec]. Consider a proof
-  for a [proc_spec] about "a ; b". What do we need to prove?
+  To simplify proofs, we automate reasoning about [proc_spec].
+  Consider a proof for a [proc_spec] about "a ; b". What do
+  we need to prove?
 
 <<
       pre                             post
@@ -404,35 +539,46 @@ Ltac monad_simpl :=
      state0 --[a]--> state1 --[b]--> state2
 >>
 
-  We need to find a [proc_spec] for [a] and line up our precondition with that spec's then
-  reduce to proving a [proc_spec] for b, with [a]'s post as the new pre.  Keep
-  doing this repeatedly.
+  We need to find a [proc_spec] for [a] and line up our precondition with
+  that spec's, then reduce to proving a [proc_spec] for b, with [a]'s post
+  as the new pre.  Keep doing this repeatedly.
 
   There are two requirements to make this plan work:
-    - a [proc_spec] for the [a] program
-    - a way to line up our current state precondition with [a]'s [proc_spec] pre
+    - a [proc_spec] for the [a] procedure
+    - a way to line up our current state's precondition with
+      [a]'s [proc_spec] precondition
 
-  This Ltac implements this plan.  It compares Coq's current goal  to:
+  The following Ltac, [step_proc], implements this plan.
+  It compares Coq's current goal to:
 
-  - [forall]: if so, intro the variables, and invoke [step_prog] again
+  - [forall]: if so, intro the variables, and invoke [step_proc] again
 
-  - a proc_spec with a procedure that invokes a [Ret] operation: if so, apply
-    the [ret_spec] theorem to consume the [Ret].
+  - a [proc_spec] with a procedure that invokes a [Ret] operation:
+    if so, apply the [ret_spec] theorem to consume the [Ret].  This
+    will generate some proof obligations, corresponding to the premises
+    of the [ret_spec] theorem.
 
-  - a proc_spec with a procedure that sequences two operations [a] and [b] (with [Bind]): if
-    so, apply the proc_spec_rx theorem to consume the [Bind]. If an "ok" theorem
-    exists for the two operations [a] and [b], then "eauto" will try to apply the two
-    theorems and dismiss the obligrations, if successful.
+  - a [proc_spec] with a procedure that sequences two operations [a] and [b]
+    (with [Bind]): if so, apply the [proc_spec_rx] theorem to consume the
+    [Bind].  This will generate some proof obligations, corresponding to
+    the premises of the [proc_spec_rx] theorem.
 
-  - a proc_spec that is implied by a proc_spec that is in context: if so, apply
-    the [proc_spec_weaken] theorem
+    A common pattern is that we have already proven that [a] already meets
+    some specification.  To automate this case, [step_proc] calls [eauto]
+    to find such a theorem.  We tell Coq about these theorems using
+    [Hint Resolve] statements that you will see throughout our lab code.
 
+    Proving the correctness of the [b] procedure will remain as a proof
+    obligation.
+
+  - a [proc_spec] that is implied by a [proc_spec] that is already in
+    context: if so, apply the [proc_spec_weaken] theorem and try to
+    prove that one spec implies the other.
  *)
 
-
-Ltac step_prog :=
+Ltac step_proc :=
   match goal with
-  | |- forall _, _ => intros; step_prog
+  | |- forall _, _ => intros; step_proc
   | |- proc_spec _ (Ret _) _ _ =>
     eapply ret_spec
   | |- proc_spec _ _ _ _ =>
@@ -445,14 +591,31 @@ Ltac step_prog :=
 
 
 
-(** ** Initialization *)
+(** ** Initialization
 
-(** Initialization can succeed or fail. If it fails, the computer stops. *)
+  Initialization is special because, when the initialization
+  procedure starts running, the system may be in a
+  state that does not correspond to ANY abstract state yet.
+  This means that we will need to write a stylized kind of
+  specification about initialization procedures.
+
+  As a common pattern, initialization can succeed or fail.
+  If it fails, we typically do not promise anything.
+ *)
+
 Inductive InitResult :=
 | Initialized
 | InitFailed.
 
-(** Run a low-level initialization first, followed by higher-level initialization. *)
+(** When we compose multiple layers together, a common pattern
+  that emerges is trying to initialize the lower level first,
+  and then initializing the higher level.  The reason we don't
+  just combine the procedures using semicolon (i.e., [Bind])
+  is that if the lower-level initialization fails, we should
+  return failure right away, instead of continuing to run the
+  higher-level initialization.
+ *)
+
 Definition then_init (init1 init2: proc InitResult) : proc InitResult :=
   r <- init1;
   match r with
@@ -460,9 +623,26 @@ Definition then_init (init1 init2: proc InitResult) : proc InitResult :=
   | Failed => Ret Failed
   end.
 
-Definition inited_any {State} (s : State) : Prop := True.
+(** ** Initialization specs
 
-(** The spec for initialization: *)
+  To specify what it means for the initialization procedure to
+  be correct, it suffices to simply write a predicate describing
+  the initialized states that will be produced by the initialization
+  procedure.  A common description of these states is "any state
+  that satisfies the abstraction relation", which we can define
+  using [inited_any]:
+ *)
+
+Definition inited_any `(s : State) : Prop := True.
+
+(** We define this shorthand for the specification of an initialization
+  procedure.  Given a description of the states that initialization
+  should produce (e.g., [inited_any] above), [init_abstraction] produces
+  a full-fledged pre- and post-condition-style specification, which
+  says that, if initialization returns success, the resulting state
+  is one of the allowed states:
+ *)
+
 Definition init_abstraction
            (init: proc InitResult) (rec: proc unit)
            `(abs: Abstraction State) (init_sem: State -> Prop) :=
@@ -479,9 +659,11 @@ Definition init_abstraction
             fun _ w' => True;
        |}) init rec (IdAbstraction world).
 
+(** Since the [init_abstraction] specification above does not
+  place any requirements in case we crash during initialization,
+  the specific recovery procedure doesn't matter:
+ *)
 
-(** Recovery is irrelevant for initialization: we only consider systems that
-successfully initialize. *)
 Theorem init_abstraction_any_rec : forall (init: proc InitResult)
                                    (rec rec': proc unit)
                                    `(abs: Abstraction State)
@@ -495,7 +677,11 @@ Proof.
   eapply H in H2; eauto.
 Qed.
 
-(** Spec and proof for then_init *)
+(** Finally, we prove a specialized lemma about how to compose
+  two initialization procedures using the [then_init] composition
+  operator defined above:
+ *)
+
 Theorem then_init_compose : forall (init1 init2: proc InitResult)
                               (rec rec': proc unit)
                               `(abs1: Abstraction State1)
@@ -519,7 +705,7 @@ Proof.
   intros.
   eapply init_abstraction_any_rec with rec.
   unfold init_abstraction; intros.
-  step_prog; intuition; simpl in *.
+  step_proc; intuition; simpl in *.
   descend; intuition eauto.
   destruct r.
   - clear H.

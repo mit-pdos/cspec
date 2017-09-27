@@ -32,17 +32,17 @@ Module NBDServer (d : OneDiskAPI).
   Proof.
     induction n; intros.
     - simpl.
-      step_prog; eauto; simpl.
+      step_proc; eauto; simpl.
       intuition eauto.
     - simpl read.
 
-      step_prog; intros.
+      step_proc; intros.
       exists tt; simpl in *; (intuition subst); eauto.
 
-      step_prog; intros.
+      step_proc; intros.
       exists tt; simpl in *; (intuition subst); eauto.
 
-      step_prog; eauto.
+      step_proc; eauto.
       simpl in *; intros.
       rewrite bsplit_bappend. autounfold.
       intuition subst; eauto.
@@ -61,17 +61,17 @@ Module NBDServer (d : OneDiskAPI).
   Proof.
     induction blocks; intros.
     - simpl.
-      step_prog; eauto; simpl.
+      step_proc; eauto; simpl.
       intuition eauto.
       exists 0; simpl; eauto.
 
     - simpl write.
 
-      step_prog; intros.
+      step_proc; intros.
       exists tt; simpl in *; (intuition subst); eauto.
 
       specialize (IHblocks (off + 1)).
-      step_prog; intros.
+      step_proc; intros.
       exists tt; simpl in *; (intuition subst); eauto.
 
       f_equal; omega.

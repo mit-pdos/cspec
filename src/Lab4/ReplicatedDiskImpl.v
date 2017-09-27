@@ -136,7 +136,7 @@ Module ReplicatedDisk (td : TwoDiskAPI) <: OneDiskAPI.
            end.
 
   Ltac step :=
-    step_prog; simplify; finish.
+    step_proc; simplify; finish.
 
   Ltac start := intros;
                 match goal with
@@ -905,7 +905,7 @@ Module ReplicatedDisk (td : TwoDiskAPI) <: OneDiskAPI.
   Qed.
 
   Theorem Recover_ok :
-    prog_loopspec
+    proc_loopspec
       Recover_spec
       (Recover)
       td.recover
