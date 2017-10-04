@@ -18,6 +18,7 @@ Module RemappedDisk (bd : BadBlockAPI) <: OneDiskAPI.
       Ret r.
 
   Definition write (a : addr) (b : block) : proc unit :=
+    (* SOL *)
     len <- bd.size;
     if a == (len-1) then
       Ret tt
@@ -28,7 +29,9 @@ Module RemappedDisk (bd : BadBlockAPI) <: OneDiskAPI.
         Ret tt
       else
         _ <- bd.write a b;
-        Ret tt.
+      Ret tt.
+    (* END *)
+    (* STUB: Ret tt. *)
 
   Definition size : proc nat :=
     len <- bd.size;
@@ -81,7 +84,8 @@ Module RemappedDisk (bd : BadBlockAPI) <: OneDiskAPI.
   Example abst_1_ok : remapped_abstraction
                          (BadBlockAPI.mkState [block1;block0] 0) [block0].
   Proof.
-    constructor; try auto.
+    constructor; auto.
+    (* SOL *)
     simpl. intros.
     - destruct (lt_dec a 2).
       omega.
@@ -89,11 +93,14 @@ Module RemappedDisk (bd : BadBlockAPI) <: OneDiskAPI.
       rewrite disk_oob_eq; auto.
     - simpl. omega.
   Qed.
+    (* END *)
+    (* STUB: Admitted. *)
 
   Example abst_2_ok : remapped_abstraction
                          (BadBlockAPI.mkState [block1;block0;block0] 0) [block0;block0].
   Proof.
-    constructor; try auto.
+    constructor; auto.
+    (* SOL *)
     simpl. intros.
     - destruct (Nat.eq_dec a 1).
       +  subst. simpl. reflexivity.
@@ -103,32 +110,42 @@ Module RemappedDisk (bd : BadBlockAPI) <: OneDiskAPI.
         rewrite disk_oob_eq; auto.
     - simpl. omega.
   Qed.
+    (* END *)
+    (* STUB: Admitted. *)
 
   Example abst_3_ok : remapped_abstraction
                          (BadBlockAPI.mkState [block0;block0] 1) [block0].
   Proof.
-    constructor; try auto; simpl; intros.
+    constructor; auto.
+    (* SOL *)
+    all: simpl; intros.
     - intuition.
       destruct a; simpl; auto.
       destruct a; simpl; try omega.
       destruct a; simpl; eauto.
     - congruence.
   Qed.
+    (* END *)
+    (* STUB: Admitted. *)
 
   Example abst_4_nok : ~ remapped_abstraction
                          (BadBlockAPI.mkState [block0;block0] 5) [block0].
   Proof.
     intro.
     inversion H; simpl in *.
+    (* SOL *)
     subst_var.
     omega.
   Qed.
+    (* END *)
+    (* STUB: Admitted. *)
 
   Example abst_5_nok : ~ remapped_abstraction
                          (BadBlockAPI.mkState [block1;block1] 0) [block0].
   Proof.
     intro.
     inversion H; simpl in *.
+    (* SOL *)
     subst_var.
     especialize Hremap.
     inversion Hremap.
@@ -137,6 +154,8 @@ Module RemappedDisk (bd : BadBlockAPI) <: OneDiskAPI.
     Unshelve.
     congruence.
   Qed.
+    (* END *)
+    (* STUB: Admitted. *)
 
 
   Ltac invert_abstraction :=
@@ -148,10 +167,9 @@ Module RemappedDisk (bd : BadBlockAPI) <: OneDiskAPI.
   Theorem init_ok : init_abstraction init recover abstr inited_any.
   Proof.
     eapply then_init_compose; eauto.
-
     step_proc; intros.
     exists tt; simpl; intuition idtac.
-
+    (* SOL *)
     destruct (r == 0).
     step_proc; intros; eauto.
 
@@ -176,6 +194,9 @@ Module RemappedDisk (bd : BadBlockAPI) <: OneDiskAPI.
     rewrite diskShrink_size; omega.
     omega.
   Qed.
+    (* END *)
+    (* STUB: Admitted. *)
+
 
   Theorem read_ok : forall a, proc_spec (OneDiskAPI.read_spec a) (read a) recover abstr.
   Proof.
@@ -183,13 +204,14 @@ Module RemappedDisk (bd : BadBlockAPI) <: OneDiskAPI.
     intros.
 
     apply spec_abstraction_compose; simpl.
-
     step_proc; intros.
     destruct a'; simpl in *; intuition idtac.
     exists tt; simpl; intuition idtac.
     2: autounfold in *; simpl in *; intuition subst; eauto.
 
     destruct (a == r).
+    (* SOL *)
+
     - step_proc; intros.
       exists tt; simpl; intuition idtac.
       2: autounfold in *; simpl in *; intuition subst; eauto.
@@ -234,6 +256,9 @@ Module RemappedDisk (bd : BadBlockAPI) <: OneDiskAPI.
       + rewrite disk_oob_eq by omega. constructor.
       + rewrite <- Hgoodsec; auto.
   Qed.
+    (* END *)
+    (* STUB: Admitted. *)
+
 
   Theorem remapped_abstraction_diskUpd_remap : forall state s v,
     remapped_abstraction state s ->
@@ -241,6 +266,7 @@ Module RemappedDisk (bd : BadBlockAPI) <: OneDiskAPI.
       (diskUpd (stateDisk state) (diskSize (stateDisk state) - 1) v)
       (stateBadBlock state)) (diskUpd s (stateBadBlock state) v).
   Proof.
+    (* SOL *)
     intros.
     invert_abstraction.
     rewrite Hsize. replace (diskSize s + 1 - 1) with (diskSize s) by omega.
@@ -250,6 +276,9 @@ Module RemappedDisk (bd : BadBlockAPI) <: OneDiskAPI.
     repeat rewrite diskUpd_neq by omega. eauto.
     repeat rewrite diskUpd_eq by omega; auto.
   Qed.
+    (* END *)
+    (* STUB: Admitted. *)
+
 
   Theorem remapped_abstraction_diskUpd_noremap : forall state s a v,
     remapped_abstraction state s ->
@@ -259,6 +288,7 @@ Module RemappedDisk (bd : BadBlockAPI) <: OneDiskAPI.
       (diskUpd (stateDisk state) a v)
       (stateBadBlock state)) (diskUpd s a v).
   Proof.
+    (* SOL *)
     intros.
     invert_abstraction.
     constructor; simpl.
@@ -273,6 +303,8 @@ Module RemappedDisk (bd : BadBlockAPI) <: OneDiskAPI.
 
     repeat rewrite diskUpd_neq by omega. eauto.
   Qed.
+    (* END *)
+    (* STUB: Admitted. *)
 
   Hint Resolve remapped_abstraction_diskUpd_remap.
   Hint Resolve remapped_abstraction_diskUpd_noremap.
@@ -290,6 +322,8 @@ Module RemappedDisk (bd : BadBlockAPI) <: OneDiskAPI.
     2: autounfold in *; simpl in *; intuition subst; eauto.
 
     destruct (a == r-1); subst.
+    (* SOL *)
+    
     - step_proc; intros.
       eauto.
 
@@ -333,6 +367,8 @@ Module RemappedDisk (bd : BadBlockAPI) <: OneDiskAPI.
         2: autounfold in *; simpl in *; intuition subst; eauto.
         eauto.
   Qed.
+    (* END *)
+    (* STUB: Admitted. *)
 
   Theorem size_ok : proc_spec OneDiskAPI.size_spec size recover abstr.
   Proof.
@@ -345,6 +381,7 @@ Module RemappedDisk (bd : BadBlockAPI) <: OneDiskAPI.
     destruct a'; simpl in *; intuition idtac.
     exists tt; simpl; intuition idtac.
     2: autounfold in *; simpl in *; intuition subst; eauto.
+    (* SOL *)
 
     step_proc; intros.
     eauto.
@@ -358,7 +395,10 @@ Module RemappedDisk (bd : BadBlockAPI) <: OneDiskAPI.
     invert_abstraction.
     omega.
   Qed.
+    (* END *)
+    (* STUB: Admitted. *)
 
+  (* This proof proves that recovery corresponds to no_wipe. *)
   Theorem recover_noop : rec_noop recover abstr no_wipe.
   Proof.
     unfold rec_noop.
