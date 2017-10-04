@@ -315,14 +315,15 @@ Module RemappedDisk (bd : BadBlockAPI) <: OneDiskAPI.
     intros.
 
     apply spec_abstraction_compose; simpl.
-
+    (* SOL *)
+    
     step_proc; intros.
     destruct a'; simpl in *; intuition idtac.
     exists tt; simpl; intuition idtac.
     2: autounfold in *; simpl in *; intuition subst; eauto.
 
     destruct (a == r-1); subst.
-    (* SOL *)
+
     
     - step_proc; intros.
       eauto.
