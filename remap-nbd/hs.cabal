@@ -10,4 +10,22 @@ executable remap-nbd
                        directory, unix, unix-bytestring, cereal,
                        cereal-conduit, conduit-extra, conduit-combinators,
                        optparse-applicative
+  other-modules:       Abstraction
+                     , BadBlockAPI
+                     , BadBlockDisk.Env
+                     , BadBlockDisk.Ops
+                     , BadBlockImpl
+                     , Disk
+                     , Helpers
+                     , Nat
+                     , NbdAPI
+                     , NbdImpl
+                     , NbdServer
+                     , Network.NBD
+                     , Network.NBD.Data
+                     , Network.ServerOps
+                     , OneDiskAPI
+                     , Proc
+                     , RemappedServer
+                     , Utils.Conversion
   default-language:    Haskell2010

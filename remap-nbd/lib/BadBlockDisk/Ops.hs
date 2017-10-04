@@ -1,7 +1,6 @@
 {-# LANGUAGE PackageImports #-}
 module BadBlockDisk.Ops where
 
-import                   Control.Monad (void)
 import                   Control.Monad.Reader (reader, liftIO)
 import qualified         Data.ByteString as BS
 import qualified         Data.Char
@@ -9,14 +8,11 @@ import                   BadBlockDisk.Env
 import                   Disk
 import                   System.IO (SeekMode(..))
 import "unix-bytestring" System.Posix.IO.ByteString
-import                   System.Posix.Types (Fd)
-import                   System.Posix.Unistd (fileSynchronise)
 import                   Utils.Conversion
 import                   Abstraction
 
 init :: Proc InitResult
-init = do
-  return Initialized
+init = return Initialized
 
 read :: Coq_addr -> Proc BS.ByteString
 read a = do
@@ -30,10 +26,10 @@ read a = do
 write :: Coq_addr -> BS.ByteString -> Proc ()
 write a b = do
   fd <- reader diskHandle
-  liftIO $ fdPwrite fd b (fromIntegral $ addrToOffset a)
+  _ <- liftIO $ fdPwrite fd b (fromIntegral $ addrToOffset a)
   return ()
 
--- |implementation of two disk DiskSize operation - note that this size is
+-- |implementation of bad disk DiskSize operation - note that this size is
 -- reported to Coq in blocks
 size :: Proc Integer
 size = do
@@ -42,10 +38,7 @@ size = do
   return (fromIntegral off `div` blocksize)
 
 getBadBlock :: Proc Integer
-getBadBlock = do
-  bs <- reader badBlock
-  return bs
+getBadBlock = reader badBlock
 
 recover :: Proc ()
-recover = do
-  return ()
+recover = return ()

@@ -2,7 +2,7 @@
 {-# LANGUAGE RecordWildCards #-}
 module Main where
 
-import Control.Monad (when, forM_)
+import Control.Monad (when)
 import Data.Semigroup ((<>))
 import Network.NBD (runServer, initServer, ServerOptions (..))
 import Options.Applicative
@@ -18,7 +18,7 @@ data Options = Start ServerOptions
              | Init InitOptions
 
 parseDiskPath :: Parser FilePath
-parseDiskPath = argument str (metavar "FILE0") <|> pure ("disk.img")
+parseDiskPath = argument str (metavar "FILE0") <|> pure "disk.img"
 
 parseBadBlock :: Parser Integer
 parseBadBlock = argument auto (metavar "BADBLOCK") <|> pure 1
@@ -45,7 +45,7 @@ initOptions = do
   pure InitOptions {..}
 
 diskDefaultMessage :: String
-diskDefaultMessage = "disks default to disk0.img and disk1.img if not provided"
+diskDefaultMessage = "disk defaults to disk0.img"
 
 options :: Parser Options
 options = hsubparser
@@ -62,7 +62,7 @@ main = execParser opts >>= run
   where
     opts = info (options <**> helper)
       (fullDesc
-       <> progDesc "an nbd server that remaps bad block; COMMAND is either init or start"
+       <> progDesc "an nbd server that remaps a bad block; COMMAND is either init or start"
        <> header "remap-nbd - remapping network block device"
        )
 
