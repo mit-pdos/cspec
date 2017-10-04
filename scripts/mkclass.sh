@@ -11,13 +11,13 @@ umask 2
 CLASSREPO=git@github.com:mit-pdos/6.826-2017-labs
 
 # include only these src/ directories 
-SRCS="src/Helpers src/Spec src/Lab1"
+SRCS="src/Helpers src/Spec src/Lab1 src/Common src/Lab2"
 
 # files/directories to copy
-TOPLEVELS="README.md LICENSE _CoqProject .gitignore scripts/add-preprocess.sh src/POCS.v statdb-cli"
+TOPLEVELS="README.md LICENSE _CoqProject .gitignore scripts/add-preprocess.sh src/POCS.v statdb-cli remap-nbd"
 
 # current Makefile
-MAKEFILE_NAME=Makefile.lab1
+MAKEFILE_NAME=Makefile.lab2
 
 SD=$(cd $(dirname $0)/.. && /bin/pwd)
 CD=/tmp/pocs.$$
