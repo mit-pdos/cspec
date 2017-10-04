@@ -551,8 +551,6 @@ Ltac monad_simpl :=
   The following Ltac, [step_proc], implements this plan.
   It compares Coq's current goal to:
 
-  - [forall]: if so, intro the variables, and invoke [step_proc] again
-
   - a [proc_spec] with a procedure that invokes a [Ret] operation:
     if so, apply the [ret_spec] theorem to consume the [Ret].  This
     will generate some proof obligations, corresponding to the premises
@@ -577,8 +575,8 @@ Ltac monad_simpl :=
  *)
 
 Ltac step_proc :=
+  intros;
   match goal with
-  | |- forall _, _ => intros; step_proc
   | |- proc_spec _ (Ret _) _ _ =>
     eapply ret_spec
   | |- proc_spec _ _ _ _ =>
@@ -587,9 +585,19 @@ Ltac step_proc :=
   | [ H: proc_spec _ ?p _ _
       |- proc_spec _ ?p _ _ ] =>
     eapply proc_spec_weaken; [ eapply H | unfold spec_impl ]
-  end.
-
-
+  end;
+  intros; simpl;
+  cbn [pre post recovered] in *;
+  repeat match goal with
+         | [ H: _ /\ _ |- _ ] => destruct H
+         | [ |- rec_noop _ _ _ ] => eauto
+         | [ |- forall _, _ ] => intros
+         | [ |- exists (_:unit), _ ] => exists tt
+         | [ |- _ /\ _ ] => split; [ solve [ trivial ] | ]
+         | [ |- _ /\ _ ] => split; [ | solve [ trivial ] ]
+         | _ => solve [ trivial ]
+         | _ => progress subst
+         end.
 
 (** ** Initialization
 
