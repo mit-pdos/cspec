@@ -85,15 +85,15 @@ Module StatDB (v : VarsAPI) <: StatDbAPI.
     eapply then_init_compose; eauto.
     unfold init'.
 
-    step_proc; intros.
+    step_proc_basic; intros.
     exists tt.
     simpl; intuition idtac.
 
-    step_proc; intros.
+    step_proc_basic; intros.
     exists tt.
     simpl; intuition idtac.
 
-    step_proc; intros.
+    step_proc_basic; intros.
     eauto.
 
     simpl in *; intuition subst.
@@ -110,20 +110,20 @@ Module StatDB (v : VarsAPI) <: StatDbAPI.
 
     apply spec_abstraction_compose; simpl.
   (* SOL *)
-    step_proc; intros.
+    step_proc_basic; intros.
     destruct a'; simpl in *; intuition idtac.
     exists tt; simpl; intuition idtac.
 
-    step_proc; intros.
+    step_proc_basic; intros.
     exists tt; simpl; intuition idtac.
 
-    step_proc; intros.
+    step_proc_basic; intros.
     exists tt; simpl; intuition idtac.
 
-    step_proc; intros.
+    step_proc_basic; intros.
     exists tt; simpl; intuition idtac.
 
-    step_proc; intros.
+    step_proc_basic; intros.
     eauto.
 
     simpl in *; intuition subst.
@@ -146,13 +146,13 @@ Module StatDB (v : VarsAPI) <: StatDbAPI.
     apply spec_abstraction_compose; simpl.
 
   (* SOL *)
-    step_proc; intros.
+    step_proc_basic; intros.
     destruct a'; simpl in *; intuition idtac.
     exists tt; simpl; intuition idtac.
 
     destruct (r == 0).
 
-    - step_proc; intros.
+    - step_proc_basic; intros.
       eauto.
 
       simpl in *; intuition subst.
@@ -162,10 +162,10 @@ Module StatDB (v : VarsAPI) <: StatDbAPI.
       destruct s; intuition; simpl in *; try congruence.
       exists nil; intuition auto.
 
-    - step_proc; intros.
+    - step_proc_basic; intros.
       exists tt; simpl; intuition idtac.
 
-      step_proc; intros.
+      step_proc_basic; intros.
       eauto.
 
       simpl in *; intuition subst.
@@ -188,7 +188,7 @@ Module StatDB (v : VarsAPI) <: StatDbAPI.
     intros.
 
     apply spec_abstraction_compose; simpl.
-    step_proc; intros.
+    step_proc_basic; intros.
     eauto.
 
     destruct a; simpl in *.

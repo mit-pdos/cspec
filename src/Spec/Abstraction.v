@@ -574,6 +574,19 @@ Ltac monad_simpl :=
     prove that one spec implies the other.
  *)
 
+Ltac step_proc_basic :=
+  match goal with
+  | |- forall _, _ => intros; step_proc_basic
+  | |- proc_spec _ (Ret _) _ _ =>
+    eapply ret_spec
+  | |- proc_spec _ _ _ _ =>
+    monad_simpl;
+    eapply proc_spec_rx; [ solve [ eauto ] | ]
+  | [ H: proc_spec _ ?p _ _
+      |- proc_spec _ ?p _ _ ] =>
+    eapply proc_spec_weaken; [ eapply H | unfold spec_impl ]
+  end.
+
 Ltac step_proc :=
   intros;
   match goal with
@@ -597,6 +610,7 @@ Ltac step_proc :=
          | [ |- _ /\ _ ] => split; [ | solve [ trivial ] ]
          | _ => solve [ trivial ]
          | _ => progress subst
+         | _ => progress autounfold in *
          end.
 
 (** ** Initialization
