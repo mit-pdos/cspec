@@ -11,7 +11,7 @@ Definition read_spec a : Specification _ block unit State :=
     pre := True;
     post := fun r state' =>
       state' = state /\
-      diskGet (stateDisk state) a ?|= eq r;
+      a <> stateBadBlock state -> diskGet (stateDisk state) a ?|= eq r;
     recovered := fun _ state' => state' = state
   |}.
 
