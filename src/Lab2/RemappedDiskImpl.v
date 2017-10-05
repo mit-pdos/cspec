@@ -60,7 +60,7 @@ Module RemappedDisk (bd : BadBlockAPI) <: OneDiskAPI.
       let bs_addr := stateBadBlock bs_state in
       forall
         (* Fill in the rest of your abstraction here. *)
-        (* Hint 0: Try to prove [Read]'s correctness to discover what you need from this abstraction *)
+        (* Hint 0: Try to prove [read_ok] to discover what you need from this abstraction *)
         (* Hint 1: What should be true about the non-bad blocks?   Replace [True] with what needs to be true *)
         (Hgoodblocks : True)
         (* Hint 2: What should be true about the bad block? *)
@@ -68,8 +68,8 @@ Module RemappedDisk (bd : BadBlockAPI) <: OneDiskAPI.
         (* Hint 3: What if the bad block address is the last address? *)
         (Hbadlast : True)
         (* Hint 4: What if the bad block address is past the end of the disk? *)
-        (* Hint 5: To refer to the contents of disk [d] at address [a], you can write [d a] *)
-        (* Hint 6: To refer to the size of disk [d], you can write [size d] *)
+        (* Hint 5: To refer to the contents of disk [d] at address [a], you can write [diskGet a] *)
+        (* Hint 6: To refer to the size of disk [d], you can write [diskSize d] *)
         (* SOL *)
         (Hgoodsec : forall a, a <> bs_addr /\ a <> diskSize rd_disk -> diskGet bs_disk a = diskGet rd_disk a)
         (Hremap : bs_addr <> diskSize rd_disk -> diskGet bs_disk (diskSize rd_disk) = diskGet rd_disk bs_addr)
