@@ -9,12 +9,12 @@ Module RemappedDisk (bd : BadBlockAPI) <: OneDiskAPI.
 
   Definition read (a : addr) : proc block :=
     bs <- bd.getBadBlock;
-    if a == bs then
-      len <- bd.size;
-      r <- bd.read (len-1);
-      Ret r
-    else
-      r <- bd.read a;
+      if a == bs then
+        len <- bd.size;
+          r <- bd.read (len-1);
+          Ret r
+      else
+        r <- bd.read a;
       Ret r.
 
   Definition write (a : addr) (b : block) : proc unit :=
@@ -26,12 +26,12 @@ Module RemappedDisk (bd : BadBlockAPI) <: OneDiskAPI.
       bs <- bd.getBadBlock;
       if a == bs then
         _ <- bd.write (len-1) b;
-        Ret tt
+          Ret tt
       else
         _ <- bd.write a b;
-      Ret tt.
-    (* END *)
-    (* STUB: Ret tt. *)
+        Ret tt.
+      (* END *)
+      (* STUB: Ret tt. *)
 
   Definition size : proc nat :=
     len <- bd.size;
@@ -91,7 +91,7 @@ Module RemappedDisk (bd : BadBlockAPI) <: OneDiskAPI.
       omega.
       rewrite disk_oob_eq; auto.
       rewrite disk_oob_eq; auto.
-    - simpl. omega.
+    - simpl; omega.
   Qed.
     (* END *)
     (* STUB: Admitted. *)
@@ -118,12 +118,14 @@ Module RemappedDisk (bd : BadBlockAPI) <: OneDiskAPI.
   Proof.
     constructor; auto.
     (* SOL *)
-    all: simpl; intros.
-    - intuition.
-      destruct a; simpl; auto.
-      destruct a; simpl; try omega.
-      destruct a; simpl; eauto.
-    - congruence.
+    simpl. intros.
+    - destruct (Nat.eq_dec a 1).
+      + subst; intuition.
+      + destruct a; simpl; intuition.
+        destruct a; simpl; intuition.
+        rewrite disk_oob_eq; auto.
+        simpl; omega.
+    - simpl. omega.
   Qed.
     (* END *)
     (* STUB: Admitted. *)
@@ -147,52 +149,46 @@ Module RemappedDisk (bd : BadBlockAPI) <: OneDiskAPI.
     inversion H; simpl in *.
     (* SOL *)
     subst_var.
-    especialize Hremap.
+    unshelve especialize Hremap; eauto.
     inversion Hremap.
-    apply block0_block1_differ; eauto.
-
-    Unshelve.
-    congruence.
+    unshelve apply block0_block1_differ; eauto.
   Qed.
     (* END *)
     (* STUB: Admitted. *)
 
-
+  (* Due to how remapped_abstraction is defined (as an inductive), it cannot be
+  unfolded. This tactic identifies abstraction relations in the hypotheses and
+  breaks them apart with [inversion], and also does some cleanup. *)
   Ltac invert_abstraction :=
     match goal with
-    | H : remapped_abstraction _ _ |- _ => inversion H; clear H; subst_var; simpl in *
+    | H : remapped_abstraction _ _ |- _ => inversion H; clear H; subst; subst_var
     end.
-
 
   Theorem init_ok : init_abstraction init recover abstr inited_any.
   Proof.
     eapply then_init_compose; eauto.
-    step_proc; intros.
-    exists tt; simpl; intuition idtac.
+    step_proc.
     (* SOL *)
     destruct (r == 0).
-    step_proc; intros; eauto.
+    step_proc.
+    step_proc.
 
-    step_proc; intros.
-    exists tt; simpl; intuition idtac.
-
-    destruct (lt_dec r0 r).
-    all: step_proc; intros; eauto.
-
-    simpl in *; intuition subst.
+    destruct (lt_dec r0 (diskSize (stateDisk state))).
+    step_proc.
 
     case_eq (diskGet (stateDisk state) (diskSize (stateDisk state) - 1)); intros.
-    2: exfalso; eapply disk_inbounds_not_none; [ | eauto ]; omega.
+    { exists (diskUpd (diskShrink (stateDisk state)) (stateBadBlock state) b).
+      unfold inited_any. (intuition idtac); auto; intros; autorewrite with upd in *; intuition idtac.
+      rewrite diskUpd_neq by omega.
+      rewrite diskShrink_preserves; auto.
+      rewrite diskShrink_size; omega.
+      rewrite diskUpd_eq; auto.
+      rewrite diskShrink_size; omega.
+      omega.
+    }
+    { exfalso; eapply disk_inbounds_not_none; [ | eauto ]; omega. }
 
-    exists (diskUpd (diskShrink (stateDisk state)) (stateBadBlock state) b).
-    unfold inited_any. (intuition idtac); auto; intros; autorewrite with upd in *; intuition idtac.
-    rewrite diskUpd_neq by omega.
-    rewrite diskShrink_preserves; auto.
-    rewrite diskShrink_size; omega.
-
-    rewrite diskUpd_eq; auto.
-    rewrite diskShrink_size; omega.
-    omega.
+    step_proc.
   Qed.
     (* END *)
     (* STUB: Admitted. *)
@@ -206,55 +202,34 @@ Module RemappedDisk (bd : BadBlockAPI) <: OneDiskAPI.
     apply spec_abstraction_compose; simpl.
     step_proc; intros.
     destruct a'; simpl in *; intuition idtac.
-    exists tt; simpl; intuition idtac.
-    2: autounfold in *; simpl in *; intuition subst; eauto.
 
     destruct (a == r).
     (* SOL *)
 
-    - step_proc; intros.
-      exists tt; simpl; intuition idtac.
-      2: autounfold in *; simpl in *; intuition subst; eauto.
+    - invert_abstraction.
+      step_proc; intuition idtac.
+      step_proc; intuition idtac.
+      step_proc; intuition idtac.
 
-      step_proc; intros.
-      exists tt; simpl; intuition idtac.
-      2: autounfold in *; simpl in *; intuition subst; eauto.
+      * replace (diskSize (stateDisk state) - 1) with (diskSize s) in * by omega.
+        exists s; intuition; intuition.
+        destruct (stateBadBlock state == diskSize s).
+        rewrite disk_oob_eq by omega; auto.
+        rewrite <- Hremap by omega; auto.
+      * subst; eexists; (intuition eauto); (intuition eauto).
+      * subst; eexists; (intuition eauto); (intuition eauto).
+      * subst; eexists; (intuition eauto); (intuition eauto).
+    - invert_abstraction.
+      step_proc; intuition idtac.
+      step_proc; intuition idtac.
+      exists s; (intuition eauto); (intuition eauto).
+      destruct (a == diskSize s); subst.
+      rewrite disk_oob_eq by omega; auto.
+      rewrite <- Hgoodsec; auto.
 
-      step_proc; intros.
-      eauto.
-
-      simpl in *; intuition subst.
-      2: autounfold in *; simpl in *; intuition subst; eauto.
-
-      exists s. split. split. auto.
-      2: auto.
-
-      invert_abstraction.
-      rewrite Hsize in H7.
-      replace (diskSize s + 1 - 1) with (diskSize s) in * by omega.
-
-      destruct (stateBadBlock state == diskSize s).
-      + rewrite disk_oob_eq by omega. constructor.
-      + rewrite <- Hremap; auto.
-
-    - step_proc; intros.
-      exists tt; simpl; intuition idtac.
-      2: autounfold in *; simpl in *; intuition subst; eauto.
-
-      step_proc; intros.
-      eauto.
-
-      simpl in *; intuition subst.
-      2: autounfold in *; simpl in *; intuition subst; eauto.
-
-      exists s. split. split. auto.
-      2: auto.
-
-      invert_abstraction.
-
-      destruct (a == diskSize s).
-      + rewrite disk_oob_eq by omega. constructor.
-      + rewrite <- Hgoodsec; auto.
+      subst; eexists; (intuition eauto); (intuition eauto).
+      subst; eexists; (intuition eauto); (intuition eauto).
+    - subst; eauto.
   Qed.
     (* END *)
     (* STUB: Admitted. *)
@@ -318,55 +293,25 @@ Module RemappedDisk (bd : BadBlockAPI) <: OneDiskAPI.
     (* SOL *)
     
     step_proc; intros.
-    destruct a'; simpl in *; intuition idtac.
-    exists tt; simpl; intuition idtac.
-    2: autounfold in *; simpl in *; intuition subst; eauto.
+    destruct a'; simpl in *; intuition (subst; eauto).
 
     destruct (a == r-1); subst.
 
-    
-    - step_proc; intros.
-      eauto.
-
-      simpl in *; intuition subst.
-      2: autounfold in *; simpl in *; intuition subst; eauto.
-
-      exists s. split. split. auto.
-      2: auto.
-
+    - step_proc; intuition subst.
+      eexists; split; eauto.
       rewrite diskUpd_oob_noop; auto.
-      invert_abstraction.
-      omega.
+      invert_abstraction; omega.
 
-    - step_proc; intros.
-      exists tt; simpl; intuition idtac.
-      2: autounfold in *; simpl in *; intuition subst; eauto.
+      eexists; split; eauto.
+      rewrite diskUpd_oob_noop; auto.
+      invert_abstraction; omega.
+    - step_proc; intuition (subst; eauto).
+      destruct (a == r); subst; eauto.
 
-      destruct (a == r0).
-      + step_proc; intros.
-        exists tt; simpl; intuition idtac.
-        2: autounfold in *; simpl in *; intuition subst; eauto.
-        2: autounfold in *; simpl in *; intuition subst; eauto.
-
-        step_proc; intros.
-        eauto.
-
-        simpl in *; intuition subst.
-        2: autounfold in *; simpl in *; intuition subst; eauto.
-
-        eauto.
-
-      + step_proc; intros.
-        exists tt; simpl; intuition idtac.
-        2: autounfold in *; simpl in *; intuition subst; eauto.
-        2: autounfold in *; simpl in *; intuition subst; eauto.
-
-        step_proc; intros.
-        eauto.
-
-        simpl in *; intuition subst.
-        2: autounfold in *; simpl in *; intuition subst; eauto.
-        eauto.
+      step_proc; intuition (subst; eauto).
+      step_proc; intuition (subst; eauto).
+      step_proc; intuition (subst; eauto).
+      step_proc; intuition (subst; eauto).
   Qed.
     (* END *)
     (* STUB: Admitted. *)
@@ -378,23 +323,15 @@ Module RemappedDisk (bd : BadBlockAPI) <: OneDiskAPI.
 
     apply spec_abstraction_compose; simpl.
 
-    step_proc; intros.
-    destruct a'; simpl in *; intuition idtac.
-    exists tt; simpl; intuition idtac.
-    2: autounfold in *; simpl in *; intuition subst; eauto.
+    step_proc.
+    destruct a'; simpl in *; intuition (subst; eauto).
     (* SOL *)
 
-    step_proc; intros.
-    eauto.
-
-    simpl in *; intuition subst.
-    2: autounfold in *; simpl in *; intuition subst; eauto.
-
-    exists s. split. split. auto.
-    2: auto.
-
-    invert_abstraction.
-    omega.
+    step_proc.
+    intuition (subst; eauto).
+    exists s; split; auto.
+    split; auto.
+    invert_abstraction; omega.
   Qed.
     (* END *)
     (* STUB: Admitted. *)
