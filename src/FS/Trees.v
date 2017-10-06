@@ -58,11 +58,38 @@ Inductive path_evaluates : forall (fs : FS) (start : Node) (pn : Pathname) (targ
 Definition path_eval_root (fs : FS) (pn : Pathname) (target : Node) : Prop :=
   path_evaluates fs (DirNode (FSRoot fs)) pn target.
 
+
+(** Largely boilerplate helpers *)
+
 Hint Constructors valid_link.
 Hint Constructors path_evaluates.
 Hint Resolve in_eq.
 Hint Resolve in_cons.
 Hint Extern 1 (In _ _) => compute.
+
+Instance Node_equal_dec : EqualDec Node.
+  unfold EqualDec; intros.
+  destruct x, y; try (right; congruence).
+  destruct (eq_nat_dec dirnum dirnum0); subst; eauto.
+    right; congruence.
+  destruct (eq_nat_dec filenum filenum0); subst; eauto.
+    right; congruence.
+  destruct (list_eq_dec string_dec target target0); subst; eauto.
+    right; congruence.
+Defined.
+
+Instance Link_equal_dec : EqualDec Link.
+  unfold EqualDec; intros.
+  destruct x, y.
+  destruct (eq_nat_dec LinkFrom0 LinkFrom1); subst.
+  destruct (Node_equal_dec LinkTo0 LinkTo1); subst.
+  destruct (string_dec LinkName0 LinkName1); subst.
+  eauto.
+  right; congruence.
+  right; congruence.
+  right; congruence.
+Defined.
+
 
 
 Definition example_fs := mkFS 1
@@ -113,28 +140,26 @@ Proof.
 Qed.
 
 
-Instance Node_equal_dec : EqualDec Node.
-  unfold EqualDec; intros.
-  destruct x, y; try (right; congruence).
-  destruct (eq_nat_dec dirnum dirnum0); subst; eauto.
-    right; congruence.
-  destruct (eq_nat_dec filenum filenum0); subst; eauto.
-    right; congruence.
-  destruct (list_eq_dec string_dec target target0); subst; eauto.
-    right; congruence.
-Defined.
+Hint Extern 1 False =>
+  match goal with
+  | H : {| LinkFrom := ?a; LinkTo := ?b; LinkName := ?c |} =
+        {| LinkFrom := ?d; LinkTo := ?e; LinkName := ?f |} |- _ =>
+    destruct (Link_equal_dec (mkLink a b c) (mkLink d e f)); try congruence
+  end.
 
-Instance Link_equal_dec : EqualDec Link.
-  unfold EqualDec; intros.
-  destruct x, y.
-  destruct (eq_nat_dec LinkFrom0 LinkFrom1); subst.
-  destruct (Node_equal_dec LinkTo0 LinkTo1); subst.
-  destruct (string_dec LinkName0 LinkName1); subst.
-  eauto.
-  right; congruence.
-  right; congruence.
-  right; congruence.
-Defined.
+
+Theorem no_usr : ~ exists node,
+  path_eval_root example_fs ["usr"] node.
+Proof.
+  unfold path_eval_root.
+  compute.
+
+  intro; deex.
+  inversion H; clear H; subst.
+  inversion H4; clear H4; subst.
+  compute in *. intuition.
+  compute in *. intuition.
+Qed.
 
 
 Definition tree_transform := Graph -> Graph.
@@ -200,4 +225,19 @@ Theorem tmp_root_tmp2_foo_passwd_concur_after :
 Proof.
   unfold path_eval_root.
   eauto 100.
+Qed.
+
+Theorem no_tmp_root_tmp2_foo_passwd_concur_after : ~ exists node,
+  path_eval_root
+  (apply_concurrent_all example_fs rename_example)
+  ["tmp"; "root"; "tmp2"; "foo"; "passwd"] node.
+Proof.
+  unfold path_eval_root.
+  compute.
+
+  intro; deex.
+  inversion H; clear H; subst.
+  inversion H4; clear H4; subst.
+  compute in *. intuition.
+  compute in *. intuition.
 Qed.
