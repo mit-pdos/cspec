@@ -62,11 +62,9 @@ Module AtomicPair (d : OneDiskAPI) <: AtomicPairAPI.
     eapply then_init_compose; eauto.
 
     step_proc; intros.
-    exists tt; simpl; intuition idtac.
 
     destruct (r == 5).
     - step_proc; intros.
-      exists tt; simpl; intuition idtac.
 
       step_proc; intros.
       eauto.
@@ -82,9 +80,6 @@ Module AtomicPair (d : OneDiskAPI) <: AtomicPairAPI.
       intuition auto.
 
     - step_proc; intros.
-      eauto.
-
-      simpl in *; intuition subst.
   Qed.
 
   Theorem get_ok : proc_spec get_spec get recover abstr.
@@ -96,16 +91,15 @@ Module AtomicPair (d : OneDiskAPI) <: AtomicPairAPI.
 
     step_proc; intros.
     destruct a'; simpl in *; intuition idtac.
-    exists tt; simpl; intuition idtac.
     2: autounfold in *; simpl in *; intuition subst; eauto.
 
     destruct (r == block0).
     - step_proc; intros.
-      exists tt; simpl; intuition idtac.
+      simpl; intuition idtac.
       2: autounfold in *; simpl in *; intuition subst; eauto.
 
       step_proc; intros.
-      exists tt; simpl; intuition idtac.
+      simpl; intuition idtac.
       2: autounfold in *; simpl in *; intuition subst; eauto.
 
       step_proc; intros.
@@ -116,15 +110,15 @@ Module AtomicPair (d : OneDiskAPI) <: AtomicPairAPI.
       eexists. split; eauto. destruct s.
 
       invert_abstraction; intuition.
-      rewrite H1 in *. rewrite H4 in *. simpl in *; congruence.
-      rewrite H2 in *. simpl in *. pose block0_block1_differ. congruence.
+      rewrite H1 in *. rewrite H7 in *. simpl in *; congruence.
+      rewrite H5 in *. simpl in *. pose block0_block1_differ. congruence.
 
     - step_proc; intros.
-      exists tt; simpl; intuition idtac.
+      simpl; intuition idtac.
       2: autounfold in *; simpl in *; intuition subst; eauto.
 
       step_proc; intros.
-      exists tt; simpl; intuition idtac.
+      simpl; intuition idtac.
       2: autounfold in *; simpl in *; intuition subst; eauto.
 
       step_proc; intros.
@@ -135,8 +129,8 @@ Module AtomicPair (d : OneDiskAPI) <: AtomicPairAPI.
       eexists. split; eauto. destruct s.
 
       invert_abstraction; intuition.
-      rewrite H2 in *. simpl in *. pose block0_block1_differ. congruence.
-      rewrite H1 in *. rewrite H4 in *. simpl in *; congruence.
+      rewrite H5 in *. simpl in *. pose block0_block1_differ. congruence.
+      rewrite H1 in *. rewrite H7 in *. simpl in *; congruence.
   Qed.
 
 
@@ -225,22 +219,21 @@ Module AtomicPair (d : OneDiskAPI) <: AtomicPairAPI.
 
     step_proc; intros.
     destruct a'; simpl in *; intuition idtac.
-    exists tt; simpl; intuition.
     2: autounfold in *; simpl in *; intuition subst; eauto 10.
 
     destruct (r == block0).
     - step_proc; intros.
-      exists tt; simpl; intuition idtac.
+      simpl; intuition idtac.
       2: autounfold in *; simpl in *; intuition subst; eauto 10.
       2: autounfold in *; simpl in *; intuition subst; eauto 10.
 
       step_proc; intros.
-      exists tt; simpl; intuition idtac.
+      simpl; intuition idtac.
       2: autounfold in *; simpl in *; intuition subst; eauto 10.
       2: autounfold in *; simpl in *; intuition subst; eauto 10.
 
       step_proc; intros.
-      exists tt; simpl; intuition idtac.
+      simpl; intuition idtac.
       2: autounfold in *; simpl in *; intuition subst; eauto 10.
       2: autounfold in *; simpl in *; intuition subst; eauto 10.
 
@@ -252,15 +245,15 @@ Module AtomicPair (d : OneDiskAPI) <: AtomicPairAPI.
       autounfold in *; simpl in *; intuition subst; eauto 10.
 
     - step_proc; intros.
-      exists tt; simpl; intuition idtac.
+      simpl; intuition idtac.
       2: autounfold in *; simpl in *; intuition subst; eauto 10.
       2: autounfold in *; simpl in *; intuition subst; eauto 10.
 
       2: assert (r = block1); subst.
       2: pose block0_block1_differ.
       2: unfold atomic_pair_abstraction in *; simpl in *; intuition auto.
-      2: rewrite H2 in *; simpl in *; subst; congruence.
-      2: rewrite H2 in *; simpl in *; subst; congruence.
+      2: rewrite H3 in *; simpl in *; subst; congruence.
+      2: rewrite H3 in *; simpl in *; subst; congruence.
       2: autounfold in *; simpl in *; intuition subst; eauto 10.
 
       assert (r = block1); subst.
@@ -270,12 +263,12 @@ Module AtomicPair (d : OneDiskAPI) <: AtomicPairAPI.
       rewrite H3 in *; simpl in *; subst; congruence.
 
       step_proc; intros.
-      exists tt; simpl; intuition idtac.
+      simpl; intuition idtac.
       2: autounfold in *; simpl in *; intuition subst; eauto 10.
       2: autounfold in *; simpl in *; intuition subst; eauto 10.
 
       step_proc; intros.
-      exists tt; simpl; intuition idtac.
+      simpl; intuition idtac.
       2: autounfold in *; simpl in *; intuition subst; eauto 10.
       2: autounfold in *; simpl in *; intuition subst; eauto 10.
 

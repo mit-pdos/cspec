@@ -207,7 +207,6 @@ Module ReplicatedDisk (td : TwoDiskAPI) <: OneDiskAPI.
 
     destruct r; step.
     destruct r; step.
-    simplify.
   Qed.
 
   Hint Resolve read_int_ok.
@@ -253,7 +252,6 @@ Module ReplicatedDisk (td : TwoDiskAPI) <: OneDiskAPI.
     autorewrite with upd in *; eauto.
 
     destruct r; step.
-    simplify.
   Qed.
 
   Hint Resolve write_int_ok.
@@ -288,7 +286,6 @@ Module ReplicatedDisk (td : TwoDiskAPI) <: OneDiskAPI.
 
     destruct r; step.
     destruct r; step.
-    simplify.
   Qed.
 
   Hint Resolve size_int_ok.
@@ -571,8 +568,6 @@ Module ReplicatedDisk (td : TwoDiskAPI) <: OneDiskAPI.
     simplify.
     assert (v = v0) by eauto using disks_eq_inbounds.
     contradiction.
-    simplify.
-    simplify.
   Qed.
 
   Theorem diskUpd_maybe_same : forall (d:disk) a b,
@@ -637,9 +632,6 @@ Module ReplicatedDisk (td : TwoDiskAPI) <: OneDiskAPI.
 
     step.
     destruct r; (intuition eauto); simplify; finish.
-
-    simplify.
-    simplify.
   Qed.
 
   Hint Resolve PeanoNat.Nat.lt_neq.
@@ -687,9 +679,6 @@ Module ReplicatedDisk (td : TwoDiskAPI) <: OneDiskAPI.
 
     destruct r; try step.
     destruct (v == v0); subst; try step.
-
-    simplify.
-    simplify.
   Qed.
 
   (* To make these specifications precise while also covering both the already
