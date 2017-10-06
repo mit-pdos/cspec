@@ -1,14 +1,14 @@
+Require Import POCS.
 Require Import String.
-Require Import List.
 
 Import ListNotations.
 Open Scope string.
 
 
 Inductive Node :=
-| DirNode : nat -> Node
-| FileNode : nat -> Node
-| SymlinkNode : list string -> Node.
+| DirNode : forall (dirnum : nat), Node
+| FileNode : forall (filenum : nat), Node
+| SymlinkNode : forall (target : list string), Node.
 
 Record Link := mkLink {
   LinkFrom : nat;   (* Always a DirNode *)
@@ -22,9 +22,9 @@ Definition File := list nat.
 Definition Files := list File.
 
 Record FS := mkFS {
-  FSRoot : nat;
+  FSRoot : nat;     (* root DirNode *)
   FSLinks : Graph;
-  FSFiles : Files;
+  FSFiles : Files;  (* [filenum]s point into this list *)
 }.
 
 Definition Pathname := list string.
@@ -72,7 +72,8 @@ Definition example_fs := mkFS 1
     mkLink 1 (SymlinkNode ["etc"]) "etc~";
     mkLink 1 (DirNode 3) "tmp";
     mkLink 3 (SymlinkNode [".."; "etc"]) "foo";
-    mkLink 3 (SymlinkNode [".."; ".."; "etc"]) "foo2"
+    mkLink 3 (SymlinkNode [".."; ".."; "etc"]) "foo2";
+    mkLink 3 (SymlinkNode [".."]) "root"
   ]
   [].
 
@@ -109,4 +110,94 @@ Theorem tmp_foo2_passwd :
 Proof.
   unfold path_eval_root.
   eauto 50.
+Qed.
+
+
+Instance Node_equal_dec : EqualDec Node.
+  unfold EqualDec; intros.
+  destruct x, y; try (right; congruence).
+  destruct (eq_nat_dec dirnum dirnum0); subst; eauto.
+    right; congruence.
+  destruct (eq_nat_dec filenum filenum0); subst; eauto.
+    right; congruence.
+  destruct (list_eq_dec string_dec target target0); subst; eauto.
+    right; congruence.
+Defined.
+
+Instance Link_equal_dec : EqualDec Link.
+  unfold EqualDec; intros.
+  destruct x, y.
+  destruct (eq_nat_dec LinkFrom0 LinkFrom1); subst.
+  destruct (Node_equal_dec LinkTo0 LinkTo1); subst.
+  destruct (string_dec LinkName0 LinkName1); subst.
+  eauto.
+  right; congruence.
+  right; congruence.
+  right; congruence.
+Defined.
+
+
+Definition tree_transform := Graph -> Graph.
+
+Definition transform_fs (fs : FS) (xform : tree_transform) :=
+  mkFS (FSRoot fs) (xform (FSLinks fs)) (FSFiles fs).
+
+Definition add_link (srcdir : nat) (dst : Node) (name : string) : tree_transform :=
+  fun links => mkLink srcdir dst name :: links.
+
+Definition remove_link (srcdir : nat) (dst : Node) (name : string) : tree_transform :=
+  fun links => filter (fun l => match Link_equal_dec l (mkLink srcdir dst name) with
+    | left _ => false
+    | right _ => true
+    end) links.
+
+Definition xform_both (x1 x2 : tree_transform) :=
+  fun t => x2 (x1 t).
+
+Notation "x1 ;; x2" := (xform_both x1 x2) (at level 50).
+
+
+Record concurrent_tree_semantics := mkConcurrentSem {
+  AddLinks : tree_transform;
+  RemoveLinks : tree_transform;
+}.
+
+Definition apply_concurrent_adds (fs : FS) (sem : concurrent_tree_semantics) : FS :=
+  transform_fs fs (AddLinks sem).
+
+Definition apply_concurrent_all (fs : FS) (sem : concurrent_tree_semantics) : FS :=
+  transform_fs fs (AddLinks sem ;; RemoveLinks sem).
+
+
+Definition rename_overwrite_semantics srcdir srcname node dstdir dstname oldnode := {|
+  AddLinks := add_link dstdir node dstname;
+  RemoveLinks := remove_link srcdir node srcname;;
+                 remove_link dstdir oldnode dstname
+|}.
+
+Definition rename_nonexist_semantics srcdir srcname node dstdir dstname := {|
+  AddLinks := add_link dstdir node dstname;
+  RemoveLinks := remove_link srcdir node srcname
+|}.
+
+
+Definition rename_example : concurrent_tree_semantics :=
+  rename_nonexist_semantics 1 "tmp" (DirNode 3) 1 "tmp2".
+
+Theorem tmp_root_tmp2_foo_passwd_concur_during :
+  path_eval_root
+  (apply_concurrent_adds example_fs rename_example)
+  ["tmp"; "root"; "tmp2"; "foo"; "passwd"] (FileNode 10).
+Proof.
+  unfold path_eval_root.
+  eauto 100.
+Qed.
+
+Theorem tmp_root_tmp2_foo_passwd_concur_after :
+  path_eval_root
+  (apply_concurrent_all example_fs rename_example)
+  ["tmp2"; "foo"; "passwd"] (FileNode 10).
+Proof.
+  unfold path_eval_root.
+  eauto 100.
 Qed.
