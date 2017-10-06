@@ -140,7 +140,7 @@ Definition spec_start {R} (fs : FS) (spec : specification R) : FS :=
   transform_fs fs (AddLinks spec).
 
 Definition spec_finish {R} (fs : FS) (spec : specification R) : FS :=
-  transform_fs fs (AddLinks spec ;; RemoveLinks spec).
+  transform_fs fs (RemoveLinks spec ;; AddLinks spec).
 
 Definition spec_ok {R} (fs : FS) (spec : specification R) (r : R) : Prop :=
   Result spec r fs.
@@ -156,11 +156,6 @@ Definition lookup_spec (pn : Pathname) : specification (option Node) := {|
   RemoveLinks := xform_id;
 |}.
 
-(**
-  TODO: take just Pathname arguments, rather than relying on knowing
-  node (and oldnode, if exists) already.
- *)
-
 Definition rename_overwrite_spec srcdir srcname node dstdir dstname oldnode := {|
   Result := fun r _ => r = tt;
   AddLinks := add_link dstdir node dstname;
@@ -173,6 +168,27 @@ Definition rename_nonexist_spec srcdir srcname node dstdir dstname := {|
   AddLinks := add_link dstdir node dstname;
   RemoveLinks := remove_link srcdir node srcname
 |}.
+
+(**
+  TODO: take just Pathname arguments, rather than relying on knowing
+  node (and oldnode, if exists) already.
+
+  tricky issues:
+  - moving a symlink: need to move the SymlinkNode, not the evaluated target.
+  - overwriting a symlink?
+  - what if there are multiple possibilities for a given name?
+    saying "~ exists .., path_eval_root" seems to imply NONE of
+    these concurrent syscalls can be running now.
+ *)
+
+(*
+Definition rename_spec srcdir srcname dstdir dstname := {|
+  Result := fun r _ =>
+    r = true <-> exists n, path_eval_root fs (srcdir ++ [srcname]) n /\
+      ~ exists d, path_eval_root fs (dstdir ++ [dstname]) (DirNode d);
+  AddLinks := add_link 
+|}.
+*)
 
 
 (** Example valid (and some invalid) lookups *)
