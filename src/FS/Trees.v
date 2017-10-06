@@ -5,6 +5,8 @@ Import ListNotations.
 Open Scope string.
 
 
+(** Data types *)
+
 Inductive Node :=
 | DirNode : forall (dirnum : nat), Node
 | FileNode : forall (filenum : nat), Node
@@ -28,6 +30,9 @@ Record FS := mkFS {
 }.
 
 Definition Pathname := list string.
+
+
+(** [path_evaluates] is the specification for lookup *)
 
 Inductive valid_link : forall (fs : FS) (dir : nat) (name : string) (target : Node), Prop :=
 | ValidLink : forall fs dir name target,
@@ -59,7 +64,7 @@ Definition path_eval_root (fs : FS) (pn : Pathname) (target : Node) : Prop :=
   path_evaluates fs (DirNode (FSRoot fs)) pn target.
 
 
-(** Largely boilerplate helpers *)
+(** Largely boilerplate helpers and proof hints *)
 
 Hint Constructors valid_link.
 Hint Constructors path_evaluates.
@@ -90,7 +95,15 @@ Instance Link_equal_dec : EqualDec Link.
   right; congruence.
 Defined.
 
+Hint Extern 1 False =>
+  match goal with
+  | H : {| LinkFrom := ?a; LinkTo := ?b; LinkName := ?c |} =
+        {| LinkFrom := ?d; LinkTo := ?e; LinkName := ?f |} |- _ =>
+    destruct (Link_equal_dec (mkLink a b c) (mkLink d e f)); try congruence
+  end.
 
+
+(** Example valid (and some invalid) lookups *)
 
 Definition example_fs := mkFS 1
   [ mkLink 1 (DirNode 2) "etc";
@@ -139,15 +152,6 @@ Proof.
   eauto 50.
 Qed.
 
-
-Hint Extern 1 False =>
-  match goal with
-  | H : {| LinkFrom := ?a; LinkTo := ?b; LinkName := ?c |} =
-        {| LinkFrom := ?d; LinkTo := ?e; LinkName := ?f |} |- _ =>
-    destruct (Link_equal_dec (mkLink a b c) (mkLink d e f)); try congruence
-  end.
-
-
 Theorem no_usr : ~ exists node,
   path_eval_root example_fs ["usr"] node.
 Proof.
@@ -161,6 +165,8 @@ Proof.
   compute in *. intuition.
 Qed.
 
+
+(** Definition of concurrent tree modifications *)
 
 Definition tree_transform := Graph -> Graph.
 
@@ -194,6 +200,13 @@ Definition apply_concurrent_all (fs : FS) (sem : concurrent_tree_semantics) : FS
   transform_fs fs (AddLinks sem ;; RemoveLinks sem).
 
 
+(** Specific semantics of concurrent rename operations
+
+  TODO: take just Pathname arguments, rather than relying on knowing
+  node (and oldnode, if exists) already.
+
+ *)
+
 Definition rename_overwrite_semantics srcdir srcname node dstdir dstname oldnode := {|
   AddLinks := add_link dstdir node dstname;
   RemoveLinks := remove_link srcdir node srcname;;
@@ -205,6 +218,8 @@ Definition rename_nonexist_semantics srcdir srcname node dstdir dstname := {|
   RemoveLinks := remove_link srcdir node srcname
 |}.
 
+
+(** Example lookups (positive and negative) in the presence of a concurrent rename *)
 
 Definition rename_example : concurrent_tree_semantics :=
   rename_nonexist_semantics 1 "tmp" (DirNode 3) 1 "tmp2".
@@ -241,3 +256,6 @@ Proof.
   compute in *. intuition.
   compute in *. intuition.
 Qed.
+
+
+(** TODO: readdir spec *)
