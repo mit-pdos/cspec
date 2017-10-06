@@ -29,21 +29,24 @@ Record FS := mkFS {
 
 Definition Pathname := list string.
 
-Inductive valid_link : forall (g : Graph) (dir : nat) (name : string) (target : Node), Prop :=
-| ValidLink : forall g dir name target,
-  In (mkLink dir target name) g ->
-  valid_link g dir name target
-| ValidDot : forall g dir,
-  valid_link g dir "." (DirNode dir)
-| ValidDotDot : forall g dir name parent,
-  In (mkLink parent (DirNode dir) name) g ->
-  valid_link g dir ".." (DirNode parent).
+Inductive valid_link : forall (fs : FS) (dir : nat) (name : string) (target : Node), Prop :=
+| ValidLink : forall fs dir name target,
+  In (mkLink dir target name) (FSLinks fs) ->
+  valid_link fs dir name target
+| ValidDot : forall fs dir,
+  valid_link fs dir "." (DirNode dir)
+| ValidDotDot : forall fs dir name parent,
+  In (mkLink parent (DirNode dir) name) (FSLinks fs) ->
+  valid_link fs dir ".." (DirNode parent)
+| ValidDotDotRoot : forall fs dir,
+  dir = FSRoot fs ->
+  valid_link fs dir ".." (DirNode dir).
 
 Inductive path_evaluates : forall (fs : FS) (start : Node) (pn : Pathname) (target : Node), Prop :=
 | PathEvalEmpty : forall fs start,
   path_evaluates fs start nil start
 | PathEvalLink : forall fs startdir name namenode pn target,
-  valid_link (FSLinks fs) startdir name namenode ->
+  valid_link fs startdir name namenode ->
   path_evaluates fs namenode pn target ->
   path_evaluates fs (DirNode startdir) (name :: pn) target
 | PathEvalSymlink : forall fs startdir name sympath symtarget pn target,
@@ -68,7 +71,8 @@ Definition example_fs := mkFS 1
     mkLink 2 (SymlinkNode ["passwd"]) "passwd~";
     mkLink 1 (SymlinkNode ["etc"]) "etc~";
     mkLink 1 (DirNode 3) "tmp";
-    mkLink 3 (SymlinkNode [".."; "etc"]) "foo"
+    mkLink 3 (SymlinkNode [".."; "etc"]) "foo";
+    mkLink 3 (SymlinkNode [".."; ".."; "etc"]) "foo2"
   ]
   [].
 
@@ -95,6 +99,13 @@ Qed.
 
 Theorem tmp_foo_passwd :
   path_eval_root example_fs ["tmp"; "foo"; "passwd"] (FileNode 10).
+Proof.
+  unfold path_eval_root.
+  eauto 50.
+Qed.
+
+Theorem tmp_foo2_passwd :
+  path_eval_root example_fs ["tmp"; "foo2"; "passwd"] (FileNode 10).
 Proof.
   unfold path_eval_root.
   eauto 50.
