@@ -32,7 +32,7 @@ Record FS := mkFS {
 Definition Pathname := list string.
 
 
-(** [path_evaluates] is the specification for lookup *)
+(** [path_evaluates] is used to specify lookup *)
 
 Inductive valid_link : forall (fs : FS) (dir : nat) (name : string) (target : Node), Prop :=
 | ValidLink : forall fs dir name target,
@@ -99,74 +99,11 @@ Hint Extern 1 False =>
   match goal with
   | H : {| LinkFrom := ?a; LinkTo := ?b; LinkName := ?c |} =
         {| LinkFrom := ?d; LinkTo := ?e; LinkName := ?f |} |- _ =>
-    destruct (Link_equal_dec (mkLink a b c) (mkLink d e f)); try congruence
+    destruct (Link_equal_dec (mkLink a b c) (mkLink d e f)); congruence
   end.
 
 
-(** Example valid (and some invalid) lookups *)
-
-Definition example_fs := mkFS 1
-  [ mkLink 1 (DirNode 2) "etc";
-    mkLink 2 (FileNode 10) "passwd";
-    mkLink 2 (SymlinkNode ["passwd"]) "passwd~";
-    mkLink 1 (SymlinkNode ["etc"]) "etc~";
-    mkLink 1 (DirNode 3) "tmp";
-    mkLink 3 (SymlinkNode [".."; "etc"]) "foo";
-    mkLink 3 (SymlinkNode [".."; ".."; "etc"]) "foo2";
-    mkLink 3 (SymlinkNode [".."]) "root"
-  ]
-  [].
-
-Theorem etc_passwd :
-  path_eval_root example_fs ["etc"; "passwd"] (FileNode 10).
-Proof.
-  unfold path_eval_root.
-  eauto 20.
-Qed.
-
-Theorem etc_passwd' :
-  path_eval_root example_fs ["etc"; "passwd~"] (FileNode 10).
-Proof.
-  unfold path_eval_root.
-  eauto 20.
-Qed.
-
-Theorem etc'_passwd :
-  path_eval_root example_fs ["etc~"; "passwd"] (FileNode 10).
-Proof.
-  unfold path_eval_root.
-  eauto 20.
-Qed.
-
-Theorem tmp_foo_passwd :
-  path_eval_root example_fs ["tmp"; "foo"; "passwd"] (FileNode 10).
-Proof.
-  unfold path_eval_root.
-  eauto 50.
-Qed.
-
-Theorem tmp_foo2_passwd :
-  path_eval_root example_fs ["tmp"; "foo2"; "passwd"] (FileNode 10).
-Proof.
-  unfold path_eval_root.
-  eauto 50.
-Qed.
-
-Theorem no_usr : ~ exists node,
-  path_eval_root example_fs ["usr"] node.
-Proof.
-  unfold path_eval_root.
-  compute.
-
-  intro; deex.
-  inversion H; clear H; subst.
-  inversion H4; clear H4; subst.
-  compute in *. intuition.
-  compute in *. intuition.
-Qed.
-
-
-(** Definition of concurrent tree modifications *)
+(** Definition of concurrent tree modifications, to write specifications *)
 
 Definition tree_transform := Graph -> Graph.
 
@@ -185,72 +122,155 @@ Definition remove_link (srcdir : nat) (dst : Node) (name : string) : tree_transf
 Definition xform_both (x1 x2 : tree_transform) :=
   fun t => x2 (x1 t).
 
+Definition xform_id : tree_transform :=
+  fun t => t.
+
 Notation "x1 ;; x2" := (xform_both x1 x2) (at level 50).
 
 
-Record concurrent_tree_semantics := mkConcurrentSem {
+(** This is what a specification looks like *)
+
+Record specification (R : Type) := mkSpec {
+  Result : forall (result : R) (fs : FS), Prop;
   AddLinks : tree_transform;
   RemoveLinks : tree_transform;
 }.
 
-Definition apply_concurrent_adds (fs : FS) (sem : concurrent_tree_semantics) : FS :=
-  transform_fs fs (AddLinks sem).
+Definition spec_start {R} (fs : FS) (spec : specification R) : FS :=
+  transform_fs fs (AddLinks spec).
 
-Definition apply_concurrent_all (fs : FS) (sem : concurrent_tree_semantics) : FS :=
-  transform_fs fs (AddLinks sem ;; RemoveLinks sem).
+Definition spec_finish {R} (fs : FS) (spec : specification R) : FS :=
+  transform_fs fs (AddLinks spec ;; RemoveLinks spec).
+
+Definition spec_ok {R} (fs : FS) (spec : specification R) (r : R) : Prop :=
+  Result spec r fs.
 
 
-(** Specific semantics of concurrent rename operations
+(** Concrete specifications *)
 
+Definition lookup_spec (pn : Pathname) : specification (option Node) := {|
+  Result := fun result fs =>
+    (exists node, result = Some node /\ path_eval_root fs pn node) \/
+    result = None /\ ~ exists node, path_eval_root fs pn node;
+  AddLinks := xform_id;
+  RemoveLinks := xform_id;
+|}.
+
+(**
   TODO: take just Pathname arguments, rather than relying on knowing
   node (and oldnode, if exists) already.
-
  *)
 
-Definition rename_overwrite_semantics srcdir srcname node dstdir dstname oldnode := {|
+Definition rename_overwrite_spec srcdir srcname node dstdir dstname oldnode := {|
+  Result := fun r _ => r = tt;
   AddLinks := add_link dstdir node dstname;
   RemoveLinks := remove_link srcdir node srcname;;
                  remove_link dstdir oldnode dstname
 |}.
 
-Definition rename_nonexist_semantics srcdir srcname node dstdir dstname := {|
+Definition rename_nonexist_spec srcdir srcname node dstdir dstname := {|
+  Result := fun r _ => r = tt;
   AddLinks := add_link dstdir node dstname;
   RemoveLinks := remove_link srcdir node srcname
 |}.
 
 
+(** Example valid (and some invalid) lookups *)
+
+Definition example_fs := mkFS 1
+  [ mkLink 1 (DirNode 2) "etc";
+    mkLink 2 (FileNode 10) "passwd";
+    mkLink 2 (SymlinkNode ["passwd"]) "passwd~";
+    mkLink 1 (SymlinkNode ["etc"]) "etc~";
+    mkLink 1 (DirNode 3) "tmp";
+    mkLink 3 (SymlinkNode [".."; "etc"]) "foo";
+    mkLink 3 (SymlinkNode [".."; ".."; "etc"]) "foo2";
+    mkLink 3 (SymlinkNode [".."]) "root"
+  ]
+  [].
+
+Theorem etc_passwd :
+  spec_ok example_fs (lookup_spec ["etc"; "passwd"]) (Some (FileNode 10)).
+Proof.
+  compute.
+  eauto 20.
+Qed.
+
+Theorem etc_passwd' :
+  spec_ok example_fs (lookup_spec ["etc"; "passwd~"]) (Some (FileNode 10)).
+Proof.
+  compute.
+  eauto 20.
+Qed.
+
+Theorem etc'_passwd :
+  spec_ok example_fs (lookup_spec ["etc~"; "passwd"]) (Some (FileNode 10)).
+Proof.
+  compute.
+  eauto 20.
+Qed.
+
+Theorem tmp_foo_passwd :
+  spec_ok example_fs (lookup_spec ["tmp"; "foo"; "passwd"]) (Some (FileNode 10)).
+Proof.
+  compute.
+  eauto 50.
+Qed.
+
+Theorem tmp_foo2_passwd :
+  spec_ok example_fs (lookup_spec ["tmp"; "foo2"; "passwd"]) (Some (FileNode 10)).
+Proof.
+  compute.
+  eauto 50.
+Qed.
+
+Theorem no_usr :
+  spec_ok example_fs (lookup_spec ["usr"]) None.
+Proof.
+  compute.
+
+  right. intuition. deex.
+  inversion H; clear H; subst.
+  inversion H4; clear H4; subst.
+  compute in *. intuition.
+  compute in *. intuition.
+Qed.
+
+
 (** Example lookups (positive and negative) in the presence of a concurrent rename *)
 
-Definition rename_example : concurrent_tree_semantics :=
-  rename_nonexist_semantics 1 "tmp" (DirNode 3) 1 "tmp2".
+Definition rename_example :=
+  rename_nonexist_spec 1 "tmp" (DirNode 3) 1 "tmp2".
 
 Theorem tmp_root_tmp2_foo_passwd_concur_during :
-  path_eval_root
-  (apply_concurrent_adds example_fs rename_example)
-  ["tmp"; "root"; "tmp2"; "foo"; "passwd"] (FileNode 10).
+  spec_ok
+    (spec_start example_fs rename_example)
+    (lookup_spec ["tmp"; "root"; "tmp2"; "foo"; "passwd"])
+    (Some (FileNode 10)).
 Proof.
-  unfold path_eval_root.
+  compute.
   eauto 100.
 Qed.
 
 Theorem tmp_root_tmp2_foo_passwd_concur_after :
-  path_eval_root
-  (apply_concurrent_all example_fs rename_example)
-  ["tmp2"; "foo"; "passwd"] (FileNode 10).
+  spec_ok
+    (spec_finish example_fs rename_example)
+    (lookup_spec ["tmp2"; "foo"; "passwd"])
+    (Some (FileNode 10)).
 Proof.
-  unfold path_eval_root.
+  compute.
   eauto 100.
 Qed.
 
-Theorem no_tmp_root_tmp2_foo_passwd_concur_after : ~ exists node,
-  path_eval_root
-  (apply_concurrent_all example_fs rename_example)
-  ["tmp"; "root"; "tmp2"; "foo"; "passwd"] node.
+Theorem no_tmp_root_tmp2_foo_passwd_concur_after :
+  spec_ok
+    (spec_finish example_fs rename_example)
+    (lookup_spec ["tmp"; "root"; "tmp2"; "foo"; "passwd"])
+    None.
 Proof.
-  unfold path_eval_root.
   compute.
 
-  intro; deex.
+  right. intuition. deex.
   inversion H; clear H; subst.
   inversion H4; clear H4; subst.
   compute in *. intuition.
