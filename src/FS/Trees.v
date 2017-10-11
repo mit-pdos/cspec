@@ -152,6 +152,8 @@ Definition lookup_spec (pn : Pathname) : specification (option Node) := {|
   Result := fun result fs =>
     (exists node, result = Some node /\ path_eval_root fs pn node) \/
     result = None /\ ~ exists node, path_eval_root fs pn node;
+
+
   AddLinks := xform_id;
   RemoveLinks := xform_id;
 |}.
@@ -295,3 +297,20 @@ Qed.
 
 
 (** TODO: readdir spec *)
+
+Definition dir := list string.
+
+Definition entries (dirnum:nat) (g: Graph) : dir :=
+  let lf := filter (fun (l: Link) => (beq_nat (LinkFrom l) dirnum)) g in
+  map (fun (l:Link) => (LinkName l)) lf.
+
+      
+Definition readdir_spec pn : specification (option dir)  := {|
+  Result := fun result fs =>
+              (exists node dir n, dir = Some (DirNode n) /\ path_eval_root fs pn node /\
+                           result = Some (entries n (FSLinks fs))
+              ) \/
+              result = None /\  ~ exists node n, path_eval_root fs pn node /\ node = (DirNode n);
+  AddLinks := xform_id;
+  RemoveLinks := xform_id;
+|}.
