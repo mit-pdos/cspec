@@ -298,17 +298,19 @@ Qed.
 
 (** TODO: readdir spec *)
 
-Definition dir := list string.
+Definition names := list string.
 
-Definition entries (dirnum:nat) (g: Graph) : dir :=
-  let lf := filter (fun (l: Link) => (beq_nat (LinkFrom l) dirnum)) g in
+Definition dirents dirnum g :=
+  filter (fun (l: Link) => (beq_nat (LinkFrom l) dirnum)) g.
+
+Definition dirnames dirnum g : names :=
+  let lf := dirents dirnum g in
   map (fun (l:Link) => (LinkName l)) lf.
 
-      
-Definition readdir_spec pn : specification (option dir)  := {|
+Definition readdir_spec pn : specification (option names)  := {|
   Result := fun result fs =>
               (exists node dir n, dir = Some (DirNode n) /\ path_eval_root fs pn node /\
-                           result = Some (entries n (FSLinks fs))
+                           result = Some (dirnames n (FSLinks fs))
               ) \/
               result = None /\  ~ exists node n, path_eval_root fs pn node /\ node = (DirNode n);
   AddLinks := xform_id;
