@@ -13,18 +13,9 @@ CODE += $(wildcard src/Lab2/*.v)
 ## Lab 3: atomic pair
 CODE += $(wildcard src/Lab3/*.v)
 
-## Lab 4: disk mirroring
-CODE += $(wildcard src/Lab4/*.v)
-
-## FS experiment
-CODE += $(wildcard src/FS/SepLogic/Mem/*.v)
-CODE += $(wildcard src/FS/SepLogic/Pred/*.v)
-CODE += $(wildcard src/FS/SepLogic/*.v)
-CODE += $(wildcard src/FS/*.v)
-
 COQRFLAGS := -R build POCS
 
-BINS	:= statdb-cli remap-nbd replicate-nbd
+BINS	:= statdb-cli remap-nbd
 
 .PHONY: default
 default: $(patsubst %,bin/%,$(BINS)) docs
@@ -61,7 +52,6 @@ docs: coq
 
 statdb-cli/extract: build/Lab1/StatDbCli.vo
 remap-nbd/extract: build/Lab2/RemappedServer.vo
-replicate-nbd/extract: build/Lab4/ReplicatedServer.vo
 
 bin/%: %/extract
 	mkdir -p $(@D)
@@ -78,4 +68,4 @@ clean:
 lab%-handin.tar.gz: clean
 	tar cf - `find . -type f | grep -v '^\.*$$' | grep -v '/\.git/' | grep -v 'lab[0-9].*\.tar\.gz'` | gzip > $@
 
-prepare-submit: lab1-handin.tar.gz
+prepare-submit: lab3-handin.tar.gz

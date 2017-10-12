@@ -7,7 +7,7 @@ CODE += $(wildcard src/Spec/*.v)
 ## Lab 1: StatDB
 CODE += $(wildcard src/Lab1/*.v)
 
-## Lab 2: remap
+## Lab 2: bad block remapping
 CODE += $(wildcard src/Lab2/*.v)
 
 COQRFLAGS := -R build POCS
