@@ -1,6 +1,5 @@
 Require Import POCS.
 
-
 Import ListNotations.
 Require Import String.
 Require Import FS.SepLogic.Mem.

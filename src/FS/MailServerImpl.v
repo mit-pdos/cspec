@@ -1,6 +1,5 @@
 Require Import POCS.
 
-Import ListNotations.
 Require Import String.
 Require Import FS.SepLogic.Mem.
 Require Import FS.SepLogic.Pred.
@@ -11,6 +10,7 @@ Require Import MailServerAPI.
 
 Module MailServer (fs : FSAPI) <: MailServerAPI.
 
+  Import ListNotations.
 
   Fixpoint mailbox_pred (mbox : mailbox) (missing_pred : pred pathname tree_node) : pred pathname tree_node :=
     match mbox with
@@ -239,3 +239,6 @@ Module MailServer (fs : FSAPI) <: MailServerAPI.
     *)
 
 End MailServer.
+
+Require Import FSImpl.
+Module MailServerImpl := MailServer FS.

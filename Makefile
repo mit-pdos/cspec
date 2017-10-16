@@ -24,7 +24,7 @@ CODE += $(wildcard src/FS/*.v)
 
 COQRFLAGS := -R build POCS
 
-BINS	:= statdb-cli remap-nbd replicate-nbd
+BINS	:= statdb-cli remap-nbd replicate-nbd mail-cli
 
 .PHONY: default
 default: $(patsubst %,bin/%,$(BINS)) docs
@@ -62,6 +62,7 @@ docs: coq
 statdb-cli/extract: build/Lab1/StatDbCli.vo
 remap-nbd/extract: build/Lab2/RemappedServer.vo
 replicate-nbd/extract: build/Lab4/ReplicatedServer.vo
+mail-cli/extract: build/FS/MailCli.vo
 
 bin/%: %/extract
 	mkdir -p $(@D)
