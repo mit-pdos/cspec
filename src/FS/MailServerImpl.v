@@ -54,10 +54,10 @@ Module MailServer (fs : FSAPI) <: MailServerAPI.
       {| abstraction := mail_abstraction |}.
 
 
-  Axiom find_available_name : pathname -> proc string.
+
 
   Definition deliver (user : string) (m : message) : proc unit :=
-    fn <- find_available_name [user];
+    fn <- fs.find_available_name [user];
     _ <- fs.create [user] fn;
     _ <- fs.write_logged [user; fn] m;
     Ret tt.
@@ -94,7 +94,7 @@ Module MailServer (fs : FSAPI) <: MailServerAPI.
     Ret tt.
 
   Definition newuser : proc string :=
-    fn <- find_available_name [];
+    fn <- fs.find_available_name [];
     _ <- fs.mkdir [] fn;
     Ret fn.
 
@@ -127,21 +127,6 @@ Module MailServer (fs : FSAPI) <: MailServerAPI.
     firstorder.
   Qed.
 
-  Definition find_available_name_spec dirpn : Specification _ _ unit FSAPI.State :=
-    fun '(F, dirnum) state => {|
-      pre :=
-        set_latest state |= F * dirpn |-> Dir dirnum;
-      post := fun r state' =>
-        state' = state /\
-        exists F',
-        F' * (dirpn ++ [r]) |-> Missing ===> F;
-      recovered := fun _ _ => False
-    |}.
-
-  Axiom find_available_name_ok :
-    forall dirpn,
-    proc_spec (find_available_name_spec dirpn) (find_available_name dirpn) fs.recover fs.abstr.
-  Hint Resolve find_available_name_ok.
 
   Lemma extract_user : forall s F uid m users_and_mailboxes,
     s |= F * uid |-> m ->

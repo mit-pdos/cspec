@@ -215,6 +215,17 @@ Definition write_bypass_spec pn data : Specification _ _ unit State :=
   |}.
 
 
+  Definition find_available_name_spec dirpn : Specification _ _ unit FSAPI.State :=
+    fun '(F, dirnum) state => {|
+      pre :=
+        set_latest state |= F * dirpn |-> Dir dirnum;
+      post := fun r state' =>
+        state' = state /\
+        exists F',
+        F' * (dirpn ++ [r]) |-> Missing ===> F;
+      recovered := fun _ _ => False
+    |}.
+
 Module Type FSAPI.
 
   Axiom init : proc InitResult.
@@ -229,7 +240,8 @@ Module Type FSAPI.
   Axiom stat : pathname -> string -> proc stat_result.
   Axiom readdir : pathname -> proc (list string).
   Axiom recover : proc unit.
-
+  Axiom find_available_name : pathname -> proc string.
+  
   Axiom abstr : Abstraction State.
 
   Axiom init_ok : init_abstraction init recover abstr inited.
@@ -244,6 +256,10 @@ Module Type FSAPI.
   Axiom stat_ok : forall pn n, proc_spec (stat_spec pn n) (stat pn n) recover abstr.
   Axiom readdir_ok : forall pn, proc_spec (readdir_spec pn) (readdir pn) recover abstr.
   Axiom recover_noop : rec_noop recover abstr no_crash.
+  Axiom find_available_name_ok :
+    forall dirpn,
+    proc_spec (find_available_name_spec dirpn) (find_available_name dirpn) recover abstr.
+
 
   Hint Resolve init_ok.
   Hint Resolve create_ok.
@@ -257,5 +273,6 @@ Module Type FSAPI.
   Hint Resolve stat_ok.
   Hint Resolve readdir_ok.
   Hint Resolve recover_noop.
+  Hint Resolve find_available_name_ok.
 
 End FSAPI.

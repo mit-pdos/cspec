@@ -22,7 +22,8 @@ Module FS <: FSAPI.
   Axiom stat : pathname -> string -> proc FSAPI.stat_result.
   Axiom readdir : pathname -> proc (list string).
   Axiom recover : proc unit.
-
+  Axiom find_available_name : pathname -> proc string.
+  
   Axiom abstr : Abstraction State.
 
   Axiom init_ok : init_abstraction init recover abstr inited.
@@ -37,9 +38,18 @@ Module FS <: FSAPI.
   Axiom stat_ok : forall pn n, proc_spec (stat_spec pn n) (stat pn n) recover abstr.
   Axiom readdir_ok : forall pn, proc_spec (readdir_spec pn) (readdir pn) recover abstr.
   Axiom recover_noop : rec_noop recover abstr no_crash.
+  Axiom find_available_name_ok :  forall dirpn,
+    proc_spec (find_available_name_spec dirpn) (find_available_name dirpn) recover abstr.
+
 
 End FS.
 
 Extract Constant FS.init => "FS.Ops.init".
 Extract Constant FS.create => "FS.Ops.create".
+Extract Constant FS.mkdir => "FS.Ops.mkdir".
+
+(* XXX should be split: it should call find_avaialbe_name, but we should check
+ * in Gallina that the name returned is indeed available and proof the check
+ * correct.  For now completely trusted. *)
+Extract Constant FS.find_available_name => "FS.Ops.find_available_name".
 
