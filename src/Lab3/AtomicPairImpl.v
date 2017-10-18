@@ -5,280 +5,316 @@ Require Import Common.OneDiskAPI.
 
 Module AtomicPair (d : OneDiskAPI) <: AtomicPairAPI.
 
+  (** To implement this API, we suggest you work out a way that does not use
+      logging but instead maintains two sets of blocks and a pointer to switch
+      between them. You can use [block0] and [block1] as concrete values for the
+      pointer and [b == b'] to compare blocks in code. *)
+
+  (* To make implementations more consistent, we recommend this layout (where
+  the pointer is in address 0). *)
+  Definition ptr_a : addr := 0.
+  Definition data0a : addr := 1.
+  Definition data1a : addr := 2.
+  Definition data0b : addr := 3.
+  Definition data1b : addr := 4.
+
+  (* We plug some extra facts into the automation to make the above definitions
+  more convenient. You can ignore these; they automatically make [auto] and
+  [autorewrite with upd] more powerful. *)
+
+  Ltac addr_omega :=
+    progress unfold ptr_a, data0a, data1a, data0b, data1b;
+    omega.
+
+  Hint Extern 2 (_ <> _ :> addr) => addr_omega.
+  Hint Extern 2 (_ < _) => addr_omega.
+
+  Opaque diskGet.
+
+  (* EXERCISE (3a): implement this procedure *)
   Definition get : proc (block*block) :=
-    ptr <- d.read 0;
-    if ptr == block0 then
-      a <- d.read 1;
-      b <- d.read 2;
-      Ret (a, b)
-    else
-      a <- d.read 3;
-      b <- d.read 4;
-      Ret (a, b).
+    (* SOL *)
+    ptr <- d.read ptr_a;
+      if ptr == block0 then
+        b0 <- d.read data0a;
+          b1 <- d.read data1a;
+          Ret (b0, b1)
+      else
+        b0 <- d.read data0b;
+      b1 <- d.read data1b;
+      Ret (b0, b1).
+  (* END *)
+  (* STUB: Ret (block0, block0). *)
 
+  (* EXERCISE (3a): implement this procedure *)
   Definition put (p : block*block) : proc unit :=
-    ptr <- d.read 0;
-    if ptr == block0 then
-      _ <- d.write 3 (fst p);
-      _ <- d.write 4 (snd p);
-      _ <- d.write 0 block1;
-      Ret tt
-    else
-      _ <- d.write 1 (fst p);
-      _ <- d.write 2 (snd p);
-      _ <- d.write 0 block0;
+    (* SOL *)
+    ptr <- d.read ptr_a;
+      if ptr == block0 then
+        _ <- d.write data0b (fst p);
+          _ <- d.write data1b (snd p);
+          _ <- d.write ptr_a block1;
+          Ret tt
+      else
+        _ <- d.write data0a (fst p);
+      _ <- d.write data1a (snd p);
+      _ <- d.write ptr_a block0;
       Ret tt.
+  (* END *)
+  (* STUB: Ret tt. *)
 
+  (* EXERCISE (3a): implement this procedure *)
   Definition init' : proc InitResult :=
+    (* SOL *)
     len <- d.size;
-    if len == 5 then
-      _ <- d.write 0 block0;
-      Ret Initialized
-    else
-      Ret InitFailed.
+      if len == 5 then
+        _ <- d.write ptr_a block0;
+        _ <- d.write data0a block0;
+        _ <- d.write data1a block0;
+          Ret Initialized
+      else Ret InitFailed.
+    (* END *)
+    (* STUB: Ret InitFailed. *)
 
   Definition init := then_init d.init init'.
 
+  (* Using this approach with a pointer (as opposed to write-ahead logging), you
+  won't need a recovery procedure. *)
   Definition recover: proc unit :=
     d.recover.
 
-
+  (* EXERCISE (3a): write an abstraction relation for your implementation *)
   Definition atomic_pair_abstraction (ds : OneDiskAPI.State) (ps : AtomicPairAPI.State) : Prop :=
+    (* SOL *)
     diskSize ds = 5 /\
-    (diskGet ds 0 = Some block0 /\ diskGet ds 1 = Some (fst ps) /\ diskGet ds 2 = Some (snd ps) \/
-     diskGet ds 0 = Some block1 /\ diskGet ds 3 = Some (fst ps) /\ diskGet ds 4 = Some (snd ps)).
+    (diskGet ds ptr_a ?|= eq block0 ->
+     diskGet ds data0a = Some (fst ps) /\
+     diskGet ds data1a = Some (snd ps)) /\
+    (forall b, diskGet ds ptr_a ?|= eq b ->
+          b <> block0 ->
+          diskGet ds data0b = Some (fst ps) /\
+          diskGet ds data1b = Some (snd ps)).
+  (* END *)
+  (* STUB: True. *)
+
+  (* EXERCISE (3a): come up with some examples of disks and pairs that satisfy
+     the abstraction relation and those that don't. Prove them correct.
+
+     Come up with at least 3 positive examples and 3 negative examples. *)
 
   Definition abstr : Abstraction AtomicPairAPI.State :=
     abstraction_compose d.abstr {| abstraction := atomic_pair_abstraction |}.
 
-  Ltac invert_abstraction :=
-    match goal with
-    | H : atomic_pair_abstraction _ _ |- _ => inversion H; clear H; subst_var; simpl in *
-    end.
+  (* For this lab, we provide a notation for diskUpd. Not only can you use this
+     to write [diskUpd d a b] as [d [a |-> b]] but you will also see this notation
+     in goals. This should especially make it easier to read goals with many
+     updates of the same disk.
 
+     Remember that the code still uses diskUpd underneath, so the same theorems
+     apply. We recommend using [autorewrite with upd] or [autorewrite with upd
+     in *] in this lab to simplify diskGet/diskUpd expressions, rather than
+     using the theorems manually. *)
+  Notation "d [ a |-> b ]" := (diskUpd d a b) (at level 31, left associativity).
 
+  (* EXERCISE (3b): prove your initialization procedure correct. *)
   Theorem init_ok : init_abstraction init recover abstr inited_any.
   Proof.
     eapply then_init_compose; eauto.
+    (* SOL *)
 
-    step_proc; intros.
-
+    step_proc.
     destruct (r == 5).
-    - step_proc; intros.
+    step_proc.
+    step_proc.
+    step_proc.
+    step_proc.
+    exists (block0, block0).
+    unfold atomic_pair_abstraction.
+    autorewrite with upd; intuition auto.
 
-      step_proc; intros.
-      eauto.
-
-      simpl in *; intuition subst.
-      edestruct disk_inbounds_exists with (d := state) (a := 1); try omega.
-      edestruct disk_inbounds_exists with (d := state) (a := 2); try omega.
-
-      unfold atomic_pair_abstraction; exists (x, x0).
-      autorewrite with upd.
-      repeat rewrite diskUpd_eq by omega.
-      repeat rewrite diskUpd_neq by omega.
-      intuition auto.
-
-    - step_proc; intros.
+    step_proc.
   Qed.
+  (* END *)
+  (* STUB: Admitted. *)
 
+  (* EXERCISE (3b): prove you can correctly get the pair using your abstraction
+  relation. *)
   Theorem get_ok : proc_spec get_spec get recover abstr.
   Proof.
     unfold get.
-    intros.
-
     apply spec_abstraction_compose; simpl.
+    (* SOL *)
 
-    step_proc; intros.
-    destruct a'; simpl in *; intuition idtac.
-    2: autounfold in *; simpl in *; intuition subst; eauto.
+    step_proc.
+    destruct a'; simpl in *; intuition; subst; eauto.
 
     destruct (r == block0).
-    - step_proc; intros.
-      simpl; intuition idtac.
-      2: autounfold in *; simpl in *; intuition subst; eauto.
+    step_proc; intuition; subst; eauto.
+    step_proc; intuition; subst; eauto.
+    step_proc; intuition; subst; eauto.
+    unfold atomic_pair_abstraction in *; intuition.
+    exists s.
+    destruct s; intuition.
+    replace (diskGet state data0a) in *.
+    replace (diskGet state data1a) in *.
+    simpl in *; subst; auto.
 
-      step_proc; intros.
-      simpl; intuition idtac.
-      2: autounfold in *; simpl in *; intuition subst; eauto.
+    step_proc; intuition; subst; eauto.
+    step_proc; intuition; subst; eauto.
+    step_proc; intuition; subst; eauto.
 
-      step_proc; intros.
-      eauto.
-
-      simpl in *; intuition subst.
-      2: autounfold in *; simpl in *; intuition subst; eauto.
-      eexists. split; eauto. destruct s.
-
-      invert_abstraction; intuition.
-      rewrite H1 in *. rewrite H7 in *. simpl in *; congruence.
-      rewrite H5 in *. simpl in *. pose block0_block1_differ. congruence.
-
-    - step_proc; intros.
-      simpl; intuition idtac.
-      2: autounfold in *; simpl in *; intuition subst; eauto.
-
-      step_proc; intros.
-      simpl; intuition idtac.
-      2: autounfold in *; simpl in *; intuition subst; eauto.
-
-      step_proc; intros.
-      eauto.
-
-      simpl in *; intuition subst.
-      2: autounfold in *; simpl in *; intuition subst; eauto.
-      eexists. split; eauto. destruct s.
-
-      invert_abstraction; intuition.
-      rewrite H5 in *. simpl in *. pose block0_block1_differ. congruence.
-      rewrite H1 in *. rewrite H7 in *. simpl in *; congruence.
+    unfold atomic_pair_abstraction in *; intuition.
+    exists s.
+    destruct s; intuition.
+    specialize (H6 r); intuition.
+    replace (diskGet state data0b) in *.
+    replace (diskGet state data1b) in *.
+    simpl in *; subst; auto.
   Qed.
+  (* END *)
+  (* STUB: Admitted. *)
 
-
-  Theorem atomic_pair_abstraction_diskUpd12 : forall state s a v,
-    (a = 1 \/ a = 2) ->
-    atomic_pair_abstraction state s ->
-    diskGet state 0 ?|= eq block1 ->
-    atomic_pair_abstraction (diskUpd state a v) s.
+  (* SOL *)
+  Lemma abstraction_update_b : forall state p0 p,
+      atomic_pair_abstraction state p0 ->
+      diskGet state ptr_a ?|= eq block0 ->
+      atomic_pair_abstraction
+        (state [data0b |-> fst p] [data1b |-> snd p] [ptr_a |-> block1]) p.
   Proof.
-    unfold atomic_pair_abstraction; intros.
-    repeat rewrite diskUpd_neq by ((intuition congruence) || (intuition omega)).
-    repeat rewrite diskUpd_eq by ( intuition omega ).
-    repeat rewrite diskUpd_neq by congruence.
-    autorewrite with upd.
-    pose block0_block1_differ.
-    intuition auto.
-    rewrite H3 in *; congruence.
-    2: rewrite H3 in *; congruence.
-    right. repeat rewrite diskUpd_neq by omega. auto.
-    right. repeat rewrite diskUpd_neq by omega. auto.
-  Qed.
-
-  Theorem atomic_pair_abstraction_diskUpd34 : forall state s a v,
-    (a = 3 \/ a = 4) ->
-    atomic_pair_abstraction state s ->
-    diskGet state 0 ?|= eq block0 ->
-    atomic_pair_abstraction (diskUpd state a v) s.
-  Proof.
-    unfold atomic_pair_abstraction; intros.
-    autorewrite with upd.
-    intuition auto;
-      repeat rewrite diskUpd_neq by congruence.
-    intuition auto.
-    pose block0_block1_differ.
-    rewrite H3 in *; congruence.
-    intuition auto.
-    pose block0_block1_differ.
-    rewrite H3 in *; congruence.
-  Qed.
-
-  Theorem atomic_pair_abstraction_state0 : forall (state : State) F a v,
-    a <> 0 ->
-    diskGet state 0 ?|= F ->
-    diskGet (diskUpd state a v) 0 ?|= F.
-  Proof.
+    unfold atomic_pair_abstraction.
     intros.
-    rewrite diskUpd_neq; auto.
+    autorewrite with upd; intuition.
   Qed.
 
-  Theorem atomic_pair_abstraction_diskUpd340 : forall state v0 v,
-    atomic_pair_abstraction state v0 ->
-    atomic_pair_abstraction
-      (diskUpd (diskUpd (diskUpd state 3 (fst v)) 4 (snd v)) 0 block1) v.
+  Lemma abstraction_update_a : forall state p0 b p,
+      atomic_pair_abstraction state p0 ->
+      diskGet state ptr_a ?|= eq b ->
+      b <> block0 ->
+      atomic_pair_abstraction
+        (state [data0a |-> fst p] [data1a |-> snd p] [ptr_a |-> block0]) p.
   Proof.
-    unfold atomic_pair_abstraction; intros.
-    autorewrite with upd.
-    repeat ( (rewrite diskUpd_eq by (autorewrite with upd; omega)) ||
-             (rewrite diskUpd_neq by (autorewrite with upd; omega)) ).
-    intuition auto.
+    unfold atomic_pair_abstraction.
+    intros.
+    autorewrite with upd; intuition.
   Qed.
 
-  Theorem atomic_pair_abstraction_diskUpd120 : forall state v0 v,
-    atomic_pair_abstraction state v0 ->
-    atomic_pair_abstraction
-      (diskUpd (diskUpd (diskUpd state 1 (fst v)) 2 (snd v)) 0 block0) v.
+  Hint Resolve
+       abstraction_update_a
+       abstraction_update_b.
+  (* END *)
+
+  Lemma diskGet_eq_values : forall d a b b',
+      diskGet d a ?|= eq b ->
+      diskGet d a ?|= eq b' ->
+      a < diskSize d ->
+      b = b'.
   Proof.
-    unfold atomic_pair_abstraction; intros.
-    autorewrite with upd.
-    repeat ( (rewrite diskUpd_eq by (autorewrite with upd; omega)) ||
-             (rewrite diskUpd_neq by (autorewrite with upd; omega)) ).
-    intuition auto.
+  (* SOL *)
+    intros.
+    destruct (diskGet d a) eqn:?; simpl in *.
+    congruence.
+    exfalso.
+    apply disk_inbounds_not_none in Heqo; eauto.
+  Qed.
+  (* END *)
+  (* STUB: Admitted. *)
+
+  (* We used this tactic to simplify goals with
+   H1: diskGet d a ?|= eq b
+   H2: diskGet d a ?|= eq b'
+
+   The tactic proves b = b'.
+   *)
+  Ltac eq_values :=
+    match goal with
+    | [ H: diskGet ?d ?a ?|= eq ?b,
+           H': diskGet ?d ?a ?|= eq ?b' |- _ ] =>
+      assert (b = b') by (apply (@diskGet_eq_values d a b b'); auto);
+      subst
+    end.
+
+  (* SOL *)
+  Lemma abstraction_partial_update_a : forall state p v v',
+      atomic_pair_abstraction state p ->
+      diskGet state ptr_a ?|= eq block0 ->
+      atomic_pair_abstraction
+        (state [data0b |-> v] [data1b |-> v']) p.
+  Proof.
+    unfold atomic_pair_abstraction.
+    intros.
+    autorewrite with upd; intuition;
+      eq_values; exfalso; eauto.
   Qed.
 
-  Hint Resolve atomic_pair_abstraction_diskUpd12.
-  Hint Resolve atomic_pair_abstraction_diskUpd34.
-  Hint Resolve atomic_pair_abstraction_state0.
-  Hint Resolve atomic_pair_abstraction_diskUpd340.
-  Hint Resolve atomic_pair_abstraction_diskUpd120.
+  Lemma abstraction_partial_update1_a : forall state p v,
+      atomic_pair_abstraction state p ->
+      diskGet state ptr_a ?|= eq block0 ->
+      atomic_pair_abstraction
+        (state [data0b |-> v]) p.
+  Proof.
+    unfold atomic_pair_abstraction.
+    intros.
+    autorewrite with upd; intuition;
+      eq_values; exfalso; eauto.
+  Qed.
 
+  Lemma abstraction_partial_update_b : forall state p b v v',
+      atomic_pair_abstraction state p ->
+      diskGet state ptr_a ?|= eq b ->
+      b <> block0 ->
+      atomic_pair_abstraction
+        (state [data0a |-> v] [data1a |-> v']) p.
+  Proof.
+    unfold atomic_pair_abstraction.
+    intros.
+    autorewrite with upd; intuition;
+      eq_values; exfalso; eauto.
+  Qed.
+
+  Lemma abstraction_partial_update1_b : forall state p b v,
+      atomic_pair_abstraction state p ->
+      diskGet state ptr_a ?|= eq b ->
+      b <> block0 ->
+      atomic_pair_abstraction
+        (state [data0a |-> v]) p.
+  Proof.
+    unfold atomic_pair_abstraction.
+    intros.
+    autorewrite with upd; intuition;
+      eq_values; exfalso; eauto.
+  Qed.
+
+  Hint Resolve
+       abstraction_partial_update_a
+       abstraction_partial_update_b
+       abstraction_partial_update1_a
+       abstraction_partial_update1_b.
+  (* END *)
+
+  (* EXERCISE (3c): prove that the atomic update is correct.
+
+   We highly recommend separating at least the crash cases into lemmas and
+   proving them separately. *)
   Theorem put_ok : forall v, proc_spec (put_spec v) (put v) recover abstr.
   Proof.
-    unfold put.
-    intros.
-
+    unfold put; intros.
     apply spec_abstraction_compose; simpl.
+    (* SOL *)
 
-    step_proc; intros.
-    destruct a'; simpl in *; intuition idtac.
-    2: autounfold in *; simpl in *; intuition subst; eauto 10.
-
+    step_proc.
+    destruct a'; simpl in *; intuition; subst; eauto.
     destruct (r == block0).
-    - step_proc; intros.
-      simpl; intuition idtac.
-      2: autounfold in *; simpl in *; intuition subst; eauto 10.
-      2: autounfold in *; simpl in *; intuition subst; eauto 10.
-
-      step_proc; intros.
-      simpl; intuition idtac.
-      2: autounfold in *; simpl in *; intuition subst; eauto 10.
-      2: autounfold in *; simpl in *; intuition subst; eauto 10.
-
-      step_proc; intros.
-      simpl; intuition idtac.
-      2: autounfold in *; simpl in *; intuition subst; eauto 10.
-      2: autounfold in *; simpl in *; intuition subst; eauto 10.
-
-      step_proc; intros.
-      eauto.
-
-      simpl in *; intuition subst.
-      autounfold in *; simpl in *; intuition subst; eauto 10.
-      autounfold in *; simpl in *; intuition subst; eauto 10.
-
-    - step_proc; intros.
-      simpl; intuition idtac.
-      2: autounfold in *; simpl in *; intuition subst; eauto 10.
-      2: autounfold in *; simpl in *; intuition subst; eauto 10.
-
-      2: assert (r = block1); subst.
-      2: pose block0_block1_differ.
-      2: unfold atomic_pair_abstraction in *; simpl in *; intuition auto.
-      2: rewrite H3 in *; simpl in *; subst; congruence.
-      2: rewrite H3 in *; simpl in *; subst; congruence.
-      2: autounfold in *; simpl in *; intuition subst; eauto 10.
-
-      assert (r = block1); subst.
-      pose block0_block1_differ.
-      unfold atomic_pair_abstraction in *; simpl in *; intuition auto.
-      rewrite H3 in *; simpl in *; subst; congruence.
-      rewrite H3 in *; simpl in *; subst; congruence.
-
-      step_proc; intros.
-      simpl; intuition idtac.
-      2: autounfold in *; simpl in *; intuition subst; eauto 10.
-      2: autounfold in *; simpl in *; intuition subst; eauto 10.
-
-      step_proc; intros.
-      simpl; intuition idtac.
-      2: autounfold in *; simpl in *; intuition subst; eauto 10.
-      2: autounfold in *; simpl in *; intuition subst; eauto 10.
-
-      step_proc; intros.
-      eauto.
-
-      simpl in *; intuition subst.
-      autounfold in *; simpl in *; intuition subst; eauto 10.
-      autounfold in *; simpl in *; intuition subst; eauto 10.
+    step_proc; intuition; subst; eauto.
+    step_proc; intuition; subst; eauto.
+    step_proc; intuition; subst; eauto.
+    step_proc; intuition; subst; eauto.
+    step_proc; intuition; subst; eauto.
+    step_proc; intuition; subst; eauto.
+    step_proc; intuition; subst; eauto.
+    step_proc; intuition; subst; eauto.
   Qed.
+  (* END *)
+  (* STUB: Admitted. *)
 
   Theorem recover_noop : rec_noop recover abstr no_wipe.
   Proof.
@@ -290,8 +326,7 @@ Module AtomicPair (d : OneDiskAPI) <: AtomicPairAPI.
     eauto.
 
     destruct a; simpl in *.
-    autounfold in *; intuition eauto.
-    subst; eauto.
+    autounfold in *; intuition; subst; eauto.
   Qed.
 
 End AtomicPair.

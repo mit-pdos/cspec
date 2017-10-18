@@ -10,8 +10,8 @@ umask 2
 # update this repository:
 CLASSREPO=git@github.com:mit-pdos/6.826-2017-labs
 
-# include only these src/ directories 
-SRCS="src/Helpers src/Spec src/Common src/Lab1 src/Lab2 src/Lab3"
+# include only these src/ directories
+SRCS="src/Helpers src/Spec src/Lab1 src/Common src/Lab2 src/Lab3"
 
 # files/directories to copy
 TOPLEVELS="README.md LICENSE _CoqProject .gitignore scripts/add-preprocess.sh src/POCS.v statdb-cli remap-nbd"

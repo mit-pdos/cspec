@@ -388,6 +388,9 @@ Proof.
       replace (length d - 0) with (length d) by omega; auto.
 Qed.
 
+Hint Rewrite diskUpd_size : disk_size.
+Hint Rewrite diskShrink_size using solve [ auto || omega ] : disk_size.
+
 (** We combine all of the above theorems into a hint database called "upd".
     This means that, when you type [autorewrite with upd] in some Coq proof,
     Coq will try to rewrite using all of the hints in that database.
@@ -399,18 +402,21 @@ Qed.
     immediately proven.
   *)
 
-Hint Rewrite diskUpd_eq using (solve [ auto ]) : upd.
-Hint Rewrite disk_oob_eq using (solve [ auto ]) : upd.
-Hint Rewrite diskUpd_oob_eq using (solve [ auto ]) : upd.
+Local Ltac solve_disk_size :=
+  solve [ autorewrite with disk_size; (auto || omega) ].
+
+Hint Rewrite diskUpd_eq using solve_disk_size : upd.
+Hint Rewrite disk_oob_eq using solve_disk_size : upd.
+Hint Rewrite diskUpd_oob_eq using solve_disk_size : upd.
 Hint Rewrite diskUpd_size : upd.
 Hint Rewrite diskUpd_neq using (solve [ auto ]) : upd.
 Hint Rewrite diskUpd_none using (solve [ auto ]) : upd.
 
 Hint Rewrite diskUpd_same using (solve [ auto ]) : upd.
-Hint Rewrite diskUpd_oob_noop using (solve [ auto ]) : upd.
+Hint Rewrite diskUpd_oob_noop using solve_disk_size : upd.
 Hint Rewrite diskUpd_twice : upd.
 
-Hint Rewrite diskShrink_size using (solve [ auto || omega ]) : upd.
-Hint Rewrite diskShrink_preserves using (solve [ auto || omega ]) : upd.
-Hint Rewrite diskShrink_diskUpd_last using (solve [ auto || omega ]) : upd.
-Hint Rewrite diskShrink_diskUpd_notlast using (solve [ auto || omega ]) : upd.
+Hint Rewrite diskShrink_size using solve_disk_size : upd.
+Hint Rewrite diskShrink_preserves using solve_disk_size : upd.
+Hint Rewrite diskShrink_diskUpd_last using solve_disk_size : upd.
+Hint Rewrite diskShrink_diskUpd_notlast using solve_disk_size : upd.
