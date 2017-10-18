@@ -10,5 +10,5 @@ getMail = do
     putStr "Enter text to send: "
     hFlush stdout
     getLine
-  return $ read x
+  return $ x
 

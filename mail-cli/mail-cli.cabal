@@ -12,6 +12,8 @@ executable mail-cli
                      , bytestring
                      , unix
                      , containers
+                     , directory
+                     , filepath                    
   other-modules:       Abstraction
                      , Bool
                      , CLI.Stubs

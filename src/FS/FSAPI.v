@@ -226,6 +226,13 @@ Definition write_bypass_spec pn data : Specification _ _ unit State :=
       recovered := fun _ _ => False
     |}.
 
+  Definition debug_spec : Specification _ _ unit FSAPI.State :=
+    fun (_: unit) state => {|
+      pre := True;
+      post := fun r state' => state = state' /\ r = tt;
+      recovered := fun _ _ => False
+    |}.
+
 Module Type FSAPI.
 
   Axiom init : proc InitResult.
@@ -241,6 +248,7 @@ Module Type FSAPI.
   Axiom readdir : pathname -> proc (list string).
   Axiom recover : proc unit.
   Axiom find_available_name : pathname -> proc string.
+  Axiom debug: string -> proc unit.
   
   Axiom abstr : Abstraction State.
 
@@ -259,6 +267,7 @@ Module Type FSAPI.
   Axiom find_available_name_ok :
     forall dirpn,
     proc_spec (find_available_name_spec dirpn) (find_available_name dirpn) recover abstr.
+  Axiom debug_ok :  forall s, proc_spec (debug_spec) (debug s) recover abstr.
 
 
   Hint Resolve init_ok.
@@ -274,5 +283,6 @@ Module Type FSAPI.
   Hint Resolve readdir_ok.
   Hint Resolve recover_noop.
   Hint Resolve find_available_name_ok.
+  Hint Resolve debug_ok.
 
 End FSAPI.

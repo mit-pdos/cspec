@@ -12,6 +12,8 @@ Module MailServer (fs : FSAPI) <: MailServerAPI.
 
   Import ListNotations.
 
+  Definition maildir := ["/tmp/"%string; "mail/"%string]%list.
+
   Fixpoint mailbox_pred (mbox : mailbox) (missing_pred : pred pathname tree_node) : pred pathname tree_node :=
     match mbox with
     | nil => missing_pred
@@ -57,9 +59,9 @@ Module MailServer (fs : FSAPI) <: MailServerAPI.
 
 
   Definition deliver (user : string) (m : message) : proc unit :=
-    fn <- fs.find_available_name [user];
-    _ <- fs.create [user] fn;
-    _ <- fs.write_logged [user; fn] m;
+    fn <- fs.find_available_name (maildir ++ [user]);
+      _ <- fs.create (maildir ++ [user]) fn;
+    _ <- fs.write_logged (maildir ++ [ (user ++ "/" ++ fn)%string]) m;
     Ret tt.
 
   Fixpoint read' (user : string) (files : list string) : proc mailbox :=
@@ -94,8 +96,8 @@ Module MailServer (fs : FSAPI) <: MailServerAPI.
     Ret tt.
 
   Definition newuser : proc string :=
-    fn <- fs.find_available_name [];
-    _ <- fs.mkdir [] fn;
+    fn <- fs.find_available_name maildir;
+    _ <- fs.mkdir maildir fn;
     Ret fn.
 
 

@@ -62,7 +62,7 @@ docs: coq
 statdb-cli/extract: build/Lab1/StatDbCli.vo
 remap-nbd/extract: build/Lab2/RemappedServer.vo
 replicate-nbd/extract: build/Lab4/ReplicatedServer.vo
-mail-cli/extract: build/FS/MailCli.vo
+mail-cli/extract: build/FS/MailCli.vo mail-cli/lib/FS/Ops.hs
 
 bin/%: %/extract
 	mkdir -p $(@D)
