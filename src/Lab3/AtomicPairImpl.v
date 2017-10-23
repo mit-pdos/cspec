@@ -1,6 +1,7 @@
 Require Import POCS.
 Require Import AtomicPairAPI.
 Require Import Common.OneDiskAPI.
+Import ListNotations.
 
 
 Module AtomicPair (d : OneDiskAPI) <: AtomicPairAPI.
@@ -28,8 +29,6 @@ Module AtomicPair (d : OneDiskAPI) <: AtomicPairAPI.
 
   Hint Extern 2 (_ <> _ :> addr) => addr_omega.
   Hint Extern 2 (_ < _) => addr_omega.
-
-  Opaque diskGet.
 
   (* EXERCISE (3a): implement this procedure *)
   Definition get : proc (block*block) :=
@@ -100,7 +99,53 @@ Module AtomicPair (d : OneDiskAPI) <: AtomicPairAPI.
   (* EXERCISE (3a): come up with some examples of disks and pairs that satisfy
      the abstraction relation and those that don't. Prove them correct.
 
-     Come up with at least 3 positive examples and 3 negative examples. *)
+     Come up with at least 2 positive examples and 1 negative example. *)
+
+  (* SOL *)
+  Example abstraction_ok_ptr0 : forall b1 b2 b3 b4,
+      atomic_pair_abstraction
+        [block0; b1; b2; b3; b4] (b1, b2).
+  Proof.
+    unfold atomic_pair_abstraction; intuition auto.
+  Qed.
+
+  Example abstraction_ok_ptr1 : forall b1 b2 b3 b4,
+      atomic_pair_abstraction
+        [block1; b1; b2; b3; b4] (b3, b4).
+  Proof.
+    unfold atomic_pair_abstraction; simpl; intuition auto.
+    exfalso; eauto.
+    exfalso; eauto.
+  Qed.
+
+  Example abstraction_ok_ptr_same : forall b b1 b2,
+      atomic_pair_abstraction
+        [b; b1; b2; b1; b2] (b1, b2).
+  Proof.
+    unfold atomic_pair_abstraction; simpl; intuition auto.
+  Qed.
+
+  Example abstraction_nok_size : forall b1 b2,
+      ~atomic_pair_abstraction [] (b1, b2).
+  Proof.
+    unfold atomic_pair_abstraction; simpl; intuition auto.
+    omega.
+  Qed.
+
+  Example abstraction_nok_size2 : forall b1 b2,
+      ~atomic_pair_abstraction [block0; block1] (b1, b2).
+  Proof.
+    unfold atomic_pair_abstraction; simpl; intuition auto.
+    omega.
+  Qed.
+
+  Example abstraction_nok_size3 : forall b1 b2,
+      ~atomic_pair_abstraction [block0; block1; block0; block1] (b1, b2).
+  Proof.
+    unfold atomic_pair_abstraction; simpl; intuition auto.
+    omega.
+  Qed.
+  (* END *)
 
   Definition abstr : Abstraction AtomicPairAPI.State :=
     abstraction_compose d.abstr {| abstraction := atomic_pair_abstraction |}.
@@ -115,6 +160,8 @@ Module AtomicPair (d : OneDiskAPI) <: AtomicPairAPI.
      in *] in this lab to simplify diskGet/diskUpd expressions, rather than
      using the theorems manually. *)
   Notation "d [ a |-> b ]" := (diskUpd d a b) (at level 31, left associativity).
+
+  Opaque diskGet.
 
   (* EXERCISE (3b): prove your initialization procedure correct. *)
   Theorem init_ok : init_abstraction init recover abstr inited_any.
