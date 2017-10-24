@@ -5,6 +5,5 @@
 # uses GHC 8.0.2
 resolver: lts-9.5
 
-build:
-  library-profiling: true
-  executable-profiling: true
+packages:
+- '.'
