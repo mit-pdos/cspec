@@ -12,7 +12,8 @@ Module MailServer (fs : FSAPI) <: MailServerAPI.
 
   Import ListNotations.
 
-  Definition maildir := ["/tmp/"%string; "mail/"%string]%list.
+  Definition maildir := ["/tmp/"%string; "mail/"%string].
+  Definition tmpdir := ["/tmp/"%string].
 
   Fixpoint mailbox_pred (mbox : mailbox) (missing_pred : pred pathname tree_node) : pred pathname tree_node :=
     match mbox with
@@ -56,12 +57,12 @@ Module MailServer (fs : FSAPI) <: MailServerAPI.
       {| abstraction := mail_abstraction |}.
 
 
-
-
   Definition deliver (user : string) (m : message) : proc unit :=
+    tmpname <- fs.find_available_name tmpdir;
+    _ <- fs.create tmpdir tmpname;
+    _ <- fs.write_logged (tmpdir ++ [tmpname]) m;
     fn <- fs.find_available_name (maildir ++ [user]);
-      _ <- fs.create (maildir ++ [user]) fn;
-    _ <- fs.write_logged (maildir ++ [ (user ++ "/" ++ fn)%string]) m;
+    _ <- fs.rename_file (tmpdir ++ [tmpname]) (maildir ++ [user]) fn;
     Ret tt.
 
   Fixpoint read' (user : string) (files : list string) : proc mailbox :=

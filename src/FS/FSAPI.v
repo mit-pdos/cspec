@@ -214,24 +214,23 @@ Definition write_bypass_spec pn data : Specification _ _ unit State :=
     recovered := fun _ _ => False
   |}.
 
+Definition find_available_name_spec dirpn : Specification _ _ unit State :=
+  fun '(F, dirnum) state => {|
+    pre :=
+      set_latest state |= F * dirpn |-> Dir dirnum;
+    post := fun r state' =>
+      state' = state /\
+      exists F',
+      F' * (dirpn ++ [r]) |-> Missing ===> F;
+    recovered := fun _ _ => False
+  |}.
 
-  Definition find_available_name_spec dirpn : Specification _ _ unit FSAPI.State :=
-    fun '(F, dirnum) state => {|
-      pre :=
-        set_latest state |= F * dirpn |-> Dir dirnum;
-      post := fun r state' =>
-        state' = state /\
-        exists F',
-        F' * (dirpn ++ [r]) |-> Missing ===> F;
-      recovered := fun _ _ => False
-    |}.
-
-  Definition debug_spec : Specification _ _ unit FSAPI.State :=
-    fun (_: unit) state => {|
-      pre := True;
-      post := fun r state' => state = state' /\ r = tt;
-      recovered := fun _ _ => False
-    |}.
+Definition debug_spec : Specification _ _ unit State :=
+  fun (_: unit) state => {|
+    pre := True;
+    post := fun r state' => state = state' /\ r = tt;
+    recovered := fun _ _ => False
+  |}.
 
 Module Type FSAPI.
 
