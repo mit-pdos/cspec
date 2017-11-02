@@ -159,7 +159,7 @@ Module AtomicPair (d : OneDiskAPI) <: AtomicPairAPI.
      apply. We recommend using [autorewrite with upd] or [autorewrite with upd
      in *] in this lab to simplify diskGet/diskUpd expressions, rather than
      using the theorems manually. *)
-  Notation "d [ a |-> b ]" := (diskUpd d a b) (at level 31, left associativity).
+  Notation "d [ a |-> b ]" := (diskUpd d a b) (at level 8, left associativity).
 
   Opaque diskGet.
 
