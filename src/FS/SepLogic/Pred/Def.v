@@ -178,6 +178,14 @@ Section Predicates.
     rewrite mem_union_empty; eauto.
   Qed.
 
+  Theorem star_exists_r : forall T p1 (p2 : T -> _),
+     p1 * exis (fun x => p2 x) ===> exis (fun x => p1 * p2 x).
+  Admitted.
+
+  Theorem star_exists_l : forall T (p1 : T -> _) p2,
+     exis (fun x => p1 x) * p2 ===> exis (fun x => p1 x * p2).
+  Admitted.
+
 End Predicates.
 
 (** * Notation magic to make separation logic easy to write in Coq. *)

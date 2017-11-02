@@ -72,18 +72,67 @@ Instance pathname_eq : EquivDec.EqDec pathname eq.
   right. congruence.
 Qed.
 
+
+Definition maildir := ["/tmp/"%string; "mail/"%string].
+Definition tmpdir := ["/tmp/"%string].
+
+Global Opaque maildir.
+Global Opaque tmpdir.
+
+
+Axiom fs_concur : forall (tid : string) (p : pred pathname tree_node), pred pathname tree_node.
+Axiom fs_concur_star : forall tid p1 p2,
+  fs_concur tid (p1 * p2) ===> fs_concur tid p1 * fs_concur tid p2.
+Axiom fs_concur_dir : forall tid pn dirid,
+  fs_concur tid (pn |-> Dir dirid) ===> pn |-> Dir dirid.
+Axiom fs_concur_tmp1 : forall tid suffix handle f,
+  fs_concur tid ((tmpdir ++ [(tid ++ "."%string ++ suffix)%string]%list) |-> File handle f) ===>
+  (tmpdir ++ [(tid ++ "."%string ++ suffix)%string]%list) |-> File handle f.
+Axiom fs_concur_tmp2 : forall tid suffix,
+  fs_concur tid ((tmpdir ++ [(tid ++ "."%string ++ suffix)%string]%list) |-> Missing) ===>
+  (tmpdir ++ [(tid ++ "."%string ++ suffix)%string]%list) |-> Missing.
+Axiom fs_concur_maildir : forall tid user suffix,
+  fs_concur tid ((maildir ++ [user] ++ [(tid ++ "."%string ++ suffix)%string]%list) |-> Missing) ===>
+  (maildir ++ [user] ++ [(tid ++ "."%string ++ suffix)%string]%list) |-> Missing.
+
+
+Require Import Setoid Classes.Morphisms.
+
+Global Instance fs_concur_proper : Proper (eq ==> pimpl ==> pimpl) fs_concur.
+Admitted.
+
+Global Instance subtree_pred_proper : Proper (eq ==> pimpl ==> pimpl) subtree_pred.
+Admitted.
+
+Lemma fs_concur_exists : forall tid T (p : T -> _),
+  fs_concur tid (exists x, p x) ===> exists x, fs_concur tid (p x).
+Admitted.
+
+Lemma subtree_pred_exists : forall pn T (p : T -> _),
+  subtree_pred pn (exists x, p x) ===> exists x, subtree_pred pn (p x).
+Admitted.
+
+Lemma subtree_pred_star : forall pn p1 p2,
+  subtree_pred pn (p1 * p2) ===> subtree_pred pn p1 * subtree_pred pn p2.
+Admitted.
+
+Lemma subtree_pred_ptsto : forall pn a v,
+  subtree_pred pn (a |-> v) ===> (pn ++ a) |-> v.
+Admitted.
+
+
 Definition inited (s : State) : Prop :=
   set_older s = nil /\
   set_latest s |= nil |-> Dir 0 * empty_dir.
 
-Definition create_spec dir name : Specification _ _ unit State :=
+Definition create_spec tid dir name : Specification _ _ unit State :=
   fun '(F, dirnum) state => {|
     pre :=
       set_latest state |= F * dir |-> Dir dirnum * (dir ++ [name]) |-> Missing;
     post := fun r state' =>
       exists handle m,
       r = handle /\
-      m |= F * dir |-> Dir dirnum * (dir ++ [name]) |-> File handle empty_file /\
+      m |= fs_concur tid (F * dir |-> Dir dirnum * (dir ++ [name]) |-> File handle empty_file) /\
       (forall mold,
        set_in mold state ->
        ~ exists F' pn f', mold |= F' * pn |-> File handle f') /\
@@ -91,39 +140,39 @@ Definition create_spec dir name : Specification _ _ unit State :=
     recovered := fun _ _ => False
   |}.
 
-Definition mkdir_spec dir name : Specification _ _ unit State :=
+Definition mkdir_spec tid dir name : Specification _ _ unit State :=
   fun '(F, dirnum) state => {|
     pre :=
       set_latest state |= F * dir |-> Dir dirnum * (dir ++ [name]) |-> Missing;
     post := fun r state' =>
       exists newdirnum m,
       r = newdirnum /\
-      m |= F * dir |-> Dir dirnum * (dir ++ [name]) |-> Dir newdirnum *
-           subtree_pred (dir ++ [name]) empty_dir /\
+      m |= fs_concur tid (F * dir |-> Dir dirnum * (dir ++ [name]) |-> Dir newdirnum *
+           subtree_pred (dir ++ [name]) empty_dir) /\
       state' = set_add state m;
     recovered := fun _ _ => False
   |}.
 
-Definition delete_spec pn : Specification _ _ unit State :=
+Definition delete_spec tid pn : Specification _ _ unit State :=
   fun '(F, handle, f) state => {|
     pre :=
       set_latest state |= F * pn |-> File handle f;
     post := fun r state' =>
       exists m,
       r = tt /\
-      m |= F * pn |-> Missing /\
+      m |= fs_concur tid (F * pn |-> Missing) /\
       state' = set_add state m;
     recovered := fun _ _ => False
   |}.
 
-Definition rmdir_spec pn : Specification _ _ unit State :=
+Definition rmdir_spec tid pn : Specification _ _ unit State :=
   fun '(F, dirnum) state => {|
     pre :=
       set_latest state |= F * pn |-> Dir dirnum * subtree_pred pn empty_dir;
     post := fun r state' =>
       exists m,
       r = tt /\
-      m |= F * pn |-> Missing /\
+      m |= fs_concur tid (F * pn |-> Missing) /\
       state' = set_add state m;
     recovered := fun _ _ => False
   |}.
@@ -214,14 +263,14 @@ Definition write_bypass_spec pn data : Specification _ _ unit State :=
     recovered := fun _ _ => False
   |}.
 
-Definition find_available_name_spec dirpn : Specification _ _ unit State :=
+Definition find_available_name_spec tid dirpn : Specification _ _ unit State :=
   fun '(F, dirnum) state => {|
     pre :=
       set_latest state |= F * dirpn |-> Dir dirnum;
     post := fun r state' =>
+      exists suffix, r = (tid ++ "."%string ++ suffix)%string /\
       state' = state /\
-      exists F',
-      F' * (dirpn ++ [r]) |-> Missing ===> F;
+      set_latest state |= pred_eexcept F (dirpn ++ [r]) * (dirpn ++ [r]) |-> Missing * dirpn |-> Dir dirnum;
     recovered := fun _ _ => False
   |}.
 
@@ -252,10 +301,10 @@ Module Type FSAPI.
   Axiom abstr : Abstraction State.
 
   Axiom init_ok : init_abstraction init recover abstr inited.
-  Axiom create_ok : forall dir name, proc_spec (create_spec dir name) (create dir name) recover abstr.
-  Axiom mkdir_ok : forall dir name, proc_spec (mkdir_spec dir name) (mkdir dir name) recover abstr.
-  Axiom delete_ok : forall pn, proc_spec (delete_spec pn) (delete pn) recover abstr.
-  Axiom rmdir_ok : forall pn, proc_spec (rmdir_spec pn) (rmdir pn) recover abstr.
+  Axiom create_ok : forall tid dir name, proc_spec (create_spec tid dir name) (create dir name) recover abstr.
+  Axiom mkdir_ok : forall tid dir name, proc_spec (mkdir_spec tid dir name) (mkdir dir name) recover abstr.
+  Axiom delete_ok : forall tid pn, proc_spec (delete_spec tid pn) (delete pn) recover abstr.
+  Axiom rmdir_ok : forall tid pn, proc_spec (rmdir_spec tid pn) (rmdir pn) recover abstr.
   Axiom rename_file_ok : forall pn newdir newname, proc_spec (rename_file_spec pn newdir newname) (rename_file pn newdir newname) recover abstr.
   Axiom read_ok : forall pn, proc_spec (read_spec pn) (read pn) recover abstr.
   Axiom write_logged_ok : forall pn f, proc_spec (write_logged_spec pn f) (write_logged pn f) recover abstr.
@@ -264,8 +313,8 @@ Module Type FSAPI.
   Axiom readdir_ok : forall pn, proc_spec (readdir_spec pn) (readdir pn) recover abstr.
   Axiom recover_noop : rec_noop recover abstr no_crash.
   Axiom find_available_name_ok :
-    forall dirpn,
-    proc_spec (find_available_name_spec dirpn) (find_available_name dirpn) recover abstr.
+    forall tid dirpn,
+    proc_spec (find_available_name_spec tid dirpn) (find_available_name dirpn) recover abstr.
   Axiom debug_ok :  forall s, proc_spec (debug_spec) (debug s) recover abstr.
 
 

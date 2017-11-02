@@ -12,9 +12,6 @@ Module MailServer (fs : FSAPI) <: MailServerAPI.
 
   Import ListNotations.
 
-  Definition maildir := ["/tmp/"%string; "mail/"%string].
-  Definition tmpdir := ["/tmp/"%string].
-
   Fixpoint mailbox_pred (mbox : mailbox) (missing_pred : pred pathname tree_node) : pred pathname tree_node :=
     match mbox with
     | nil => missing_pred
@@ -46,9 +43,10 @@ Module MailServer (fs : FSAPI) <: MailServerAPI.
   Definition mail_abstraction (fs_state : FSAPI.State) (mail_state : MailServerAPI.State) : Prop :=
     let fs := set_latest fs_state in
     set_older fs_state = nil /\
-    exists users_and_mailboxes,
+    exists users_and_mailboxes maildirid tmpdirid Ftemp,
     mail_state |= user_mailbox_pred_m users_and_mailboxes /\
-    fs |= [] |-> Dir 0 * user_mailbox_pred_fs users_and_mailboxes empty_dir.
+    fs |= subtree_pred maildir ([] |-> Dir maildirid * user_mailbox_pred_fs users_and_mailboxes empty_dir) *
+          tmpdir |-> Dir tmpdirid * Ftemp.
 
 
   Definition abstr : Abstraction MailServerAPI.State :=
@@ -127,8 +125,7 @@ Module MailServer (fs : FSAPI) <: MailServerAPI.
 
     exists nil; simpl.
     intuition.
-    firstorder.
-  Qed.
+  Admitted.
 
 
   Lemma extract_user : forall s F uid m users_and_mailboxes,
@@ -144,6 +141,12 @@ Module MailServer (fs : FSAPI) <: MailServerAPI.
     user_pred uid m.
   Admitted.
 
+  Lemma pred_eexcept_maildir_tmpdir : forall mp fn,
+    pred_eexcept (subtree_pred maildir mp) (tmpdir ++ fn) ===>
+    subtree_pred maildir mp.
+  Admitted.
+
+
   Theorem deliver_ok :
     forall uid msg, proc_spec (deliver_spec uid msg) (deliver uid msg) recover abstr.
   Proof.
@@ -157,28 +160,68 @@ Module MailServer (fs : FSAPI) <: MailServerAPI.
     intuition.
     unfold mail_abstraction in *.
     intuition.
-    deex.
+    repeat deex.
 
     eapply (extract_user _ H0) in H1.
     repeat deex.
 
-(*
-    rewrite extract_user_fs in H2.
-*)
-
-    step_proc; intros.
-    simpl in *; intuition idtac; subst.
+    step_proc; intros; simpl in *; repeat deex.
     eexists (_, _); simpl; intuition idtac.
 
-    admit.
+    eapply pimpl_apply; eauto.
+    eapply pimpl_trans. apply star_comm.
+    eapply pimpl_trans. apply star_assoc.
+    reflexivity.
 
-    step_proc; intros. simpl in *. intuition. deex.
+    step_proc; intros; simpl in *; repeat deex.
     eexists (_, _); simpl; intuition idtac.
 
-    admit.
+    clear H2.
+    eapply pimpl_apply; eauto.
+    eapply pimpl_trans. apply star_comm.
+    eapply pimpl_trans. apply star_assoc.
+    eapply star_cancel. 2: reflexivity.
 
-    step_proc; intros. simpl in *. repeat deex.
+    eapply pimpl_trans. apply star_comm.
+    reflexivity.
+
+    step_proc; intros; simpl in *; repeat deex.
+    eexists (_, _, _); simpl; intuition idtac.
+
+    eapply pimpl_apply; eauto.
+    eapply pimpl_trans. apply fs_concur_star.
+    eapply star_cancel. reflexivity.
+    eapply pimpl_trans. apply fs_concur_tmp1.
+    reflexivity.
+
+    step_proc; intros; simpl in *; repeat deex.
+    eapply pimpl_apply in H6.
+    2: rewrite pred_eexcept_star.
+    2: rewrite pred_eexcept_maildir_tmpdir.
+    2: rewrite extract_user_fs.
+    2: unfold user_pred.
+    2: rewrite star_exists_r.
+    2: rewrite star_exists_r.
+    2: rewrite subtree_pred_exists.
+    2: rewrite star_exists_r.
+    2: rewrite star_exists_l.
+    2: rewrite fs_concur_exists.
+    2: rewrite star_exists_l.
+    2: reflexivity.
+    destruct H6.
+
     eexists (_, _); simpl; intuition idtac.
+
+    eapply pimpl_apply; eauto.
+    clear H2 H4 H3 H1 H5.
+    repeat rewrite subtree_pred_star.
+    rewrite subtree_pred_ptsto with (a := [uid]).
+    repeat rewrite fs_concur_star.
+    rewrite fs_concur_dir.
+
+    norm. cancel.
+
+    eapply pimpl_trans. apply star_assoc.
 
   Admitted.
 

@@ -28,10 +28,10 @@ Module FS <: FSAPI.
   Axiom abstr : Abstraction State.
 
   Axiom init_ok : init_abstraction init recover abstr inited.
-  Axiom create_ok : forall dir name, proc_spec (create_spec dir name) (create dir name) recover abstr.
-  Axiom mkdir_ok : forall dir name, proc_spec (mkdir_spec dir name) (mkdir dir name) recover abstr.
-  Axiom delete_ok : forall pn, proc_spec (delete_spec pn) (delete pn) recover abstr.
-  Axiom rmdir_ok : forall pn, proc_spec (rmdir_spec pn) (rmdir pn) recover abstr.
+  Axiom create_ok : forall tid dir name, proc_spec (create_spec tid dir name) (create dir name) recover abstr.
+  Axiom mkdir_ok : forall tid dir name, proc_spec (mkdir_spec tid dir name) (mkdir dir name) recover abstr.
+  Axiom delete_ok : forall tid pn, proc_spec (delete_spec tid pn) (delete pn) recover abstr.
+  Axiom rmdir_ok : forall tid pn, proc_spec (rmdir_spec tid pn) (rmdir pn) recover abstr.
   Axiom rename_file_ok : forall pn newdir newname, proc_spec (rename_file_spec pn newdir newname) (rename_file pn newdir newname) recover abstr.
   Axiom read_ok : forall pn, proc_spec (read_spec pn) (read pn) recover abstr.
   Axiom write_logged_ok : forall pn f, proc_spec (write_logged_spec pn f) (write_logged pn f) recover abstr.
@@ -39,8 +39,8 @@ Module FS <: FSAPI.
   Axiom stat_ok : forall pn n, proc_spec (stat_spec pn n) (stat pn n) recover abstr.
   Axiom readdir_ok : forall pn, proc_spec (readdir_spec pn) (readdir pn) recover abstr.
   Axiom recover_noop : rec_noop recover abstr no_crash.
-  Axiom find_available_name_ok :  forall dirpn,
-    proc_spec (find_available_name_spec dirpn) (find_available_name dirpn) recover abstr.
+  Axiom find_available_name_ok :  forall tid dirpn,
+    proc_spec (find_available_name_spec tid dirpn) (find_available_name dirpn) recover abstr.
   Axiom debug_ok :  forall s, proc_spec (debug_spec) (debug s) recover abstr.
 
 
