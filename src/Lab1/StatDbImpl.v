@@ -42,9 +42,6 @@ Module StatDB (v : VarsAPI) <: StatDbAPI.
 
   Definition init := then_init v.init init'.
 
-  Definition recover : proc unit :=
-    v.recover.
-
   (** ** Exercise : complete the implementation of the abstraction function: *)
   Definition statdb_abstraction (vars_state : VariablesAPI.State) (statdb_state : StatDbAPI.State) : Prop :=
   (* SOL *)
@@ -80,7 +77,7 @@ Module StatDB (v : VarsAPI) <: StatDbAPI.
   (* END *)
   (* STUB: Admitted. *)
 
-  Theorem init_ok : init_abstraction init recover abstr inited.
+  Theorem init_ok : init_abstraction init abstr inited.
   Proof.
     eapply then_init_compose; eauto.
     unfold init'.
@@ -103,7 +100,7 @@ Module StatDB (v : VarsAPI) <: StatDbAPI.
   Qed.
 
   (** ** Exercise : complete the proof of [add] *)
-  Theorem add_ok : forall v, proc_spec (add_spec v) (add v) recover abstr.
+  Theorem add_ok : forall v, proc_spec (add_spec v) (add v) abstr.
   Proof.
     unfold add.
     intros.
@@ -131,14 +128,12 @@ Module StatDB (v : VarsAPI) <: StatDbAPI.
     eexists; intuition auto.
     unfold statdb_abstraction in *; simpl in *.
     intuition omega.
-
-    autounfold in *; intuition.
   Qed.
   (* END *)
   (* STUB: Admitted. *)
 
   (** ** Exercise : complete the proof of [mean] *)
-  Theorem mean_ok : proc_spec mean_spec mean recover abstr.
+  Theorem mean_ok : proc_spec mean_spec mean abstr.
   Proof.
     unfold mean.
     intros.
@@ -156,7 +151,6 @@ Module StatDB (v : VarsAPI) <: StatDbAPI.
       eauto.
 
       simpl in *; intuition subst.
-      2: autounfold in *; intuition.
 
       unfold statdb_abstraction in *.
       destruct s; intuition; simpl in *; try congruence.
@@ -169,7 +163,6 @@ Module StatDB (v : VarsAPI) <: StatDbAPI.
       eauto.
 
       simpl in *; intuition subst.
-      2: autounfold in *; intuition.
 
       unfold statdb_abstraction in *.
       destruct s; intuition.
@@ -181,20 +174,6 @@ Module StatDB (v : VarsAPI) <: StatDbAPI.
   (* END *)
   (* STUB: Admitted. *)
 
-
-  Theorem recover_noop : rec_noop recover abstr no_crash.
-  Proof.
-    unfold rec_noop.
-    intros.
-
-    apply spec_abstraction_compose; simpl.
-    step_proc_basic; intros.
-    eauto.
-
-    destruct a; simpl in *.
-    intuition.
-    eauto.
-  Qed.
 
 End StatDB.
 

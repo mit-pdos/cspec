@@ -33,7 +33,7 @@ Record State := mkState {
   The postcondition states the value returned by [read] is either [count] or
   [sum], depending on which variable is read. *)
 
-Definition read_spec v : Specification _ _ unit _ :=
+Definition read_spec v : Specification _ _ _ :=
   fun (_ : unit) state => {|
     pre := True;
     post := fun r state' =>
@@ -42,7 +42,6 @@ Definition read_spec v : Specification _ _ unit _ :=
       | VarCount => r = StateCount state
       | VarSum => r = StateSum state
       end;
-    recovered := fun _ _ => False
   |}.
 
 (** An implementation of [write] has the same precondition as [read].  The
@@ -50,7 +49,7 @@ Definition read_spec v : Specification _ _ unit _ :=
   or [StateSum] is updated, depending on which variable [write] writes. The
   return value is tt. *)
 
-Definition write_spec v val : Specification _ _ unit _ :=
+Definition write_spec v val : Specification _ _ _ :=
   fun (_ : unit) state => {|
     pre := True;
     post := fun r state' =>
@@ -59,7 +58,6 @@ Definition write_spec v val : Specification _ _ unit _ :=
       | VarCount => state' = mkState val (StateSum state)
       | VarSum => state' = mkState (StateCount state) val
       end;
-    recovered := fun _ _ => False
   |}.
 
 
@@ -77,20 +75,17 @@ Module Type VarsAPI.
   Axiom init : proc InitResult.
   Axiom read : var -> proc nat.
   Axiom write : var -> nat -> proc unit.
-  Axiom recover : proc unit.
 
   Axiom abstr : Abstraction State.
 
   (* Note that [inited_any] allows any initial state, meaning StatDB is required
      to initialize its variables appropriately. *)
-  Axiom init_ok : init_abstraction init recover abstr inited_any.
-  Axiom read_ok : forall v, proc_spec (read_spec v) (read v) recover abstr.
-  Axiom write_ok : forall v val, proc_spec (write_spec v val) (write v val) recover abstr.
-  Axiom recover_noop : rec_noop recover abstr no_crash.
+  Axiom init_ok : init_abstraction init abstr inited_any.
+  Axiom read_ok : forall v, proc_spec (read_spec v) (read v) abstr.
+  Axiom write_ok : forall v val, proc_spec (write_spec v val) (write v val) abstr.
 
   Hint Resolve init_ok.
   Hint Resolve read_ok.
   Hint Resolve write_ok.
-  Hint Resolve recover_noop.
 
 End VarsAPI.

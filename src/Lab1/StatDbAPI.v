@@ -51,22 +51,20 @@ Definition inited (s : State) : Prop :=
 
  *)
 
-Definition add_spec v : Specification unit unit unit State :=
+Definition add_spec v : Specification unit unit State :=
   fun (_ : unit) state => {|
     pre := True;
     post := fun r state' =>
       r = tt /\ state' = v :: state;
-    recovered := fun _ _ => False
   |}.
 
-Definition mean_spec : Specification unit (option nat) unit State :=
+Definition mean_spec : Specification unit (option nat) State :=
   fun (_ : unit) state => {|
     pre := True;
     post := fun r state' =>
       state' = state /\
       (state = nil /\ r = None \/
        state <> nil /\ r = Some (fold_right plus 0 state / length state));
-    recovered := fun _ _ => False
   |}.
 
 
@@ -90,16 +88,14 @@ Module Type StatDbAPI.
   Axiom init : proc InitResult.
   Axiom add : nat -> proc unit.
   Axiom mean : proc (option nat).
-  Axiom recover : proc unit.
 
   (** The abstraction relation between spec and code state *)
   Axiom abstr : Abstraction State.
 
   (** The proofs that the implementation methods meet their specs: *)
-  Axiom init_ok : init_abstraction init recover abstr inited.
-  Axiom add_ok : forall v, proc_spec (add_spec v) (add v) recover abstr.
-  Axiom mean_ok : proc_spec mean_spec mean recover abstr.
-  Axiom recover_noop : rec_noop recover abstr no_crash.
+  Axiom init_ok : init_abstraction init abstr inited.
+  Axiom add_ok : forall v, proc_spec (add_spec v) (add v) abstr.
+  Axiom mean_ok : proc_spec mean_spec mean abstr.
 
   (** Hints to proof automation to apply the following proofs when "stepping"
   through a procedure: e.g., if Coq has a [add] goal, it will try to apply
@@ -108,6 +104,5 @@ Module Type StatDbAPI.
   Hint Resolve init_ok.
   Hint Resolve add_ok.
   Hint Resolve mean_ok.
-  Hint Resolve recover_noop.
 
 End StatDbAPI.

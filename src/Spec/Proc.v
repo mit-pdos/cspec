@@ -104,10 +104,11 @@ Axiom world : Type.
 *)
 
 Inductive Result T :=
-| Finished (v:T) (w:world)
-| Crashed (w:world).
+| Finished (v:T) (w:world).
 
+(*
 Arguments Crashed {T} w.
+*)
 
 (** To define the execution of procedures, we need to state an axiom about how our
     opaque [baseOpT] primitives execute. This axiom is [base_step]. This is
@@ -145,113 +146,9 @@ Inductive exec : forall T, proc T -> world -> Result T -> Prop :=
 
 | ExecOp : forall T (op: baseOpT T) w v w',
     base_step op w v w' ->
-    exec (BaseOp op) w (Finished v w')
-
-(** - And finally, it defines how procedures can crash.  Any procedure
-      can crash just before it starts running or just after it finishes.
-      [Bind] can crash in the middle of running the first sub-procedure.
-      Crashes during the second sub-procedure of a [Bind] are covered by
-      the [ExecBindFinished] constructor above.
-  *)
-
-| ExecCrashBegin : forall T (p: proc T) w,
-    exec p w (Crashed w)
-| ExecCrashEnd : forall T (p: proc T) w v w',
-    exec p w (Finished v w') ->
-    exec p w (Crashed w')
-| ExecBindCrashed : forall T T' (p: proc T) (p': T -> proc T')
-                      w w',
-    exec p w (Crashed w') ->
-    exec (Bind p p') w (Crashed w').
+    exec (BaseOp op) w (Finished v w').
 
 
-(** * Execution model with recovery
-
-    We also define a model of how our system executes procedures in the
-    presence of recovery after a crash.  What we want to model is a system
-    that, after a crash, reboots and starts running some recovery procedure
-    (like [fsck] in a Unix system to fix up the state of a file system).
-    If the system crashes again while running the recovery procedure, it
-    starts running the same recovery procedure again after reboot.
-
-  *)
-
-(** When we talk about recovery, we need to capture one more property of
-    crashes. Above, a crash just stops execution. In practice, however, some
-    parts of the state are volatile and are lost after a crash, such as memory
-    contents or disk write buffers. Our model is that, on a crash, the world
-    state is modified according to the opaque [world_crash] function, which we
-    define as an axiom. This relation is meant to capture the computer losing
-    volatile state, such as memory contents or disk write buffers.
- *)
-
-Axiom world_crash : world -> world.
-
-(** Before we talk about the whole execution, we first just model executing the
-    recovery procedure, including repeated attempts in the case of a crash
-    during recovery. [exec_recover rec w rv w'] means the procedure [rec] can
-    execute from [w] to [w'], ultimately returning [rv] (a "recovery value"),
-    and possibly crashing and restarting multiple times along the way.
-  *)
-
-Inductive exec_recover R (rec:proc R) (w:world) : R -> world -> Prop :=
-
-(** The first constructor, [ExecRecoverExec], says that if the recovery
-    procedure [rec] executes and finishes normally, then that's a possible
-    outcome for [exec_recover].
-  *)
-
-| ExecRecoverExec : forall v w',
-    exec rec w (Finished v w') ->
-    exec_recover rec w v w'
-
-(** The second constructor, [ExecRecoverCrashDuringRecovery], allows repeated
-    crashes by referring to [exec_recover] recursively. In between crashes, the
-    world state is transformed according to [world_crash].
-  *)
-
-| ExecRecoverCrashDuringRecovery : forall w' v w'',
-    exec rec w (Crashed w') ->
-    exec_recover rec (world_crash w') v w'' ->
-    exec_recover rec w v w''.
-
-(** * Chaining normal execution with recovery *)
-
-(** [RResult] ("recovery result") is the outcome of running a procedure with
-    recovery. It is similar to the [Result] type defined above, except that in
-    the case of a crash, we run a recovery procedure and get both a final state
-    _and_ a return value from the recovery procedure.
-*)
-Inductive RResult T R :=
-| RFinished (v:T) (w:world)
-| Recovered (v:R) (w:world).
-
-Arguments RFinished {T R} v w.
-Arguments Recovered {T R} v w.
-
-(** Finally, [rexec] defines what it means to run a procedure and use
-    some recovery procedure on crashes, including crashes during recovery.
-    [rexec] says that:
-
-    - either the original procedure [p] finishes and returns a [RFinished]
-      outcome, or
-    - [p] crashes, and after running the recovery procedure [rec] one or
-      more times, the system eventually stops crashing, [rec] finishes,
-      and produces a [Recovered] outcome.
-
-    Note that there is no recursion in this definition; it merely combines
-    normal execution with crash execution followed by recovery execution, each
-    of which is defined above.
-  *)
-
-Inductive rexec T R : proc T -> proc R -> world -> RResult T R -> Prop :=
-| RExec : forall (p:proc T) (rec:proc R) w v w',
-    exec p w (Finished v w') ->
-    rexec p rec w (RFinished v w')
-| RExecCrash : forall (p:proc T) (rec:proc R) w w' rv w'',
-    exec p w (Crashed w') ->
-    exec_recover rec (world_crash w') rv w'' ->
-    rexec p rec w (Recovered rv w'').
 
 (** * Notation for composing procedures.
 

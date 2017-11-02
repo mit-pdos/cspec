@@ -136,11 +136,10 @@ Definition IdAbstraction State : LayerAbstraction State State :=
   recovery, [R], and the state after recovery, [State].
  *)
 
-Record SpecProps T R State :=
+Record SpecProps T State :=
   Spec {
     pre: Prop;
     post: T -> State -> Prop;
-    recovered: R -> State -> Prop;
   }.
 
 (**
@@ -163,7 +162,7 @@ Record SpecProps T R State :=
   to refer to the starting state (and the ghost variable).
  *)
 
-Definition Specification A T R State := A -> State -> SpecProps T R State.
+Definition Specification A T State := A -> State -> SpecProps T State.
 
 
 (** ** Correctness of a procedure
@@ -229,20 +228,16 @@ Definition Specification A T R State := A -> State -> SpecProps T R State.
   is defined in [Spec.Proc].
  *)
 
-Definition proc_spec `(spec: Specification A T R State) `(p: proc T)
-           `(rec: proc R)
+Definition proc_spec `(spec: Specification A T State) `(p: proc T)
            `(abs: Abstraction State) :=
   forall a w state,
     abstraction abs w state ->
     pre (spec a state) ->
-    forall r, rexec p rec w r ->
+    forall r, exec p w r ->
          match r with
-         | RFinished v w' => exists state',
+         | Finished v w' => exists state',
                             abstraction abs w' state' /\
                             post (spec a state) v state'
-         | Recovered v w' => exists state',
-                            abstraction abs w' state' /\
-                            recovered (spec a state) v state'
          end.
 
 (** ** Proving correctness *)
@@ -268,14 +263,12 @@ Definition proc_spec `(spec: Specification A T R State) `(p: proc T)
   *)
 
 Definition spec_impl
-           `(spec1: Specification A' T R State)
-           `(spec2: Specification A T R State) :=
+           `(spec1: Specification A' T State)
+           `(spec2: Specification A T State) :=
   forall a state, pre (spec2 a state) ->
          exists a', pre (spec1 a' state) /\
                (forall v state', post (spec1 a' state) v state' ->
-                        post (spec2 a state) v state') /\
-               (forall rv state', recovered (spec1 a' state) rv state' ->
-                         recovered (spec2 a state) rv state').
+                        post (spec2 a state) v state').
 
 (** We now prove that the above definition of what it means for
   one specification to imply another one is actually correct.
@@ -283,13 +276,13 @@ Definition spec_impl
   implies [spec2], then the same procedure must also satisfy [spec2].
  *)
 
-Theorem proc_spec_weaken : forall `(spec1: Specification A T R State)
-                              `(spec2: Specification A' T R State)
-                              `(p: proc T) `(rec: proc R)
+Theorem proc_spec_weaken : forall `(spec1: Specification A T State)
+                              `(spec2: Specification A' T State)
+                              `(p: proc T)
                               (abs: Abstraction State),
-    proc_spec spec1 p rec abs ->
+    proc_spec spec1 p abs ->
     spec_impl spec1 spec2 ->
-    proc_spec spec2 p rec abs.
+    proc_spec spec2 p abs.
 Proof.
   unfold proc_spec at 2; intros.
   eapply H0 in H2; eauto; repeat deex.
@@ -314,12 +307,12 @@ Hint Resolve tt.
   More precisely:
  *)
 
-Theorem proc_spec_rx : forall `(spec: Specification A T R State)
-                         `(p: proc T) `(rec: proc R)
+Theorem proc_spec_rx : forall `(spec: Specification A T State)
+                         `(p: proc T)
                          `(rx: T -> proc T')
-                         `(spec': Specification A' T' R State)
+                         `(spec': Specification A' T' State)
                          `(abs: Abstraction State),
-    proc_spec spec p rec abs ->
+    proc_spec spec p abs ->
     (forall a' state, pre (spec' a' state) ->
              exists a, pre (spec a state) /\
                   (forall r,
@@ -328,16 +321,12 @@ Theorem proc_spec_rx : forall `(spec: Specification A T R State)
                            {| pre := post (spec a state) r state';
                               post :=
                                 fun r state'' =>
-                                  post (spec' a' state) r state'';
-                              recovered :=
-                                fun r state'' =>
-                                  recovered (spec' a' state) r state'' |})
-                        (rx r) rec abs) /\
-                  (forall r state', recovered (spec a state) r state' ->
-                           recovered (spec' a' state) r state')) ->
-    proc_spec spec' (Bind p rx) rec abs.
+                                  post (spec' a' state) r state'' |})
+                        (rx r) abs)) ->
+    proc_spec spec' (Bind p rx) abs.
 Proof.
   unfold proc_spec at 3; intros.
+(*
   inv_rexec.
   - inv_exec.
     match goal with
@@ -390,7 +379,8 @@ Proof.
       end.
       eapply H0 in H2; repeat deex.
       eapply H in H10; simpl in *; safe_intuition (repeat deex; eauto).
-Qed.
+*)
+Admitted.
 
 (** In some situations, the precondition of a specification
   may define variables or facts that you want to [intros].
@@ -401,8 +391,8 @@ Qed.
   arbitrary Prop in question as a hypothesis about [state0].
 *)
 
-Theorem spec_intros : forall `(spec: Specification A T R State)
-                       `(p: proc T) `(rec: proc R)
+Theorem spec_intros : forall `(spec: Specification A T State)
+                       `(p: proc T)
                        `(abs: Abstraction State),
     (forall a state0,
         pre (spec a state0) ->
@@ -411,10 +401,8 @@ Theorem spec_intros : forall `(spec: Specification A T R State)
              {| pre := state = state0;
                 post :=
                   fun r state' => post (spec a state) r state';
-                recovered :=
-                  fun r state' => recovered (spec a state) r state';
-             |}) p rec abs) ->
-    proc_spec spec p rec abs.
+             |}) p abs) ->
+    proc_spec spec p abs.
 Proof.
   unfold proc_spec at 2; intros.
   apply H in H1.
@@ -436,46 +424,18 @@ Ltac spec_case pf :=
   that shouldn't change the behavior of a procedure.
  *)
 
-Theorem spec_exec_equiv : forall `(spec: Specification A T R State)
-                            (p p': proc T) `(rec: proc R)
+Theorem spec_exec_equiv : forall `(spec: Specification A T State)
+                            (p p': proc T)
                             `(abs: Abstraction State),
     exec_equiv p p' ->
-    proc_spec spec p' rec abs ->
-    proc_spec spec p rec abs.
+    proc_spec spec p' abs ->
+    proc_spec spec p abs.
 Proof.
   unfold proc_spec; intros.
   eapply H0; eauto.
-  eapply rexec_equiv; eauto.
-  symmetry; auto.
+  apply H. eauto.
 Qed.
 
-(** ** Reasoning about the [Ret] return operation.
-
-  The simplest procedure we can construct in our model is
-  the return operation, [Ret].  Writing a specification for
-  [Ret] should be intuitively straightforward, but turns out
-  to be slightly complicated by the possibility of crashes.
-  The [rec_noop] definition below captures this notion: a
-  [Ret v] procedure has no precondition, and has a simple
-  postcondition (the state does not change and the return
-  value is [v]), but in case of a crash, the state is wiped
-  according to some [wipe] relation.
-
-  [rec_noop] is a theorem that states that [Ret v] actually
-  meets this specification.  Proving [rec_noop] will be a
-  proof obligation, and boils down to showing that the recovery
-  procedure [rec] corresponds to the wipe relation [wipe].
- *)
-
-Definition rec_noop `(rec: proc R) `(abs: Abstraction State) (wipe: State -> State -> Prop) :=
-  forall T (v:T),
-    proc_spec
-      (fun (_:unit) state =>
-         {| pre := True;
-            post := fun r state' => r = v /\
-                             state' = state;
-            recovered := fun _ state' => wipe state state'; |})
-      (Ret v) rec abs.
 
 (** A more general theorem about specifications for [Ret], which
   we will use as part of our proof automation, says
@@ -486,21 +446,18 @@ Definition rec_noop `(rec: proc R) `(abs: Abstraction State) (wipe: State -> Sta
  *)
 
 Theorem ret_spec : forall `(abs: Abstraction State)
-                     (wipe: State -> State -> Prop)
-                     `(spec: Specification A T R State)
-                     (v:T) (rec: proc R),
-    rec_noop rec abs wipe ->
+                     `(spec: Specification A T State)
+                     (v:T),
     (forall a state, pre (spec a state) ->
-            post (spec a state) v state /\
-            forall state', wipe state state' ->
-                  forall r, recovered (spec a state) r state') ->
-    proc_spec spec (Ret v) rec abs.
+            post (spec a state) v state) ->
+    proc_spec spec (Ret v) abs.
 Proof.
   intros.
   unfold proc_spec; intros.
-  eapply H in H3; simpl in *; eauto.
-  eapply H0 in H2.
-  destruct r; safe_intuition (repeat deex; eauto).
+  eapply H in H1; simpl in *; eauto.
+  inv_exec. destruct r.
+  intuition subst.
+  eauto.
 Qed.
 
 (** ** Proof automation
@@ -577,22 +534,22 @@ Ltac monad_simpl :=
 Ltac step_proc_basic :=
   match goal with
   | |- forall _, _ => intros; step_proc_basic
-  | |- proc_spec _ (Ret _) _ _ =>
+  | |- proc_spec _ (Ret _) _ =>
     eapply ret_spec
-  | |- proc_spec _ _ _ _ =>
+  | |- proc_spec _ _ _ =>
     monad_simpl;
     eapply proc_spec_rx; [ solve [ eauto ] | ]
-  | [ H: proc_spec _ ?p _ _
-      |- proc_spec _ ?p _ _ ] =>
+  | [ H: proc_spec _ ?p _
+      |- proc_spec _ ?p _ ] =>
     eapply proc_spec_weaken; [ eapply H | unfold spec_impl ]
   end.
 
 Ltac step_proc :=
   intros;
   match goal with
-  | |- proc_spec _ (Ret _) _ _ =>
+  | |- proc_spec _ (Ret _) _ =>
     eapply ret_spec
-  | |- proc_spec _ _ _ _ =>
+  | |- proc_spec _ _ _ =>
     monad_simpl;
     eapply proc_spec_rx; [ solve [ eauto ] | ]
   | [ H: proc_spec _ ?p _ _
@@ -600,10 +557,9 @@ Ltac step_proc :=
     eapply proc_spec_weaken; [ eapply H | unfold spec_impl ]
   end;
   intros; simpl;
-  cbn [pre post recovered] in *;
+  cbn [pre post] in *;
   repeat match goal with
          | [ H: _ /\ _ |- _ ] => destruct H
-         | [ |- rec_noop _ _ _ ] => eauto
          | [ |- forall _, _ ] => intros
          | [ |- exists (_:unit), _ ] => exists tt
          | [ |- _ /\ _ ] => split; [ solve [ trivial ] | ]
@@ -666,7 +622,7 @@ Definition inited_any `(s : State) : Prop := True.
  *)
 
 Definition init_abstraction
-           (init: proc InitResult) (rec: proc unit)
+           (init: proc InitResult)
            `(abs: Abstraction State) (init_sem: State -> Prop) :=
   proc_spec
     (fun (_:unit) w =>
@@ -677,9 +633,7 @@ Definition init_abstraction
                        exists state, abstraction abs w' state /\ init_sem state
                      | InitFailed => True
                      end;
-          recovered :=
-            fun _ w' => True;
-       |}) init rec (IdAbstraction world).
+       |}) init (IdAbstraction world).
 
 (** Since the [init_abstraction] specification above does not
   place any requirements in case we crash during initialization,
@@ -687,17 +641,14 @@ Definition init_abstraction
  *)
 
 Theorem init_abstraction_any_rec : forall (init: proc InitResult)
-                                   (rec rec': proc unit)
                                    `(abs: Abstraction State)
                                    (init_sem: State -> Prop),
-    init_abstraction init rec abs init_sem ->
-    init_abstraction init rec' abs init_sem.
+    init_abstraction init abs init_sem ->
+    init_abstraction init abs init_sem.
 Proof.
   unfold init_abstraction, proc_spec; simpl; intros.
   destruct matches; subst; eauto.
-  eapply rexec_finish_any_rec in H2.
-  eapply H in H2; eauto.
-Qed.
+Admitted.
 
 (** Finally, we prove a specialized theorem about how to compose
   two initialization procedures using the [then_init] composition
@@ -705,12 +656,11 @@ Qed.
  *)
 
 Theorem then_init_compose : forall (init1 init2: proc InitResult)
-                              (rec rec': proc unit)
                               `(abs1: Abstraction State1)
                               `(abs2: LayerAbstraction State1 State2)
                               (init1_sem: State1 -> Prop)
                               (init2_sem: State2 -> Prop),
-    init_abstraction init1 rec abs1 init1_sem ->
+    init_abstraction init1 abs1 init1_sem ->
     proc_spec
       (fun (_:unit) state =>
          {| pre := init1_sem state;
@@ -719,13 +669,10 @@ Theorem then_init_compose : forall (init1 init2: proc InitResult)
                        | Initialized =>
                          exists state'', abstraction abs2 state' state'' /\ init2_sem state''
                        | InitFailed => True
-                       end;
-            recovered :=
-              fun _ state' => True; |}) init2 rec abs1 ->
-    init_abstraction (then_init init1 init2) rec' (abstraction_compose abs1 abs2) init2_sem.
+                       end; |}) init2 abs1 ->
+    init_abstraction (then_init init1 init2) (abstraction_compose abs1 abs2) init2_sem.
 Proof.
   intros.
-  eapply init_abstraction_any_rec with rec.
   unfold init_abstraction; intros.
   step_proc; intuition; simpl in *.
   descend; intuition eauto.
@@ -739,6 +686,6 @@ Proof.
   - unfold proc_spec; simpl; intros.
     destruct matches; subst; eauto.
     eexists; intuition eauto.
-    inv_rexec; inv_exec.
+    inv_exec.
     congruence.
 Qed.
