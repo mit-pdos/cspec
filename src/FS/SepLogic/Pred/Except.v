@@ -33,9 +33,9 @@ Proof.
 *)
 Admitted.
 
-Axiom pred_eexcept_ptsto_eq : forall `(F: pred A V) {AEQ: EqDec A eq} a (v : V),
+Axiom pred_eexcept_ptsto_eq : forall {A V} {AEQ: EqDec A eq} a (v : V),
   pred_eexcept (a |-> v) a ===> emp.
-Axiom pred_eexcept_ptsto_ne : forall `(F: pred A V) {AEQ: EqDec A eq} a' a (v : V),
+Axiom pred_eexcept_ptsto_ne : forall {A V} {AEQ: EqDec A eq} a' a (v : V),
   a <> a' ->
   pred_eexcept (a |-> v) a' ===> a |-> v.
 Axiom pred_eexcept_star : forall `(p1: pred A V) p2 {AEQ: EqDec A eq} a',

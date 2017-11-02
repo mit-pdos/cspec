@@ -148,7 +148,7 @@ Module MailServer (fs : FSAPI) <: MailServerAPI.
 
 
   Theorem deliver_ok :
-    forall uid msg, proc_spec (deliver_spec uid msg) (deliver uid msg) recover abstr.
+    forall (uid : string) msg, proc_spec (deliver_spec uid msg) (deliver uid msg) recover abstr.
   Proof.
     unfold deliver.
     intros.
@@ -178,34 +178,34 @@ Module MailServer (fs : FSAPI) <: MailServerAPI.
 
     clear H2.
     eapply pimpl_apply; eauto.
-    eapply pimpl_trans. apply star_comm.
-    eapply pimpl_trans. apply star_assoc.
-    eapply star_cancel. 2: reflexivity.
-
-    eapply pimpl_trans. apply star_comm.
-    reflexivity.
+    repeat rewrite subtree_pred_star.
+    repeat rewrite pred_eexcept_star.
+    repeat rewrite fs_concur_star.
+    rewrite fs_concur_dir.
+    replace (String "." suffix) with ("." ++ suffix)%string by reflexivity.
+    rewrite fs_concur_tmp2.
+    norm. cancel. denorm. reflexivity.
 
     step_proc; intros; simpl in *; repeat deex.
     eexists (_, _, _); simpl; intuition idtac.
 
     eapply pimpl_apply; eauto.
-    eapply pimpl_trans. apply fs_concur_star.
-    eapply star_cancel. reflexivity.
-    eapply pimpl_trans. apply fs_concur_tmp1.
-    reflexivity.
+    repeat rewrite fs_concur_star.
+    replace (String "." suffix) with ("." ++ suffix)%string by reflexivity.
+    rewrite fs_concur_tmp1.
+    norm. cancel. denorm. reflexivity.
 
     step_proc; intros; simpl in *; repeat deex.
     eapply pimpl_apply in H6.
-    2: rewrite pred_eexcept_star.
     2: rewrite pred_eexcept_maildir_tmpdir.
     2: rewrite extract_user_fs.
     2: unfold user_pred.
     2: rewrite star_exists_r.
     2: rewrite star_exists_r.
     2: rewrite subtree_pred_exists.
-    2: rewrite star_exists_r.
-    2: rewrite star_exists_l.
     2: rewrite fs_concur_exists.
+    2: rewrite fs_concur_exists.
+    2: rewrite star_exists_r.
     2: rewrite star_exists_l.
     2: reflexivity.
     destruct H6.
@@ -217,11 +217,33 @@ Module MailServer (fs : FSAPI) <: MailServerAPI.
     repeat rewrite subtree_pred_star.
     rewrite subtree_pred_ptsto with (a := [uid]).
     repeat rewrite fs_concur_star.
-    rewrite fs_concur_dir.
+    repeat rewrite fs_concur_dir.
 
-    norm. cancel.
+    norm. cancel. denorm. reflexivity.
 
-    eapply pimpl_trans. apply star_assoc.
+    step_proc; intros; simpl in *; repeat deex.
+    eexists (_, _, _, _); simpl; intuition idtac.
+    clear H2 H4 H3 H1 H5.
+    eapply pimpl_apply; eauto.
+    clear H8.
+
+    repeat rewrite pred_eexcept_star.
+    repeat rewrite fs_concur_star.
+    rewrite pred_eexcept_ptsto_ne.
+    repeat rewrite fs_concur_dir.
+    replace (String "." suffix) with ("." ++ suffix)%string by reflexivity.
+    rewrite fs_concur_tmp1.
+    replace (String "." suffix0) with ("." ++ suffix0)%string by reflexivity.
+    rewrite <- app_assoc.
+    rewrite fs_concur_maildir.
+
+    norm. cancel. denorm. reflexivity.
+    admit.
+
+    step_proc; intros; simpl in *; repeat deex.
+    eexists; simpl; intuition idtac.
+
+    
 
   Admitted.
 

@@ -94,6 +94,8 @@ Axiom fs_concur_tmp2 : forall tid suffix,
 Axiom fs_concur_maildir : forall tid user suffix,
   fs_concur tid ((maildir ++ [user] ++ [(tid ++ "."%string ++ suffix)%string]%list) |-> Missing) ===>
   (maildir ++ [user] ++ [(tid ++ "."%string ++ suffix)%string]%list) |-> Missing.
+Axiom fs_concur_idem : forall tid p,
+  fs_concur tid (fs_concur tid p) ===> fs_concur tid p.
 
 
 Require Import Setoid Classes.Morphisms.
@@ -270,7 +272,7 @@ Definition find_available_name_spec tid dirpn : Specification _ _ unit State :=
     post := fun r state' =>
       exists suffix, r = (tid ++ "."%string ++ suffix)%string /\
       state' = state /\
-      set_latest state |= pred_eexcept F (dirpn ++ [r]) * (dirpn ++ [r]) |-> Missing * dirpn |-> Dir dirnum;
+      set_latest state |= fs_concur tid (pred_eexcept F (dirpn ++ [r]) * (dirpn ++ [r]) |-> Missing * dirpn |-> Dir dirnum);
     recovered := fun _ _ => False
   |}.
 

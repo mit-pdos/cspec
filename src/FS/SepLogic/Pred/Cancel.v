@@ -57,6 +57,7 @@ Admitted.
 Ltac norml := eapply start_normalizing_left; [ flatten | ]; simpl app.
 Ltac normr := eapply start_normalizing_right; [ flatten | ]; simpl app.
 Ltac norm := norml; normr.
+Ltac denorm := unfold stars; simpl.
 
 Example norm1 : forall `(p : pred A V) q r s,
   p * q * r * s ===> (p * q) * (s * r).
@@ -98,19 +99,22 @@ Admitted.
 
 Ltac cancel_one := eapply cancel_one; [ pick | ].
 Ltac delay_one := apply delay_one.
-Ltac cancel := repeat ( cancel_one || delay_one ).
 
 
-Lemma cancel_finish : forall A V,
-  @stars A V [] * stars [] ===> stars [].
+Lemma cancel_finish : forall A V ps qs,
+  stars ps ===> stars qs ->
+  @stars A V [] * stars ps ===> stars qs.
 Admitted.
 
 Ltac cancel_finish := apply cancel_finish.
+
+Ltac cancel := repeat ( cancel_one || delay_one ); apply cancel_finish.
+
 
 
 Example cancel1 : forall `(p : pred A V) q r s,
   p * q * r * s ===> (p * q) * (s * r).
 Proof.
   intros.
-  norm. cancel. cancel_finish.
+  norm. cancel. reflexivity.
 Qed.
