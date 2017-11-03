@@ -81,28 +81,16 @@ Definition mean_spec : Specification unit (option nat) State :=
 
 *)
 
+Inductive opT : Type -> Type :=
+| Add (n : nat) : opT unit
+| Mean : opT (option nat).
 
-Module Type StatDbAPI.
-
-  (** The implementation must provide the following methods: *)
-  Axiom init : proc InitResult.
-  Axiom add : nat -> proc unit.
-  Axiom mean : proc (option nat).
-
-  (** The abstraction relation between spec and code state *)
-  Axiom abstr : Abstraction State.
-
-  (** The proofs that the implementation methods meet their specs: *)
-  Axiom init_ok : init_abstraction init abstr inited.
-  Axiom add_ok : forall v, proc_spec (add_spec v) (add v) abstr.
-  Axiom mean_ok : proc_spec mean_spec mean abstr.
-
-  (** Hints to proof automation to apply the following proofs when "stepping"
-  through a procedure: e.g., if Coq has a [add] goal, it will try to apply
-  [add_ok] to resolve that goal. The implementation doesn't have to be concerned
-  with these hints. *)
-  Hint Resolve init_ok.
-  Hint Resolve add_ok.
-  Hint Resolve mean_ok.
-
-End StatDbAPI.
+Inductive op_step : forall T, opT T -> State -> T -> State -> Prop :=
+| OpAdd : forall n s r s',
+  pre (add_spec n tt s) ->
+  post (add_spec n tt s) r s' ->
+  op_step (Add n) s r s'
+| OpMean : forall s r s',
+  pre (mean_spec tt s) ->
+  post (mean_spec tt s) r s' ->
+  op_step (Mean) s r s'.

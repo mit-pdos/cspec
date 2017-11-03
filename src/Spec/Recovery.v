@@ -48,6 +48,7 @@ Proof.
     econstructor; eauto.
 Qed.
 
+(*
 Theorem spec_abstraction_compose :
   forall `(spec: Specification A T State2)
     `(p: proc T)
@@ -70,7 +71,7 @@ Proof.
   eapply (H (a, state)) in H2; simpl in *; eauto.
   destruct r; intuition (repeat deex; eauto).
 Qed.
-
+*)
 
 
 (** Helpers for defining step-based semantics. *)

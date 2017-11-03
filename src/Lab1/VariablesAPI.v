@@ -60,6 +60,9 @@ Definition write_spec v val : Specification _ _ _ :=
       end;
   |}.
 
+Inductive opT : Type -> Type :=
+| Read (v : var) : opT nat
+| Write (v : var) (val : nat) : opT unit.
 
 (** * Variables module
 
@@ -70,22 +73,12 @@ Definition write_spec v val : Specification _ _ _ :=
 
   *)
 
-Module Type VarsAPI.
-
-  Axiom init : proc InitResult.
-  Axiom read : var -> proc nat.
-  Axiom write : var -> nat -> proc unit.
-
-  Axiom abstr : Abstraction State.
-
-  (* Note that [inited_any] allows any initial state, meaning StatDB is required
-     to initialize its variables appropriately. *)
-  Axiom init_ok : init_abstraction init abstr inited_any.
-  Axiom read_ok : forall v, proc_spec (read_spec v) (read v) abstr.
-  Axiom write_ok : forall v val, proc_spec (write_spec v val) (write v val) abstr.
-
-  Hint Resolve init_ok.
-  Hint Resolve read_ok.
-  Hint Resolve write_ok.
-
-End VarsAPI.
+Inductive op_step : forall T, opT T -> State -> T -> State -> Prop :=
+| OpRead : forall v s r s',
+  pre (read_spec v tt s) ->
+  post (read_spec v tt s) r s' ->
+  op_step (Read v) s r s'
+| OpWrite : forall v val s r s',
+  pre (write_spec v val tt s) ->
+  post (write_spec v val tt s) r s' ->
+  op_step (Write v val) s r s'.

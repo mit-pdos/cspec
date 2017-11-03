@@ -27,13 +27,6 @@ Global Generalizable All Variables.
 
   *)
 
-(** As a technical detail, we let procedures include arbitrary operations of types
-    [baseOpT T] (which will produce a T-typed result). These will tell Coq that
-    a [proc] can contain outside code that we don't care to represent here.
-  *)
-
-Axiom baseOpT : Type -> Type.
-
 (** Our minimal, generic model of sequential procedures.
 
     The only detail we expose about our opaque procedures is that it's possible
@@ -51,8 +44,12 @@ Axiom baseOpT : Type -> Type.
     effects.
   *)
 
+Section Proc.
+
+Variable opT : Type -> Type.
+
 CoInductive proc (T : Type) : Type :=
-| BaseOp (op : baseOpT T)
+| Op (op : opT T)
 | Ret (v : T)
 | Bind (T1 : Type) (p1 : proc T1) (p2 : T1 -> proc T).
 
@@ -67,12 +64,14 @@ CoInductive proc (T : Type) : Type :=
     a [proc] procedure.
   *)
 
+(*
 Require Extraction.
 Extraction Language Haskell.
 
 Extract Inductive proc => "Proc"
                            ["error 'accessing BaseOp'" "return" "(>>=)"]
                            "(\fprim fret fbind -> error 'pattern match on proc')".
+*)
 
 
 (** * Execution model.
@@ -93,7 +92,7 @@ Extract Inductive proc => "Proc"
 
  *)
 
-Axiom world : Type.
+Variable State : Type.
 
 
 (** We start by defining the possible outcomes of executing a procedure [proc
@@ -104,7 +103,7 @@ Axiom world : Type.
 *)
 
 Inductive Result T :=
-| Finished (v:T) (w:world).
+| Finished (v:T) (s:State).
 
 (*
 Arguments Crashed {T} w.
@@ -115,7 +114,7 @@ Arguments Crashed {T} w.
     just another technicality.
   *)
 
-Axiom base_step : forall T, baseOpT T -> world -> T -> world -> Prop.
+Variable op_step : forall T, opT T -> State -> T -> State -> Prop.
 
 (** Finally, we define the [exec] relation to represent the execution semantics
     of a procedure, leveraging the [step] and [world_crash] definitions from
@@ -125,30 +124,24 @@ Axiom base_step : forall T, baseOpT T -> world -> T -> world -> Prop.
     value of type [T] if the execution finishes successfully without crashing.
   *)
 
-Inductive exec : forall T, proc T -> world -> Result T -> Prop :=
+Inductive exec : forall T, proc T -> State -> Result T -> Prop :=
 
-(** There are three interesting aspects of this definition:
-
-    - First, it defines how [Bind] and [Ret] work, in the [ExecRet]
-      and [ExecBindFinished] constructors.
-  *)
-
-| ExecRet : forall T (v:T) w,
-    exec (Ret v) w (Finished v w)
+| ExecRet : forall T (v:T) s,
+    exec (Ret v) s (Finished v s)
 | ExecBindFinished : forall T T' (p: proc T) (p': T -> proc T')
-                       w v w' r,
-    exec p w (Finished v w') ->
-    exec (p' v) w' r ->
-    exec (Bind p p') w r
+                       s v s' r,
+    exec p s (Finished v s') ->
+    exec (p' v) s' r ->
+    exec (Bind p p') s r
 
 (** - Second, it incorporates the opaque way base operations step.
   *)
 
-| ExecOp : forall T (op: baseOpT T) w v w',
-    base_step op w v w' ->
-    exec (BaseOp op) w (Finished v w').
+| ExecOp : forall T (op: opT T) s v s',
+    op_step op s v s' ->
+    exec (Op op) s (Finished v s').
 
-
+End Proc.
 
 (** * Notation for composing procedures.
 
@@ -179,4 +172,4 @@ Inductive exec : forall T, proc T -> world -> Result T -> Prop :=
 Notation "x <- p1 ; p2" := (Bind p1 (fun x => p2))
                             (at level 60, right associativity).
 
-Arguments Ret {T} v.
+Arguments Ret {opT T} v.

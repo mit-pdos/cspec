@@ -61,24 +61,6 @@ Record LayerAbstraction State1 State2 :=
   { abstraction : State1 -> State2 -> Prop; }.
 
 (**
-  The above definition of [LayerAbstraction] helps us connect two
-  layers, such as the layer of variables and the layer of the StatDB
-  specification.
-
-  A particular kind of abstraction is one that connects the bottom-most
-  type of state, [world], with some abstract state above the world.
-  (Recall that our model of execution is that, at the lowest level,
-  procedures (code) always manipulates the "real world", whose state
-  is of type [world].)
-
-  We define [Abstraction] to be this particular kind of abstraction:
-  it is a relation between [world] states and some other type of states,
-  [State].
- *)
-
-Definition Abstraction State := LayerAbstraction world State.
-
-(**
   We can compose abstractions, by layering one abstraction on top
   of another.  In our case, since everything is ultimately connected
   to [world] states at the bottom, we define a composition of two
@@ -93,10 +75,11 @@ Definition Abstraction State := LayerAbstraction world State.
   *)
 
 Definition abstraction_compose
-           `(abs1: Abstraction State1)
-           `(abs2: LayerAbstraction State1 State2) :=
-  {| abstraction := fun w state' => exists state, abstraction abs2 state state' /\
-                                  abstraction abs1 w state; |}.
+           `(abs1: LayerAbstraction State1 State2)
+           `(abs2: LayerAbstraction State2 State3) :=
+  {| abstraction := fun s1 s3 => exists s2,
+                                  abstraction abs1 s1 s2 /\
+                                  abstraction abs2 s2 s3; |}.
 
 (**
   In some situations, we will want to keep the same level of abstraction
@@ -228,16 +211,12 @@ Definition Specification A T State := A -> State -> SpecProps T State.
   is defined in [Spec.Proc].
  *)
 
-Definition proc_spec `(spec: Specification A T State) `(p: proc T)
-           `(abs: Abstraction State) :=
-  forall a w state,
-    abstraction abs w state ->
+Definition proc_spec `(spec: Specification A T State) `(p: proc opT T) Sem :=
+  forall a state,
     pre (spec a state) ->
-    forall r, exec p w r ->
+    forall r, exec Sem p state r ->
          match r with
-         | Finished v w' => exists state',
-                            abstraction abs w' state' /\
-                            post (spec a state) v state'
+         | Finished v s' => post (spec a state) v s'
          end.
 
 (** ** Proving correctness *)
@@ -278,15 +257,14 @@ Definition spec_impl
 
 Theorem proc_spec_weaken : forall `(spec1: Specification A T State)
                               `(spec2: Specification A' T State)
-                              `(p: proc T)
-                              (abs: Abstraction State),
-    proc_spec spec1 p abs ->
+                              `(p: proc opT T) Sem,
+    proc_spec spec1 p Sem ->
     spec_impl spec1 spec2 ->
-    proc_spec spec2 p abs.
+    proc_spec spec2 p Sem.
 Proof.
   unfold proc_spec at 2; intros.
-  eapply H0 in H2; eauto; repeat deex.
-  eapply H in H3; eauto.
+  eapply H0 in H1; eauto; repeat deex.
+  eapply H in H2; eauto.
   destruct r; simpl in *; repeat deex; intuition eauto.
 Qed.
 
@@ -308,11 +286,11 @@ Hint Resolve tt.
  *)
 
 Theorem proc_spec_rx : forall `(spec: Specification A T State)
-                         `(p: proc T)
-                         `(rx: T -> proc T')
+                         `(p: proc opT T)
+                         `(rx: T -> proc opT T')
                          `(spec': Specification A' T' State)
-                         `(abs: Abstraction State),
-    proc_spec spec p abs ->
+                         Sem,
+    proc_spec spec p Sem ->
     (forall a' state, pre (spec' a' state) ->
              exists a, pre (spec a state) /\
                   (forall r,
@@ -322,65 +300,17 @@ Theorem proc_spec_rx : forall `(spec: Specification A T State)
                               post :=
                                 fun r state'' =>
                                   post (spec' a' state) r state'' |})
-                        (rx r) abs)) ->
-    proc_spec spec' (Bind p rx) abs.
+                        (rx r) Sem)) ->
+    proc_spec spec' (Bind p rx) Sem.
 Proof.
   unfold proc_spec at 3; intros.
-(*
-  inv_rexec.
-  - inv_exec.
-    match goal with
-    | [ Hexec: exec p _ _ |- _ ] =>
-      eapply RExec in Hexec
-    end.
-    eapply H0 in H2; repeat deex.
-    eapply H in H9; simpl in *; safe_intuition (repeat deex; eauto).
-    match goal with
-    | [ Hexec: exec (rx _) _ _ |- _ ] =>
-      eapply RExec in Hexec;
-        eapply H3 in Hexec; eauto
-    end.
-  - inv_exec.
-    + (* p finished, rx crashed *)
-      match goal with
-      | [ Hexec: exec p _ _ |- _ ] =>
-        eapply RExec in Hexec
-      end.
-      eapply H0 in H2; repeat deex.
-      eapply H in H10; simpl in *; safe_intuition (repeat deex; eauto).
-      match goal with
-      | [ Hexec: exec (rx _) _ _ |- _ ] =>
-        eapply RExecCrash in Hexec; eauto;
-          eapply H3 in Hexec; eauto
-      end.
-    + (* p crashed before running *)
-      assert (exec p w' (Crashed w')) as Hexec by ( constructor; eauto ).
-      eapply RExecCrash in Hexec; eauto.
-      eapply H0 in H2; repeat deex.
-      eapply H in Hexec; simpl in *; safe_intuition (repeat deex; eauto).
-    + (* p crashed immediately after finishing *)
-      inv_exec.
-      match goal with
-      | [ Hexec: exec p _ _ |- _ ] =>
-        eapply RExec in Hexec
-      end.
-      eapply H0 in H2; repeat deex.
-      eapply H in H10; simpl in *; safe_intuition (repeat deex; eauto).
-      match goal with
-      | [ Hexec: exec (rx _) _ _ |- _ ] =>
-        apply ExecCrashEnd in Hexec;
-          eapply RExecCrash in Hexec; eauto;
-          eapply H3 in Hexec; eauto
-      end.
-    + (* p itself crashed *)
-      match goal with
-      | [ Hexec: exec p _ _ |- _ ] =>
-        eapply RExecCrash in Hexec; eauto
-      end.
-      eapply H0 in H2; repeat deex.
-      eapply H in H10; simpl in *; safe_intuition (repeat deex; eauto).
-*)
-Admitted.
+  inv_exec.
+  edestruct H0; eauto.
+  intuition.
+  eapply H in H8; eauto.
+  eapply H4 in H10; simpl; eauto.
+Qed.
+
 
 (** In some situations, the precondition of a specification
   may define variables or facts that you want to [intros].
@@ -392,8 +322,8 @@ Admitted.
 *)
 
 Theorem spec_intros : forall `(spec: Specification A T State)
-                       `(p: proc T)
-                       `(abs: Abstraction State),
+                       `(p: proc opT T)
+                       Sem,
     (forall a state0,
         pre (spec a state0) ->
         proc_spec
@@ -401,12 +331,12 @@ Theorem spec_intros : forall `(spec: Specification A T State)
              {| pre := state = state0;
                 post :=
                   fun r state' => post (spec a state) r state';
-             |}) p abs) ->
-    proc_spec spec p abs.
+             |}) p Sem) ->
+    proc_spec spec p Sem.
 Proof.
   unfold proc_spec at 2; intros.
-  apply H in H1.
-  eapply H1 in H2; eauto.
+  apply H in H0.
+  eapply H0 in H1; eauto.
   simpl in *; eauto.
 Qed.
 
@@ -424,12 +354,12 @@ Ltac spec_case pf :=
   that shouldn't change the behavior of a procedure.
  *)
 
-Theorem spec_exec_equiv : forall `(spec: Specification A T State)
-                            (p p': proc T)
-                            `(abs: Abstraction State),
-    exec_equiv p p' ->
-    proc_spec spec p' abs ->
-    proc_spec spec p abs.
+Theorem spec_exec_equiv : forall opT `(spec: Specification A T State)
+                            (p p': proc opT T)
+                            Sem,
+    exec_equiv Sem p p' ->
+    proc_spec spec p' Sem ->
+    proc_spec spec p Sem.
 Proof.
   unfold proc_spec; intros.
   eapply H0; eauto.
@@ -445,16 +375,16 @@ Qed.
   [spec] matches the [wipe] relation:
  *)
 
-Theorem ret_spec : forall `(abs: Abstraction State)
+Theorem ret_spec : forall opT
                      `(spec: Specification A T State)
-                     (v:T),
+                     (v:T) Sem,
     (forall a state, pre (spec a state) ->
             post (spec a state) v state) ->
-    proc_spec spec (Ret v) abs.
+    proc_spec spec (@Ret opT T v) Sem.
 Proof.
   intros.
   unfold proc_spec; intros.
-  eapply H in H1; simpl in *; eauto.
+  eapply H in H0; simpl in *; eauto.
   inv_exec. destruct r.
   intuition subst.
   eauto.
@@ -531,6 +461,8 @@ Ltac monad_simpl :=
     prove that one spec implies the other.
  *)
 
+Check proc_spec.
+
 Ltac step_proc_basic :=
   match goal with
   | |- forall _, _ => intros; step_proc_basic
@@ -581,6 +513,7 @@ Ltac step_proc :=
   If it fails, we typically do not promise anything.
  *)
 
+(*
 Inductive InitResult :=
 | Initialized
 | InitFailed.
@@ -689,3 +622,12 @@ Proof.
     inv_exec.
     congruence.
 Qed.
+*)
+
+Definition spec_lower `(s : Specification A T State) `(abs : LayerAbstraction LState State) : Specification _ T LState :=
+  fun '(a, remember_state) lstate =>
+    {|
+      pre := exists state, abstraction abs lstate state /\ pre (s a state) /\ remember_state = state;
+      post := fun r lstate' =>
+        exists state', abstraction abs lstate' state' /\ post (s a remember_state) r state';
+    |}.
