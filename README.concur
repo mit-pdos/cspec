@@ -1,0 +1,56 @@
+Documentation of various plans we have tried:
+
+BEFORE CFSCQ
+
+0. Concurrent separation logic.  Discovered it doesn't allow for temporal
+reasoning (queue holds the things you put in there).
+
+1. Separation logic with rely-guarantee (lrg).  Hard to automate
+reasoning about separation logic across rely-guarantee relations
+(actions).  Concretely, couldn't use [cancel] across rely actions.
+
+CFSCQ
+
+2. In cfscq, build lock and unlock into semantics.  Don't remember what
+went wrong.
+
+3. No fine-grained concurrency in current cfscq.  Seems like a good fit
+for its scope.
+
+POCS
+
+4. Stable predicates.  Discovered that specifying only a part of the state
+means the rest of the state can be corrupted arbitrarily.  Need to talk about
+which threads modify which parts of the state.  Need thread IDs in background
+steps.
+
+5. Rely-guarantee.  Specs talked about rely-guarantee relations in the base
+execution semantics.  Discovered that it's not sound to reason about low-level
+"assembly" steps using high-level abstractions, because assembly steps might
+not produce a clean abstract state.
+
+6. Commutative operations.  Re-order operations to achieve atomicity.
+Add thread IDs because they seem necessary (see plan 4 above).
+Add "Atomic" to the [prog] type to indicate an atomic sequence of code.
+Still some kind of protocol in the low-level exec semantics, but might
+be OK (i.e., can get a clean abstract state) due to re-ordering.
+
+7. Multiple languages.  Every basic operation in a language is atomic.
+Ran into an issue: when moving up to a higher-level language, concurrent
+threads should not appear to modify the state in an incomplete fashion.
+Thus, even if the higher-level language has the same abstract state (e.g.,
+per-thread counters), it is INCORRECT to have an identity abstraction
+relation.  Instead, it seems like the lower-level state needs to have
+ghost a snapshot of each thread's counter, which is set when the thread
+starts running, and atomically committed when the thread finishes its
+operation.  The abstraction relation then exposes the SNAPSHOT state
+instead of the real implementation state, if a snapshot exists.
+
+===
+
+Observations:
+
+Commuting or re-ordering of operations seems important for rely/guarantee
+or protocol-style reasoning about concurrent threads WITH abstraction.
+In particular, if operations are never re-ordered, then there may never
+be a state of the system that cleanly matches a high-level abstraction.
