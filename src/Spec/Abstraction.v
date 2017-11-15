@@ -244,7 +244,7 @@ Inductive example_op_step : forall T, example_opT T -> nat -> example_state -> T
 | RunDec : forall s tid,
   example_op_step Dec tid s tt (dec s tid).
 
-Definition inc_twice := _ <- Op _ _ Inc; Op _ _ Inc.
+Definition inc_twice_impl := _ <- Op _ _ Inc; Op _ _ Inc.
 
 Require Import Relations.Relation_Operators.
 Require Import RelationClasses.
@@ -371,9 +371,9 @@ Proof.
 Qed.
 
 
-Theorem inc_twice_ok : proc_spec inc_twice_spec inc_twice example_op_step example_proto.
+Theorem inc_twice_ok : proc_spec inc_twice_spec inc_twice_impl example_op_step example_proto.
 Proof.
-  unfold proc_spec, inc_twice_spec, inc_twice.
+  unfold proc_spec, inc_twice_spec, inc_twice_impl.
   simpl.
   intros.
 
@@ -429,6 +429,46 @@ Proof.
       congruence.
 Qed.
 
+
+
+Definition inc_twice (s : example_state) (tid : nat) :=
+  inc (inc s tid) tid.
+
+Inductive example2_opT : Type -> Type :=
+| IncTwice : example2_opT unit.
+
+Inductive example2_op_step : forall T, example2_opT T -> nat -> example_state -> T -> example_state -> Prop :=
+| RunIncTwice : forall s tid,
+  example2_op_step IncTwice tid s tt (inc_twice s tid).
+
+
+Inductive example2_compilation : forall T, proc example2_opT T -> proc example_opT T -> Prop :=
+| Example2CompileRet : forall T (r : T),
+  example2_compilation (Ret r) (Ret r)
+| Example2CompileBind : forall T1 T2 p1 p1' p2 p2',
+  example2_compilation p1 p1' ->
+  (forall (x : T1), example2_compilation (p2 x) (p2' x)) ->
+  @example2_compilation T2 (Bind p1 p2) (Bind p1' p2')
+| Example2CompileOpIncTwice :
+  example2_compilation (Op _ _ IncTwice) inc_twice_impl
+.
+
+Definition any_proto {ST} (tid : nat) (s0 s1 : ST) := True.
+
+
+Theorem example2_compilation_ok : forall T p1 p2 tid state r,
+  @example2_compilation T p1 p2 ->
+  exec example_op_step example_proto p2 tid state r ->
+  exec example2_op_step any_proto p1 tid state r.
+Proof.
+  intros.
+  apply exec_exec2_equiv.
+  apply exec_exec2_equiv in H0.
+
+  induction H.
+  - inversion H0; clear H0; subst; repeat sigT_eq.
+    XXX
+Admitted.
 
 
 (** ** Proving correctness *)
