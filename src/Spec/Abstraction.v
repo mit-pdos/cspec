@@ -1,6 +1,7 @@
 Require Import Helpers.Helpers.
+Require Import Omega.
 Require Import Proc.
-Require Import ProcTheorems.
+(* Require Import ProcTheorems. *)
 
 (** * Specification style: Abstractions with pre- and post-conditions
 
@@ -145,7 +146,7 @@ Record SpecProps T State :=
   to refer to the starting state (and the ghost variable).
  *)
 
-Definition Specification A T State := A -> State -> SpecProps T State.
+Definition Specification A T State := nat -> A -> State -> SpecProps T State.
 
 
 (** ** Correctness of a procedure
@@ -211,13 +212,224 @@ Definition Specification A T State := A -> State -> SpecProps T State.
   is defined in [Spec.Proc].
  *)
 
-Definition proc_spec `(spec: Specification A T State) `(p: proc opT T) Sem :=
-  forall a state,
-    pre (spec a state) ->
-    forall r, exec Sem p state r ->
+Definition proc_spec `(spec: Specification A T State) `(p: proc opT T) Sem proto :=
+  forall tid a state,
+    pre (spec tid a state) ->
+    forall r, exec Sem proto p tid state r ->
          match r with
-         | Finished v s' => post (spec a state) v s'
+         | Finished v s' => post (spec tid a state) v s'
+         | ProtocolMismatch => False
          end.
+
+
+Definition example_state := nat -> nat.
+
+Definition example_proto :=
+  fun (tid' : nat) (s0 s1 : example_state) =>
+    forall tid'', tid'' <> tid' -> s0 tid'' = s1 tid''.
+
+Definition inc (s : example_state) (tid : nat) :=
+  fun x => if x == tid then (s x) + 1 else s x.
+
+Definition dec (s : example_state) (tid : nat) :=
+  fun x => if x == tid then (s x) - 1 else s x.
+
+Inductive example_opT : Type -> Type :=
+| Inc : example_opT unit
+| Dec : example_opT unit.
+
+Inductive example_op_step : forall T, example_opT T -> nat -> example_state -> T -> example_state -> Prop :=
+| RunInc : forall s tid,
+  example_op_step Inc tid s tt (inc s tid)
+| RunDec : forall s tid,
+  example_op_step Dec tid s tt (dec s tid).
+
+Definition inc_twice := _ <- Op _ _ Inc; Op _ _ Inc.
+
+Require Import Relations.Relation_Operators.
+Require Import RelationClasses.
+Require Import FunctionalExtensionality.
+
+Definition inc_twice_spec : Specification _ _ _ :=
+  fun (tid : nat) (_ : unit) state => {|
+    pre := True;
+    post := fun r state' =>
+      r = tt /\
+      exists state'',
+      clos_refl_trans _ (rely example_opT example_op_step example_proto tid) state state'' /\
+      state' = inc (inc state'' tid) tid;
+  |}.
+
+
+Lemma inc_dec_eq : forall s tid, dec (inc s tid) tid = s.
+Proof.
+  intros.
+  apply functional_extensionality.
+  unfold inc, dec; intros.
+  destruct (x == tid); omega.
+Qed.
+
+Lemma inc_inc : forall s tid tid', inc (inc s tid) tid' = inc (inc s tid') tid.
+Proof.
+  intros.
+  apply functional_extensionality.
+  unfold inc, dec; intros.
+  destruct (x == tid); destruct (x == tid'); omega.
+Qed.
+
+Lemma inc_dec_ne : forall s tid tid', tid <> tid' ->
+  dec (inc s tid) tid' = inc (dec s tid') tid.
+Proof.
+  intros.
+  apply functional_extensionality.
+  unfold inc, dec; intros.
+  destruct (x == tid); destruct (x == tid'); omega.
+Qed.
+
+Lemma example_proto_inc : forall tid s,
+  example_proto tid s (inc s tid).
+Proof.
+  unfold example_proto, inc; intros.
+  destruct (tid'' == tid); omega.
+Qed.
+
+Lemma example_proto_dec : forall tid s,
+  example_proto tid s (dec s tid).
+Proof.
+  unfold example_proto, dec; intros.
+  destruct (tid'' == tid); omega.
+Qed.
+
+
+Definition op_commutes T (op : example_opT T) := forall s0 s1 s2 tid r,
+  example_op_step op tid s0 r s1 ->
+  rely example_opT example_op_step example_proto tid s1 s2 ->
+  exists s1',
+  rely example_opT example_op_step example_proto tid s0 s1' /\
+  example_op_step op tid s1' r s2.
+
+Theorem inc_commutes : op_commutes Inc.
+Proof.
+  unfold op_commutes.
+  intros.
+  exists (dec s2 tid).
+  unfold rely in H0. repeat deex.
+  clear H1.
+
+  destruct op'.
+  - inversion H; clear H; subst; repeat sigT_eq.
+    inversion H2; clear H2; subst; repeat sigT_eq.
+
+    rewrite inc_dec_ne by eauto.
+    rewrite inc_dec_eq.
+    rewrite inc_inc.
+
+    intuition.
+    + unfold rely. do 4 eexists; intuition eauto.
+      apply example_proto_inc.
+      constructor.
+
+    + constructor.
+
+  - inversion H; clear H; subst; repeat sigT_eq.
+    inversion H2; clear H2; subst; repeat sigT_eq.
+
+    rewrite inc_dec_ne by eauto.
+    rewrite inc_dec_eq.
+
+    intuition.
+    + unfold rely. do 4 eexists; intuition eauto.
+      apply example_proto_dec.
+      constructor.
+
+    + constructor.
+Qed.
+
+Theorem op_commutes_star : forall T (op : example_opT T) r s0 s1 s2 tid,
+  op_commutes op ->
+  example_op_step op tid s0 r s1 ->
+  clos_refl_trans example_state
+       (rely example_opT example_op_step example_proto tid) 
+       s1 s2 ->
+  exists s1',
+  clos_refl_trans example_state
+       (rely example_opT example_op_step example_proto tid) 
+       s0 s1' /\
+  example_op_step op tid s1' r s2.
+Proof.
+  intros.
+  apply Operators_Properties.clos_rt_rt1n in H1.
+  generalize dependent s0.
+  induction H1; intros.
+  - exists s0. intuition eauto. apply rt_refl.
+  - edestruct H; intuition eauto.
+    edestruct IHclos_refl_trans_1n; intuition eauto.
+    eexists; intuition eauto.
+    eapply rt_trans.
+    constructor; eauto.
+    eauto.
+Qed.
+
+
+Theorem inc_twice_ok : proc_spec inc_twice_spec inc_twice example_op_step example_proto.
+Proof.
+  unfold proc_spec, inc_twice_spec, inc_twice.
+  simpl.
+  intros.
+
+  apply exec_exec2_equiv in H0.
+  destruct r.
+
+  - inversion H0; clear H0; subst; repeat sigT_eq.
+    inversion H7; clear H7; subst; repeat sigT_eq.
+    inversion H9; clear H9; subst; repeat sigT_eq.
+
+    inversion H8; subst; repeat sigT_eq.
+    inversion H11; subst; repeat sigT_eq.
+
+    clear H10.
+    clear H12.
+
+    intuition eauto.
+
+    edestruct op_commutes_star.
+    apply inc_commutes.
+    apply H8.
+    apply H5.
+    clear H8.
+    clear H5.
+    intuition.
+
+    eexists; intuition idtac.
+    eapply rt_trans; eauto.
+
+    inversion H2; clear H2; subst; repeat sigT_eq.
+    reflexivity.
+
+  - inversion H0; subst; repeat sigT_eq.
+    + inversion H7; subst; repeat sigT_eq.
+      inversion H9; subst; repeat sigT_eq.
+      inversion H3; subst; repeat sigT_eq.
+      apply H6.
+
+      unfold example_proto; intros.
+      unfold inc.
+      destruct (tid'' == tid).
+      congruence.
+      congruence.
+
+    + inversion H7; subst; repeat sigT_eq.
+      inversion H3; subst; repeat sigT_eq.
+      apply H5.
+
+      unfold example_proto; intros.
+      unfold inc.
+      destruct (tid'' == tid).
+      congruence.
+      congruence.
+Qed.
+
+
 
 (** ** Proving correctness *)
 

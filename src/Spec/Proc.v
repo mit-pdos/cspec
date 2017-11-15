@@ -1,3 +1,10 @@
+Require Import Relations.Relation_Operators.
+Require Import RelationClasses.
+Require Import ClassicalFacts.
+Require Import Helpers.Helpers.
+
+Axiom EM : excluded_middle.
+
 Global Set Implicit Arguments.
 Global Generalizable All Variables.
 
@@ -103,7 +110,10 @@ Variable State : Type.
 *)
 
 Inductive Result T :=
-| Finished (v:T) (s:State).
+| Finished (v:T) (s:State)
+| ProtocolMismatch.
+
+Arguments ProtocolMismatch {T}.
 
 (*
 Arguments Crashed {T} w.
@@ -114,7 +124,7 @@ Arguments Crashed {T} w.
     just another technicality.
   *)
 
-Variable op_step : forall T, opT T -> State -> T -> State -> Prop.
+Variable op_step : forall T, opT T -> nat -> State -> T -> State -> Prop.
 
 (** Finally, we define the [exec] relation to represent the execution semantics
     of a procedure, leveraging the [step] and [world_crash] definitions from
@@ -124,24 +134,147 @@ Variable op_step : forall T, opT T -> State -> T -> State -> Prop.
     value of type [T] if the execution finishes successfully without crashing.
   *)
 
-Inductive exec : forall T, proc T -> State -> Result T -> Prop :=
+Variable protocol : forall (tid : nat), State -> State -> Prop.
 
-| ExecRet : forall T (v:T) s,
-    exec (Ret v) s (Finished v s)
-| ExecBindFinished : forall T T' (p: proc T) (p': T -> proc T')
+
+Definition rely (tid : nat) (s0 s1 : State) : Prop :=
+  exists tid' T (op' : opT T) r',
+  tid' <> tid /\
+  protocol tid' s0 s1 /\
+  op_step op' tid' s0 r' s1.
+
+
+Inductive exec : forall T, proc T -> nat -> State -> Result T -> Prop :=
+
+| ExecOther : forall T (p : proc T) T' (op: opT T') tid s s' r,
+    exec p tid s' r ->
+    rely tid s s' ->
+    exec p tid s r
+
+| ExecRet : forall T (v:T) tid s,
+    exec (Ret v) tid s (Finished v s)
+
+| ExecBindFinished : forall T T' (p: proc T) (p': T -> proc T') tid
                        s v s' r,
-    exec p s (Finished v s') ->
-    exec (p' v) s' r ->
-    exec (Bind p p') s r
+    exec p tid s (Finished v s') ->
+    exec (p' v) tid s' r ->
+    exec (Bind p p') tid s r
 
-(** - Second, it incorporates the opaque way base operations step.
-  *)
+| ExecBindMismatch : forall T T' (p: proc T) (p': T -> proc T') tid
+                       s,
+    exec p tid s ProtocolMismatch ->
+    exec (Bind p p') tid s ProtocolMismatch
 
-| ExecOp : forall T (op: opT T) s v s',
-    op_step op s v s' ->
-    exec (Op op) s (Finished v s').
+| ExecOp : forall T (op: opT T) tid s v s',
+    op_step op tid s v s' ->
+    protocol tid s s' ->
+    exec (Op op) tid s (Finished v s')
+
+| ExecOpMismatch : forall T (op: opT T) tid s v s',
+    op_step op tid s v s' ->
+    ~ protocol tid s s' ->
+    exec (Op op) tid s ProtocolMismatch.
+
+
+
+Inductive exec2 : forall T, proc T -> nat -> State ->
+                  Result T -> Prop :=
+
+| Exec2Ret : forall T (v:T) w w' tid,
+    clos_refl_trans _ (rely tid) w w' ->
+    exec2 (Ret v) tid w (Finished v w')
+
+| Exec2BindFinished : forall T T' (p: proc T) (p': T -> proc T') tid
+                       w v w' r,
+    exec2 p tid w (Finished v w') ->
+    exec2 (p' v) tid w' r ->
+    exec2 (Bind p p') tid w r
+
+| Exec2BindFailed : forall T T' (p: proc T) (p': T -> proc T') tid
+                       w,
+    exec2 p tid w ProtocolMismatch ->
+    exec2 (Bind p p') tid w ProtocolMismatch
+
+| Exec2Op : forall T (op: opT T) tid w w'' v w',
+    clos_refl_trans _ (rely tid) w w'' ->
+    op_step op tid w'' v w' ->
+    protocol tid w'' w' ->
+    exec2 (Op op) tid w (Finished v w')
+
+| Exec2OpFail : forall T (op: opT T) tid w w'' v w',
+    clos_refl_trans _ (rely tid) w w'' ->
+    op_step op tid w'' v w' ->
+    ~ protocol tid w'' w' ->
+    exec2 (Op op) tid w ProtocolMismatch.
+
+Lemma exec2_allows_rely : forall w w' T (p : proc T) r tid,
+  clos_refl_trans _ (rely tid) w w' ->
+  exec2 p tid w' r ->
+  exec2 p tid w r.
+Proof.
+  intros.
+  generalize dependent w.
+  induction H0; intros.
+  - constructor. eapply rt_trans; eauto.
+  - eapply Exec2BindFinished.
+    + eapply IHexec2_1; eauto.
+    + eapply IHexec2_2; eauto.
+      eapply rt_refl.
+  - eapply Exec2BindFailed. eauto.
+  - eapply Exec2Op.
+    2: eauto.
+    2: eauto.
+    eapply rt_trans; eauto.
+  - eapply Exec2OpFail.
+    2: eauto.
+    2: eauto.
+    eapply rt_trans; eauto.
+Qed.
+
+Theorem exec_exec2_equiv : forall T p tid w res,
+  @exec T p tid w res <->
+  @exec2 T p tid w res.
+Proof.
+  split; intros.
+  - induction H.
+    + eapply exec2_allows_rely; eauto.
+      constructor; eauto.
+    + constructor. apply rt_refl.
+    + eapply Exec2BindFinished.
+      * eapply IHexec1.
+      * eapply IHexec2.
+    + eapply Exec2BindFailed. eauto.
+    + eapply Exec2Op. 2: eauto. 2: eauto. apply rt_refl.
+    + eapply Exec2OpFail. 2: eauto. 2: eauto. apply rt_refl.
+  - induction H.
+    + apply Operators_Properties.clos_rt_rt1n in H.
+      induction H.
+      * constructor.
+      * unfold rely in *. repeat deex.
+        eapply ExecOther; eauto.
+        unfold rely. do 4 eexists. eauto.
+    + eapply ExecBindFinished; eauto.
+    + eapply ExecBindMismatch; eauto.
+    + apply Operators_Properties.clos_rt_rt1n in H.
+      induction H.
+      * constructor; eauto.
+      * unfold rely in *. repeat deex.
+        eapply ExecOther; eauto.
+        unfold rely. do 4 eexists. eauto.
+    + apply Operators_Properties.clos_rt_rt1n in H.
+      induction H.
+      * eapply ExecOpMismatch; eauto.
+      * unfold rely in *. repeat deex.
+        eapply ExecOther; eauto.
+        unfold rely. do 4 eexists. eauto.
+Qed.
+
 
 End Proc.
+
+
+Arguments ProtocolMismatch {State T}.
+
 
 (** * Notation for composing procedures.
 

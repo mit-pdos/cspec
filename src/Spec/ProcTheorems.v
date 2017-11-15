@@ -10,10 +10,11 @@ Require Import Proc.
 Ltac inv_exec' H :=
   inversion H; subst; clear H; repeat sigT_eq.
 
-Theorem exec_ret : forall opT State Sem T (v:T) w r,
-    @exec opT State Sem _ (Ret v) w r ->
+Theorem exec_ret : forall opT State Sem T (v:T) w r proto tid,
+    @exec opT State Sem proto _ (Ret v) tid w r ->
     match r with
     | Finished v' w' => v = v' /\ w = w'
+    | ProtocolMismatch => False
     end.
 Proof.
   intros.
