@@ -244,6 +244,20 @@ Inductive example_op_step : forall T, example_opT T -> nat -> example_state -> T
 | RunDec : forall s tid,
   example_op_step Dec tid s tt (dec s tid).
 
+
+(*
+Record example_state_withghost := {
+  CodeState : example_state;
+  GhostState : example_state;
+}.
+
+Definition example_proto_withghost :=
+  fun (tid' : nat) (s0 s1 : example_state_withghost) =>
+    forall tid'', tid'' <> tid' -> CodeState s0 tid'' = CodeState s1 tid'' /\
+    (GhostState s0 tid' = GhostState s1 tid' + 2).
+*)
+
+
 Definition inc_twice_impl := _ <- Op _ _ Inc; Op _ _ Inc.
 
 Require Import Relations.Relation_Operators.
