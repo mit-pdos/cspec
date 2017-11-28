@@ -93,49 +93,58 @@ Fixpoint prepend (evs : list event) (tr : trace) : trace :=
   end.
 
 
+Inductive exec_tid (tid : nat) : State -> proc unit -> thread_state -> State -> proc unit -> thread_state -> list event -> Prop :=
+
+| ExecTidRet : forall T (v : T) p s,
+  exec_tid tid s (Bind (Ret v) p) ThreadRunning
+               s (p v) ThreadRunning
+               nil
+
+| ExecTidOpCall : forall T p s (op : opT T),
+  exec_tid tid s (Bind (Op op) p) ThreadRunning
+               s (Bind (Op op) p) ThreadCalled
+               [InvokeLo tid op]
+
+| ExecTidOpRun : forall T (v : T) p s s' op,
+  op_step op tid s v s' ->
+  exec_tid tid s (Bind (Op op) p) ThreadCalled
+               s' (p v) (ThreadReturning v)
+               nil
+
+| ExecTidOpRet : forall T (v : T) p s,
+  exec_tid tid s p (ThreadReturning v)
+               s p ThreadRunning
+               [ReturnLo tid v]
+
+| ExecTidAtomic : forall T (v : T) p ap s s' evs,
+  atomic_exec ap tid s v s' evs ->
+  exec_tid tid s (Bind (Atomic ap) p) ThreadRunning
+               s' (p v) ThreadRunning
+               evs
+
+| ExecTidInvokeHi : forall p s T' (op : opHiT T'),
+  exec_tid tid s (Bind (InvokeOpHi op) p) ThreadRunning
+               s (p tt) ThreadRunning
+               [InvokeHi tid op]
+
+| ExecTidReturnHi : forall p s T' (r : T'),
+  exec_tid tid s (Bind (ReturnOpHi r) p) ThreadRunning
+               s (p tt) ThreadRunning
+               [ReturnHi tid r]
+
+| ExecTidBind : forall T1 (p1 : proc T1) T2 (p2 : T1 -> proc T2) p3 s,
+  exec_tid tid s (Bind (Bind p1 p2) p3) ThreadRunning
+               s (Bind p1 (fun x => Bind (p2 x) p3)) ThreadRunning
+               nil.
+
+
 Inductive exec : State -> threads_state -> trace -> Prop :=
 
-| ExecRet : forall tid ts T (v : T) trace p s,
-  ts tid = Some (Bind (Ret v) p, ThreadRunning) ->
-  exec s (thread_upd ts tid (p v, ThreadRunning)) trace ->
-  exec s ts trace
-
-| ExecOpCall : forall tid ts T trace p s (op : opT T),
-  ts tid = Some (Bind (Op op) p, ThreadRunning) ->
-  exec s (thread_upd ts tid (Bind (Op op) p, ThreadCalled)) trace ->
-  exec s ts (TraceEvent (InvokeLo tid op) trace)
-
-| ExecOp : forall tid ts T (v : T) trace p s s' op,
-  ts tid = Some (Bind (Op op) p, ThreadCalled) ->
-  op_step op tid s v s' ->
-  exec s' (thread_upd ts tid (p v, ThreadReturning v)) trace ->
-  exec s ts trace
-
-| ExecOpRet : forall tid ts T (v : T) trace p s,
-  ts tid = Some (p, ThreadReturning v) ->
-  exec s (thread_upd ts tid (p, ThreadRunning)) trace ->
-  exec s ts (TraceEvent (ReturnLo tid v) trace)
-
-| ExecAtomic : forall tid ts T (v : T) trace p s s' ap evs,
-  ts tid = Some (Bind (Atomic ap) p, ThreadRunning) ->
-  atomic_exec ap tid s v s' evs ->
-  exec s' (thread_upd ts tid (p v, ThreadRunning)) trace ->
+| ExecOne : forall tid ts trace p ps p' ps' s s' evs,
+  ts tid = Some (p, ps) ->
+  exec_tid tid s p ps s' p' ps' evs ->
+  exec s' (thread_upd ts tid (p', ps')) trace ->
   exec s ts (prepend evs trace)
-
-| ExecInvokeHi : forall tid ts trace p s T' (op : opHiT T'),
-  ts tid = Some (Bind (InvokeOpHi op) p, ThreadRunning) ->
-  exec s (thread_upd ts tid (p tt, ThreadRunning)) trace ->
-  exec s ts (TraceEvent (InvokeHi tid op) trace)
-
-| ExecReturnHi : forall tid ts trace p s T' (r : T'),
-  ts tid = Some (Bind (ReturnOpHi r) p, ThreadRunning) ->
-  exec s (thread_upd ts tid (p tt, ThreadRunning)) trace ->
-  exec s ts (TraceEvent (ReturnHi tid r) trace)
-
-| ExecBind : forall tid ts trace T1 (p1 : proc T1) T2 (p2 : T1 -> proc T2) p3 s,
-  ts tid = Some (Bind (Bind p1 p2) p3, ThreadRunning) ->
-  exec s (thread_upd ts tid (Bind p1 (fun x => Bind (p2 x) p3), ThreadRunning)) trace ->
-  exec s ts trace
 
 | ExecDone : forall tid ts trace s,
   ts tid = Some (Ret tt, ThreadRunning) ->
@@ -198,6 +207,24 @@ Proof.
   destruct (tid == tid); congruence.
 Qed.
 
+Lemma thread_upd_ne : forall opT opHiT ts p tid tid',
+  tid <> tid' ->
+  @thread_upd opT opHiT ts tid p tid' = ts tid'.
+Proof.
+  unfold thread_upd; intros.
+  destruct (tid == tid'); congruence.
+Qed.
+
+Lemma thread_upd_upd_ne : forall opT opHiT ts p p' tid tid',
+  tid <> tid' ->
+  @thread_upd opT opHiT (@thread_upd opT opHiT ts tid p) tid' p' =
+  @thread_upd opT opHiT (@thread_upd opT opHiT ts tid' p') tid p.
+Proof.
+  unfold thread_upd; intros.
+  apply functional_extensionality; intros.
+  destruct (tid' == x); destruct (tid == x); congruence.
+Qed.
+
 Lemma thread_del_upd_eq : forall opT opHiT ts p tid,
   @thread_del opT opHiT (@thread_upd opT opHiT ts tid p) tid =
   @thread_del opT opHiT ts tid.
@@ -205,6 +232,16 @@ Proof.
   unfold thread_del, thread_upd; intros.
   apply functional_extensionality; intros.
   destruct (tid == x); congruence.
+Qed.
+
+Lemma thread_del_upd_ne : forall opT opHiT ts p tid tid',
+  tid <> tid' ->
+  @thread_del opT opHiT (@thread_upd opT opHiT ts tid p) tid' =
+  @thread_upd opT opHiT (@thread_del opT opHiT ts tid') tid p.
+Proof.
+  unfold thread_del, thread_upd; intros.
+  apply functional_extensionality; intros.
+  destruct (tid == x); destruct (tid' == x); congruence.
 Qed.
 
 Lemma thread_del_empty : forall opT opHiT tid,
@@ -232,70 +269,44 @@ Hint Rewrite thread_del_empty : t.
 
 Definition init_state : State := fun tid' => 4.
 
+Ltac exec_one tid' :=
+  eapply ExecOne with (tid := tid');
+    [ rewrite thread_upd_eq; reflexivity | | autorewrite with t ].
+
 Definition ex_trace :
   { t : trace opT opHiT | exec op_step init_state ts t }.
 Proof.
   eexists.
   unfold ts.
   unfold init_state.
-  eapply ExecBind with (tid := 1).
-    rewrite thread_upd_eq.
-    reflexivity.
-    autorewrite with t.
-  eapply ExecInvokeHi with (tid := 1).
-    rewrite thread_upd_eq.
-    reflexivity.
-    autorewrite with t.
-  eapply ExecBind with (tid := 1).
-    rewrite thread_upd_eq.
-    reflexivity.
-    autorewrite with t.
-  eapply ExecOpCall with (tid := 1).
-    rewrite thread_upd_eq.
-    reflexivity.
-    autorewrite with t.
-  eapply ExecOp with (tid := 1).
-    rewrite thread_upd_eq.
-    reflexivity.
+  exec_one 1.
+    eapply ExecTidBind.
+  exec_one 1.
+    eapply ExecTidInvokeHi.
+  exec_one 1.
+    eapply ExecTidBind.
+  exec_one 1.
+    eapply ExecTidOpCall.
+  exec_one 1.
+    eapply ExecTidOpRun.
     constructor.
-    autorewrite with t.
-  eapply ExecOpRet with (tid := 1).
-    rewrite thread_upd_eq.
-    reflexivity.
-    autorewrite with t.
-  eapply ExecBind with (tid := 1).
-    rewrite thread_upd_eq.
-    reflexivity.
-    autorewrite with t.
-  eapply ExecOpCall with (tid := 1).
-    rewrite thread_upd_eq.
-    reflexivity.
-    autorewrite with t.
-  eapply ExecOp with (tid := 1).
-    unfold ts.
-    rewrite thread_upd_eq.
-    reflexivity.
+  exec_one 1.
+    eapply ExecTidOpRet.
+  exec_one 1.
+    eapply ExecTidBind.
+  exec_one 1.
+    eapply ExecTidOpCall.
+  exec_one 1.
+    eapply ExecTidOpRun.
     constructor.
-    autorewrite with t.
-  eapply ExecOpRet with (tid := 1).
-    rewrite thread_upd_eq.
-    reflexivity.
-    autorewrite with t.
-  eapply ExecBind with (tid := 1).
-    unfold ts.
-    rewrite thread_upd_eq.
-    reflexivity.
-    autorewrite with t.
-  eapply ExecReturnHi with (tid := 1).
-    unfold ts.
-    rewrite thread_upd_eq.
-    reflexivity.
-    autorewrite with t.
-  eapply ExecRet with (tid := 1).
-    unfold ts.
-    rewrite thread_upd_eq.
-    reflexivity.
-    autorewrite with t.
+  exec_one 1.
+    eapply ExecTidOpRet.
+  exec_one 1.
+    eapply ExecTidBind.
+  exec_one 1.
+    eapply ExecTidReturnHi.
+  exec_one 1.
+    eapply ExecTidRet.
   eapply ExecDone with (tid := 1).
     rewrite thread_upd_eq.
     reflexivity.
@@ -319,19 +330,13 @@ Proof.
   eexists.
   unfold ts2.
   unfold init_state.
-  eapply ExecOpCall with (tid := 1).
-    rewrite thread_upd_eq.
-    reflexivity.
-    autorewrite with t.
-  eapply ExecOp with (tid := 1).
-    rewrite thread_upd_eq.
-    reflexivity.
+  exec_one 1.
+    eapply ExecTidOpCall.
+  exec_one 1.
+    eapply ExecTidOpRun.
     constructor.
-    autorewrite with t.
-  eapply ExecOpRet with (tid := 1).
-    rewrite thread_upd_eq.
-    reflexivity.
-    autorewrite with t.
+  exec_one 1.
+    eapply ExecTidOpRet.
   eapply ExecDone with (tid := 1).
     rewrite thread_upd_eq.
     reflexivity.
@@ -470,7 +475,14 @@ Ltac bind_inv :=
 Ltac exec_inv :=
   match goal with
   | H : exec _ _ _ _ |- _ =>
-    inversion H; clear H; subst
+    inversion H; clear H; subst; repeat sigT_eq
+  end;
+  autorewrite with t in *.
+
+Ltac exec_tid_inv :=
+  match goal with
+  | H : exec_tid _ _ _ _ _ _ _ _ _ |- _ =>
+    inversion H; clear H; subst; repeat sigT_eq
   end;
   autorewrite with t in *.
 
@@ -495,19 +507,31 @@ Proof.
   intros.
   unfold ts, ts2 in *.
 
-  repeat ( exec_inv; repeat thread_inv ).
+  repeat ( exec_inv; repeat thread_inv;
+    try ( exec_tid_inv; repeat thread_inv ) ).
   repeat step_inv.
 
-  destruct (1 == 1); try congruence.
-  replace (s 1 + 1 + 1) with (s 1 + 2) by omega.
+  simpl.
+  replace (s' 1 + 1 + 1) with (s' 1 + 2) by omega.
   eauto 20.
 Qed.
 
 
+(* [same_traces] ignores differences in low-level invoke/return events
+ * and compares only high-level invoke/return events.  this is because
+ * we intend to use [same_traces] for proving equivalence of atomic
+ * brackets, and atomic brackets do change the possible low-level events
+ * that can occur.  However, atomic brackets should not change the possible
+ * high-level events.
+ *)
+
 Definition same_traces {opLo opHi State} op_step (s : State) (ts1 ts2 : threads_state opLo opHi) :=
   forall tr,
     exec op_step s ts1 tr ->
-    exec op_step s ts2 tr.
+    exists tr', exec op_step s ts2 tr' /\
+      forall opHi2 (trHi : trace opHi opHi2),
+        traces_match tr trHi -> traces_match tr' trHi.
+
 
 Definition p1_a :=
   (Bind (Atomic inc_twice_impl) (fun _ =>
@@ -532,7 +556,8 @@ Proof.
   intros.
   unfold ts, ts_a in *.
 
-  repeat ( exec_inv; repeat thread_inv ).
+  repeat ( exec_inv; repeat thread_inv;
+    try ( exec_tid_inv; repeat thread_inv ) ).
 
   repeat match goal with
   | H : ?a = ?a |- _ => clear H
@@ -541,10 +566,10 @@ Proof.
   repeat step_inv.
   unfold p1_a.
 
-  eapply exec_trace_eq.
-  eapply ExecAtomic with (tid := 1).
-    rewrite thread_upd_eq.
-    reflexivity.
+  eexists; split.
+
+  exec_one 1.
+  eapply ExecTidAtomic.
     unfold inc_twice_impl.
     eapply AtomicBind.
       eapply AtomicInvokeHi.
@@ -557,7 +582,6 @@ Proof.
     eapply AtomicBind.
       eapply AtomicReturnHi.
     eapply AtomicRet.
-    autorewrite with t.
   eapply ExecDone with (tid := 1).
     rewrite thread_upd_eq.
     reflexivity.
@@ -565,7 +589,43 @@ Proof.
   eapply ExecEmpty.
     unfold threads_empty; congruence.
 
-  reflexivity.
+  simpl.
+  intros.
+  eauto.
+Qed.
+
+
+Lemma traces_match_prepend_one : forall opLo opMid a (tr0 tr1 : trace opLo opMid),
+  (forall opHi (trHi : trace opMid opHi),
+    traces_match tr0 trHi ->
+    traces_match tr1 trHi) ->
+  (forall opHi (trHi : trace opMid opHi),
+    traces_match (TraceEvent a tr0) trHi ->
+    traces_match (TraceEvent a tr1) trHi).
+Proof.
+  intros.
+  remember (TraceEvent a tr0).
+  generalize dependent a.
+  induction H0; intros; subst; simpl in *.
+  all: try congruence.
+  all: eauto.
+  all: inversion Heqt; subst.
+  all: eauto.
+Qed.
+
+Lemma traces_match_prepend : forall opLo opMid evs (tr0 tr1 : trace opLo opMid),
+  (forall opHi (trHi : trace opMid opHi),
+    traces_match tr0 trHi ->
+    traces_match tr1 trHi) ->
+  (forall opHi (trHi : trace opMid opHi),
+    traces_match (prepend evs tr0) trHi ->
+    traces_match (prepend evs tr1) trHi).
+Proof.
+  induction evs; simpl; intros.
+  eauto.
+  eapply traces_match_prepend_one.
+    2: eassumption.
+  eauto.
 Qed.
 
 
@@ -578,8 +638,71 @@ Theorem atomic_start :
 Proof.
   unfold same_traces; intros.
   remember (thread_upd ts0 tid (Bind (Op opT0 opHiT0 T op) p, ThreadRunning)) as ts.
-  induction H; subst.
-  - 
+  generalize dependent ts0.
+  induction H; intros; subst.
+
+  - destruct (tid == tid0).
+    + subst.
+      rewrite thread_upd_eq in H.
+      inversion H; clear H; subst.
+
+      exec_tid_inv.
+
+      (*
+      exec_one tid0.
+      eapply ExecTidAtomic.
+        eapply AtomicOp.
+      *)
+      admit.
+
+    + rewrite thread_upd_ne in * by assumption.
+      edestruct IHexec; intuition idtac.
+      shelve.
+
+      eexists; split.
+
+      eapply ExecOne with (tid := tid0).
+      rewrite thread_upd_ne by assumption.
+      eauto.
+
+      eauto.
+
+      rewrite thread_upd_upd_ne by assumption.
+      eauto.
+
+      eapply traces_match_prepend; eauto.
+
+      Unshelve.
+      rewrite thread_upd_upd_ne by assumption.
+      reflexivity.
+
+  - destruct (tid == tid0).
+    + subst.
+      rewrite thread_upd_eq in H.
+      congruence.
+
+    + rewrite thread_upd_ne in * by assumption.
+      edestruct IHexec; intuition idtac.
+      shelve.
+
+      eexists; split.
+
+      eapply ExecDone with (tid := tid0).
+      rewrite thread_upd_ne by assumption.
+      eauto.
+
+      rewrite thread_del_upd_ne by assumption.
+      eauto.
+      eauto.
+
+      Unshelve.
+      rewrite thread_del_upd_ne by assumption.
+      reflexivity.
+
+  - specialize (H tid).
+    rewrite thread_upd_eq in H.
+    congruence.
+Qed.
 
 
 (*
