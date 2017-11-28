@@ -631,29 +631,61 @@ Qed.
 
 Theorem atomic_start :
   forall opT opHiT T State
-         op (p : T -> proc opT opHiT unit) op_step ts tid (s : State),
+         op (p : T -> proc opT opHiT unit) ps op_step ts tid (s : State),
   same_traces op_step s
-    (thread_upd ts tid (Bind (Op opT opHiT T op) p, ThreadRunning))
+    (thread_upd ts tid (Bind (Op opT opHiT T op) p, ps))
     (thread_upd ts tid (Bind (Atomic (Op opT opHiT T op)) p, ThreadRunning)).
 Proof.
   unfold same_traces; intros.
-  remember (thread_upd ts0 tid (Bind (Op opT0 opHiT0 T op) p, ThreadRunning)) as ts.
+  remember (thread_upd ts0 tid (Bind (Op opT0 opHiT0 T op) p, ps)) as ts.
   generalize dependent ts0.
+  generalize dependent ps.
   induction H; intros; subst.
 
   - destruct (tid == tid0).
     + subst.
       rewrite thread_upd_eq in H.
+
       inversion H; clear H; subst.
 
       exec_tid_inv.
+      * edestruct IHexec; intuition idtac.
+        eexists; split.
+        eauto.
 
-      (*
-      exec_one tid0.
-      eapply ExecTidAtomic.
-        eapply AtomicOp.
-      *)
-      admit.
+        simpl; intros.
+        eapply H2.
+
+        remember (TraceEvent (InvokeLo opT0 opHiT0 tid0 T op) trace0).
+        induction H; intros; subst.
+        all: try congruence.
+        constructor. eauto.
+        constructor. eauto.
+
+      * eexists; split.
+        eapply ExecOne with (tid := tid0).
+          rewrite thread_upd_eq. reflexivity.
+          eapply ExecTidAtomic.
+          constructor.
+          eauto.
+          autorewrite with t.
+
+        (* ThreadRunning <> ThreadReturning v... *)
+        admit.
+
+        simpl; intros.
+        constructor. constructor. eauto.
+
+      * edestruct IHexec; intuition idtac.
+        eexists; intuition eauto.
+
+        eapply H2.
+        simpl in *.
+        remember (TraceEvent (ReturnLo opT0 opHiT0 tid0 v) trace0).
+        induction H; intros; subst.
+        all: try congruence.
+        constructor. eauto.
+        constructor. eauto.
 
     + rewrite thread_upd_ne in * by assumption.
       edestruct IHexec; intuition idtac.
@@ -673,8 +705,8 @@ Proof.
       eapply traces_match_prepend; eauto.
 
       Unshelve.
-      rewrite thread_upd_upd_ne by assumption.
-      reflexivity.
+      all: try rewrite thread_upd_upd_ne by assumption.
+      all: try reflexivity.
 
   - destruct (tid == tid0).
     + subst.
@@ -696,13 +728,13 @@ Proof.
       eauto.
 
       Unshelve.
-      rewrite thread_del_upd_ne by assumption.
-      reflexivity.
+      all: try rewrite thread_del_upd_ne by assumption.
+      all: try reflexivity.
 
   - specialize (H tid).
     rewrite thread_upd_eq in H.
     congruence.
-Qed.
+Admitted.
 
 
 (*
