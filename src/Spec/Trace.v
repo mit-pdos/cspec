@@ -19,7 +19,7 @@ Section Proc.
 Variable opT : Type -> Type.
 Variable opHiT : Type -> Type.
 
-CoInductive proc : Type -> Type :=
+Inductive proc : Type -> Type :=
 | Op : forall T (op : opT T), proc T
 | Ret : forall T (v : T), proc T
 | Bind : forall T (T1 : Type) (p1 : proc T1) (p2 : T1 -> proc T), proc T
@@ -39,7 +39,7 @@ Inductive event :=
 | InvokeHi : forall (tid : nat) T (op : opHiT T), event
 | ReturnHi : forall (tid : nat) T (result : T), event.
 
-CoInductive trace :=
+Inductive trace :=
 | TraceEvent : event -> trace -> trace
 | TraceEmpty : trace.
 
@@ -93,7 +93,7 @@ Fixpoint prepend (evs : list event) (tr : trace) : trace :=
   end.
 
 
-CoInductive exec : State -> threads_state -> trace -> Prop :=
+Inductive exec : State -> threads_state -> trace -> Prop :=
 
 | ExecRet : forall tid ts T (v : T) trace p s,
   ts tid = Some (Bind (Ret v) p, ThreadRunning) ->
@@ -160,19 +160,19 @@ Inductive opHiT : Type -> Type :=
 Inductive opHi2T : Type -> Type :=
 .
 
-Definition State := nat.
+Definition State := forall (tid : nat), nat.
 
 Inductive op_step : forall T, opT T -> nat -> State -> T -> State -> Prop :=
-| StepInc : forall tid n,
-  op_step Inc tid n (n+1) (n+1)
-| StepNoop : forall tid n,
-  op_step Noop tid n tt n.
+| StepInc : forall tid s,
+  op_step Inc tid s (s tid + 1) (fun tid' => if tid' == tid then (s tid' + 1) else (s tid'))
+| StepNoop : forall tid s,
+  op_step Noop tid s tt s.
 
 Inductive opHi_step : forall T, opHiT T -> nat -> State -> T -> State -> Prop :=
-| StepIncTwice : forall tid n,
-  opHi_step IncTwice tid n (n+2) (n+2)
-| StepNoop2 : forall tid n,
-  opHi_step Noop2 tid n tt n.
+| StepIncTwice : forall tid s,
+  opHi_step IncTwice tid s (s tid + 2) (fun tid' => if tid' == tid then (s tid' + 2) else (s tid'))
+| StepNoop2 : forall tid s,
+  opHi_step Noop2 tid s tt s.
 
 
 Definition threads_empty {opT opHiT} : threads_state opT opHiT :=
@@ -230,11 +230,14 @@ Hint Rewrite thread_del_upd_eq : t.
 Hint Rewrite thread_del_empty : t.
 
 
+Definition init_state : State := fun tid' => 4.
+
 Definition ex_trace :
-  { t : trace opT opHiT | exec op_step 4 ts t }.
+  { t : trace opT opHiT | exec op_step init_state ts t }.
 Proof.
   eexists.
   unfold ts.
+  unfold init_state.
   eapply ExecBind with (tid := 1).
     rewrite thread_upd_eq.
     reflexivity.
@@ -311,10 +314,11 @@ Definition p2 :=
 Definition ts2 := thread_upd threads_empty 1 (p2, ThreadRunning).
 
 Definition ex_trace2 :
-  { t : trace opHiT opHi2T | exec opHi_step 4 ts2 t }.
+  { t : trace opHiT opHi2T | exec opHi_step init_state ts2 t }.
 Proof.
   eexists.
   unfold ts2.
+  unfold init_state.
   eapply ExecOpCall with (tid := 1).
     rewrite thread_upd_eq.
     reflexivity.
@@ -378,7 +382,7 @@ Theorem ex_trace_ex_trace2 :
   traces_match (proj1_sig ex_trace) (proj1_sig ex_trace2).
 Proof.
   simpl.
-  eauto 10.
+  eauto 20.
 Qed.
 
 
@@ -494,25 +498,31 @@ Proof.
   repeat ( exec_inv; repeat thread_inv ).
   repeat step_inv.
 
-  replace (s + 1 + 1) with (s + 2) by omega.
+  destruct (1 == 1); try congruence.
+  replace (s 1 + 1 + 1) with (s 1 + 2) by omega.
   eauto 20.
 Qed.
 
 
 Definition same_traces {opLo opHi State} op_step (s : State) (ts1 ts2 : threads_state opLo opHi) :=
-  forall tr1 tr2,
-    exec op_step s ts1 tr1 ->
-    exec op_step s ts2 tr2 ->
-    forall opHi2 (trHi : trace opHi opHi2),
-      traces_match tr1 trHi ->
-      traces_match tr2 trHi.
-
+  forall tr,
+    exec op_step s ts1 tr ->
+    exec op_step s ts2 tr.
 
 Definition p1_a :=
   (Bind (Atomic inc_twice_impl) (fun _ =>
         (Ret opT opHiT tt))).
 
 Definition ts_a := thread_upd threads_empty 1 (p1_a, ThreadRunning).
+
+
+Lemma exec_trace_eq : forall opLo opHi State op_step (s : State) (ts : threads_state opLo opHi) tr1 tr2,
+  exec op_step s ts tr1 ->
+  tr1 = tr2 ->
+  exec op_step s ts tr2.
+Proof.
+  intros; subst; eauto.
+Qed.
 
 
 Theorem ts_equiv_ts_a : forall s,
@@ -528,15 +538,48 @@ Proof.
   | H : ?a = ?a |- _ => clear H
   end.
 
-  repeat match goal with
-  | H : atomic_exec _ _ _ _ _ _ _ |- _ =>
-    inversion H; clear H; subst; repeat sigT_eq
-  end.
-
   repeat step_inv.
-  simpl.
-  eauto.
+  unfold p1_a.
+
+  eapply exec_trace_eq.
+  eapply ExecAtomic with (tid := 1).
+    rewrite thread_upd_eq.
+    reflexivity.
+    unfold inc_twice_impl.
+    eapply AtomicBind.
+      eapply AtomicInvokeHi.
+    eapply AtomicBind.
+      eapply AtomicOp.
+      constructor.
+    eapply AtomicBind.
+      eapply AtomicOp.
+      constructor.
+    eapply AtomicBind.
+      eapply AtomicReturnHi.
+    eapply AtomicRet.
+    autorewrite with t.
+  eapply ExecDone with (tid := 1).
+    rewrite thread_upd_eq.
+    reflexivity.
+    autorewrite with t.
+  eapply ExecEmpty.
+    unfold threads_empty; congruence.
+
+  reflexivity.
 Qed.
+
+
+Theorem atomic_start :
+  forall opT opHiT T State
+         op (p : T -> proc opT opHiT unit) op_step ts tid (s : State),
+  same_traces op_step s
+    (thread_upd ts tid (Bind (Op opT opHiT T op) p, ThreadRunning))
+    (thread_upd ts tid (Bind (Atomic (Op opT opHiT T op)) p, ThreadRunning)).
+Proof.
+  unfold same_traces; intros.
+  remember (thread_upd ts0 tid (Bind (Op opT0 opHiT0 T op) p, ThreadRunning)) as ts.
+  induction H; subst.
+  - 
 
 
 (*
@@ -572,18 +615,74 @@ Admitted.
 *)
 
 
-
-Theorem all_single_thread_traces_match' :
-  forall s tr1 tr2 T (p1 : proc opT opHiT T) (p2 : proc opHiT opHi2T T),
+Theorem all_single_thread_traces_match :
+  forall s tr1 (p1 : proc opT opHiT unit) (p2 : proc opHiT opHi2T unit),
   compile_ok p1 p2 ->
-  exec op_step s (thread_upd threads_empty 1 (Bind p1 (fun _ => Ret _ _ tt))) tr1 ->
-  exec opHi_step s (thread_upd threads_empty 1 (Bind p2 (fun _ => Ret _ _ tt))) tr2 ->
-  traces_match tr1 tr2.
+  exec op_step s (thread_upd threads_empty 1 (p1, ThreadRunning)) tr1 ->
+  exists tr2,
+    exec opHi_step s (thread_upd threads_empty 1 (p2, ThreadRunning)) tr2 /\
+    traces_match tr1 tr2.
 Proof.
   intros.
-  generalize dependent tr1.
-  generalize dependent tr2.
-  induction H; intros.
+  induction H0.
+  - intros.
+    inversion H; clear H; subst; repeat sigT_eq.
+    unfold inc_twice_impl in H1.
+    exec_inv; repeat thread_inv.
+    exec_inv; repeat thread_inv.
+    exec_inv; repeat thread_inv.
+    exec_inv; repeat thread_inv.
+    exec_inv; repeat thread_inv.
+    exec_inv; repeat thread_inv.
+    exec_inv; repeat thread_inv.
+    exec_inv; repeat thread_inv.
+    exec_inv; repeat thread_inv.
+    exec_inv; repeat thread_inv.
+    exec_inv; repeat thread_inv.
+    exec_inv; repeat thread_inv.
+    autorewrite with t in *.
+
+    eexists.
+    split.
+
+    eapply ExecOpCall with (tid := 1).
+      rewrite thread_upd_eq.
+      reflexivity.
+      autorewrite with t.
+    eapply ExecOp with (tid := 1).
+      rewrite thread_upd_eq.
+      reflexivity.
+      constructor.
+      autorewrite with t.
+    eapply ExecOpRet with (tid := 1).
+      rewrite thread_upd_eq.
+      reflexivity.
+      autorewrite with t.
+
+    admit.
+
+    constructor.
+    constructor.
+    constructor.
+    constructor.
+    constructor.
+    repeat step_inv.
+    replace (s + 1 + 1) with (s + 2) by omega.
+    constructor.
+
+    exec_inv; repeat thread_inv.
+    exec_inv; repeat thread_inv.
+    exec_inv; repeat thread_inv.
+    exec_inv; repeat thread_inv.
+    exec_inv; repeat thread_inv.
+    exec_inv; repeat thread_inv.
+    exec_inv; repeat thread_inv.
+    exec_inv; repeat thread_inv.
+    exec_inv; repeat thread_inv.
+    repeat ( exec_inv; repeat thread_inv ).
+    
+
+  induction H.
   - admit.
   - admit.
   - 
