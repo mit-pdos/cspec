@@ -1251,6 +1251,36 @@ Proof.
   eapply atomic_start.
 Qed.
 
+
+Definition exec_equiv {opT opHiT T} (p1 p2 : proc opT opHiT T) :=
+  forall State op_step (s : State) ts tid tr px,
+    exec op_step s (thread_upd ts tid (Bind p1 px, ThreadRunning)) tr <->
+    exec op_step s (thread_upd ts tid (Bind p2 px, ThreadRunning)) tr.
+
+Theorem monad_left_id : forall opT opHiT T T' (v : T) (p : T -> proc opT opHiT T'),
+  exec_equiv (Bind (Ret v) p) (p v).
+Proof.
+  unfold exec_equiv; split; intros.
+  - match goal with
+    | H : exec _ _ (thread_upd ?ts ?tid ?p) _ |- _ =>
+      remember (thread_upd ts tid p); generalize dependent ts;
+        induction H; intros; subst
+    end.
+
+    + destruct (tid == tid0); subst.
+      * rewrite thread_upd_eq in H; inversion H; clear H; subst.
+        exec_tid_inv.
+
+  - eapply exec_trace_eq.
+      exec_one tid.
+      constructor.
+      exec_one tid.
+      constructor.
+      eauto.
+    reflexivity.
+Qed.
+
+
 Theorem trace_equiv_bind : forall T1 T2 (p1 p1' : proc _ _ T1) (p2 p2' : T1 -> proc _ _ T2),
   trace_equiv p1 p1' ->
   (forall x, trace_equiv (p2 x) (p2' x)) ->
@@ -1316,48 +1346,42 @@ Proof.
 Qed.
 
 
-(*
-Lemma helper1 : forall S opT opHiT step (s : S) tid p (tr : trace opT opHiT),
-  exec step s (thread_upd threads_empty tid p) tr ->
-  exec step s (thread_upd threads_empty tid (Bind p (fun _ => Ret _ _ tt))) tr.
-Proof.
-Admitted.
-*)
-
-
-(**
- PLAN:
- two proof styles:
-  - state correspondence like in POCS
-  - commute operations in low level while preserving high-level trace
- The theorem below tries to do state correspondence, in a way.
-
- Need to figure out how to deal with semicolon.
- Need to figure out how to generalize the [compile_ok p1 p2] statement to
-  allow for some partially-executed code inside of [p1].  This corresponds
-  to some relation between states [s2] and [s1] in the high and low levels,
-  respectively.
-*)
-
-(**
- TODO: introduce notion of atomicity.
-
- In particular, we would like to show that the low-level implementation opcodes
- (i.e., Inc) can be commuted to produce atomic groups of more than one opcode.
- Then, we can group the entire inc_twice_impl into a single atomic unit.  Then
- this might simplify our proof.
-*)
-
-
 Theorem all_single_thread_traces_match :
-  forall s tr1 (p1 : proc opT opHiT unit) (p2 : proc opHiT opHi2T unit),
+  forall s tr1 T (p1 : proc opT opHiT T) (p2 : proc opHiT opHi2T T) (p1rest : T -> proc opT opHiT unit) (p2rest : T -> proc opHiT opHi2T unit),
+  (forall x,
+    exec op_step s
+      (thread_upd threads_empty 1 (p1rest x, ThreadRunning)) tr1 ->
+    exists tr2,
+      exec opHi_step s (thread_upd threads_empty 1 (p2rest x, ThreadRunning)) tr2 /\
+        traces_match tr1 tr2) ->
   compile_ok p1 p2 ->
-  exec op_step s (thread_upd threads_empty 1 (p1, ThreadRunning)) tr1 ->
+  exec op_step s (thread_upd threads_empty 1 (Bind p1 p1rest, ThreadRunning)) tr1 ->
   exists tr2,
-    exec opHi_step s (thread_upd threads_empty 1 (p2, ThreadRunning)) tr2 /\
+    exec opHi_step s (thread_upd threads_empty 1 (Bind p2 p2rest, ThreadRunning)) tr2 /\
     traces_match tr1 tr2.
 Proof.
   intros.
+  induction H0.
+
+  - admit.
+
+  - exec_inv; repeat thread_inv; autorewrite with t in *.
+    exec_tid_inv.
+    edestruct H; eauto.
+    eexists; intuition eauto.
+
+    eapply exec_trace_eq.
+      exec_one 1.
+      constructor.
+      eauto.
+      reflexivity.
+
+  - edestruct IHcompile_ok.
+    
+
+ 1.
+  - 
+
   induction H0.
   - intros.
     inversion H; clear H; subst; repeat sigT_eq.
