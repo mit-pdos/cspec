@@ -539,48 +539,66 @@ Qed.
  * high-level events.
  *)
 
-Inductive trace_match_hi {opLoT opHiT} :
-  forall (t1 : trace opLoT opHiT)
-         (t2 : trace opLoT opHiT), Prop :=
+Inductive low_event {opLoT opHiT} : event opLoT opHiT -> Prop :=
+| LowEventInvoke : forall tid T op,
+  low_event (@InvokeLo opLoT opHiT tid T op)
+| LowEventReturn : forall tid T r,
+  low_event (@ReturnLo opLoT opHiT tid T r).
 
-| SameInvokeLoL : forall t1 t2 tid T (op : opLoT T),
-  trace_match_hi t1 t2 ->
-  trace_match_hi (TraceEvent (@InvokeLo opLoT opHiT tid _ op) t1) t2
-| SameReturnLoL : forall t1 t2 tid T (r : T),
-  trace_match_hi t1 t2 ->
-  trace_match_hi (TraceEvent (@ReturnLo opLoT opHiT tid _ r) t1) t2
+Hint Constructors low_event.
 
-| SameInvokeHi : forall t1 t2 tid T (op : opHiT T),
-  trace_match_hi t1 t2 ->
-  trace_match_hi (TraceEvent (@InvokeHi opLoT opHiT tid _ op) t1)
-               (TraceEvent (@InvokeHi opLoT opHiT tid _ op) t2)
-| SameReturnHi : forall t1 t2 tid T (r : T),
-  trace_match_hi t1 t2 ->
-  trace_match_hi (TraceEvent (@ReturnHi opLoT opHiT tid _ r) t1)
-               (TraceEvent (@ReturnHi opLoT opHiT tid _ r) t2)
+Inductive high_event {opLoT opHiT} : event opLoT opHiT -> Prop :=
+| HighEventInvoke : forall tid T op,
+  high_event (@InvokeHi opLoT opHiT tid T op)
+| HighEventReturn : forall tid T r,
+  high_event (@ReturnHi opLoT opHiT tid T r).
 
-| SameInvokeLoR : forall t1 t2 tid T (op : opLoT T),
-  trace_match_hi t1 t2 ->
-  trace_match_hi t1 (TraceEvent (@InvokeLo opLoT opHiT tid _ op) t2)
-| SameReturnLoR : forall t1 t2 tid T (r : T),
-  trace_match_hi t1 t2 ->
-  trace_match_hi t1 (TraceEvent (@ReturnLo opLoT opHiT tid _ r) t2)
+Hint Constructors high_event.
 
-| SameEmpty :
-  trace_match_hi (TraceEmpty opLoT opHiT) (TraceEmpty opLoT opHiT).
 
-Hint Constructors trace_match_hi.
+Definition is_high_event {opLoT opHiT} (e : event opLoT opHiT) : {high_event e} + {low_event e}.
+  destruct e; eauto.
+Defined.
+
+Fixpoint trace_filter_hi {opLoT opHiT} (t : trace opLoT opHiT) : trace opLoT opHiT :=
+  match t with
+  | TraceEmpty _ _ => TraceEmpty _ _
+  | TraceEvent e t' =>
+    match is_high_event e with
+    | left _ => TraceEvent e (trace_filter_hi t')
+    | right _ => trace_filter_hi t'
+    end
+  end.
+
+
+Definition trace_match_hi {opLoT opHiT} (t1 t2 : trace opLoT opHiT) :=
+  trace_filter_hi t1 = trace_filter_hi t2.
 
 
 Theorem trace_match_hi_refl :
   forall opLoT opHiT (tr : trace opLoT opHiT),
     trace_match_hi tr tr.
 Proof.
-  induction tr; simpl; eauto.
-  destruct e; eauto.
+  unfold trace_match_hi; eauto.
 Qed.
 
 Hint Resolve trace_match_hi_refl.
+
+
+Lemma trace_event_hi_lo : forall opLoT opHiT (e : event opLoT opHiT),
+  low_event e \/ high_event e.
+Proof.
+  destruct e; eauto.
+Qed.
+
+Theorem trace_match_hi_trans :
+  forall opLoT opHiT (tr1 tr2 tr3 : trace opLoT opHiT),
+    trace_match_hi tr1 tr2 ->
+    trace_match_hi tr2 tr3 ->
+    trace_match_hi tr1 tr3.
+Proof.
+  unfold trace_match_hi; intros; congruence.
+Qed.
 
 
 Definition same_traces {opLo opHi State} op_step (s : State) (ts1 ts2 : @threads_state opLo opHi) :=
@@ -664,9 +682,11 @@ Lemma trace_match_hi_prepend : forall opLo opMid evs (tr0 tr1 : trace opLo opMid
   trace_match_hi tr0 tr1 ->
   trace_match_hi (prepend evs tr0) (prepend evs tr1).
 Proof.
+  unfold trace_match_hi.
   induction evs; simpl; intros.
   eauto.
-  destruct a; eauto.
+  destruct (is_high_event a); eauto.
+  erewrite IHevs; eauto.
 Qed.
 
 Lemma prepend_app : forall opT opHiT evs1 evs2 (tr : trace opT opHiT),
@@ -677,6 +697,40 @@ Proof.
 Qed.
 
 Hint Resolve trace_match_hi_prepend.
+
+
+Lemma low_high_event : forall opLoT opHiT (e : event opLoT opHiT),
+  low_event e -> high_event e -> False.
+Proof.
+  destruct e; intros; inversion H; inversion H0.
+Qed.
+
+Hint Resolve low_high_event.
+
+Lemma trace_match_hi_drop_lo_l : forall opLoT opHiT (e : event opLoT opHiT) tr1 tr2,
+  low_event e ->
+  trace_match_hi tr1 tr2 ->
+  trace_match_hi (TraceEvent e tr1) tr2.
+Proof.
+  unfold trace_match_hi; intros.
+  simpl.
+  destruct (is_high_event e); eauto.
+  exfalso; eauto.
+Qed.
+
+Lemma trace_match_hi_drop_lo_r : forall opLoT opHiT (e : event opLoT opHiT) tr1 tr2,
+  low_event e ->
+  trace_match_hi tr1 tr2 ->
+  trace_match_hi tr1 (TraceEvent e tr2).
+Proof.
+  unfold trace_match_hi; intros.
+  simpl.
+  destruct (is_high_event e); eauto.
+  exfalso; eauto.
+Qed.
+
+Hint Resolve trace_match_hi_drop_lo_l.
+Hint Resolve trace_match_hi_drop_lo_r.
 
 
 Lemma can_ignore_return :
@@ -1116,7 +1170,150 @@ Proof.
 Qed.
 
 
+Definition inc_twice_impl_atomic :=
+  _ <- InvokeOpHi IncTwice;
+  i12 <- Atomic (i1 <- Op Inc; i2 <- Op Inc; Ret (i1, i2));
+  _ <- ReturnOpHi (snd i12);
+  Ret (snd i12).
 
+
+Definition trace_equiv {T} (p1 p2 : proc opT opHiT T) :=
+  forall p ts tid s,
+  same_traces op_step s
+    (thread_upd ts tid (r <- p1; p r, ThreadRunning))
+    (thread_upd ts tid (r <- p2; p r, ThreadRunning)).
+
+
+Require Import RelationClasses.
+Require Import Morphisms.
+
+Instance trace_match_hi_preorder {opLoT opHiT} :
+  PreOrder (@trace_match_hi opLoT opHiT).
+Proof.
+  split.
+  - intro t.
+    eapply trace_match_hi_refl.
+  - intros t1 t2 t3.
+    eapply trace_match_hi_trans.
+Qed.
+
+Instance trace_equiv_preorder {T} :
+  PreOrder (@trace_equiv T).
+Proof.
+  split.
+  - intro p.
+    unfold trace_equiv, same_traces; intros.
+    eexists; intuition eauto.
+  - intros p1 p2 p3.
+    intros.
+    unfold trace_equiv, same_traces; intros.
+    edestruct H; eauto; intuition idtac.
+    edestruct H0; eauto; intuition idtac.
+    eexists; intuition eauto.
+    eapply trace_match_hi_trans; eauto.
+Qed.
+
+
+Instance trace_equiv_proper {T} : Proper (Basics.flip trace_equiv ==> trace_equiv ==> Basics.impl) (@trace_equiv T).
+Proof.
+  intros p1 p2 H21 p3 p4 H34 H; subst.
+  unfold Basics.flip in *.
+  unfold trace_equiv, same_traces.
+  intros.
+  edestruct H21; eauto; intuition idtac.
+  edestruct H; eauto; intuition idtac.
+  edestruct H34; eauto; intuition idtac.
+  eexists; intuition eauto.
+  eapply trace_match_hi_trans; eauto.
+  eapply trace_match_hi_trans; eauto.
+Qed.
+
+
+Instance trace_equiv_proper_flip {T} : Proper (trace_equiv ==> Basics.flip trace_equiv ==> Basics.flip Basics.impl) (@trace_equiv T).
+Proof.
+  intros p1 p2 H21 p3 p4 H34 H; subst.
+  unfold Basics.flip in *.
+  unfold trace_equiv, same_traces.
+  intros.
+  edestruct H21; eauto; intuition idtac.
+  edestruct H; eauto; intuition idtac.
+  edestruct H34; eauto; intuition idtac.
+  eexists; intuition eauto.
+  eapply trace_match_hi_trans; eauto.
+  eapply trace_match_hi_trans; eauto.
+Qed.
+
+
+Theorem trace_equiv_op : forall T (op : opT T),
+  trace_equiv (Op op) (Atomic (Op op)).
+Proof.
+  unfold trace_equiv; intros.
+  eapply atomic_start.
+Qed.
+
+Theorem trace_equiv_bind : forall T1 T2 (p1 p1' : proc _ _ T1) (p2 p2' : T1 -> proc _ _ T2),
+  trace_equiv p1 p1' ->
+  (forall x, trace_equiv (p2 x) (p2' x)) ->
+  trace_equiv (Bind p1 p2) (Bind p1' p2').
+Proof.
+Admitted.
+
+
+Theorem trace_equiv_bind_swap : forall T1 T2 T3 (p1 : proc _ _ T1) (p2 : T1 -> proc _ _ T2) (p3 : T1 -> T2 -> proc _ _ T3),
+  trace_equiv (Bind p1 (fun x => Bind (p2 x) (p3 x)))
+              (Bind (Bind p1 (fun x => Bind (p2 x) (fun y => Ret (x, y))))
+                    (fun p => p3 (fst p) (snd p))).
+Proof.
+Admitted.
+
+
+Theorem trace_equiv_inc_commutes : forall T (ap : proc opT opHiT T),
+  trace_equiv (r <- Atomic ap; i <- Op Inc; Ret (r, i))
+              (Atomic (r <- ap; i <- Op Inc; Ret (r, i))).
+Proof.
+Admitted.
+
+
+Theorem inc_twice_atomic :
+  trace_equiv inc_twice_impl inc_twice_impl_atomic.
+Proof.
+  unfold inc_twice_impl, inc_twice_impl_atomic.
+
+  eapply trace_equiv_bind.
+  reflexivity.
+  intros.
+
+  etransitivity.
+  eapply trace_equiv_bind.
+  eapply trace_equiv_op.
+
+  intros.
+  match goal with
+  | |- trace_equiv ?p1 _ =>
+    instantiate (1 := fun x => p1)
+  end.
+  reflexivity.
+
+  etransitivity.
+  eapply trace_equiv_bind_swap.
+
+  simpl.
+  etransitivity.
+  eapply trace_equiv_bind.
+  apply trace_equiv_inc_commutes.
+
+  intros.
+  match goal with
+  | |- trace_equiv ?p1 (?p2 ?x) => 
+    match eval pattern x in p1 with
+    | ?f x =>
+      instantiate (1 := f)
+    end
+  end.
+  reflexivity.
+
+  reflexivity.
+Qed.
 
 
 (*
