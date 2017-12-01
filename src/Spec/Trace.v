@@ -51,11 +51,8 @@ Inductive thread_state :=
 
 Definition threads_state := forall (tid : nat), option (proc unit * thread_state).
 
-Definition thread_upd (ts : threads_state) (tid : nat) (s : proc unit * thread_state) :=
-  fun tid' => if tid == tid' then Some s else ts tid'.
-
-Definition thread_del (ts : threads_state) (tid : nat) :=
-  fun tid' => if tid == tid' then None else ts tid'.
+Definition thread_upd (ts : threads_state) (tid : nat) (s : option (proc unit * thread_state)) :=
+  fun tid' => if tid == tid' then s else ts tid'.
 
 
 Inductive atomic_exec : forall T, proc T -> nat -> State -> T -> State -> list event -> Prop :=
@@ -150,10 +147,11 @@ Inductive exec : State -> threads_state -> trace -> Prop :=
 | ExecOne : forall tid ts trace p ps s s' evs result,
   ts tid = Some (p, ps) ->
   exec_tid tid s (p, ps) s' result evs ->
-  exec s' match result with
-          | inl _ => thread_del ts tid
-          | inr (p', ps') => thread_upd ts tid (p', ps')
-          end trace ->
+  exec s' (thread_upd ts tid
+            match result with
+            | inl _ => None
+            | inr (p', ps') => Some (p', ps')
+            end) trace ->
   exec s ts (prepend evs trace)
 
 | ExecEmpty : forall ts s,
@@ -217,10 +215,10 @@ Definition p1 :=
   _ <- inc_twice_impl;
   Ret tt.
 
-Definition ts := thread_upd threads_empty 1 (p1, ThreadRunning).
+Definition ts := thread_upd threads_empty 1 (Some (p1, ThreadRunning)).
 
 Lemma thread_upd_eq : forall opT opHiT ts p tid,
-  @thread_upd opT opHiT ts tid p tid = Some p.
+  @thread_upd opT opHiT ts tid p tid = p.
 Proof.
   unfold thread_upd; intros.
   destruct (tid == tid); congruence.
@@ -244,34 +242,6 @@ Proof.
   destruct (tid' == x); destruct (tid == x); congruence.
 Qed.
 
-Lemma thread_del_upd_eq : forall opT opHiT ts p tid,
-  @thread_del opT opHiT (thread_upd ts tid p) tid =
-  @thread_del opT opHiT ts tid.
-Proof.
-  unfold thread_del, thread_upd; intros.
-  apply functional_extensionality; intros.
-  destruct (tid == x); congruence.
-Qed.
-
-Lemma thread_del_upd_ne : forall opT opHiT ts p tid tid',
-  tid <> tid' ->
-  @thread_del opT opHiT (@thread_upd opT opHiT ts tid p) tid' =
-  @thread_upd opT opHiT (@thread_del opT opHiT ts tid') tid p.
-Proof.
-  unfold thread_del, thread_upd; intros.
-  apply functional_extensionality; intros.
-  destruct (tid == x); destruct (tid' == x); congruence.
-Qed.
-
-Lemma thread_del_empty : forall opT opHiT tid,
-  @thread_del opT opHiT (threads_empty) tid =
-  threads_empty.
-Proof.
-  unfold thread_del, threads_empty; intros.
-  apply functional_extensionality; intros.
-  destruct (tid == x); congruence.
-Qed.
-
 Lemma thread_upd_upd_eq : forall opT opHiT ts tid p1 p2,
   @thread_upd opT opHiT (thread_upd ts tid p1) tid p2 =
   thread_upd ts tid p2.
@@ -281,9 +251,17 @@ Proof.
   destruct (tid == x); congruence.
 Qed.
 
+Lemma thread_upd_None_empty : forall opT opHiT tid,
+  @thread_upd opT opHiT (threads_empty) tid None =
+  threads_empty.
+Proof.
+  unfold thread_upd, threads_empty; intros.
+  apply functional_extensionality; intros.
+  destruct (tid == x); congruence.
+Qed.
+
 Hint Rewrite thread_upd_upd_eq : t.
-Hint Rewrite thread_del_upd_eq : t.
-Hint Rewrite thread_del_empty : t.
+Hint Rewrite thread_upd_None_empty : t.
 
 
 Definition init_state : State := fun tid' => 4.
@@ -353,7 +331,7 @@ Definition p2 : proc opHiT opHi2T _ :=
   _ <- Op IncTwice;
   Ret tt.
 
-Definition ts2 := thread_upd threads_empty 1 (p2, ThreadRunning).
+Definition ts2 := thread_upd threads_empty 1 (Some (p2, ThreadRunning)).
 
 Definition ex_trace2 :
   { t : trace opHiT opHi2T | exec opHi_step init_state ts2 t }.
@@ -462,7 +440,7 @@ Proof.
 Qed.
 
 Lemma thread_upd_inv : forall opT opHiT ts tid1 p tid2 p',
-  @thread_upd opT opHiT ts tid1 p tid2 = Some p' ->
+  @thread_upd opT opHiT ts tid1 (Some p) tid2 = Some p' ->
   tid1 = tid2 /\ p = p' \/
   tid1 <> tid2 /\ ts tid2 = Some p'.
 Proof.
@@ -479,7 +457,7 @@ Proof.
 Qed.
 
 Lemma thread_upd_not_empty : forall opT opHiT tid ts p,
-  (forall tid', @thread_upd opT opHiT ts tid p tid' = None) -> False.
+  (forall tid', @thread_upd opT opHiT ts tid (Some p) tid' = None) -> False.
 Proof.
   unfold thread_upd; intros.
   specialize (H tid).
@@ -643,7 +621,7 @@ Definition p1_a :=
   Ret tt.
 
 
-Definition ts_a := thread_upd threads_empty 1 (p1_a, ThreadRunning).
+Definition ts_a := thread_upd threads_empty 1 (Some (p1_a, ThreadRunning)).
 
 
 Lemma exec_trace_eq : forall opLo opHi State op_step (s : State) (ts : @threads_state opLo opHi) tr1 tr2,
@@ -763,8 +741,8 @@ Lemma can_ignore_return :
   forall opT opHiT T State
          (p : proc opT opHiT unit) op_step ts tid (s : State) (v : T),
   same_traces op_step s
-    (thread_upd ts tid (p, ThreadReturning v))
-    (thread_upd ts tid (p, ThreadRunning)).
+    (thread_upd ts tid (Some (p, ThreadReturning v)))
+    (thread_upd ts tid (Some (p, ThreadRunning))).
 Proof.
   unfold same_traces; intros.
   remember (thread_upd ts0 tid (p, ThreadReturning v)).
