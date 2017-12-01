@@ -93,70 +93,68 @@ Fixpoint prepend (evs : list event) (tr : trace) : trace :=
   end.
 
 
-(**
- For next time: make [Ret] an [exec_tid] thing, by
- having [exec_tid] provide an [option proc unit] for
- the next proc state.  This reduces the number of
- constructors in [exec] to just 2, instead of 3.
- *)
+Inductive exec_tid : forall T (tid : nat),
+  State -> (proc T * thread_state) ->
+  State -> T + (proc T * thread_state) -> list event -> Prop :=
 
-Inductive exec_tid (tid : nat) : State -> proc unit -> thread_state -> State -> proc unit -> thread_state -> list event -> Prop :=
-
-| ExecTidRet : forall T (v : T) p s,
-  exec_tid tid s (Bind (Ret v) p) ThreadRunning
-               s (p v) ThreadRunning
+| ExecTidRet : forall tid T (v : T) s,
+  exec_tid tid s (Ret v, ThreadRunning)
+               s (inl v)
                nil
 
-| ExecTidOpCall : forall T p s (op : opT T),
-  exec_tid tid s (Bind (Op op) p) ThreadRunning
-               s (Bind (Op op) p) ThreadCalled
+| ExecTidOpCall : forall tid T s (op : opT T),
+  exec_tid tid s (Op op, ThreadRunning)
+               s (inr (Op op, ThreadCalled))
                [InvokeLo tid op]
 
-| ExecTidOpRun : forall T (v : T) p s s' op,
+| ExecTidOpRun : forall tid T (v : T) s s' op,
   op_step op tid s v s' ->
-  exec_tid tid s (Bind (Op op) p) ThreadCalled
-               s' (p v) (ThreadReturning v)
+  exec_tid tid s (Op op, ThreadCalled)
+               s' (inr (Op op, ThreadReturning v))
                nil
 
-| ExecTidOpRet : forall T (v : T) p s,
-  exec_tid tid s p (ThreadReturning v)
-               s p ThreadRunning
+| ExecTidOpRet : forall tid T (v : T) op s,
+  exec_tid tid s (Op op, ThreadReturning v)
+               s (inl v)
                [ReturnLo tid v]
 
-| ExecTidAtomic : forall T (v : T) p ap s s' evs,
+| ExecTidAtomic : forall tid T (v : T) ap s s' evs,
   atomic_exec ap tid s v s' evs ->
-  exec_tid tid s (Bind (Atomic ap) p) ThreadRunning
-               s' (p v) ThreadRunning
+  exec_tid tid s (Atomic ap, ThreadRunning)
+               s' (inl v)
                evs
 
-| ExecTidInvokeHi : forall p s T' (op : opHiT T'),
-  exec_tid tid s (Bind (InvokeOpHi op) p) ThreadRunning
-               s (p tt) ThreadRunning
+| ExecTidInvokeHi : forall tid s T' (op : opHiT T'),
+  exec_tid tid s (InvokeOpHi op, ThreadRunning)
+               s (inl tt)
                [InvokeHi tid op]
 
-| ExecTidReturnHi : forall p s T' (r : T'),
-  exec_tid tid s (Bind (ReturnOpHi r) p) ThreadRunning
-               s (p tt) ThreadRunning
+| ExecTidReturnHi : forall tid s T' (r : T'),
+  exec_tid tid s (ReturnOpHi r, ThreadRunning)
+               s (inl tt)
                [ReturnHi tid r]
 
-| ExecTidBind : forall T1 (p1 : proc T1) T2 (p2 : T1 -> proc T2) p3 s,
-  exec_tid tid s (Bind (Bind p1 p2) p3) ThreadRunning
-               s (Bind p1 (fun x => Bind (p2 x) p3)) ThreadRunning
-               nil.
-
+| ExecTidBind : forall tid T1 (p1 : proc T1) T2 (p2 : T1 -> proc T2) ts s s' result evs,
+  exec_tid tid s (p1, ts)
+               s' result evs ->
+  exec_tid tid s (Bind p1 p2, ts)
+               s' (inr
+                   match result with
+                   | inl r => (p2 r, ThreadRunning)
+                   | inr (p1', ts') => (Bind p1' p2, ts')
+                   end
+                  ) evs.
 
 Inductive exec : State -> threads_state -> trace -> Prop :=
 
-| ExecOne : forall tid ts trace p ps p' ps' s s' evs,
+| ExecOne : forall tid ts trace p ps s s' evs result,
   ts tid = Some (p, ps) ->
-  exec_tid tid s p ps s' p' ps' evs ->
-  exec s' (thread_upd ts tid (p', ps')) trace ->
+  exec_tid tid s (p, ps) s' result evs ->
+  exec s' match result with
+          | inl _ => thread_del ts tid
+          | inr (p', ps') => thread_upd ts tid (p', ps')
+          end trace ->
   exec s ts (prepend evs trace)
-
-| ExecDone : forall tid ts trace s,
-  ts tid = Some (Ret tt, ThreadRunning) ->
-  exec s (thread_del ts tid) trace ->
-  exec s ts trace
 
 | ExecEmpty : forall ts s,
   (forall tid, ts tid = None) ->
@@ -294,6 +292,8 @@ Ltac exec_one tid' :=
   eapply ExecOne with (tid := tid');
     [ rewrite thread_upd_eq; reflexivity | | autorewrite with t ].
 
+Hint Constructors exec_tid.
+
 Definition ex_trace :
   { t : trace opT opHiT | exec op_step init_state ts t }.
 Proof.
@@ -301,37 +301,47 @@ Proof.
   unfold ts.
   unfold init_state.
   exec_one 1.
-    eapply ExecTidBind.
+    repeat eapply ExecTidBind.
+    econstructor.
+    simpl; autorewrite with t.
   exec_one 1.
-    eapply ExecTidInvokeHi.
+    repeat eapply ExecTidBind.
+    econstructor.
+    simpl; autorewrite with t.
   exec_one 1.
-    eapply ExecTidBind.
-  exec_one 1.
-    eapply ExecTidOpCall.
-  exec_one 1.
-    eapply ExecTidOpRun.
+    repeat eapply ExecTidBind.
+    econstructor.
     constructor.
+    simpl; autorewrite with t.
   exec_one 1.
-    eapply ExecTidOpRet.
+    repeat eapply ExecTidBind.
+    econstructor.
+    simpl; autorewrite with t.
   exec_one 1.
-    eapply ExecTidBind.
+    repeat eapply ExecTidBind.
+    econstructor.
+    simpl; autorewrite with t.
   exec_one 1.
-    eapply ExecTidOpCall.
-  exec_one 1.
-    eapply ExecTidOpRun.
+    repeat eapply ExecTidBind.
+    econstructor.
     constructor.
+    simpl; autorewrite with t.
   exec_one 1.
-    eapply ExecTidOpRet.
+    repeat eapply ExecTidBind.
+    econstructor.
+    simpl; autorewrite with t.
   exec_one 1.
-    eapply ExecTidBind.
+    repeat eapply ExecTidBind.
+    econstructor.
+    simpl; autorewrite with t.
   exec_one 1.
-    eapply ExecTidReturnHi.
+    repeat eapply ExecTidBind.
+    econstructor.
+    simpl; autorewrite with t.
   exec_one 1.
-    eapply ExecTidRet.
-  eapply ExecDone with (tid := 1).
-    rewrite thread_upd_eq.
-    reflexivity.
-    autorewrite with t.
+    repeat eapply ExecTidBind.
+    econstructor.
+    simpl; autorewrite with t.
   eapply ExecEmpty.
     unfold threads_empty; congruence.
 Defined.
@@ -352,16 +362,22 @@ Proof.
   unfold ts2.
   unfold init_state.
   exec_one 1.
-    eapply ExecTidOpCall.
+    repeat eapply ExecTidBind.
+    econstructor.
+    simpl; autorewrite with t.
   exec_one 1.
-    eapply ExecTidOpRun.
+    repeat eapply ExecTidBind.
+    econstructor.
     constructor.
+    simpl; autorewrite with t.
   exec_one 1.
-    eapply ExecTidOpRet.
-  eapply ExecDone with (tid := 1).
-    rewrite thread_upd_eq.
-    reflexivity.
-    autorewrite with t.
+    repeat eapply ExecTidBind.
+    econstructor.
+    simpl; autorewrite with t.
+  exec_one 1.
+    repeat eapply ExecTidBind.
+    econstructor.
+    simpl; autorewrite with t.
   eapply ExecEmpty.
     unfold threads_empty; congruence.
 Defined.
@@ -502,7 +518,7 @@ Ltac exec_inv :=
 
 Ltac exec_tid_inv :=
   match goal with
-  | H : exec_tid _ _ _ _ _ _ _ _ _ |- _ =>
+  | H : exec_tid _ _ _ _ _ _ _ |- _ =>
     inversion H; clear H; subst; repeat sigT_eq
   end;
   autorewrite with t in *.
@@ -529,7 +545,7 @@ Proof.
   unfold ts, ts2 in *.
 
   repeat ( exec_inv; repeat thread_inv;
-    try ( exec_tid_inv; repeat thread_inv ) ).
+    try ( repeat exec_tid_inv; repeat thread_inv ) ).
   repeat step_inv.
 
   simpl.
@@ -647,7 +663,7 @@ Proof.
   unfold ts, ts_a in *.
 
   repeat ( exec_inv; repeat thread_inv;
-    try ( exec_tid_inv; repeat thread_inv ) ).
+    try ( repeat exec_tid_inv; repeat thread_inv ) ).
 
   repeat match goal with
   | H : ?a = ?a |- _ => clear H
@@ -659,8 +675,8 @@ Proof.
   eexists; split.
 
   exec_one 1.
-  eapply ExecTidAtomic.
-    unfold inc_twice_impl.
+    repeat eapply ExecTidBind.
+    econstructor.
     eapply AtomicBind.
       eapply AtomicInvokeHi.
     eapply AtomicBind.
@@ -672,10 +688,11 @@ Proof.
     eapply AtomicBind.
       eapply AtomicReturnHi.
     eapply AtomicRet.
-  eapply ExecDone with (tid := 1).
-    rewrite thread_upd_eq.
-    reflexivity.
-    autorewrite with t.
+    simpl; autorewrite with t.
+  exec_one 1.
+    repeat eapply ExecTidBind.
+    econstructor.
+    simpl; autorewrite with t.
   eapply ExecEmpty.
     unfold threads_empty; congruence.
 
@@ -739,6 +756,8 @@ Qed.
 Hint Resolve trace_match_hi_drop_lo_l.
 Hint Resolve trace_match_hi_drop_lo_r.
 
+
+(* XXX stopped here *)
 
 Lemma can_ignore_return :
   forall opT opHiT T State
