@@ -93,6 +93,13 @@ Fixpoint prepend (evs : list event) (tr : trace) : trace :=
   end.
 
 
+(**
+ For next time: make [Ret] an [exec_tid] thing, by
+ having [exec_tid] provide an [option proc unit] for
+ the next proc state.  This reduces the number of
+ constructors in [exec] to just 2, instead of 3.
+ *)
+
 Inductive exec_tid (tid : nat) : State -> proc unit -> thread_state -> State -> proc unit -> thread_state -> list event -> Prop :=
 
 | ExecTidRet : forall T (v : T) p s,
@@ -1258,6 +1265,7 @@ Definition exec_equiv {opT opHiT T} (p1 p2 : proc opT opHiT T) :=
     exec op_step s (thread_upd ts tid (Bind p2 px, ThreadRunning)) tr.
 
 Definition exec_tid_local {opT opHiT} (p1 p2 : proc opT opHiT unit) :=
+  p1 <> Ret tt /\
   forall State op_step (s : State) tid s' p' ts' evs,
     @exec_tid opT opHiT State op_step tid s p1 ThreadRunning s' p' ts' evs ->
     s' = s /\
@@ -1269,6 +1277,7 @@ Theorem exec_tid_local_bind_ret : forall opT opHiT T (p : T -> proc opT opHiT un
   exec_tid_local (Bind (Ret v) p) (p v).
 Proof.
   unfold exec_tid_local; intros.
+  split; try congruence; intros.
   inversion H; subst; repeat sigT_eq.
   eauto.
 Qed.
@@ -1277,8 +1286,31 @@ Theorem exec_tid_local_bind_bind : forall opT opHiT T1 T2 (p1 : proc opT opHiT T
   exec_tid_local (Bind (Bind p1 p2) p3) (Bind p1 (fun v => Bind (p2 v) p3)).
 Proof.
   unfold exec_tid_local; intros.
+  split; try congruence; intros.
   inversion H; subst; repeat sigT_eq.
   eauto.
+Qed.
+
+Definition exec_tid_local_star {opT opHiT} (p1 p2 : proc opT opHiT unit) :=
+  clos_refl_trans _ exec_tid_local p1 p2.
+
+Instance exec_tid_local_star_preorder {opT opHiT} :
+  PreOrder (@exec_tid_local_star opT opHiT).
+Proof.
+  split.
+  - unfold Reflexive, exec_tid_local_star; intros.
+    apply rt_refl.
+  - unfold Transitive, exec_tid_local_star; intros.
+    eapply rt_trans; eauto.
+Qed.
+
+Theorem exec_tid_local_to_star : forall opT opHiT (p1 p2 : proc opT opHiT unit),
+  exec_tid_local p1 p2 ->
+  exec_tid_local_star p1 p2.
+Proof.
+  unfold exec_tid_local, exec_tid_local_star; intuition.
+  constructor.
+  split; eauto.
 Qed.
 
 Theorem exec_tid_local_to_exec : forall opT opHiT (p1 p2 : proc opT opHiT unit),
@@ -1298,31 +1330,51 @@ Proof.
       eapply H in H1; intuition subst.
       simpl.
       rewrite thread_upd_upd_eq in *; auto.
-    + rewrite thread_upd_ne in H0 by auto.
-      
-
-Theorem exec_equiv_ : forall opT opHiT T T' (v : T) (p : T -> proc opT opHiT T'),
-  exec_equiv (e (Ret v) p) (p v).
-Proof.
-  unfold exec_equiv; split; intros.
-  - match goal with
-    | H : exec _ _ (thread_upd ?ts ?tid ?p) _ |- _ =>
-      remember (thread_upd ts tid p); generalize dependent ts;
-        induction H; intros; subst
-    end.
-
-    + destruct (tid == tid0); subst.
-      * rewrite thread_upd_eq in H; inversion H; clear H; subst.
-        exec_tid_inv.
-
-  - eapply exec_trace_eq.
-      exec_one tid.
-      constructor.
-      exec_one tid.
-      constructor.
+    + eapply ExecOne with (tid := tid0).
+        rewrite thread_upd_ne in H0 by auto.
+        rewrite thread_upd_ne by auto.
+        eauto.
+        eauto.
+      rewrite thread_upd_upd_ne by auto.
+      eapply IHexec.
+      rewrite thread_upd_upd_ne by auto.
       eauto.
-    reflexivity.
+  - destruct (tid0 == tid); subst.
+    + rewrite thread_upd_eq in H0; inversion H0; clear H0; subst.
+      unfold exec_tid_local in H.
+      intuition congruence.
+    + eapply ExecDone with (tid := tid0).
+        rewrite thread_upd_ne by auto.
+        rewrite thread_upd_ne in * by auto.
+        auto.
+      rewrite thread_del_upd_ne by auto.
+      eapply IHexec.
+      rewrite thread_del_upd_ne by auto.
+      auto.
+  - specialize (H0 tid).
+    rewrite thread_upd_eq in H0.
+    congruence.
 Qed.
+
+Theorem exec_tid_local_star_to_exec : forall opT opHiT (p1 p2 : proc opT opHiT unit),
+  exec_tid_local_star p1 p2 ->
+  forall State op_step (s : State) ts tid tr,
+    exec op_step s (thread_upd ts tid (p1, ThreadRunning)) tr ->
+    exec op_step s (thread_upd ts tid (p2, ThreadRunning)) tr.
+Proof.
+  unfold exec_tid_local_star; intros.
+  eapply Operators_Properties.clos_rt_rt1n in H.
+  induction H.
+  - eauto.
+  - eapply exec_tid_local_to_exec in H0.
+    2: eassumption.
+    eauto.
+Qed.
+
+
+Theorem exec_tid_local_star_bind : forall opT opHiT T1 (p1 p2 : proc opT opHiT T1) (p2 : T1 -> proc opT opHiT unit),
+  
+  exec_tid_local (Bind (Bind p1 p2) p3) (Bind p1 (fun v => Bind (p2 v) p3)).
 
 
 Theorem trace_equiv_bind : forall T1 T2 (p1 p1' : proc _ _ T1) (p2 p2' : T1 -> proc _ _ T2),
@@ -1333,11 +1385,24 @@ Proof.
 Admitted.
 
 
+Theorem trace_equiv_bind_swap' : forall T1 T2 T3 (p1 : proc _ _ T1) (p2 : T1 -> proc _ _ T2) (p3 : T2 -> proc _ _ T3),
+  trace_equiv (Bind (Bind p1 p2) p3)
+              (Bind p1 (fun x => Bind (p2 x) p3)).
+Proof.
+  unfold trace_equiv, same_traces.
+  intros.
+  eapply 
+Admitted.
+
+
 Theorem trace_equiv_bind_swap : forall T1 T2 T3 (p1 : proc _ _ T1) (p2 : T1 -> proc _ _ T2) (p3 : T1 -> T2 -> proc _ _ T3),
   trace_equiv (Bind p1 (fun x => Bind (p2 x) (p3 x)))
               (Bind (Bind p1 (fun x => Bind (p2 x) (fun y => Ret (x, y))))
                     (fun p => p3 (fst p) (snd p))).
 Proof.
+  unfold trace_equiv, same_traces.
+  intros.
+  
 Admitted.
 
 
