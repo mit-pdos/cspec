@@ -1257,8 +1257,52 @@ Definition exec_equiv {opT opHiT T} (p1 p2 : proc opT opHiT T) :=
     exec op_step s (thread_upd ts tid (Bind p1 px, ThreadRunning)) tr <->
     exec op_step s (thread_upd ts tid (Bind p2 px, ThreadRunning)) tr.
 
-Theorem monad_left_id : forall opT opHiT T T' (v : T) (p : T -> proc opT opHiT T'),
-  exec_equiv (Bind (Ret v) p) (p v).
+Definition exec_tid_local {opT opHiT} (p1 p2 : proc opT opHiT unit) :=
+  forall State op_step (s : State) tid s' p' ts' evs,
+    @exec_tid opT opHiT State op_step tid s p1 ThreadRunning s' p' ts' evs ->
+    s' = s /\
+    p' = p2 /\
+    ts' = ThreadRunning /\
+    evs = nil.
+
+Theorem exec_tid_local_bind_ret : forall opT opHiT T (p : T -> proc opT opHiT unit) v,
+  exec_tid_local (Bind (Ret v) p) (p v).
+Proof.
+  unfold exec_tid_local; intros.
+  inversion H; subst; repeat sigT_eq.
+  eauto.
+Qed.
+
+Theorem exec_tid_local_bind_bind : forall opT opHiT T1 T2 (p1 : proc opT opHiT T1) (p2 : T1 -> proc opT opHiT T2) (p3 : T2 -> proc opT opHiT unit),
+  exec_tid_local (Bind (Bind p1 p2) p3) (Bind p1 (fun v => Bind (p2 v) p3)).
+Proof.
+  unfold exec_tid_local; intros.
+  inversion H; subst; repeat sigT_eq.
+  eauto.
+Qed.
+
+Theorem exec_tid_local_to_exec : forall opT opHiT (p1 p2 : proc opT opHiT unit),
+  exec_tid_local p1 p2 ->
+  forall State op_step (s : State) ts tid tr,
+    exec op_step s (thread_upd ts tid (p1, ThreadRunning)) tr ->
+    exec op_step s (thread_upd ts tid (p2, ThreadRunning)) tr.
+Proof.
+  intros.
+  match goal with
+  | H : exec _ _ (thread_upd ?ts ?tid ?p) _ |- _ =>
+    remember (thread_upd ts tid p); generalize dependent ts;
+      induction H; intros; subst
+  end.
+  - destruct (tid0 == tid); subst.
+    + rewrite thread_upd_eq in H0; inversion H0; clear H0; subst.
+      eapply H in H1; intuition subst.
+      simpl.
+      rewrite thread_upd_upd_eq in *; auto.
+    + rewrite thread_upd_ne in H0 by auto.
+      
+
+Theorem exec_equiv_ : forall opT opHiT T T' (v : T) (p : T -> proc opT opHiT T'),
+  exec_equiv (e (Ret v) p) (p v).
 Proof.
   unfold exec_equiv; split; intros.
   - match goal with
