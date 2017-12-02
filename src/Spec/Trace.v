@@ -1504,9 +1504,10 @@ Theorem trace_equiv_bind_swap' : forall T1 T2 (p1 : proc _ _ T1) (p2 : T1 -> pro
   trace_equiv (Bind (Bind p1 p2) p3)
               (Bind p1 (fun x => Bind (p2 x) p3)).
 Proof.
-  unfold trace_equiv, same_traces.
   intros.
-Admitted.
+  rewrite exec_equiv_bind_bind.
+  reflexivity.
+Qed.
 
 
 Theorem trace_equiv_bind_swap : forall T1 T2 (p1 : proc _ _ T1) (p2 : T1 -> proc _ _ T2) (p3 : T1 -> T2 -> proc _ _ unit),
