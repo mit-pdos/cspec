@@ -1489,7 +1489,62 @@ Proof.
   induction H0; intros.
 
   - rewrite inc_twice_atomic.
-    admit.
+
+    unfold trace_match_one_thread; intros.
+
+    exec_inv; repeat thread_inv.
+    autorewrite with t in *.
+    repeat ( exec_tid_inv; intuition try congruence ).
+
+    exec_inv; repeat thread_inv.
+    autorewrite with t in *.
+    repeat ( exec_tid_inv; intuition try congruence ).
+
+    repeat match goal with
+    | H : atomic_exec _ _ _ _ _ _ _ |- _ =>
+      inversion H; clear H; subst; repeat sigT_eq
+    end.
+    repeat step_inv.
+
+    exec_inv; repeat thread_inv.
+    autorewrite with t in *.
+    repeat ( exec_tid_inv; intuition try congruence ).
+
+    exec_inv; repeat thread_inv.
+    autorewrite with t in *.
+    repeat ( exec_tid_inv; intuition try congruence ).
+
+    apply H in H5. deex.
+
+    eexists; split.
+    eapply ExecOne with (tid := 1).
+      rewrite thread_upd_eq; auto.
+      eauto.
+    eapply ExecOne with (tid := 1).
+      rewrite thread_upd_eq; auto.
+      eapply ExecTidBind; auto.
+      eapply ExecTidOpRun.
+      constructor.
+    eapply ExecOne with (tid := 1).
+      rewrite thread_upd_eq; auto.
+      eapply ExecTidOpRet.
+    autorewrite with t.
+
+    match goal with
+    | H : exec _ ?s1 (thread_upd _ _ (Some (?p1, _))) _ |-
+          exec _ ?s2 (thread_upd _ _ (Some (?p2, _))) _ =>
+      replace p2 with p1; [ replace s2 with s1; [ eauto | ] | ]
+    end.
+
+    apply functional_extensionality; intros.
+    destruct (x == 1); omega.
+
+    f_equal. omega.
+
+    simpl.
+    repeat constructor.
+    replace (s' 1 + 1 + 1) with (s' 1 + 2) by omega.
+    eauto.
 
   - unfold trace_match_one_thread in *; intros.
 
@@ -1512,17 +1567,4 @@ Proof.
     intros.
     eapply H1.
     eapply H2.
-Admitted.
-
-Theorem all_single_thread_traces_match :
-  forall s tr1 tr2 p1 p2,
-  compile_ok p1 p2 ->
-  exec op_step s (thread_upd threads_empty 1 p1) tr1 ->
-  exec opHi_step s (thread_upd threads_empty 1 p2) tr2 ->
-  traces_match tr1 tr2.
-Proof.
-  intros.
-  eapply all_single_thread_traces_match'; eauto.
-  eapply helper1; eauto.
-  eapply helper1; eauto.
 Qed.
