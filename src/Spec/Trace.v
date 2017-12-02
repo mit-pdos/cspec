@@ -1111,11 +1111,11 @@ Definition inc_twice_impl_atomic :=
   Ret (snd i12).
 
 
-Definition trace_equiv {T} (p1 p2 : proc opT opHiT T) :=
-  forall p ts tid s,
+Definition trace_equiv (p1 p2 : proc opT opHiT unit) :=
+  forall ts tid s,
   same_traces op_step s
-    (thread_upd ts tid (Some (r <- p1; p r, ThreadRunning)))
-    (thread_upd ts tid (Some (r <- p2; p r, ThreadRunning))).
+    (thread_upd ts tid (Some (p1, ThreadRunning)))
+    (thread_upd ts tid (Some (p2, ThreadRunning))).
 
 
 Require Import RelationClasses.
@@ -1131,8 +1131,8 @@ Proof.
     eapply trace_match_hi_trans.
 Qed.
 
-Instance trace_equiv_preorder {T} :
-  PreOrder (@trace_equiv T).
+Instance trace_equiv_preorder :
+  PreOrder trace_equiv.
 Proof.
   split.
   - intro p.
@@ -1148,7 +1148,7 @@ Proof.
 Qed.
 
 
-Instance trace_equiv_proper {T} : Proper (Basics.flip trace_equiv ==> trace_equiv ==> Basics.impl) (@trace_equiv T).
+Instance trace_equiv_proper : Proper (Basics.flip trace_equiv ==> trace_equiv ==> Basics.impl) trace_equiv.
 Proof.
   intros p1 p2 H21 p3 p4 H34 H; subst.
   unfold Basics.flip in *.
@@ -1163,7 +1163,7 @@ Proof.
 Qed.
 
 
-Instance trace_equiv_proper_flip {T} : Proper (trace_equiv ==> Basics.flip trace_equiv ==> Basics.flip Basics.impl) (@trace_equiv T).
+Instance trace_equiv_proper_flip : Proper (trace_equiv ==> Basics.flip trace_equiv ==> Basics.flip Basics.impl) trace_equiv.
 Proof.
   intros p1 p2 H21 p3 p4 H34 H; subst.
   unfold Basics.flip in *.
@@ -1178,8 +1178,8 @@ Proof.
 Qed.
 
 
-Theorem trace_equiv_op : forall T (op : opT T),
-  trace_equiv (Op op) (Atomic (Op op)).
+Theorem trace_equiv_op : forall T (op : opT T) (p : T -> proc _ _ unit),
+  trace_equiv (Bind (Op op) p) (Bind (Atomic (Op op)) p).
 Proof.
   unfold trace_equiv; intros.
   eapply atomic_start.
@@ -1325,15 +1325,16 @@ Proof.
 Admitted.
 
 
+
 Theorem trace_equiv_bind : forall T1 T2 (p1 p1' : proc _ _ T1) (p2 p2' : T1 -> proc _ _ T2),
-  trace_equiv p1 p1' ->
-  (forall x, trace_equiv (p2 x) (p2' x)) ->
-  trace_equiv (Bind p1 p2) (Bind p1' p2').
+  (forall rx, trace_equiv (Bind p1 rx) (Bind p1' rx)) ->
+  (forall rx, (forall x, trace_equiv (Bind (p2 x) rx) (Bind (p2' x) rx))) ->
+  (forall rx, trace_equiv (Bind (Bind p1 p2) rx) (Bind (Bind p1' p2') rx)).
 Proof.
 Admitted.
 
 
-Theorem trace_equiv_bind_swap' : forall T1 T2 T3 (p1 : proc _ _ T1) (p2 : T1 -> proc _ _ T2) (p3 : T2 -> proc _ _ T3),
+Theorem trace_equiv_bind_swap' : forall T1 T2 (p1 : proc _ _ T1) (p2 : T1 -> proc _ _ T2) (p3 : T2 -> proc _ _ unit),
   trace_equiv (Bind (Bind p1 p2) p3)
               (Bind p1 (fun x => Bind (p2 x) p3)).
 Proof.
@@ -1342,7 +1343,7 @@ Proof.
 Admitted.
 
 
-Theorem trace_equiv_bind_swap : forall T1 T2 T3 (p1 : proc _ _ T1) (p2 : T1 -> proc _ _ T2) (p3 : T1 -> T2 -> proc _ _ T3),
+Theorem trace_equiv_bind_swap : forall T1 T2 (p1 : proc _ _ T1) (p2 : T1 -> proc _ _ T2) (p3 : T1 -> T2 -> proc _ _ unit),
   trace_equiv (Bind p1 (fun x => Bind (p2 x) (p3 x)))
               (Bind (Bind p1 (fun x => Bind (p2 x) (fun y => Ret (x, y))))
                     (fun p => p3 (fst p) (snd p))).
@@ -1353,16 +1354,17 @@ Proof.
 Admitted.
 
 
-Theorem trace_equiv_inc_commutes : forall T (ap : proc opT opHiT T),
-  trace_equiv (r <- Atomic ap; i <- Op Inc; Ret (r, i))
-              (Atomic (r <- ap; i <- Op Inc; Ret (r, i))).
+Theorem trace_equiv_inc_commutes : forall T (ap : proc opT opHiT T) rx,
+  trace_equiv (Bind (r <- Atomic ap; i <- Op Inc; Ret (r, i)) rx)
+              (Bind (Atomic (r <- ap; i <- Op Inc; Ret (r, i))) rx).
 Proof.
 Admitted.
 
 
-Theorem inc_twice_atomic :
-  trace_equiv inc_twice_impl inc_twice_impl_atomic.
+Theorem inc_twice_atomic : forall rx,
+  trace_equiv (Bind inc_twice_impl rx) (Bind inc_twice_impl_atomic rx).
 Proof.
+(*
   unfold inc_twice_impl, inc_twice_impl_atomic.
 
   eapply trace_equiv_bind.
@@ -1399,7 +1401,8 @@ Proof.
   reflexivity.
 
   reflexivity.
-Qed.
+*)
+Admitted.
 
 
 Definition trace_match_one_thread {opLoT opMidT opHiT State} lo_step hi_step (s : State)
@@ -1425,6 +1428,54 @@ Proof.
   apply H0. eauto.
 Qed.
 
+Lemma traces_match_trace_match_hi : forall opLoT opMidT opHiT
+  (tr1 : trace opLoT opMidT) (tr2 : trace opMidT opHiT),
+  traces_match tr1 tr2 ->
+  forall tr1',
+  trace_match_hi tr1 tr1' ->
+  traces_match tr1' tr2.
+Proof.
+  induction 1; simpl; intros; eauto.
+  - generalize dependent t2.
+    generalize dependent t1.
+    induction tr1'; simpl; intros.
+    + destruct e; eauto.
+      * inversion H0; clear H0; subst; repeat sigT_eq.
+        constructor. eauto.
+      * inversion H0.
+    + inversion H0.
+  - generalize dependent t2.
+    generalize dependent t1.
+    induction tr1'; simpl; intros.
+    + destruct e; eauto.
+      * inversion H0.
+      * inversion H0; clear H0; subst; repeat sigT_eq.
+        constructor. eauto.
+    + inversion H0.
+  - induction tr1'; simpl; intros.
+    + destruct e; eauto.
+      * inversion H.
+      * inversion H.
+    + constructor.
+Qed.
+
+Instance trace_match_one_thread_proper2 {opHi2T hi_step s} :
+  Proper (trace_equiv ==> exec_equiv ==> Basics.flip Basics.impl) (@trace_match_one_thread opT opHiT opHi2T State op_step hi_step s).
+Proof.
+  intros p1 p1'; intros.
+  intros p2 p2'; intros.
+  unfold Basics.flip, Basics.impl; intros.
+  unfold trace_match_one_thread in *; intros.
+  apply H in H2.
+  deex.
+  apply H1 in H2.
+  deex.
+  eexists; intuition eauto.
+  apply H0. eauto.
+  eapply traces_match_trace_match_hi; eauto.
+  unfold trace_match_hi in *; congruence.
+Qed.
+
 Theorem all_single_thread_traces_match :
   forall s T (p1 : proc opT opHiT T) (p2 : proc opHiT opHi2T T) (p1rest : T -> proc opT opHiT unit) (p2rest : T -> proc opHiT opHi2T unit),
   (forall s' x, trace_match_one_thread op_step opHi_step s' (p1rest x) (p2rest x)) ->
@@ -1437,7 +1488,8 @@ Proof.
   generalize dependent s.
   induction H0; intros.
 
-  - admit.
+  - rewrite inc_twice_atomic.
+    admit.
 
   - unfold trace_match_one_thread in *; intros.
 
