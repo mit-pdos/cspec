@@ -1478,16 +1478,30 @@ Proof.
   reflexivity.
 Qed.
 
+Theorem trace_equiv_bind_swap'' : forall T1 T2 (p1 : proc _ _ T1) (p2 : T1 -> proc _ _ T2) (p3 : T2 -> proc _ _ unit),
+  trace_equiv (Bind p1 (fun x => Bind (p2 x) p3))
+              (Bind (Bind p1 p2) p3).
+Proof.
+  intros.
+  rewrite exec_equiv_bind_bind.
+  reflexivity.
+Qed.
+
 
 Theorem trace_equiv_bind_swap : forall T1 T2 (p1 : proc _ _ T1) (p2 : T1 -> proc _ _ T2) (p3 : T1 -> T2 -> proc _ _ unit),
   trace_equiv (Bind p1 (fun x => Bind (p2 x) (p3 x)))
               (Bind (Bind p1 (fun x => Bind (p2 x) (fun y => Ret (x, y))))
                     (fun p => p3 (fst p) (snd p))).
 Proof.
-  unfold trace_equiv, same_traces.
   intros.
-  
-Admitted.
+  rewrite <- trace_equiv_bind_swap''.
+  eapply trace_equiv_bind_a; intros.
+  rewrite exec_equiv_bind_bind.
+  eapply trace_equiv_bind_a; intros.
+  rewrite exec_equiv_ret_bind.
+  simpl.
+  reflexivity.
+Qed.
 
 
 Theorem trace_equiv_inc_commutes : forall T (ap : proc opT opHiT T) rx,
