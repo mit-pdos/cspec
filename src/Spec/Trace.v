@@ -613,13 +613,6 @@ Definition same_traces {opLo opHi State} op_step (s : State) (ts1 ts2 : @threads
     exists tr', exec op_step s ts2 tr' /\
       trace_match_hi tr tr'.
 
-Theorem trace_match_hi_ok : forall opLo opHi (tr1 tr2 : trace opLo opHi),
-  trace_match_hi tr1 tr2 ->
-  forall opHi2 (trHi : trace opHi opHi2),
-    traces_match tr1 trHi -> traces_match tr2 trHi.
-Proof.
-Admitted.
-
 
 Definition p1_a :=
   _ <- Atomic inc_twice_impl;
@@ -1187,9 +1180,9 @@ Qed.
 
 
 Definition exec_equiv {opT opHiT} (p1 p2 : proc opT opHiT unit) :=
-  forall State op_step (s : State) ts tid tr,
-    exec op_step s (thread_upd ts tid (Some (p1, ThreadRunning))) tr <->
-    exec op_step s (thread_upd ts tid (Some (p2, ThreadRunning))) tr.
+  forall State op_step (s : State) ts tid tr ps,
+    exec op_step s (thread_upd ts tid (Some (p1, ps))) tr <->
+    exec op_step s (thread_upd ts tid (Some (p2, ps))) tr.
 
 Instance exec_equiv_preorder {opLoT opHiT} :
   PreOrder (@exec_equiv opLoT opHiT).
@@ -1204,6 +1197,7 @@ Proof.
 Qed.
 
 
+(*
 Definition exec_tid_local {opT opHiT T} (p1 p2 : proc opT opHiT T) :=
   forall State op_step (s : State) tid,
     @exec_tid opT opHiT State op_step T tid s p1 ThreadRunning s (inr p2) ThreadRunning nil /\
@@ -1317,13 +1311,87 @@ Proof.
   - eapply exec_tid_local_to_exec in H.
     etransitivity; eauto.
 Qed.
-
+*)
 
 Theorem exec_equiv_bind_bind : forall opT opHiT T1 T2 (p1 : proc opT opHiT T1) (p2 : T1 -> proc opT opHiT T2) (p3 : T2 -> proc opT opHiT unit),
   exec_equiv (Bind (Bind p1 p2) p3) (Bind p1 (fun v => Bind (p2 v) p3)).
 Proof.
-Admitted.
+  unfold exec_equiv; split; intros.
+  - match goal with
+    | H : exec _ _ (thread_upd ?ts ?tid (Some (?p, ?ps))) _ |- _ =>
+      remember (thread_upd ts tid (Some (p, ps)));
+      generalize dependent ts;
+      generalize dependent ps;
+      generalize dependent p3;
+      induction H; intros; subst
+    end.
+    + destruct (tid0 == tid); subst.
+      * rewrite thread_upd_eq in H. inversion H; clear H. subst.
+        exec_tid_inv.
+        {
+          eapply ExecOne with (tid := tid).
+            rewrite thread_upd_eq. eauto.
+            constructor.
+            simpl.
+            autorewrite with t.
+            eauto.
+        }
 
+        exec_tid_inv; try intuition congruence.
+        eapply ExecOne with (tid := tid).
+          rewrite thread_upd_eq. eauto.
+          eauto.
+        autorewrite with t.
+
+        destruct result; eauto.
+
+      * rewrite thread_upd_upd_ne in * by eauto.
+        eapply ExecOne with (tid := tid0).
+          rewrite thread_upd_ne in * by auto. eauto.
+          eauto.
+        rewrite thread_upd_upd_ne by auto.
+        eauto.
+    + specialize (H tid).
+      rewrite thread_upd_eq in H.
+      congruence.
+
+  - match goal with
+    | H : exec _ _ (thread_upd ?ts ?tid (Some (?p, ?ps))) _ |- _ =>
+      remember (thread_upd ts tid (Some (p, ps)));
+      generalize dependent ts;
+      generalize dependent ps;
+      generalize dependent p3;
+      induction H; intros; subst
+    end.
+    + destruct (tid0 == tid); subst.
+      * rewrite thread_upd_eq in H. inversion H; clear H. subst.
+        exec_tid_inv.
+        {
+          eapply ExecOne with (tid := tid).
+            rewrite thread_upd_eq. eauto.
+            constructor.
+            simpl.
+            autorewrite with t.
+            eauto.
+        }
+
+        eapply ExecOne with (tid := tid).
+          rewrite thread_upd_eq. eauto.
+          eauto.
+        autorewrite with t.
+
+        destruct result0; eauto.
+
+      * rewrite thread_upd_upd_ne in * by eauto.
+        eapply ExecOne with (tid := tid0).
+          rewrite thread_upd_ne in * by auto. eauto.
+          eauto.
+        rewrite thread_upd_upd_ne by auto.
+        eauto.
+    + specialize (H tid).
+      rewrite thread_upd_eq in H.
+      congruence.
+Qed.
 
 
 Theorem trace_equiv_bind : forall T1 T2 (p1 p1' : proc _ _ T1) (p2 p2' : T1 -> proc _ _ T2),
