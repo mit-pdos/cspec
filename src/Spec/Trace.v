@@ -1394,12 +1394,110 @@ Proof.
 Qed.
 
 
+Instance trace_equiv_exec_equiv_proper :
+  Proper (exec_equiv ==> exec_equiv ==> iff) trace_equiv.
+Proof.
+  intros p1 p1' ?.
+  intros p2 p2' ?.
+  unfold trace_equiv, same_traces; split; intros.
+  - apply H in H2.
+    apply H1 in H2.
+    deex.
+    apply H0 in H2.
+    eauto.
+  - apply H in H2.
+    apply H1 in H2.
+    deex.
+    apply H0 in H2.
+    eauto.
+Qed.
+
+
+Theorem trace_equiv_bind_a : forall T (p : proc _ _ T) (p2 p2' : T -> proc _ _ unit),
+  (forall x, trace_equiv (p2 x) (p2' x)) ->
+  trace_equiv (Bind p p2) (Bind p p2').
+Proof.
+  intros.
+  unfold trace_equiv, same_traces; intros.
+
+  match goal with
+  | H : exec _ _ (thread_upd ?ts ?tid (Some (Bind ?p ?p2, ?ps))) _ |- _ =>
+    remember (thread_upd ts tid (Some (Bind p p2, ps)));
+    generalize dependent ts;
+    generalize dependent p;
+    generalize dependent ps;
+    induction H; intros; subst
+  end.
+  - destruct (tid0 == tid); subst.
+    + rewrite thread_upd_eq in H0. inversion H0; clear H0. subst.
+      exec_tid_inv.
+      {
+        edestruct IHexec. eauto. intuition idtac.
+        eexists; split.
+        eapply ExecOne with (tid := tid).
+          rewrite thread_upd_eq. eauto.
+          constructor.
+          simpl.
+          autorewrite with t.
+          eauto.
+        simpl. eauto.
+      }
+
+      destruct result0.
+      * edestruct H.
+        (* [trace_equiv] cannot deal with a thread whose current state
+           is [ThreadCalled]. *)
+        admit.
+
+        destruct H0.
+        eexists; split.
+        eapply ExecOne with (tid := tid).
+          rewrite thread_upd_eq. eauto.
+          eauto.
+          autorewrite with t.
+
+        (* another [ThreadCalled] vs [ThreadRunning] mismatch.. *)
+        admit.
+
+        eauto.
+
+      * edestruct IHexec. eauto.
+        eexists; split. destruct H0.
+        eapply ExecOne with (tid := tid).
+          rewrite thread_upd_eq. eauto.
+          eauto.
+        autorewrite with t.
+        eauto.
+
+        intuition eauto.
+
+    + rewrite thread_upd_upd_ne in * by eauto.
+      edestruct IHexec. shelve.
+
+      eexists; split.
+      eapply ExecOne with (tid := tid0).
+        rewrite thread_upd_ne in * by auto. eauto.
+        eauto.
+      rewrite thread_upd_upd_ne by auto.
+      intuition eauto.
+      intuition eauto.
+  - specialize (H0 tid).
+    rewrite thread_upd_eq in H0.
+    congruence.
+Admitted.
+
+
 Theorem trace_equiv_bind : forall T1 T2 (p1 p1' : proc _ _ T1) (p2 p2' : T1 -> proc _ _ T2),
   (forall rx, trace_equiv (Bind p1 rx) (Bind p1' rx)) ->
   (forall rx, (forall x, trace_equiv (Bind (p2 x) rx) (Bind (p2' x) rx))) ->
   (forall rx, trace_equiv (Bind (Bind p1 p2) rx) (Bind (Bind p1' p2') rx)).
 Proof.
-Admitted.
+  intros.
+  repeat rewrite exec_equiv_bind_bind.
+  rewrite H.
+  eapply trace_equiv_bind_a.
+  eauto.
+Qed.
 
 
 Theorem trace_equiv_bind_swap' : forall T1 T2 (p1 : proc _ _ T1) (p2 : T1 -> proc _ _ T2) (p3 : T2 -> proc _ _ unit),
