@@ -1197,121 +1197,90 @@ Proof.
 Qed.
 
 
-(*
-Definition exec_tid_local {opT opHiT T} (p1 p2 : proc opT opHiT T) :=
-  forall State op_step (s : State) tid,
-    @exec_tid opT opHiT State op_step T tid s p1 ThreadRunning s (inr p2) ThreadRunning nil /\
-    (forall s' result' ts' evs,
-     @exec_tid opT opHiT State op_step T tid s p1 ThreadRunning s' result' ts' evs ->
-     s' = s /\
-     result' = inr p2 /\
-     ts' = ThreadRunning /\
-     evs = nil).
-
-Theorem exec_tid_local_bind_ret : forall opT opHiT T (p : T -> proc opT opHiT unit) v,
-  exec_tid_local (Bind (Ret v) p) (p v).
-Proof.
-  unfold exec_tid_local; split; intros.
-  - pose proof ExecTidRet.
-    eapply ExecTidBind in H; eauto.
-  - repeat exec_tid_inv; try intuition congruence.
-Qed.
-
-Definition exec_tid_local_star {opT opHiT} (p1 p2 : proc opT opHiT unit) :=
-  clos_refl_trans _ exec_tid_local p1 p2.
-
-Instance exec_tid_local_star_preorder {opT opHiT} :
-  PreOrder (@exec_tid_local_star opT opHiT).
-Proof.
-  split.
-  - unfold Reflexive, exec_tid_local_star; intros.
-    apply rt_refl.
-  - unfold Transitive, exec_tid_local_star; intros.
-    eapply rt_trans; eauto.
-Qed.
-
-Theorem exec_tid_local_to_star : forall opT opHiT (p1 p2 : proc opT opHiT unit),
-  exec_tid_local p1 p2 ->
-  exec_tid_local_star p1 p2.
-Proof.
-  unfold exec_tid_local, exec_tid_local_star; intuition.
-Qed.
-
-Theorem exec_tid_local_to_exec : forall opT opHiT (p1 p2 : proc opT opHiT unit),
-  exec_tid_local p1 p2 ->
-  exec_equiv p1 p2.
+Theorem exec_equiv_ret_bind : forall opT opHiT T (v : T) (p : T -> proc opT opHiT unit),
+  exec_equiv (Bind (Ret v) p) (p v).
 Proof.
   unfold exec_equiv; split; intros.
-  * match goal with
-    | H : exec _ _ (thread_upd ?ts ?tid ?p) _ |- _ =>
-      remember (thread_upd ts tid p); generalize dependent ts;
-        induction H; intros; subst
+  - match goal with
+    | H : exec _ _ (thread_upd ?ts ?tid (Some (?p, ?ps))) _ |- _ =>
+      remember (thread_upd ts tid (Some (p, ps)));
+      generalize dependent ts;
+      generalize dependent ps;
+      induction H; intros; subst
     end.
-    - destruct (tid0 == tid); subst.
-      + rewrite thread_upd_eq in H0; inversion H0; clear H0; subst.
-        eapply H in H1; intuition subst.
-        simpl.
-        rewrite thread_upd_upd_eq in *; auto.
-      + eapply ExecOne with (tid := tid0).
-          rewrite thread_upd_ne in H0 by auto.
-          rewrite thread_upd_ne by auto.
+    + destruct (tid0 == tid); subst.
+      * rewrite thread_upd_eq in H. inversion H; clear H. subst.
+        exec_tid_inv.
+        {
+          eapply ExecOne with (tid := tid).
+            rewrite thread_upd_eq. eauto.
+            constructor.
+            simpl.
+            autorewrite with t.
+            eauto.
+        }
+
+        exec_tid_inv; try intuition congruence.
+
+      * rewrite thread_upd_upd_ne in * by eauto.
+        eapply ExecOne with (tid := tid0).
+          rewrite thread_upd_ne in * by auto. eauto.
           eauto.
-          eauto.
-        rewrite thread_upd_upd_ne by auto.
-        eapply IHexec.
         rewrite thread_upd_upd_ne by auto.
         eauto.
-    - specialize (H0 tid).
-      rewrite thread_upd_eq in H0.
+    + specialize (H tid).
+      rewrite thread_upd_eq in H.
       congruence.
-  * match goal with
-    | H : exec _ _ (thread_upd ?ts ?tid ?p) _ |- _ =>
-      remember (thread_upd ts tid p); generalize dependent ts;
-        induction H; intros; subst
+
+  - match goal with
+    | H : exec _ _ (thread_upd ?ts ?tid (Some (?p, ?ps))) _ |- _ =>
+      remember (thread_upd ts tid (Some (p, ps)));
+      generalize dependent ts;
+      generalize dependent ps;
+      induction H; intros; subst
     end.
-    - destruct (tid0 == tid); subst.
-      + rewrite thread_upd_eq in H0; inversion H0; clear H0; subst.
-        rewrite <- app_nil_l with (l := evs).
-        rewrite prepend_app.
+    + destruct (tid0 == tid); subst.
+      * rewrite thread_upd_eq in H. inversion H; clear H. subst.
+        destruct ps.
+        {
+          rewrite <- app_nil_l with (l := evs).
+          rewrite prepend_app.
+          eapply ExecOne with (tid := tid).
+            rewrite thread_upd_eq. eauto.
+            constructor; eauto.
+            autorewrite with t.
+          eapply ExecOne with (tid := tid).
+            rewrite thread_upd_eq. eauto.
+            eauto.
+            eauto.
+        }
 
-        eapply ExecOne with (tid := tid).
-          rewrite thread_upd_eq. reflexivity.
-          unfold exec_tid_local in H. edestruct H. apply H0.
-        autorewrite with t; simpl.
+        {
+          rewrite <- app_nil_l with (l := evs).
+          rewrite prepend_app.
+          eapply ExecOne with (tid := tid).
+            rewrite thread_upd_eq. eauto.
+            constructor; eauto.
 
-        eapply ExecOne with (tid := tid).
-          rewrite thread_upd_eq. reflexivity.
-          eauto.
-        autorewrite with t in *; simpl.
+            (* hmm, cannot do a [Ret] when in [ThreadCalled]. *)
+            admit.
+          admit.
+        }
 
-        eauto.
+        {
+          admit.
+        }
 
-      + eapply ExecOne with (tid := tid0).
-          rewrite thread_upd_ne in H0 by auto.
-          rewrite thread_upd_ne by auto.
-          eauto.
+      * rewrite thread_upd_upd_ne in * by eauto.
+        eapply ExecOne with (tid := tid0).
+          rewrite thread_upd_ne in * by auto. eauto.
           eauto.
         rewrite thread_upd_upd_ne by auto.
-        eapply IHexec.
-        rewrite thread_upd_upd_ne by auto.
         eauto.
-    - specialize (H0 tid).
-      rewrite thread_upd_eq in H0.
+    + specialize (H tid).
+      rewrite thread_upd_eq in H.
       congruence.
-Qed.
-
-Theorem exec_tid_local_star_to_exec : forall opT opHiT (p1 p2 : proc opT opHiT unit),
-  exec_tid_local_star p1 p2 ->
-  exec_equiv p1 p2.
-Proof.
-  unfold exec_tid_local_star; intros.
-  eapply Operators_Properties.clos_rt_rt1n in H.
-  induction H.
-  - reflexivity.
-  - eapply exec_tid_local_to_exec in H.
-    etransitivity; eauto.
-Qed.
-*)
+Admitted.
 
 Theorem exec_equiv_bind_bind : forall opT opHiT T1 T2 (p1 : proc opT opHiT T1) (p2 : T1 -> proc opT opHiT T2) (p3 : T2 -> proc opT opHiT unit),
   exec_equiv (Bind (Bind p1 p2) p3) (Bind p1 (fun v => Bind (p2 v) p3)).
