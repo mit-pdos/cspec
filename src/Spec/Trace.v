@@ -1649,17 +1649,17 @@ Proof.
 Qed.
 
 
-Definition trace_match_one_thread {opLoT opMidT opHiT State} lo_step hi_step (s : State)
+Definition trace_match_one_thread {opLoT opMidT opHiT State} lo_step hi_step
                                             (p1 : proc opLoT opMidT unit)
                                             (p2 : proc opMidT opHiT unit) :=
-  forall tr1,
+  forall (s : State) tr1,
     exec lo_step s (thread_upd threads_empty 1 (Some p1)) tr1 ->
     exists tr2,
       exec hi_step s (thread_upd threads_empty 1 (Some p2)) tr2 /\
       traces_match tr1 tr2.
 
-Instance trace_match_one_thread_proper {opLoT opMidT opHiT State lo_step hi_step s} :
-  Proper (exec_equiv ==> exec_equiv ==> Basics.flip Basics.impl) (@trace_match_one_thread opLoT opMidT opHiT State lo_step hi_step s).
+Instance trace_match_one_thread_proper {opLoT opMidT opHiT State lo_step hi_step} :
+  Proper (exec_equiv ==> exec_equiv ==> Basics.flip Basics.impl) (@trace_match_one_thread opLoT opMidT opHiT State lo_step hi_step).
 Proof.
   intros p1 p1'; intros.
   intros p2 p2'; intros.
@@ -1703,8 +1703,8 @@ Proof.
     + constructor.
 Qed.
 
-Instance trace_match_one_thread_proper2 {opHi2T hi_step s} :
-  Proper (trace_equiv ==> exec_equiv ==> Basics.flip Basics.impl) (@trace_match_one_thread opT opHiT opHi2T State op_step hi_step s).
+Instance trace_match_one_thread_proper2 {opHi2T hi_step} :
+  Proper (trace_equiv ==> exec_equiv ==> Basics.flip Basics.impl) (@trace_match_one_thread opT opHiT opHi2T State op_step hi_step).
 Proof.
   intros p1 p1'; intros.
   intros p2 p2'; intros.
@@ -1721,15 +1721,14 @@ Proof.
 Qed.
 
 Theorem all_single_thread_traces_match' :
-  forall s T (p1 : proc opT opHiT T) (p2 : proc opHiT opHi2T T) (p1rest : T -> proc opT opHiT unit) (p2rest : T -> proc opHiT opHi2T unit),
-  (forall s' x, trace_match_one_thread op_step opHi_step s' (p1rest x) (p2rest x)) ->
+  forall T (p1 : proc opT opHiT T) (p2 : proc opHiT opHi2T T) (p1rest : T -> proc opT opHiT unit) (p2rest : T -> proc opHiT opHi2T unit),
+  (forall x, trace_match_one_thread op_step opHi_step (p1rest x) (p2rest x)) ->
   compile_ok p1 p2 ->
-  trace_match_one_thread op_step opHi_step s (Bind p1 p1rest) (Bind p2 p2rest).
+  trace_match_one_thread op_step opHi_step (Bind p1 p1rest) (Bind p2 p2rest).
 Proof.
   intros.
   generalize dependent p2rest.
   generalize dependent p1rest.
-  generalize dependent s.
   induction H0; intros.
 
   - rewrite inc_twice_atomic.
@@ -1817,9 +1816,9 @@ Proof.
 Qed.
 
 Theorem all_single_thread_traces_match :
-  forall s (p1 : proc opT opHiT unit) (p2 : proc opHiT opHi2T unit),
+  forall (p1 : proc opT opHiT unit) (p2 : proc opHiT opHi2T unit),
   compile_ok p1 p2 ->
-  trace_match_one_thread op_step opHi_step s p1 p2.
+  trace_match_one_thread op_step opHi_step p1 p2.
 Proof.
   intros.
   unfold trace_match_one_thread; intros.
@@ -1844,3 +1843,38 @@ Proof.
 
   eauto.
 Qed.
+
+Definition compile_ok_all (ts1 ts2 : threads_state) :=
+  forall tid,
+    (ts1 tid = None /\ ts2 tid = None) \/
+    exists p1 p2,
+    ts1 tid = Some p1 /\ ts2 tid = Some p2 /\
+    compile_ok p1 p2.
+
+Definition trace_match_threads {opLoT opMidT opHiT State} lo_step hi_step
+                                            (ts1 : @threads_state opLoT opMidT)
+                                            (ts2 : @threads_state opMidT opHiT) :=
+  forall (s : State) tr1,
+    exec lo_step s ts1 tr1 ->
+    exists tr2,
+      exec hi_step s ts2 tr2 /\
+      traces_match tr1 tr2.
+
+Theorem all_traces_match' :
+  forall T ts1 ts2 (p1 : proc _ _ T) p2 p1rest p2rest tid x,
+  trace_match_threads op_step opHi_step ts1 ts2 ->
+  ts1 tid = Some (p1rest x) ->
+  ts2 tid = Some (p2rest x) ->
+  compile_ok p1 p2 ->
+  trace_match_threads op_step opHi_step
+    (thread_upd ts1 tid (Some (Bind p1 p1rest)))
+    (thread_upd ts2 tid (Some (Bind p2 p2rest))).
+Proof.
+Admitted.
+
+Theorem all_traces_match :
+  forall ts1 ts2,
+  compile_ok_all ts1 ts2 ->
+  trace_match_threads op_step opHi_step ts1 ts2.
+Proof.
+Admitted.
