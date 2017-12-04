@@ -1648,25 +1648,29 @@ Proof.
     autorewrite with t in *.
     repeat ( exec_tid_inv; intuition try congruence ).
 
-    apply H in H5. deex.
+    apply H in H2. deex.
 
     eexists; split.
     eapply ExecOne with (tid := 1).
       rewrite thread_upd_eq; auto.
-      eauto.
+      eapply ExecTidBind.
+      eapply ExecTidBind.
+      eapply ExecTidOpCall.
     eapply ExecOne with (tid := 1).
       rewrite thread_upd_eq; auto.
-      eapply ExecTidBind; auto.
+      eapply ExecTidBind.
+      eapply ExecTidBind.
       eapply ExecTidOpRun.
       constructor.
     eapply ExecOne with (tid := 1).
       rewrite thread_upd_eq; auto.
+      eapply ExecTidBind.
       eapply ExecTidOpRet.
     autorewrite with t.
 
     match goal with
-    | H : exec _ ?s1 (thread_upd _ _ (Some (?p1, _))) _ |-
-          exec _ ?s2 (thread_upd _ _ (Some (?p2, _))) _ =>
+    | H : exec _ ?s1 (thread_upd _ _ (Some ?p1)) _ |-
+          exec _ ?s2 (thread_upd _ _ (Some ?p2)) _ =>
       replace p2 with p1; [ replace s2 with s1; [ eauto | ] | ]
     end.
 
@@ -1677,7 +1681,7 @@ Proof.
 
     simpl.
     repeat constructor.
-    replace (s' 1 + 1 + 1) with (s' 1 + 2) by omega.
+    replace (s1 1 + 1 + 1) with (s1 1 + 2) by omega.
     eauto.
 
   - unfold trace_match_one_thread in *; intros.
@@ -1692,7 +1696,6 @@ Proof.
       eapply ExecTidBind. eauto. eauto.
       autorewrite with t; simpl.
 
-    eapply H1.
     eauto.
 
   - rewrite exec_equiv_bind_bind.
