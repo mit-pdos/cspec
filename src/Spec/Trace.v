@@ -2361,17 +2361,107 @@ Definition compile_ok_all (ts1 ts2 : threads_state) :=
     ts1 tid = Some (existT _ T p1) /\ ts2 tid = Some (existT _ T p2) /\
     compile_ok p1 p2.
 
+Fixpoint compile_atomic T (p : proc opHiT opHi2T T) : proc opT opHiT T :=
+  match p with
+  | Ret t => Ret t
+  | OpCall op => InvokeOpHi op
+  | OpExec op =>
+    match op with
+    | IncTwice => Atomic (_ <- Op Inc; Op Inc)
+    | Noop2 => Atomic (Ret tt)
+    end
+  | OpRet r => ReturnOpHi r
+  | Bind p1 p2 =>
+    Bind (compile_atomic p1) (fun r => compile_atomic (p2 r))
+  | InvokeOpHi _ => Ret tt
+  | ReturnOpHi v => Ret v
+  | Atomic p => Atomic (compile_atomic p)
+  end.
+
 Theorem atomize_preserves_trace :
-  forall ts1 ts1',
+  forall ts1' ts1,
+  length ts1 = length ts1' ->
   atomize_ok_all ts1 ts1' ->
-  forall s tr1,
-  exec op_step s ts1 tr1 ->
+    forall s tr1,
+    exec op_step s ts1 tr1 ->
+    exists tr1',
+      exec op_step s ts1' tr1' /\
+      trace_match_hi tr1 tr1'.
+Proof.
+  induction ts1' using rev_ind.
+  - intros.
+    exec_inv.
+    + specialize (H0 tid); intuition eauto.
+      congruence.
+      repeat deex.
+      unfold thread_get in H1. rewrite nth_error_nil in H1. congruence.
+    + eexists; split.
+      constructor. eapply threads_empty_no_runnable.
+      constructor.
+  - intros.
+    destruct ts1 using rev_ind.
+    {
+      rewrite app_length in *. simpl in *. omega.
+    }
+
+    repeat rewrite app_length in *. simpl in *.
+
+    destruct x; destruct x0.
+
+    {
+      specialize (H0 (length ts1)) as H'.
+
+Lemma app_is_thread_upd : forall opT opHiT (ts : @threads_state opT opHiT) p,
+  ts ++ [p] = thread_upd ts (length ts) p.
+Admitted.
+
+      repeat rewrite app_is_thread_upd in *.
+      rewrite thread_upd_eq in *.
+      replace (length ts1) with (length ts1') in H' by omega.
+      rewrite thread_upd_eq in *.
+      intuition try congruence.
+      repeat deex.
+      inversion H2; clear H2. inversion H3; clear H3. subst.
+
+Lemma trace_match_atomize_ok : forall ts1 ts1' tid,
+  (forall (s : State) (tr1 : trace opT opHiT),
+   exec op_step s ts1 tr1 ->
+   exists tr1' : trace opT opHiT,
+     exec op_step s ts1' tr1' /\ trace_match_hi tr1 tr1') ->
+  forall T (p : proc _ _ T) p',
+  atomize_ok p p' ->
+  forall T' s tr1 (rx : T -> proc _ _ T'),
+  exec op_step s (thread_upd ts1 tid (Some (existT _ _ (Bind p rx)))) tr1 ->
   exists tr1',
-    exec op_step s ts1' tr1' /\
+    exec op_step s (thread_upd ts1' tid (Some (existT _ _ (Bind p' rx)))) tr1' /\
     trace_match_hi tr1 tr1'.
 Proof.
-  intros.
-  
+  induction 2; simpl; intros.
+  - apply inc_twice_atomic in H0. deex.
+    (* something fishy: ts1 needs to change to ts1' underneath.... *)
+    
+Admitted.
+
+      eapply exec_equiv_bind_ret in H1.
+      eapply trace_match_atomize_ok in H1.
+      3: eauto.
+      repeat deex.
+
+      eexists; split.
+      eapply exec_equiv_bind_ret.
+      replace (length ts1') with (length ts1) by omega.
+      apply H1.
+
+      eauto.
+      eapply IHts1'.
+      omega.
+      admit.
+    }
+
+    admit.
+    admit.
+
+    admit.
 Admitted.
 
 Theorem all_traces_match_1 :
@@ -2391,47 +2481,66 @@ Proof.
   symmetry; eauto.
 Qed.
 
-(*
-Fixpoint atomize_f {T} (p : proc opT opHiT T) : proc opT opHiT T :=
-  match p with
-  | Ret x => Ret x
-  | Bind (InvokeOpHi _) 
-      => inc_twice_impl_atomic
-  | Bind a b =>
-    Bind (atomize_f a) (fun x => atomize_f (b x))
-  | x => x
-  end.
-*)
-
 Theorem make_one_atomic :
-  forall T (p1 : proc _ _ T) p2,
+  forall T p2 (p1 : proc _ _ T),
   compile_ok p1 p2 ->
-  exists p1',
-    atomize_ok p1 p1' /\
-    compile_ok_atomic p1' p2.
+    atomize_ok p1 (compile_atomic p2) /\
+    compile_ok_atomic (compile_atomic p2) p2.
+Proof.
+  induction 1; simpl; intros.
+  - split. constructor. repeat constructor.
+  - split; constructor.
+  - intuition idtac.
+    constructor. eauto. intros. specialize (H1 x). intuition eauto.
+    constructor. eauto. intros. specialize (H1 x). intuition eauto.
+Qed.
+
+Lemma atomize_ok_cons : forall T (p1 : proc _ _ T) p2 ts1 ts2,
+  atomize_ok_all ts1 ts2 ->
+  atomize_ok p1 p2 ->
+  atomize_ok_all (Some (existT _ _ p1) :: ts1) (Some (existT _ _ p2) :: ts2).
 Proof.
   intros.
-  induction H.
-  - eexists; split. constructor.
-    repeat constructor.
-  - eexists; split. constructor. constructor.
-  - edestruct IHcompile_ok; clear IHcompile_ok; intuition idtac.
+  intro tid; destruct tid.
+  - unfold thread_get; simpl. right. do 3 eexists. eauto.
+  - apply H.
+Qed.
 
-    assert (exists (p1b' : T1 -> proc _ _ T2),
-      forall x, atomize_ok (p1b x) (p1b' x) /\ compile_ok_atomic (p1b' x) (p2b x)).
-    {
-      admit.
-    }
+Lemma atomize_ok_cons_None : forall ts1 ts2,
+  atomize_ok_all ts1 ts2 ->
+  atomize_ok_all (None :: ts1) (None :: ts2).
+Proof.
+  intros.
+  intro tid; destruct tid.
+  - unfold thread_get; simpl. left; eauto.
+  - apply H.
+Qed.
 
-    deex.
-    eexists (Bind x p1b').
-    split.
-      constructor. eauto.
-      intros. specialize (H2 x0). intuition eauto.
-      constructor. eauto.
-      intros. specialize (H2 x0). intuition eauto.
-Admitted.
+Lemma compile_ok_atomic_cons : forall T (p1 : proc _ _ T) p2 ts1 ts2,
+  compile_ok_all_atomic ts1 ts2 ->
+  compile_ok_atomic p1 p2 ->
+  compile_ok_all_atomic (Some (existT _ _ p1) :: ts1) (Some (existT _ _ p2) :: ts2).
+Proof.
+  intros.
+  intro tid; destruct tid.
+  - unfold thread_get; simpl. right. do 3 eexists. eauto.
+  - apply H.
+Qed.
 
+Lemma compile_ok_atomic_cons_None : forall ts1 ts2,
+  compile_ok_all_atomic ts1 ts2 ->
+  compile_ok_all_atomic (None :: ts1) (None :: ts2).
+Proof.
+  intros.
+  intro tid; destruct tid.
+  - unfold thread_get; simpl. left; eauto.
+  - apply H.
+Qed.
+
+Hint Resolve atomize_ok_cons.
+Hint Resolve atomize_ok_cons_None.
+Hint Resolve compile_ok_atomic_cons.
+Hint Resolve compile_ok_atomic_cons_None.
 
 Theorem make_all_atomic :
   forall ts1 ts2,
@@ -2440,28 +2549,47 @@ Theorem make_all_atomic :
     atomize_ok_all ts1 ts1' /\
     compile_ok_all_atomic ts1' ts2.
 Proof.
-  intros.
-  eexists (fun tid' => match ts1 tid' with | None => _ | Some px => _ end).
-  split.
-  - unfold atomize_ok_all; intros.
-    specialize (H tid).
-    destruct H.
-    + destruct H.
-      rewrite H.
-      left; eauto.
-    + repeat deex.
-      rewrite H.
-      right. do 3 eexists.
-      split. eauto.
-      split.
-(*
- instantiate (1 := p3). reflexivity.
-      
- instantiate (Goal0 := Some p3).
+  induction ts1; intros.
+  - exists nil; split.
+    intro tid; left; unfold thread_get; repeat rewrite nth_error_nil; eauto.
+    intro tid.
+    specialize (H tid); intuition; repeat deex.
+    exfalso.
+    unfold thread_get in H.
+    rewrite nth_error_nil in H. congruence.
+  - destruct ts3.
+    + exists nil; split.
+      2: intro tid; left; unfold thread_get; repeat rewrite nth_error_nil; eauto.
+      intro tid.
+      specialize (H tid); intuition; repeat deex.
+      2: unfold thread_get in H0; rewrite nth_error_nil in H0; congruence.
+      left. intuition eauto.
+      unfold thread_get; rewrite nth_error_nil; eauto.
+    + edestruct IHts1.
+      * intro tid. specialize (H (S tid)).
+        apply H.
+      * intuition.
+        destruct o; destruct a.
+       -- destruct s.
+          destruct s0.
+          specialize (H 0) as H'.
+            unfold thread_get in H'; simpl in H'. intuition try congruence.
+          repeat deex.
+          inversion H0; clear H0.
+          inversion H3; clear H3.
+          subst; repeat sigT_eq'.
 
-  trace_match_threads op_step opHi_step ts1 ts2.
-*)
-Admitted.
+          edestruct (make_one_atomic H4).
+          exists (Some (existT _ _ (compile_atomic p4)) :: x).
+          split; eauto.
+       -- specialize (H 0); unfold thread_get in H; simpl in H;
+            intuition try congruence.
+          repeat deex; intuition congruence.
+       -- specialize (H 0); unfold thread_get in H; simpl in H;
+            intuition try congruence.
+          repeat deex; intuition congruence.
+       -- exists (None :: x). eauto.
+Qed.
 
 Theorem all_traces_match :
   forall ts1 ts2,
