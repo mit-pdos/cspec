@@ -27,7 +27,7 @@ Inductive proc : Type -> Type :=
 | Ret : forall T (v : T), proc T
 | Bind : forall T (T1 : Type) (p1 : proc T1) (p2 : T1 -> proc T), proc T
 | InvokeOpHi : forall T' (op : opHiT T'), proc unit
-| ReturnOpHi : forall T' (result : T'), proc unit
+| ReturnOpHi : forall T (result : T), proc T
 | Atomic : forall T (p : proc T), proc T.
 
 
@@ -47,9 +47,9 @@ Inductive trace :=
 | TraceEmpty : trace.
 
 
-Definition threads_state := forall (tid : nat), option (proc unit).
+Definition threads_state := forall (tid : nat), option {T : Type & proc T}.
 
-Definition thread_upd (ts : threads_state) (tid : nat) (s : option (proc unit)) :=
+Definition thread_upd (ts : threads_state) (tid : nat) (s : option {T : Type & proc T}) :=
   fun tid' => if tid == tid' then s else ts tid'.
 
 
@@ -80,7 +80,7 @@ Inductive atomic_exec : forall T, proc T -> nat -> State -> T -> State -> list e
   atomic_exec (InvokeOpHi op) tid s tt s (InvokeHi tid op :: nil)
 
 | AtomicReturnHi : forall T (r : T) tid s,
-  atomic_exec (ReturnOpHi r) tid s tt s (ReturnHi tid r :: nil)
+  atomic_exec (ReturnOpHi r) tid s r s (ReturnHi tid r :: nil)
 
 | AtomicAtomic : forall T (p : proc T) tid s r s' ev',
   atomic_exec p tid s r s' ev' ->
@@ -133,7 +133,7 @@ Inductive exec_tid : forall T (tid : nat),
 
 | ExecTidReturnHi : forall tid s T' (r : T'),
   exec_tid tid s (ReturnOpHi r)
-               s (inl tt)
+               s (inl r)
                [ReturnHi tid r]
 
 | ExecTidBind : forall tid T1 (p1 : proc T1) T2 (p2 : T1 -> proc T2) s s' result evs,
@@ -149,13 +149,13 @@ Inductive exec_tid : forall T (tid : nat),
 
 Inductive exec : State -> threads_state -> trace -> Prop :=
 
-| ExecOne : forall tid ts trace p s s' evs result,
-  ts tid = Some p ->
+| ExecOne : forall T tid ts trace p s s' evs result,
+  ts tid = Some (existT _ T p) ->
   exec_tid tid s p s' result evs ->
   exec s' (thread_upd ts tid
             match result with
             | inl _ => None
-            | inr p' => Some p'
+            | inr p' => Some (existT _ T p')
             end) trace ->
   exec s ts (prepend evs trace)
 
@@ -172,7 +172,7 @@ Arguments OpRet {opT opHiT T}.
 Arguments Ret {opT opHiT T}.
 Arguments Bind {opT opHiT T T1}.
 Arguments InvokeOpHi {opT opHiT T'}.
-Arguments ReturnOpHi {opT opHiT T'}.
+Arguments ReturnOpHi {opT opHiT T}.
 Arguments Atomic {opT opHiT T}.
 
 Arguments threads_state {opT opHiT}.
@@ -219,14 +219,13 @@ Definition inc_twice_impl :=
   _ <- InvokeOpHi IncTwice;
   _ <- Op Inc;
   i2 <- Op Inc;
-  _ <- ReturnOpHi i2;
-  Ret i2.
+  ReturnOpHi i2.
 
 Definition p1 :=
   _ <- inc_twice_impl;
   Ret tt.
 
-Definition ts := thread_upd threads_empty 1 (Some p1).
+Definition ts := thread_upd threads_empty 1 (Some (existT _ _ p1)).
 
 Lemma thread_upd_eq : forall opT opHiT ts p tid,
   @thread_upd opT opHiT ts tid p tid = p.
@@ -268,7 +267,7 @@ Lemma thread_upd_None_empty : forall opT opHiT tid,
 Proof.
   unfold thread_upd, threads_empty; intros.
   apply functional_extensionality; intros.
-  destruct (tid == x); congruence.
+  destruct (tid == x); reflexivity.
 Qed.
 
 Hint Rewrite thread_upd_upd_eq : t.
@@ -327,10 +326,6 @@ Proof.
     repeat eapply ExecTidBind.
     econstructor.
     simpl; autorewrite with t.
-  exec_one 1.
-    repeat eapply ExecTidBind.
-    econstructor.
-    simpl; autorewrite with t.
   eapply ExecEmpty.
     unfold threads_empty; congruence.
 Defined.
@@ -342,7 +337,7 @@ Definition p2 : proc opHiT opHi2T _ :=
   _ <- Op IncTwice;
   Ret tt.
 
-Definition ts2 := thread_upd threads_empty 1 (Some p2).
+Definition ts2 := thread_upd threads_empty 1 (Some (existT _ _ p2)).
 
 Definition ex_trace2 :
   { t : trace opHiT opHi2T | exec opHi_step init_state ts2 t }.
@@ -441,13 +436,14 @@ Hint Resolve ex_compile_ok.
 Definition threads_compile_ok (ts1 : @threads_state opT opHiT) (ts2 : @threads_state opHiT opHi2T) :=
   forall tid,
     ts1 tid = None /\ ts2 tid = None \/
-  (exists p1 p2,
-    ts1 tid = Some p1 /\ ts2 tid = Some p2 /\ compile_ok p1 p2).
+  (exists T p1 p2,
+    ts1 tid = Some (existT _ T p1) /\ ts2 tid = Some (existT _ T p2) /\ compile_ok p1 p2).
 
 Theorem ex_ts_compile_ok : threads_compile_ok ts ts2.
 Proof.
   unfold threads_compile_ok, ts, ts2, thread_upd, threads_empty; intros.
-  destruct (1 == tid); intuition eauto.
+  destruct (1 == tid); intuition.
+  right. do 3 eexists. intuition eauto.
 Qed.
 
 Lemma thread_upd_inv : forall opT opHiT ts tid1 p tid2 p',
@@ -476,6 +472,15 @@ Proof.
 Qed.
 
 
+Ltac sigT_eq' := match goal with
+  | H : ?a = ?a |- _ =>
+    clear H
+  | H : existT _ _ _ = existT _ _ _ |- _ =>
+    sigT_eq
+  | H : existT _ _ _ = existT _ _ _ |- _ =>
+    inversion H; clear H; subst
+  end.
+
 Ltac thread_inv :=
   match goal with
   | H : thread_upd _ _ _ _ = Some _ |- _ =>
@@ -483,7 +488,7 @@ Ltac thread_inv :=
   | H : threads_empty _ = Some _ |- _ =>
     eapply thread_empty_inv in H; exfalso; apply H
   | H : (_, _) = (_, _) |- _ =>
-    inversion H; clear H; subst; repeat sigT_eq
+    inversion H; clear H; subst; repeat sigT_eq'
   | H : _ = Bind _ _ |- _ =>
     solve [ inversion H ]
   | H : _ = Ret _ _ _|- _ =>
@@ -501,20 +506,20 @@ Ltac thread_inv :=
 Ltac bind_inv :=
   match goal with
   | H : _ = Bind _ _ |- _ =>
-    inversion H; clear H; subst; repeat sigT_eq
+    inversion H; clear H; subst; repeat sigT_eq'
   end.
 
 Ltac exec_inv :=
   match goal with
   | H : exec _ _ _ _ |- _ =>
-    inversion H; clear H; subst; repeat sigT_eq
+    inversion H; clear H; subst; repeat sigT_eq'
   end;
   autorewrite with t in *.
 
 Ltac exec_tid_inv :=
   match goal with
   | H : exec_tid _ _ _ _ _ _ _ |- _ =>
-    inversion H; clear H; subst; repeat sigT_eq
+    inversion H; clear H; subst; repeat sigT_eq'
   end;
   autorewrite with t in *.
 
@@ -525,9 +530,9 @@ Ltac empty_inv :=
 Ltac step_inv :=
   match goal with
   | H : op_step _ _ _ _ _ |- _ =>
-    inversion H; clear H; subst; repeat sigT_eq
+    inversion H; clear H; subst; repeat sigT_eq'
   | H : opHi_step _ _ _ _ _ |- _ =>
-    inversion H; clear H; subst; repeat sigT_eq
+    inversion H; clear H; subst; repeat sigT_eq'
   end.
 
 Theorem ex_all_traces_match :
@@ -637,7 +642,7 @@ Definition p1_a :=
   Ret tt.
 
 
-Definition ts_a := thread_upd threads_empty 1 (Some p1_a).
+Definition ts_a := thread_upd threads_empty 1 (Some (existT _ _ p1_a)).
 
 
 Lemma exec_trace_eq : forall opLo opHi State op_step (s : State) (ts : @threads_state opLo opHi) tr1 tr2,
@@ -687,9 +692,7 @@ Proof.
       eapply AtomicOpExec.
       constructor.
     eapply AtomicOpRet.
-    eapply AtomicBind.
-      eapply AtomicReturnHi.
-    eapply AtomicRet.
+    eapply AtomicReturnHi.
     simpl; autorewrite with t.
   exec_one 1.
     repeat eapply ExecTidBind; eauto.
@@ -776,17 +779,17 @@ Proof.
 Qed.
 
 
-Definition trace_equiv_s (s s' : State) tid (p1 p2 : proc opT opHiT unit) :=
+Definition trace_equiv_s {T} (s s' : State) tid (p1 p2 : proc opT opHiT T) :=
   forall ts,
   same_traces_s op_step s s'
-    (thread_upd ts tid (Some p1))
-    (thread_upd ts tid (Some p2)).
+    (thread_upd ts tid (Some (existT _ _ p1)))
+    (thread_upd ts tid (Some (existT _ _ p2))).
 
-Definition trace_equiv (p1 p2 : proc opT opHiT unit) :=
+Definition trace_equiv {T} (p1 p2 : proc opT opHiT T) :=
   forall ts tid s,
   same_traces op_step s
-    (thread_upd ts tid (Some p1))
-    (thread_upd ts tid (Some p2)).
+    (thread_upd ts tid (Some (existT _ _ p1)))
+    (thread_upd ts tid (Some (existT _ _ p2))).
 
 
 Instance trace_match_hi_preorder {opLoT opHiT} :
@@ -799,8 +802,8 @@ Proof.
     eapply trace_match_hi_trans.
 Qed.
 
-Instance trace_equiv_preorder :
-  PreOrder trace_equiv.
+Instance trace_equiv_preorder {T} :
+  PreOrder (@trace_equiv T).
 Proof.
   split.
   - intro p.
@@ -815,7 +818,8 @@ Proof.
     eapply trace_match_hi_trans; eauto.
 Qed.
 
-Instance trace_equiv_proper : Proper (Basics.flip trace_equiv ==> trace_equiv ==> Basics.impl) trace_equiv.
+Instance trace_equiv_proper {T} :
+  Proper (Basics.flip trace_equiv ==> trace_equiv ==> Basics.impl) (@trace_equiv T).
 Proof.
   intros p1 p2 H21 p3 p4 H34 H; subst.
   unfold Basics.flip in *.
@@ -829,7 +833,8 @@ Proof.
   eapply trace_match_hi_trans; eauto.
 Qed.
 
-Instance trace_equiv_proper_flip : Proper (trace_equiv ==> Basics.flip trace_equiv ==> Basics.flip Basics.impl) trace_equiv.
+Instance trace_equiv_proper_flip {T} :
+  Proper (trace_equiv ==> Basics.flip trace_equiv ==> Basics.flip Basics.impl) (@trace_equiv T).
 Proof.
   intros p1 p2 H21 p3 p4 H34 H; subst.
   unfold Basics.flip in *.
@@ -844,13 +849,13 @@ Proof.
 Qed.
 
 
-Definition exec_equiv_opt {opT opHiT} (p1 p2 : option (proc opT opHiT unit)) :=
+Definition exec_equiv_opt {opT opHiT} (p1 p2 : option {T : Type & proc opT opHiT T}) :=
   forall State op_step (s : State) ts tid tr,
     exec op_step s (thread_upd ts tid p1) tr <->
     exec op_step s (thread_upd ts tid p2) tr.
 
-Definition exec_equiv {opT opHiT} (p1 p2 : proc opT opHiT unit) :=
-  exec_equiv_opt (Some p1) (Some p2).
+Definition exec_equiv {opT opHiT T} (p1 p2 : proc opT opHiT T) :=
+  exec_equiv_opt (Some (existT _ _ p1)) (Some (existT _ _ p2)).
 
 Instance exec_equiv_opt_preorder {opLoT opHiT} :
   PreOrder (@exec_equiv_opt opLoT opHiT).
@@ -864,8 +869,8 @@ Proof.
     + eapply H. eapply H0. eauto.
 Qed.
 
-Instance exec_equiv_preorder {opLoT opHiT} :
-  PreOrder (@exec_equiv opLoT opHiT).
+Instance exec_equiv_preorder {opLoT opHiT T} :
+  PreOrder (@exec_equiv opLoT opHiT T).
 Proof.
   split.
   - intro t.
@@ -877,7 +882,7 @@ Proof.
 Qed.
 
 
-Theorem exec_equiv_ret_bind : forall opT opHiT T (v : T) (p : T -> proc opT opHiT unit),
+Theorem exec_equiv_ret_bind : forall opT opHiT T T' (v : T) (p : T -> proc opT opHiT T'),
   exec_equiv (Bind (Ret v) p) (p v).
 Proof.
   split; intros.
@@ -889,6 +894,7 @@ Proof.
     end.
     + destruct (tid0 == tid); subst.
       * rewrite thread_upd_eq in H. inversion H; clear H. subst.
+        repeat sigT_eq'.
         repeat exec_tid_inv.
         simpl. eauto.
 
@@ -912,6 +918,7 @@ Proof.
       * rewrite thread_upd_eq in H. inversion H; clear H. subst.
         rewrite <- app_nil_l with (l := evs).
         rewrite prepend_app.
+        repeat sigT_eq'.
         eapply ExecOne with (tid := tid).
           rewrite thread_upd_eq. eauto.
           constructor. constructor.
@@ -932,8 +939,8 @@ Proof.
       congruence.
 Qed.
 
-Theorem exec_equiv_ret_None : forall opT opHiT,
-  @exec_equiv_opt opT opHiT (Some (Ret tt)) None.
+Theorem exec_equiv_ret_None : forall opT opHiT T (v : T),
+  @exec_equiv_opt opT opHiT (Some (existT _ _ (Ret v))) None.
 Proof.
   split; intros.
   - match goal with
@@ -944,6 +951,7 @@ Proof.
     end.
     + destruct (tid0 == tid); subst.
       * rewrite thread_upd_eq in H. inversion H; clear H. subst.
+        repeat sigT_eq'.
         repeat exec_tid_inv.
         simpl. eauto.
 
@@ -965,7 +973,7 @@ Proof.
     eauto.
 Qed.
 
-Theorem exec_equiv_bind_ret : forall opT opHiT (p : proc opT opHiT unit),
+Theorem exec_equiv_bind_ret : forall opT opHiT T (p : proc opT opHiT T),
   exec_equiv (Bind p Ret) p.
 Proof.
   unfold exec_equiv; split; intros.
@@ -978,6 +986,7 @@ Proof.
     end.
     + destruct (tid0 == tid); subst.
       * rewrite thread_upd_eq in H. inversion H; clear H. subst.
+        repeat sigT_eq'.
         exec_tid_inv.
         eapply ExecOne with (tid := tid).
           rewrite thread_upd_eq in * by auto. eauto.
@@ -985,7 +994,7 @@ Proof.
         autorewrite with t.
 
         destruct result0; eauto.
-        destruct u.
+
         eapply exec_equiv_ret_None in H1.
         eauto.
 
@@ -1008,12 +1017,12 @@ Proof.
     end.
     + destruct (tid0 == tid); subst.
       * rewrite thread_upd_eq in H. inversion H; clear H. subst.
+        repeat sigT_eq'.
         eapply ExecOne with (tid := tid).
           rewrite thread_upd_eq. eauto.
           eauto.
         autorewrite with t in *.
         destruct result; eauto.
-        destruct u.
         apply exec_equiv_ret_None; eauto.
 
       * rewrite thread_upd_upd_ne in * by eauto.
@@ -1027,7 +1036,7 @@ Proof.
       congruence.
 Qed.
 
-Theorem exec_equiv_bind_bind : forall opT opHiT T1 T2 (p1 : proc opT opHiT T1) (p2 : T1 -> proc opT opHiT T2) (p3 : T2 -> proc opT opHiT unit),
+Theorem exec_equiv_bind_bind : forall opT opHiT T1 T2 T3 (p1 : proc opT opHiT T1) (p2 : T1 -> proc opT opHiT T2) (p3 : T2 -> proc opT opHiT T3),
   exec_equiv (Bind (Bind p1 p2) p3) (Bind p1 (fun v => Bind (p2 v) p3)).
 Proof.
   unfold exec_equiv; split; intros.
@@ -1040,6 +1049,7 @@ Proof.
     end.
     + destruct (tid0 == tid); subst.
       * rewrite thread_upd_eq in H. inversion H; clear H. subst.
+        repeat sigT_eq'.
         exec_tid_inv.
         exec_tid_inv; try intuition congruence.
         eapply ExecOne with (tid := tid).
@@ -1068,6 +1078,7 @@ Proof.
     end.
     + destruct (tid0 == tid); subst.
       * rewrite thread_upd_eq in H. inversion H; clear H. subst.
+        repeat sigT_eq'.
         exec_tid_inv.
 
         eapply ExecOne with (tid := tid).
@@ -1089,8 +1100,8 @@ Proof.
 Qed.
 
 
-Instance trace_equiv_exec_equiv_proper :
-  Proper (exec_equiv ==> exec_equiv ==> iff) trace_equiv.
+Instance trace_equiv_exec_equiv_proper {T} :
+  Proper (exec_equiv ==> exec_equiv ==> iff) (@trace_equiv T).
 Proof.
   intros p1 p1' ?.
   intros p2 p2' ?.
@@ -1113,18 +1124,23 @@ Hint Constructors atomic_exec.
 
 
 Lemma trace_equiv_opret :
-  forall T (p : T -> proc opT opHiT unit) (v : T),
+  forall T T' (p : T -> proc opT opHiT T') (v : T),
   trace_equiv (Bind (OpRet v) p)
               (p v).
 Proof.
   unfold trace_equiv, same_traces; intros.
-  remember (thread_upd ts0 tid (Some (Bind (OpRet v) p))).
-  generalize dependent ts0.
-  induction H; intros; subst.
+
+  match goal with
+  | H : exec _ _ (thread_upd ?ts ?tid (Some ?p)) _ |- _ =>
+    remember (thread_upd ts tid (Some p));
+    generalize dependent ts;
+    induction H; intros; subst
+  end.
 
   - destruct (tid == tid0); subst.
     + rewrite thread_upd_eq in H.
       inversion H; clear H; subst.
+      repeat sigT_eq'.
       exec_tid_inv.
       exec_tid_inv.
 
@@ -1158,18 +1174,23 @@ Qed.
 
 
 Lemma trace_equiv_opcall :
-  forall T (p : unit -> proc opT opHiT unit) (op : opT T),
+  forall T T' (p : unit -> proc opT opHiT T') (op : opT T),
   trace_equiv (Bind (OpCall op) p)
               (p tt).
 Proof.
   unfold trace_equiv, same_traces; intros.
-  remember (thread_upd ts0 tid (Some (Bind (OpCall op) p))).
-  generalize dependent ts0.
-  induction H; intros; subst.
+
+  match goal with
+  | H : exec _ _ (thread_upd ?ts ?tid (Some ?p)) _ |- _ =>
+    remember (thread_upd ts tid (Some p));
+    generalize dependent ts;
+    induction H; intros; subst
+  end.
 
   - destruct (tid == tid0); subst.
     + rewrite thread_upd_eq in H.
       inversion H; clear H; subst.
+      repeat sigT_eq'.
       exec_tid_inv.
       exec_tid_inv.
 
@@ -1202,19 +1223,24 @@ Proof.
 Qed.
 
 Theorem trace_equiv_opexec :
-  forall T op (p : T -> proc opT opHiT unit),
+  forall T T' op (p : T -> proc opT opHiT T'),
   trace_equiv (Bind (OpExec op) p)
               (Bind (Atomic (Op op)) p).
 Proof.
   unfold trace_equiv, same_traces; intros.
-  remember (thread_upd ts0 tid (Some (Bind (OpExec op) p))) as ts.
-  generalize dependent ts0.
-  induction H; intros; subst.
+
+  match goal with
+  | H : exec _ _ (thread_upd ?ts ?tid (Some ?p)) _ |- _ =>
+    remember (thread_upd ts tid (Some p));
+    generalize dependent ts;
+    induction H; intros; subst
+  end.
 
   - destruct (tid == tid0).
     + subst.
       rewrite thread_upd_eq in H.
       inversion H; clear H; subst.
+      repeat sigT_eq'.
       repeat exec_tid_inv.
 
       eexists; split.
@@ -1260,7 +1286,7 @@ Proof.
     congruence.
 Qed.
 
-Theorem trace_equiv_bind_a : forall T (p : proc _ _ T) (p2 p2' : T -> proc _ _ unit),
+Theorem trace_equiv_bind_a : forall T T' (p : proc _ _ T) (p2 p2' : T -> proc _ _ T'),
   (forall x, trace_equiv (p2 x) (p2' x)) ->
   trace_equiv (Bind p p2) (Bind p p2').
 Proof.
@@ -1268,14 +1294,15 @@ Proof.
   unfold trace_equiv, same_traces; intros.
 
   match goal with
-  | H : exec _ _ (thread_upd ?ts ?tid (Some (Bind ?p ?p2))) _ |- _ =>
-    remember (thread_upd ts tid (Some (Bind p p2)));
+  | H : exec _ _ (thread_upd ?ts ?tid (Some (existT _ _ (Bind ?p ?p2)))) _ |- _ =>
+    remember (thread_upd ts tid (Some (existT _ _ (Bind p p2))));
     generalize dependent ts;
     generalize dependent p;
     induction H; intros; subst
   end.
   - destruct (tid0 == tid); subst.
     + rewrite thread_upd_eq in H0. inversion H0; clear H0. subst.
+      repeat sigT_eq'.
       exec_tid_inv.
       destruct result0.
 
@@ -1321,7 +1348,7 @@ Qed.
 
 
 Theorem trace_equiv_op :
-  forall T op (p : T -> proc opT opHiT unit),
+  forall T T' op (p : T -> proc opT opHiT T'),
   trace_equiv (Bind (Op op) p)
               (Bind (Atomic (Op op)) p).
 Proof.
@@ -1414,7 +1441,7 @@ Qed.
 
 
 Theorem inc_commutes_0 :
-  forall s tid (p1 p2 : _ -> proc opT opHiT unit),
+  forall T s tid (p1 p2 : _ -> proc opT opHiT T),
   (forall r, trace_equiv (p1 r) (p2 r)) ->
   trace_equiv_s s (fun tid' => if tid' == tid then s tid' + 1 else s tid')
                 tid (r <- OpExec Inc; p1 r) (p2 (s tid + 1)).
@@ -1422,13 +1449,14 @@ Proof.
   unfold trace_equiv_s, same_traces_s; intros.
 
   match goal with
-  | H : exec _ _ (thread_upd ?ts ?tid (Some (Bind ?p ?p2))) _ |- _ =>
-    remember (thread_upd ts tid (Some (Bind p p2)));
+  | H : exec _ _ (thread_upd ?ts ?tid (Some (existT _ _ (Bind ?p ?p2)))) _ |- _ =>
+    remember (thread_upd ts tid (Some (existT _ _ (Bind p p2))));
     generalize dependent ts;
     induction H; intros; subst
   end.
   - destruct (tid0 == tid); subst.
     + rewrite thread_upd_eq in H0. inversion H0; clear H0. subst.
+      repeat sigT_eq'.
       repeat exec_tid_inv.
       step_inv.
       eapply H in H2; deex.
@@ -1457,9 +1485,9 @@ Qed.
 
 
 Theorem inc_commutes_1 :
-  forall TA (ap : proc _ _ TA)
-            (p1 : proc opT opHiT unit)
-            (p2 : _ -> proc opT opHiT unit),
+  forall TA T' (ap : proc _ _ TA)
+            (p1 : proc opT opHiT T')
+            (p2 : _ -> proc opT opHiT T'),
   (forall s tid,
     trace_equiv_s s (fun tid' => if tid' == tid then s tid' + 1 else s tid')
                   tid p1 (p2 (s tid + 1))) ->
@@ -1469,13 +1497,14 @@ Proof.
   unfold trace_equiv, same_traces; intros.
 
   match goal with
-  | H : exec _ _ (thread_upd ?ts ?tid (Some (Bind ?p ?p2))) _ |- _ =>
-    remember (thread_upd ts tid (Some (Bind p p2)));
+  | H : exec _ _ (thread_upd ?ts ?tid (Some (existT _ _ (Bind ?p ?p2)))) _ |- _ =>
+    remember (thread_upd ts tid (Some (existT _ _ (Bind p p2))));
     generalize dependent ts;
     induction H; intros; subst
   end.
   - destruct (tid0 == tid); subst.
     + rewrite thread_upd_eq in H0. inversion H0; clear H0. subst.
+      repeat sigT_eq'.
       repeat exec_tid_inv.
 
       eapply H in H2. deex.
@@ -1519,10 +1548,10 @@ Unshelve.
 Qed.
 
 
-Theorem trace_equiv_s_trans : forall s s' tid p0 p1 p2,
+Theorem trace_equiv_s_trans : forall T s s' tid p0 p1 p2,
   trace_equiv p0 p1 ->
   trace_equiv_s s s' tid p1 p2 ->
-  trace_equiv_s s s' tid p0 p2.
+  (@trace_equiv_s T s s' tid p0 p2).
 Proof.
   intros.
   unfold trace_equiv_s, same_traces_s; intros.
@@ -1534,7 +1563,7 @@ Qed.
 
 
 Theorem inc_commutes_final :
-  forall TA (ap : proc _ _ TA) (p : _ -> proc opT opHiT unit),
+  forall TA T' (ap : proc _ _ TA) (p : _ -> proc opT opHiT T'),
   trace_equiv (_ <- Atomic ap; r <- Op Inc; p r)
               (r <- Atomic (_ <- ap; Op Inc); p r).
 Proof.
@@ -1561,14 +1590,13 @@ Qed.
 Definition inc_twice_impl_atomic :=
   _ <- InvokeOpHi IncTwice;
   r <- Atomic (_ <- Op Inc; Op Inc);
-  _ <- ReturnOpHi r;
-  Ret r.
+  ReturnOpHi r.
 
 
 Theorem trace_equiv_bind : forall T1 T2 (p1 p1' : proc _ _ T1) (p2 p2' : T1 -> proc _ _ T2),
-  (forall rx, trace_equiv (Bind p1 rx) (Bind p1' rx)) ->
-  (forall rx, (forall x, trace_equiv (Bind (p2 x) rx) (Bind (p2' x) rx))) ->
-  (forall rx, trace_equiv (Bind (Bind p1 p2) rx) (Bind (Bind p1' p2') rx)).
+  (forall T (rx : _ -> proc _ _ T), trace_equiv (Bind p1 rx) (Bind p1' rx)) ->
+  (forall T (rx : _ -> proc _ _ T), (forall x, trace_equiv (Bind (p2 x) rx) (Bind (p2' x) rx))) ->
+  (forall T (rx : _ -> proc _ _ T), trace_equiv (Bind (Bind p1 p2) rx) (Bind (Bind p1' p2') rx)).
 Proof.
   intros.
   repeat rewrite exec_equiv_bind_bind.
@@ -1578,7 +1606,7 @@ Proof.
 Qed.
 
 
-Theorem trace_equiv_bind_swap' : forall T1 T2 (p1 : proc _ _ T1) (p2 : T1 -> proc _ _ T2) (p3 : T2 -> proc _ _ unit),
+Theorem trace_equiv_bind_swap' : forall T1 T2 T3 (p1 : proc _ _ T1) (p2 : T1 -> proc _ _ T2) (p3 : T2 -> proc _ _ T3),
   trace_equiv (Bind (Bind p1 p2) p3)
               (Bind p1 (fun x => Bind (p2 x) p3)).
 Proof.
@@ -1587,7 +1615,7 @@ Proof.
   reflexivity.
 Qed.
 
-Theorem trace_equiv_bind_swap'' : forall T1 T2 (p1 : proc _ _ T1) (p2 : T1 -> proc _ _ T2) (p3 : T2 -> proc _ _ unit),
+Theorem trace_equiv_bind_swap'' : forall T1 T2 T3 (p1 : proc _ _ T1) (p2 : T1 -> proc _ _ T2) (p3 : T2 -> proc _ _ T3),
   trace_equiv (Bind p1 (fun x => Bind (p2 x) p3))
               (Bind (Bind p1 p2) p3).
 Proof.
@@ -1597,7 +1625,7 @@ Proof.
 Qed.
 
 
-Theorem trace_equiv_bind_swap : forall T1 T2 (p1 : proc _ _ T1) (p2 : T1 -> proc _ _ T2) (p3 : T1 -> T2 -> proc _ _ unit),
+Theorem trace_equiv_bind_swap : forall T1 T2 T3 (p1 : proc _ _ T1) (p2 : T1 -> proc _ _ T2) (p3 : T1 -> T2 -> proc _ _ T3),
   trace_equiv (Bind p1 (fun x => Bind (p2 x) (p3 x)))
               (Bind (Bind p1 (fun x => Bind (p2 x) (fun y => Ret (x, y))))
                     (fun p => p3 (fst p) (snd p))).
@@ -1613,7 +1641,7 @@ Proof.
 Qed.
 
 
-Theorem inc_twice_atomic : forall rx,
+Theorem inc_twice_atomic : forall T (rx : _ -> proc _ _ T),
   trace_equiv (Bind inc_twice_impl rx) (Bind inc_twice_impl_atomic rx).
 Proof.
   unfold inc_twice_impl, inc_twice_impl_atomic.
@@ -1644,22 +1672,22 @@ Proof.
   eapply inc_commutes_final.
 
   simpl.
-  rewrite <- exec_equiv_bind_bind.
+  rewrite exec_equiv_bind_bind.
   reflexivity.
 Qed.
 
 
-Definition trace_match_one_thread {opLoT opMidT opHiT State} lo_step hi_step
-                                            (p1 : proc opLoT opMidT unit)
-                                            (p2 : proc opMidT opHiT unit) :=
+Definition trace_match_one_thread {opLoT opMidT opHiT State T} lo_step hi_step
+                                            (p1 : proc opLoT opMidT T)
+                                            (p2 : proc opMidT opHiT T) :=
   forall (s : State) tr1,
-    exec lo_step s (thread_upd threads_empty 1 (Some p1)) tr1 ->
+    exec lo_step s (thread_upd threads_empty 1 (Some (existT _ _ p1))) tr1 ->
     exists tr2,
-      exec hi_step s (thread_upd threads_empty 1 (Some p2)) tr2 /\
+      exec hi_step s (thread_upd threads_empty 1 (Some (existT _ _ p2))) tr2 /\
       traces_match tr1 tr2.
 
-Instance trace_match_one_thread_proper {opLoT opMidT opHiT State lo_step hi_step} :
-  Proper (exec_equiv ==> exec_equiv ==> Basics.flip Basics.impl) (@trace_match_one_thread opLoT opMidT opHiT State lo_step hi_step).
+Instance trace_match_one_thread_proper {opLoT opMidT opHiT State T lo_step hi_step} :
+  Proper (exec_equiv ==> exec_equiv ==> Basics.flip Basics.impl) (@trace_match_one_thread opLoT opMidT opHiT State T lo_step hi_step).
 Proof.
   intros p1 p1'; intros.
   intros p2 p2'; intros.
@@ -1703,8 +1731,8 @@ Proof.
     + constructor.
 Qed.
 
-Instance trace_match_one_thread_proper2 {opHi2T hi_step} :
-  Proper (trace_equiv ==> exec_equiv ==> Basics.flip Basics.impl) (@trace_match_one_thread opT opHiT opHi2T State op_step hi_step).
+Instance trace_match_one_thread_proper2 {T opHi2T hi_step} :
+  Proper (trace_equiv ==> exec_equiv ==> Basics.flip Basics.impl) (@trace_match_one_thread opT opHiT opHi2T State T op_step hi_step).
 Proof.
   intros p1 p1'; intros.
   intros p2 p2'; intros.
@@ -1721,7 +1749,7 @@ Proof.
 Qed.
 
 Theorem all_single_thread_traces_match' :
-  forall T (p1 : proc opT opHiT T) (p2 : proc opHiT opHi2T T) (p1rest : T -> proc opT opHiT unit) (p2rest : T -> proc opHiT opHi2T unit),
+  forall T T' (p1 : proc opT opHiT T) (p2 : proc opHiT opHi2T T) (p1rest : T -> proc opT opHiT T') (p2rest : T -> proc opHiT opHi2T T'),
   (forall x, trace_match_one_thread op_step opHi_step (p1rest x) (p2rest x)) ->
   compile_ok p1 p2 ->
   trace_match_one_thread op_step opHi_step (Bind p1 p1rest) (Bind p2 p2rest).
@@ -1753,11 +1781,7 @@ Proof.
     autorewrite with t in *.
     repeat ( exec_tid_inv; intuition try congruence ).
 
-    exec_inv; repeat thread_inv.
-    autorewrite with t in *.
-    repeat ( exec_tid_inv; intuition try congruence ).
-
-    apply H in H2. deex.
+    apply H in H3. deex.
 
     eexists; split.
     eapply ExecOne with (tid := 1).
@@ -1786,7 +1810,7 @@ Proof.
     apply functional_extensionality; intros.
     destruct (x == 1); omega.
 
-    f_equal. omega.
+    f_equal. f_equal. omega.
 
     simpl.
     repeat constructor.
@@ -1816,7 +1840,7 @@ Proof.
 Qed.
 
 Theorem all_single_thread_traces_match :
-  forall (p1 : proc opT opHiT unit) (p2 : proc opHiT opHi2T unit),
+  forall T' (p1 : proc opT opHiT T') (p2 : proc opHiT opHi2T T'),
   compile_ok p1 p2 ->
   trace_match_one_thread op_step opHi_step p1 p2.
 Proof.
@@ -1831,7 +1855,6 @@ Proof.
 
   clear H0.
   unfold trace_match_one_thread; intros.
-  destruct x.
   eapply exec_equiv_ret_None in H0.
   rewrite thread_upd_None_empty in *.
   exec_inv; repeat thread_inv.
@@ -1844,12 +1867,28 @@ Proof.
   eauto.
 Qed.
 
-Definition compile_ok_all (ts1 ts2 : threads_state) :=
+
+Inductive compile_ok_atomic : forall T (p1 : proc opT opHiT T) (p2 : proc opHiT opHi2T T), Prop :=
+| CompileAIncTwiceCall :
+  compile_ok_atomic (InvokeOpHi IncTwice) (@OpCall opHiT opHi2T _ IncTwice)
+| CompileAIncTwiceExec :
+  compile_ok_atomic (Atomic (_ <- Op Inc; Op Inc)) (@OpExec opHiT opHi2T _ IncTwice)
+| CompileAIncTwiceRet : forall T (r : T),
+  compile_ok_atomic (ReturnOpHi r) (@OpRet opHiT opHi2T _ r)
+| CompileARet : forall T (x : T),
+  compile_ok_atomic (@Ret opT opHiT T x) (@Ret opHiT opHi2T T x)
+| CompileABind : forall T1 T2 (p1a : proc opT opHiT T1) (p2a : proc opHiT opHi2T T1)
+                             (p1b : T1 -> proc opT opHiT T2) (p2b : T1 -> proc opHiT opHi2T T2),
+  compile_ok_atomic p1a p2a ->
+  (forall x, compile_ok_atomic (p1b x) (p2b x)) ->
+  compile_ok_atomic (Bind p1a p1b) (Bind p2a p2b).
+
+Definition compile_ok_all_atomic (ts1 ts2 : threads_state) :=
   forall tid,
     (ts1 tid = None /\ ts2 tid = None) \/
-    exists p1 p2,
-    ts1 tid = Some p1 /\ ts2 tid = Some p2 /\
-    compile_ok p1 p2.
+    exists T p1 p2,
+    ts1 tid = Some (existT _ T p1) /\ ts2 tid = Some (existT _ T p2) /\
+    compile_ok_atomic p1 p2.
 
 Definition trace_match_threads {opLoT opMidT opHiT State} lo_step hi_step
                                             (ts1 : @threads_state opLoT opMidT)
@@ -1860,21 +1899,271 @@ Definition trace_match_threads {opLoT opMidT opHiT State} lo_step hi_step
       exec hi_step s ts2 tr2 /\
       traces_match tr1 tr2.
 
-Theorem all_traces_match' :
-  forall T ts1 ts2 (p1 : proc _ _ T) p2 p1rest p2rest tid x,
-  trace_match_threads op_step opHi_step ts1 ts2 ->
-  ts1 tid = Some (p1rest x) ->
-  ts2 tid = Some (p2rest x) ->
-  compile_ok p1 p2 ->
-  trace_match_threads op_step opHi_step
-    (thread_upd ts1 tid (Some (Bind p1 p1rest)))
-    (thread_upd ts2 tid (Some (Bind p2 p2rest))).
+Lemma compile_ok_all_atomic_del : forall ts1 ts2 tid,
+  compile_ok_all_atomic ts1 ts2 ->
+  compile_ok_all_atomic (thread_upd ts1 tid None) (thread_upd ts2 tid None).
 Proof.
-Admitted.
+  unfold compile_ok_all_atomic; intros.
+  specialize (H tid0).
+  destruct (tid == tid0); subst.
+  - repeat rewrite thread_upd_eq; intuition eauto.
+  - repeat rewrite thread_upd_ne by auto. intuition eauto.
+Qed.
+
+Lemma compile_ok_atomic_thread_upd : forall ts1 ts2 T p1 p2 tid,
+  compile_ok_all_atomic ts1 ts2 ->
+  compile_ok_atomic p1 p2 ->
+  compile_ok_all_atomic (thread_upd ts1 tid (Some (existT _ T p1)))
+                        (thread_upd ts2 tid (Some (existT _ T p2))).
+Proof.
+  unfold compile_ok_all_atomic; intros.
+  specialize (H tid0).
+  destruct (tid == tid0); subst.
+  - repeat rewrite thread_upd_eq.
+    right.
+    do 3 eexists.
+    intuition eauto.
+  - repeat rewrite thread_upd_ne by auto. intuition eauto.
+Qed.
+
+Lemma traces_match_prepend : forall opLoT opMidT opHiT (tr1 : trace opLoT opMidT) (tr2 : trace opMidT opHiT) evs evs',
+  traces_match tr1 tr2 ->
+  traces_match (prepend evs (TraceEmpty _ _)) (prepend evs' (TraceEmpty _ _)) ->
+  traces_match (prepend evs tr1) (prepend evs' tr2).
+Proof.
+  intros.
+  remember (prepend evs (TraceEmpty _ _)).
+  remember (prepend evs' (TraceEmpty _ _)).
+  generalize dependent evs'.
+  generalize dependent evs.
+  induction H0; intros.
+  all: destruct evs; simpl in *.
+  all: try inversion Heqt.
+  all: subst.
+  all: try solve [ constructor ; eauto ].
+
+  all: destruct evs'; simpl in *.
+  all: try inversion Heqt0.
+  all: subst.
+  all: try solve [ constructor; eauto ].
+
+  all: try solve [ constructor; specialize (IHtraces_match nil); simpl in *; eauto ].
+  all: try solve [ constructor; specialize (IHtraces_match ([e] ++ evs)); simpl in *; eauto ].
+
+  eauto.
+Qed.
+
+Lemma compile_ok_atomic_exec_tid : forall T (p1 : proc _ _ T) p2,
+  compile_ok_atomic p1 p2 ->
+  forall tid s s' result evs,
+  exec_tid op_step tid s p1 s' result evs ->
+  exists result' evs',
+  exec_tid opHi_step tid s p2 s' result' evs' /\
+  traces_match (prepend evs (TraceEmpty _ _)) (prepend evs' (TraceEmpty _ _)) /\
+  match result with
+  | inl v => match result' with
+    | inl v' => v = v'
+    | inr _ => False
+    end
+  | inr p' => match result' with
+    | inl _ => False
+    | inr p'' => compile_ok_atomic p' p''
+    end
+  end.
+Proof.
+  induction 1; intros.
+
+  - exec_tid_inv.
+    do 2 eexists; split.
+    constructor.
+    split.
+    simpl; eauto.
+    eauto.
+
+  - exec_tid_inv.
+    repeat match goal with
+    | H : atomic_exec _ _ _ _ _ _ _ |- _ =>
+      inversion H; clear H; subst; repeat sigT_eq
+    end.
+    repeat step_inv.
+    do 2 eexists; split.
+    constructor.
+
+    match goal with
+    | |- opHi_step _ _ _ _ ?s =>
+      replace s with (fun tid' => if tid' == tid then s1 tid' + 2 else s1 tid')
+    end.
+    constructor.
+
+    apply functional_extensionality; intros.
+    destruct (x == tid); omega.
+
+    split.
+    simpl; eauto.
+
+    destruct (tid == tid); omega.
+
+  - exec_tid_inv.
+    do 2 eexists; split.
+    constructor.
+    split.
+    simpl; eauto.
+    eauto.
+
+  - exec_tid_inv.
+    do 2 eexists; split.
+    constructor.
+    split.
+    simpl; eauto.
+    eauto.
+
+  - exec_tid_inv.
+    eapply IHcompile_ok_atomic in H12.
+    repeat deex.
+
+    destruct result0; destruct result'; try solve [ exfalso; eauto ].
+
+    + do 2 eexists; split.
+      eauto.
+      split.
+      eauto.
+      subst; eauto.
+
+    + do 2 eexists; split.
+      eauto.
+      split.
+      eauto.
+      constructor.
+      eauto.
+      eauto.
+Qed.
 
 Theorem all_traces_match :
   forall ts1 ts2,
-  compile_ok_all ts1 ts2 ->
+  compile_ok_all_atomic ts1 ts2 ->
   trace_match_threads op_step opHi_step ts1 ts2.
 Proof.
+  unfold trace_match_threads; intros.
+  generalize dependent ts3.
+  induction H0; intros.
+  - specialize (H2 tid) as H2'.
+    intuition try congruence.
+    repeat deex.
+    rewrite H3 in H; inversion H; clear H; subst.
+    repeat sigT_eq'.
+
+    edestruct compile_ok_atomic_exec_tid; eauto.
+    repeat deex.
+
+    edestruct IHexec.
+    shelve.
+    intuition idtac.
+
+    eexists; split.
+    eapply ExecOne with (tid := tid).
+      eauto.
+      eauto.
+      eauto.
+
+    eapply traces_match_prepend; eauto.
+    Unshelve.
+
+    destruct result, x; simpl in *; try solve [ exfalso; eauto ].
+    eapply compile_ok_all_atomic_del; eauto.
+    eapply compile_ok_atomic_thread_upd; eauto.
+
+  - eexists; split.
+    eapply ExecEmpty.
+    2: eauto.
+
+    intros.
+      specialize (H tid).
+      specialize (H0 tid).
+      intuition eauto.
+    repeat deex.
+    congruence.
+Qed.
+
+Inductive atomize_ok : forall T (p1 : proc opT opHiT T) (p2 : proc opT opHiT T), Prop :=
+| AtomizeIncTwice :
+  atomize_ok (inc_twice_impl) (inc_twice_impl_atomic)
+| AtomizeRet : forall T (x : T),
+  atomize_ok (Ret x) (Ret x)
+| AtomizeBind : forall T1 T2 (p1a p2a : proc opT opHiT T1) 
+                             (p1b p2b : T1 -> proc opT opHiT T2),
+  atomize_ok p1a p2a ->
+  (forall x, atomize_ok (p1b x) (p2b x)) ->
+  atomize_ok (Bind p1a p1b) (Bind p2a p2b).
+
+Definition atomize_ok_all (ts1 ts2 : threads_state) :=
+  forall tid,
+    (ts1 tid = None /\ ts2 tid = None) \/
+    exists T p1 p2,
+    ts1 tid = Some (existT _ T p1) /\ ts2 tid = Some (existT _ T p2) /\
+    atomize_ok p1 p2.
+
+Definition compile_ok_all (ts1 ts2 : threads_state) :=
+  forall tid,
+    (ts1 tid = None /\ ts2 tid = None) \/
+    exists T p1 p2,
+    ts1 tid = Some (existT _ T p1) /\ ts2 tid = Some (existT _ T p2) /\
+    compile_ok p1 p2.
+
+Theorem make_one_atomic :
+  forall T (p1 : proc _ _ T) p2,
+  compile_ok p1 p2 ->
+  exists p1',
+    atomize_ok p1 p1' /\
+    compile_ok_atomic p1' p2.
+Proof.
+  intros.
+  induction H.
+  - eexists; split. constructor.
+    repeat constructor.
+  - eexists; split. constructor. constructor.
+  - edestruct IHcompile_ok; clear IHcompile_ok; intuition idtac.
+
+    assert (exists (p1b' : T1 -> proc _ _ T2),
+      forall x, atomize_ok (p1b x) (p1b' x) /\ compile_ok_atomic (p1b' x) (p2b x)).
+    {
+      admit.
+    }
+
+    deex.
+    eexists (Bind x p1b').
+    split.
+      constructor. eauto.
+      intros. specialize (H2 x0). intuition eauto.
+      constructor. eauto.
+      intros. specialize (H2 x0). intuition eauto.
 Admitted.
+
+
+Theorem make_all_atomic :
+  forall ts1 ts2,
+  compile_ok_all ts1 ts2 ->
+  exists ts1',
+    atomize_ok_all ts1 ts1' /\
+    compile_ok_all_atomic ts1' ts2.
+Proof.
+  intros.
+  eexists (fun tid' => match ts1 tid' with | None => _ | Some px => _ end).
+  split.
+  - unfold atomize_ok_all; intros.
+    specialize (H tid).
+    destruct H.
+    + destruct H.
+      rewrite H.
+      left; eauto.
+    + repeat deex.
+      rewrite H.
+      right. do 3 eexists.
+      split. eauto.
+      split.
+(*
+ instantiate (1 := p3). reflexivity.
+      
+ instantiate (Goal0 := Some p3).
+
+  trace_match_threads op_step opHi_step ts1 ts2.
+*)
