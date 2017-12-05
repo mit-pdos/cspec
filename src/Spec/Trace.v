@@ -1033,16 +1033,18 @@ Qed.
 
 
 Definition trace_equiv_s {T} (s s' : State) tid (p1 p2 : proc opT opHiT T) :=
-  forall ts,
+  forall ts1 ts2,
+  same_traces_s op_step s s' ts1 ts2 ->
   same_traces_s op_step s s'
-    (thread_upd ts tid (Some (existT _ _ p1)))
-    (thread_upd ts tid (Some (existT _ _ p2))).
+    (thread_upd ts1 tid (Some (existT _ _ p1)))
+    (thread_upd ts2 tid (Some (existT _ _ p2))).
 
 Definition trace_equiv {T} (p1 p2 : proc opT opHiT T) :=
-  forall ts tid s,
+  forall ts1 ts2 tid s,
+  same_traces op_step s ts1 ts2 ->
   same_traces op_step s
-    (thread_upd ts tid (Some (existT _ _ p1)))
-    (thread_upd ts tid (Some (existT _ _ p2))).
+    (thread_upd ts1 tid (Some (existT _ _ p1)))
+    (thread_upd ts2 tid (Some (existT _ _ p2))).
 
 
 Instance trace_match_hi_preorder {opLoT opHiT} :
