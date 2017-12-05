@@ -2038,7 +2038,7 @@ Proof.
       eauto.
 Qed.
 
-Theorem all_traces_match :
+Theorem all_traces_match_0 :
   forall ts1 ts2,
   compile_ok_all_atomic ts1 ts2 ->
   trace_match_threads op_step opHi_step ts1 ts2.
@@ -2109,6 +2109,35 @@ Definition compile_ok_all (ts1 ts2 : threads_state) :=
     ts1 tid = Some (existT _ T p1) /\ ts2 tid = Some (existT _ T p2) /\
     compile_ok p1 p2.
 
+Theorem atomize_preserves_trace :
+  forall ts1 ts1',
+  atomize_ok_all ts1 ts1' ->
+  forall s tr1,
+  exec op_step s ts1 tr1 ->
+  exists tr1',
+    exec op_step s ts1' tr1' /\
+    trace_match_hi tr1 tr1'.
+Proof.
+  intros.
+Admitted.
+
+Theorem all_traces_match_1 :
+  forall ts1 ts1' ts2,
+  atomize_ok_all ts1 ts1' ->
+  compile_ok_all_atomic ts1' ts2 ->
+  trace_match_threads op_step opHi_step ts1 ts2.
+Proof.
+  unfold trace_match_threads; intros.
+  eapply atomize_preserves_trace in H; eauto.
+  deex.
+  edestruct all_traces_match_0; eauto.
+  intuition idtac.
+  eexists; split.
+  eauto.
+  eapply traces_match_trace_match_hi; eauto.
+  symmetry; eauto.
+Qed.
+
 Theorem make_one_atomic :
   forall T (p1 : proc _ _ T) p2,
   compile_ok p1 p2 ->
@@ -2167,3 +2196,14 @@ Proof.
 
   trace_match_threads op_step opHi_step ts1 ts2.
 *)
+Admitted.
+
+Theorem all_traces_match :
+  forall ts1 ts2,
+  compile_ok_all ts1 ts2 ->
+  trace_match_threads op_step opHi_step ts1 ts2.
+Proof.
+  intros.
+  eapply make_all_atomic in H; deex.
+  eapply all_traces_match_1; eauto.
+Qed.
