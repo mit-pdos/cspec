@@ -1033,18 +1033,16 @@ Qed.
 
 
 Definition trace_equiv_s {T} (s s' : State) tid (p1 p2 : proc opT opHiT T) :=
-  forall ts1 ts2,
-  same_traces_s op_step s s' ts1 ts2 ->
+  forall (ts1 : threads_state),
+  ts1 tid = Some (existT _ _ p1) ->
   same_traces_s op_step s s'
-    (thread_upd ts1 tid (Some (existT _ _ p1)))
-    (thread_upd ts2 tid (Some (existT _ _ p2))).
+    ts1 (thread_upd ts1 tid (Some (existT _ _ p2))).
 
 Definition trace_equiv {T} (p1 p2 : proc opT opHiT T) :=
-  forall ts1 ts2 tid s,
-  same_traces op_step s ts1 ts2 ->
+  forall (ts1 : threads_state) tid s,
+  ts1 tid = Some (existT _ _ p1) ->
   same_traces op_step s
-    (thread_upd ts1 tid (Some (existT _ _ p1)))
-    (thread_upd ts2 tid (Some (existT _ _ p2))).
+    ts1 (thread_upd ts1 tid (Some (existT _ _ p2))).
 
 
 Instance trace_match_hi_preorder {opLoT opHiT} :
@@ -1057,20 +1055,69 @@ Proof.
     eapply trace_match_hi_trans.
 Qed.
 
+Lemma pad_noop : forall n T (l : list (option T)),
+  n <= length l ->
+  pad l n = l.
+Proof.
+  induction n; simpl; intros; eauto.
+  destruct l; simpl in *.
+  omega.
+  rewrite IHn; eauto.
+  omega.
+Qed.
+
+Lemma thread_get_Some_length : forall tid opT opHiT (ts : @threads_state opT opHiT) t,
+  thread_get ts tid = Some t ->
+  tid < length ts.
+Proof.
+  unfold thread_get.
+  induction tid; simpl; intros.
+  - destruct ts0; try congruence. simpl. omega.
+  - destruct ts0; try congruence. simpl.
+    specialize (IHtid _ _ _ _ H).
+    omega.
+Qed.
+
+Hint Resolve thread_get_Some_length.
+Hint Resolve lt_le_S.
+
+Lemma list_upd_noop : forall tid opT opHiT (ts : @threads_state opT opHiT) t,
+  thread_get ts tid = Some t ->
+  list_upd ts tid (Some t) = ts.
+Proof.
+  unfold thread_get.
+  induction tid; simpl; intros.
+  - destruct ts0; try congruence. simpl. congruence.
+  - destruct ts0; try congruence. simpl. f_equal. eauto.
+Qed.
+
+Lemma thread_upd_same : forall tid opT opHiT (ts : @threads_state opT opHiT) T (p : proc _ _ T),
+  ts tid = Some (existT _ _ p) ->
+  thread_upd ts tid (Some (existT _ _ p)) = ts.
+Proof.
+  unfold thread_upd; intros.
+  rewrite pad_noop by eauto.
+  rewrite list_upd_noop; eauto.
+Qed.
+
 Instance trace_equiv_preorder {T} :
   PreOrder (@trace_equiv T).
 Proof.
   split.
-  - intro p.
+  - unfold Reflexive; intros.
+    unfold trace_equiv; intros.
+    rewrite thread_upd_same by eauto.
+    reflexivity.
+  - unfold Transitive; intros.
     unfold trace_equiv, same_traces; intros.
+    eapply H in H2; try eassumption.
+    deex.
+    eapply H0 in H2.
+    2: rewrite thread_upd_eq; reflexivity.
+    deex.
+    rewrite thread_upd_upd_eq in *.
     eexists; intuition eauto.
-  - intros p1 p2 p3.
-    intros.
-    unfold trace_equiv, same_traces; intros.
-    edestruct H; eauto; intuition idtac.
-    edestruct H0; eauto; intuition idtac.
-    eexists; intuition eauto.
-    eapply trace_match_hi_trans; eauto.
+    etransitivity; eauto.
 Qed.
 
 Instance trace_equiv_proper {T} :
@@ -1078,14 +1125,7 @@ Instance trace_equiv_proper {T} :
 Proof.
   intros p1 p2 H21 p3 p4 H34 H; subst.
   unfold Basics.flip in *.
-  unfold trace_equiv, same_traces.
-  intros.
-  edestruct H21; eauto; intuition idtac.
-  edestruct H; eauto; intuition idtac.
-  edestruct H34; eauto; intuition idtac.
-  eexists; intuition eauto.
-  eapply trace_match_hi_trans; eauto.
-  eapply trace_match_hi_trans; eauto.
+  repeat (etransitivity; eauto).
 Qed.
 
 Instance trace_equiv_proper_flip {T} :
@@ -1093,14 +1133,7 @@ Instance trace_equiv_proper_flip {T} :
 Proof.
   intros p1 p2 H21 p3 p4 H34 H; subst.
   unfold Basics.flip in *.
-  unfold trace_equiv, same_traces.
-  intros.
-  edestruct H21; eauto; intuition idtac.
-  edestruct H; eauto; intuition idtac.
-  edestruct H34; eauto; intuition idtac.
-  eexists; intuition eauto.
-  eapply trace_match_hi_trans; eauto.
-  eapply trace_match_hi_trans; eauto.
+  repeat (etransitivity; eauto).
 Qed.
 
 
@@ -1360,22 +1393,32 @@ Instance trace_equiv_exec_equiv_proper {T} :
 Proof.
   intros p1 p1' ?.
   intros p2 p2' ?.
-  unfold trace_equiv, same_traces; split; intros.
-  - apply H in H2.
-    apply H1 in H2.
-    deex.
-    apply H0 in H2.
-    eauto.
-  - apply H in H2.
-    apply H1 in H2.
-    deex.
-    apply H0 in H2.
-    eauto.
+  split; intros.
+  - unfold trace_equiv, same_traces; intros.
+    pose proof (thread_upd_same _ _ H2).
+    rewrite <- H4 in H3.
+    apply H in H3.
+    eapply H1 in H3.
+    2: rewrite thread_upd_eq; reflexivity.
+    rewrite thread_upd_upd_eq in *; deex.
+    apply H0 in H3.
+    eexists; intuition eauto.
+  - unfold trace_equiv, same_traces; intros.
+    pose proof (thread_upd_same _ _ H2).
+    rewrite <- H4 in H3.
+    apply H in H3.
+    eapply H1 in H3.
+    2: rewrite thread_upd_eq; reflexivity.
+    rewrite thread_upd_upd_eq in *; deex.
+    apply H0 in H3.
+    eexists; intuition eauto.
 Qed.
 
 
 Hint Constructors exec_tid.
 Hint Constructors atomic_exec.
+
+Hint Resolve no_runnable_threads_some.
 
 
 Lemma trace_equiv_opret :
@@ -1383,28 +1426,23 @@ Lemma trace_equiv_opret :
   trace_equiv (Bind (OpRet v) p)
               (p v).
 Proof.
-  unfold trace_equiv, same_traces; intros.
+  unfold trace_equiv, same_traces. intros.
 
-  match goal with
-  | H : exec _ _ (thread_upd ?ts ?tid (Some ?p)) _ |- _ =>
-    remember (thread_upd ts tid (Some p));
-    generalize dependent ts;
-    induction H; intros; subst
-  end.
+  induction H0.
 
   - destruct (tid == tid0); subst.
-    + rewrite thread_upd_eq in H.
+    + rewrite H0 in H.
       inversion H; clear H; subst.
       repeat sigT_eq'.
       exec_tid_inv.
       exec_tid_inv.
 
-      eexists; intuition eauto.
+      eexists; split.
+      eauto.
       constructor.
 
-    + rewrite thread_upd_ne in * by assumption.
-      edestruct IHexec; intuition idtac.
-      shelve.
+    + edestruct IHexec; intuition idtac.
+      rewrite thread_upd_ne; eauto.
 
       eexists; split.
 
@@ -1418,13 +1456,7 @@ Proof.
       eauto.
       eauto.
 
-      Unshelve.
-      all: try rewrite thread_upd_upd_ne by assumption.
-      all: try reflexivity.
-
-  - specialize (H tid).
-    rewrite thread_upd_eq in H.
-    congruence.
+  - exfalso; eauto.
 Qed.
 
 
@@ -1435,15 +1467,10 @@ Lemma trace_equiv_opcall :
 Proof.
   unfold trace_equiv, same_traces; intros.
 
-  match goal with
-  | H : exec _ _ (thread_upd ?ts ?tid (Some ?p)) _ |- _ =>
-    remember (thread_upd ts tid (Some p));
-    generalize dependent ts;
-    induction H; intros; subst
-  end.
+  induction H0.
 
   - destruct (tid == tid0); subst.
-    + rewrite thread_upd_eq in H.
+    + rewrite H0 in H.
       inversion H; clear H; subst.
       repeat sigT_eq'.
       exec_tid_inv.
@@ -1452,9 +1479,8 @@ Proof.
       eexists; intuition eauto.
       constructor.
 
-    + rewrite thread_upd_ne in * by assumption.
-      edestruct IHexec; intuition idtac.
-      shelve.
+    + edestruct IHexec; intuition idtac.
+      rewrite thread_upd_ne; eauto.
 
       eexists; split.
 
@@ -1468,13 +1494,7 @@ Proof.
       eauto.
       eauto.
 
-      Unshelve.
-      all: try rewrite thread_upd_upd_ne by assumption.
-      all: try reflexivity.
-
-  - specialize (H tid).
-    rewrite thread_upd_eq in H.
-    congruence.
+  - exfalso; eauto.
 Qed.
 
 Theorem trace_equiv_opexec :
@@ -1484,16 +1504,11 @@ Theorem trace_equiv_opexec :
 Proof.
   unfold trace_equiv, same_traces; intros.
 
-  match goal with
-  | H : exec _ _ (thread_upd ?ts ?tid (Some ?p)) _ |- _ =>
-    remember (thread_upd ts tid (Some p));
-    generalize dependent ts;
-    induction H; intros; subst
-  end.
+  induction H0.
 
   - destruct (tid == tid0).
     + subst.
-      rewrite thread_upd_eq in H.
+      rewrite H0 in H.
       inversion H; clear H; subst.
       repeat sigT_eq'.
       repeat exec_tid_inv.
@@ -1516,9 +1531,8 @@ Proof.
       simpl.
       eauto.
 
-    + rewrite thread_upd_ne in * by assumption.
-      edestruct IHexec; intuition idtac.
-      shelve.
+    + edestruct IHexec; intuition idtac.
+      rewrite thread_upd_ne; eauto.
 
       eexists; split.
 
@@ -1532,13 +1546,7 @@ Proof.
       eauto.
       eauto.
 
-      Unshelve.
-      all: try rewrite thread_upd_upd_ne by assumption.
-      all: try reflexivity.
-
-  - specialize (H tid).
-    rewrite thread_upd_eq in H.
-    congruence.
+  - exfalso; eauto.
 Qed.
 
 Theorem trace_equiv_bind_a : forall T T' (p : proc _ _ T) (p2 p2' : T -> proc _ _ T'),
@@ -1548,22 +1556,21 @@ Proof.
   intros.
   unfold trace_equiv, same_traces; intros.
 
-  match goal with
-  | H : exec _ _ (thread_upd ?ts ?tid (Some (existT _ _ (Bind ?p ?p2)))) _ |- _ =>
-    remember (thread_upd ts tid (Some (existT _ _ (Bind p p2))));
-    generalize dependent ts;
-    generalize dependent p;
-    induction H; intros; subst
-  end.
+  generalize dependent p.
+  induction H1; intros.
+
   - destruct (tid0 == tid); subst.
-    + rewrite thread_upd_eq in H0. inversion H0; clear H0. subst.
+    + rewrite H3 in H0.
+      inversion H0; clear H0; subst.
       repeat sigT_eq'.
       exec_tid_inv.
       destruct result0.
 
       * edestruct H; eauto.
+        rewrite thread_upd_eq; eauto.
+        intuition idtac.
 
-        destruct H0.
+        autorewrite with t in *.
         eexists; split.
         eapply ExecOne with (tid := tid).
           rewrite thread_upd_eq. eauto.
@@ -1573,8 +1580,12 @@ Proof.
 
         eauto.
 
-      * edestruct IHexec. eauto.
-        eexists; split. destruct H0.
+      * edestruct IHexec.
+        rewrite thread_upd_eq; eauto.
+        intuition idtac.
+
+        autorewrite with t in *.
+        eexists; split.
         eapply ExecOne with (tid := tid).
           rewrite thread_upd_eq. eauto.
           eauto.
@@ -1583,8 +1594,8 @@ Proof.
 
         intuition eauto.
 
-    + rewrite thread_upd_upd_ne in * by eauto.
-      edestruct IHexec. shelve.
+    + edestruct IHexec.
+      rewrite thread_upd_ne; eauto.
 
       eexists; split.
       eapply ExecOne with (tid := tid0).
@@ -1593,12 +1604,7 @@ Proof.
       rewrite thread_upd_upd_ne by auto.
       intuition eauto.
       intuition eauto.
-  - specialize (H0 tid).
-    rewrite thread_upd_eq in H0.
-    congruence.
-
-Unshelve.
-  reflexivity.
+  - exfalso; eauto.
 Qed.
 
 
@@ -1703,23 +1709,19 @@ Theorem inc_commutes_0 :
 Proof.
   unfold trace_equiv_s, same_traces_s; intros.
 
-  match goal with
-  | H : exec _ _ (thread_upd ?ts ?tid (Some (existT _ _ (Bind ?p ?p2)))) _ |- _ =>
-    remember (thread_upd ts tid (Some (existT _ _ (Bind p p2))));
-    generalize dependent ts;
-    induction H; intros; subst
-  end.
+  induction H1.
+
   - destruct (tid0 == tid); subst.
-    + rewrite thread_upd_eq in H0. inversion H0; clear H0. subst.
+    + rewrite H1 in H0. inversion H0; clear H0; subst.
       repeat sigT_eq'.
       repeat exec_tid_inv.
       step_inv.
-      eapply H in H2; deex.
+      edestruct H. 2: eauto. rewrite thread_upd_eq; eauto.
+      intuition idtac. autorewrite with t in *.
       eexists; split; eauto.
 
     + edestruct IHexec.
-      rewrite thread_upd_upd_ne by auto.
-      reflexivity.
+      rewrite thread_upd_ne; eauto.
       intuition idtac.
 
       eexists; split.
@@ -1727,15 +1729,13 @@ Proof.
         rewrite thread_upd_ne in * by auto. eauto.
         eapply inc_commutes_exec_tid; eauto.
         rewrite thread_upd_upd_ne by auto.
-        eapply inc_commutes_exec_tid' in H1.
-        rewrite H1.
+        eapply inc_commutes_exec_tid' in H2.
+        rewrite H2.
         eauto.
         eauto.
       auto.
 
-  - specialize (H0 tid).
-    rewrite thread_upd_eq in H0.
-    congruence.
+  - exfalso; eauto.
 Qed.
 
 
@@ -1751,18 +1751,15 @@ Theorem inc_commutes_1 :
 Proof.
   unfold trace_equiv, same_traces; intros.
 
-  match goal with
-  | H : exec _ _ (thread_upd ?ts ?tid (Some (existT _ _ (Bind ?p ?p2)))) _ |- _ =>
-    remember (thread_upd ts tid (Some (existT _ _ (Bind p p2))));
-    generalize dependent ts;
-    induction H; intros; subst
-  end.
+  induction H1.
+
   - destruct (tid0 == tid); subst.
-    + rewrite thread_upd_eq in H0. inversion H0; clear H0. subst.
+    + rewrite H1 in H0. inversion H0; clear H0; subst.
       repeat sigT_eq'.
       repeat exec_tid_inv.
 
-      eapply H in H2. deex.
+      eapply H in H3. deex.
+      2: rewrite thread_upd_eq; eauto.
 
       eexists; split.
 
@@ -1778,13 +1775,13 @@ Proof.
         eapply AtomicOpExec.
         constructor. (* INC semantics *)
         eapply AtomicOpRet.
-      simpl. autorewrite with t.
+      simpl. autorewrite with t in *.
       eauto.
 
       rewrite prepend_app. simpl. eauto.
 
-    + rewrite thread_upd_upd_ne in * by eauto.
-      edestruct IHexec. shelve.
+    + edestruct IHexec.
+      rewrite thread_upd_ne; eauto.
 
       eexists; split.
       eapply ExecOne with (tid := tid0).
@@ -1794,12 +1791,7 @@ Proof.
       intuition eauto.
       intuition eauto.
 
-  - specialize (H0 tid).
-    rewrite thread_upd_eq in H0.
-    congruence.
-
-Unshelve.
-  reflexivity.
+  - exfalso; eauto.
 Qed.
 
 
@@ -1810,8 +1802,9 @@ Theorem trace_equiv_s_trans : forall T s s' tid p0 p1 p2,
 Proof.
   intros.
   unfold trace_equiv_s, same_traces_s; intros.
-  eapply H in H1; deex.
-  eapply H0 in H1; deex.
+  edestruct H; eauto. intuition idtac.
+  edestruct H0; eauto. rewrite thread_upd_eq; eauto. intuition idtac.
+  autorewrite with t in *.
   eexists. intuition eauto.
   etransitivity; eauto.
 Qed.
@@ -1993,7 +1986,7 @@ Proof.
   intros p2 p2'; intros.
   unfold Basics.flip, Basics.impl; intros.
   unfold trace_match_one_thread in *; intros.
-  apply H in H2.
+  eapply H in H2. 2: rewrite thread_upd_eq; eauto.
   deex.
   apply H1 in H2.
   deex.
