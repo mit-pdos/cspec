@@ -236,3 +236,35 @@ Proof.
   replace (s' 1 + 1 + 1) with (s' 1 + 2) by omega.
   eauto 20.
 Qed.
+
+
+(** Atomicity *)
+
+Definition p1_a :=
+  _ <- Atomic inc_twice_impl;
+  Ret tt.
+
+Definition ts_a := threads_empty [[ 1 := Proc p1_a ]].
+
+
+Theorem ts_equiv_ts_a : forall s,
+  same_traces op_step s ts ts_a.
+Proof.
+  unfold same_traces, same_traces_s.
+  intros.
+  unfold ts, ts_a in *.
+
+  repeat ( exec_inv; repeat thread_inv;
+    try ( repeat exec_tid_inv; repeat thread_inv ) ).
+
+  repeat step_inv.
+  unfold p1_a.
+
+  eexists; split.
+
+  exec_one 1; eauto 20; simpl; autorewrite with t.
+  exec_one 1; eauto 20; simpl; autorewrite with t.
+  eapply ExecEmpty; eauto.
+
+  reflexivity.
+Qed.

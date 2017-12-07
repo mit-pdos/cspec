@@ -287,6 +287,29 @@ Proof.
   omega.
 Qed.
 
+Lemma pad_noop : forall n T (l : list T) v,
+  n <= length l ->
+  pad l n v = l.
+Proof.
+  induction n; simpl; intros; eauto.
+  destruct l; simpl in *.
+  omega.
+  rewrite IHn; eauto.
+  omega.
+Qed.
+
+Lemma thread_get_Some_length : forall tid `(ts : @threads_state opT opHiT) `(p : proc _ _ T),
+  ts [[ tid ]] = Proc p ->
+  tid < length ts.
+Proof.
+  unfold thread_get.
+  induction tid; simpl; intros.
+  - destruct ts; try congruence. simpl. omega.
+  - destruct ts; try congruence. simpl.
+    specialize (IHtid _ _ _ _ _ H).
+    omega.
+Qed.
+
 Lemma length_hint_lt_le : forall n m,
   S n <= m ->
   n < m.
@@ -298,7 +321,16 @@ Hint Resolve pad_length_noshrink.
 Hint Resolve pad_length_grow.
 Hint Resolve length_hint_lt_le.
 Hint Resolve pad_length_noshrink'.
+Hint Resolve thread_get_Some_length.
 Hint Resolve lt_le_S.
+
+
+Lemma prepend_app : forall `(evs1 : list (event opT opHiT)) evs2 tr tid,
+  prepend tid (evs1 ++ evs2) tr = prepend tid evs1 (prepend tid evs2 tr).
+Proof.
+  induction evs1; simpl; intros; eauto.
+  rewrite IHevs1; eauto.
+Qed.
 
 Lemma list_upd_eq : forall tid `(ts : @threads_state opT opHiT) p,
   tid < length ts ->
@@ -324,6 +356,39 @@ Proof.
   - destruct ts; simpl in *. congruence.
     destruct tid; auto.
     eapply IHtid'. omega. omega.
+Qed.
+
+Lemma list_upd_noop : forall tid `(ts : @threads_state opT opHiT) `(p : proc _ _ T),
+  ts [[ tid ]] = Proc p ->
+  list_upd ts tid (Proc p) = ts.
+Proof.
+  unfold thread_get.
+  induction tid; simpl; intros.
+  - destruct ts; try congruence. simpl. congruence.
+  - destruct ts; try congruence. simpl. f_equal. eauto.
+Qed.
+
+Lemma list_upd_noop_NoProc : forall tid `(ts : @threads_state opT opHiT),
+  ts [[ tid ]] = NoProc ->
+  tid < length ts ->
+  list_upd ts tid NoProc = ts.
+Proof.
+  unfold thread_get.
+  induction tid; simpl; intros.
+  - destruct ts; try congruence. simpl. congruence.
+    simpl. subst. congruence.
+  - destruct ts; try congruence. simpl. congruence.
+    simpl. f_equal. eapply IHtid. 2: simpl in *; omega.
+    eauto.
+Qed.
+
+Lemma thread_upd_same : forall tid `(ts : @threads_state opT opHiT) `(p : proc _ _ T),
+  ts [[ tid ]] = Proc p ->
+  ts [[ tid := Proc p ]] = ts.
+Proof.
+  unfold thread_upd; intros.
+  rewrite pad_noop by eauto.
+  rewrite list_upd_noop; eauto.
 Qed.
 
 Lemma thread_upd_eq : forall tid `(ts : @threads_state opT opHiT) p,
@@ -533,6 +598,7 @@ Hint Rewrite thread_upd_eq : t.
 Hint Rewrite thread_upd_ne using (solve [ auto ]) : t.
 
 Hint Extern 1 (exec_tid _ _ _ _ _ _ _) => econstructor.
+Hint Extern 1 (atomic_exec _ _ _ _ _ _ _) => econstructor.
 
 
 Ltac maybe_proc_inv := match goal with
