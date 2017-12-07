@@ -4,19 +4,19 @@ Import ListNotations.
 Global Set Implicit Arguments.
 Global Generalizable All Variables.
 
-Fixpoint pad T (l : list (option T)) len : list (option T) :=
+Fixpoint pad `(l : list T) len val : list T :=
   match len with
   | O => l
   | S len' =>
     match l with
     | x :: l' =>
-      x :: pad l' len'
+      x :: pad l' len' val
     | nil =>
-      None :: pad nil len'
+      val :: pad nil len' val
     end
   end.
 
-Fixpoint list_upd T (l : list (option T)) (idx : nat) (v : option T) :=
+Fixpoint list_upd `(l : list T) (idx : nat) (v : T) :=
   match l with
   | nil => nil
   | x :: l' =>

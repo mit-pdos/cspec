@@ -78,22 +78,23 @@ Section Proc.
   Variable op_step : OpSemantics.
 
 
-  Definition threads_state := list (option {T : Type & proc T}).
+  Inductive maybe_proc :=
+  | Proc : forall T, proc T -> maybe_proc
+  | NoProc.
+
+  Definition threads_state := list maybe_proc.
 
   Definition thread_get (ts : threads_state) (tid : nat) :=
     match nth_error ts tid with
     | Some x => x
-    | None => None
+    | None => NoProc
     end.
 
-  Definition thread_upd (ts : threads_state) (tid : nat) (s : option {T : Type & proc T}) : threads_state :=
-    list_upd (pad ts (S tid)) tid s.
-
-  Definition thread_updS {T} (ts : threads_state) (tid : nat) (p : proc T) :=
-    thread_upd ts tid (Some (existT _ _ p)).
+  Definition thread_upd (ts : threads_state) (tid : nat) (s : maybe_proc) : threads_state :=
+    list_upd (pad ts (S tid) NoProc) tid s.
 
   Definition no_runnable_threads (ts : threads_state) :=
-    forall tid, thread_get ts tid = None.
+    forall tid, thread_get ts tid = NoProc.
 
 
   Inductive atomic_exec : forall T, proc T -> nat -> State ->
@@ -189,12 +190,12 @@ Section Proc.
   Inductive exec : State -> threads_state -> trace opT opHiT -> Prop :=
 
   | ExecOne : forall T tid (ts : threads_state) trace p s s' evs result,
-    thread_get ts tid = Some (existT _ T p) ->
+    thread_get ts tid = @Proc T p ->
     exec_tid tid s p s' result evs ->
     exec s' (thread_upd ts tid
               match result with
-              | inl _ => None
-              | inr p' => Some (existT _ T p')
+              | inl _ => NoProc
+              | inr p' => Proc p'
               end) trace ->
     exec s ts (prepend tid evs trace)
 
@@ -213,6 +214,9 @@ Arguments OpCallHi {opT opHiT T'}.
 Arguments OpRetHi {opT opHiT T}.
 Arguments Atomic {opT opHiT T}.
 
+Arguments Proc {opT opHiT T}.
+Arguments NoProc {opT opHiT}.
+
 Arguments threads_state {opT opHiT}.
 
 
@@ -222,10 +226,7 @@ Notation "x <- p1 ; p2" := (Bind p1 (fun x => p2))
 Notation "ts [[ tid ]]" := (thread_get ts tid)
   (at level 8, left associativity).
 
-Notation "ts [[ tid ::= p ]]" := (thread_upd ts tid p)
-  (at level 8, left associativity).
-
-Notation "ts [[ tid := p ]]" := (thread_updS ts tid p)
+Notation "ts [[ tid := p ]]" := (thread_upd ts tid p)
   (at level 8, left associativity).
 
 
@@ -245,7 +246,7 @@ Proof.
 Qed.
 
 Lemma pad_eq : forall n `(ts : @threads_state opT opHiT) tid,
-  thread_get ts tid = thread_get (pad ts n) tid.
+  ts [[ tid ]] = (pad ts n NoProc) [[ tid ]].
 Proof.
   unfold thread_get.
   induction n; simpl; eauto.
@@ -255,34 +256,34 @@ Proof.
   - destruct tid; simpl; eauto.
 Qed.
 
-Lemma pad_length_noshrink : forall n `(ts : @threads_state opT opHiT),
-  length ts <= length (pad ts n).
+Lemma pad_length_noshrink : forall n `(l : list T) v,
+  length l <= length (pad l n v).
 Proof.
   intros.
-  generalize dependent ts.
+  generalize dependent l.
   induction n; simpl; eauto.
-  destruct ts; simpl; eauto.
+  destruct l; simpl; eauto.
   - specialize (IHn []). omega.
-  - specialize (IHn ts). omega.
+  - specialize (IHn l). omega.
 Qed.
 
-Lemma pad_length_grow : forall n `(ts : @threads_state opT opHiT),
-  n <= length (pad ts n).
+Lemma pad_length_grow : forall n `(l : list T) v,
+  n <= length (pad l n v).
 Proof.
   intros.
-  generalize dependent ts.
+  generalize dependent l.
   induction n; simpl; intros; try omega.
-  destruct ts; simpl; eauto.
+  destruct l; simpl; eauto.
   - specialize (IHn []). omega.
-  - specialize (IHn ts). omega.
+  - specialize (IHn l). omega.
 Qed.
 
-Lemma pad_length_noshrink' : forall x n `(ts : @threads_state opT opHiT),
-  x <= length ts ->
-  x <= length (pad ts n).
+Lemma pad_length_noshrink' : forall x n `(l : list T) v,
+  x <= length l ->
+  x <= length (pad l n v).
 Proof.
   intros.
-  pose proof (pad_length_noshrink n ts).
+  pose proof (pad_length_noshrink n l v).
   omega.
 Qed.
 
@@ -326,22 +327,16 @@ Proof.
 Qed.
 
 Lemma thread_upd_eq : forall tid `(ts : @threads_state opT opHiT) p,
-  ts [[ tid ::= p ]] [[ tid ]] = p.
+  ts [[ tid := p ]] [[ tid ]] = p.
 Proof.
   unfold thread_upd; intros.
   apply list_upd_eq.
-  pose proof (pad_length_grow (S tid) ts).
+  pose proof (pad_length_grow (S tid) ts NoProc).
   omega.
 Qed.
 
-Lemma thread_updS_unfold : forall tid `(ts : @threads_state opT opHiT) T p,
-  ts [[ tid := p ]] = ts [[ tid ::= Some (existT _ T p) ]].
-Proof.
-  reflexivity.
-Qed.
-
 Lemma thread_get_pad : forall tid `(ts : @threads_state opT opHiT) n,
-  (pad ts n) [[ tid ]] = ts [[ tid ]].
+  (pad ts n NoProc) [[ tid ]] = ts [[ tid ]].
 Proof.
   unfold thread_get.
   induction tid; simpl.
@@ -355,7 +350,7 @@ Qed.
 
 Lemma thread_upd_ne : forall tid `(ts : @threads_state opT opHiT) p tid',
   tid <> tid' ->
-  ts [[ tid ::= p ]] [[ tid' ]] = ts [[ tid' ]].
+  ts [[ tid := p ]] [[ tid' ]] = ts [[ tid' ]].
 Proof.
   unfold thread_upd.
   intros.
@@ -365,7 +360,7 @@ Qed.
 
 Lemma list_upd_pad : forall `(ts : @threads_state opT opHiT) tid n p,
   tid < length ts ->
-  pad (list_upd ts tid p) n = list_upd (pad ts n) tid p.
+  pad (list_upd ts tid p) n NoProc = list_upd (pad ts n NoProc) tid p.
 Proof.
   induction ts; simpl; intros.
   - omega.
@@ -399,8 +394,8 @@ Proof.
   omega.
 Qed.
 
-Lemma pad_comm : forall T n m (l : list (option T)),
-  pad (pad l n) m = pad (pad l m) n.
+Lemma pad_comm : forall T n m (l : list T) v,
+  pad (pad l n v) m v = pad (pad l m v) n v.
 Proof.
   induction n; simpl; intros; eauto.
   destruct l; simpl; eauto.
@@ -408,8 +403,8 @@ Proof.
   - destruct m; simpl; eauto. rewrite IHn; eauto.
 Qed.
 
-Lemma pad_idem : forall T n (l : list (option T)),
-  pad (pad l n) n = pad l n.
+Lemma pad_idem : forall T n (l : list T) v,
+  pad (pad l n v) n v = pad l n v.
 Proof.
   induction n; simpl; intros; eauto.
   destruct l; simpl; eauto.
@@ -419,8 +414,8 @@ Qed.
 
 Lemma thread_upd_upd_ne : forall tid tid' `(ts : @threads_state opT opHiT) p p',
   tid <> tid' ->
-  ts [[ tid ::= p ]] [[ tid' ::= p' ]] =
-  ts [[ tid' ::= p' ]] [[ tid ::= p ]].
+  ts [[ tid := p ]] [[ tid' := p' ]] =
+  ts [[ tid' := p' ]] [[ tid := p ]].
 Proof.
   unfold thread_upd.
   intros.
@@ -432,23 +427,14 @@ Proof.
 Qed.
 
 Lemma thread_upd_upd_eq : forall tid `(ts : @threads_state opT opHiT) p1 p2,
-  ts [[ tid ::= p1 ]] [[ tid ::= p2 ]] =
-  ts [[ tid ::= p2 ]].
+  ts [[ tid := p1 ]] [[ tid := p2 ]] =
+  ts [[ tid := p2 ]].
 Proof.
   unfold thread_upd; intros.
   rewrite list_upd_pad by eauto.
   rewrite pad_idem.
   rewrite list_upd_upd_eq by eauto.
   reflexivity.
-Qed.
-
-Lemma thread_updS_updS_eq : forall tid `(ts : @threads_state opT opHiT) T1 T2 (p1 : proc _ _ T1) (p2 : proc _ _ T2),
-  ts [[ tid := p1 ]] [[ tid := p2 ]] =
-  ts [[ tid := p2 ]].
-Proof.
-  unfold thread_updS; intros.
-  rewrite thread_upd_upd_eq.
-  eauto.
 Qed.
 
 Theorem threads_empty_no_runnable : forall opT opHiT,
@@ -462,14 +448,14 @@ Qed.
 
 Lemma no_runnable_threads_pad : forall n `(ts : @threads_state opT opHiT),
   no_runnable_threads ts ->
-  no_runnable_threads (pad ts n).
+  no_runnable_threads (pad ts n NoProc).
 Proof.
   unfold no_runnable_threads, thread_get.
   induction n; simpl; eauto; intros.
   destruct ts; simpl.
   - destruct tid; simpl; eauto.
   - destruct tid; simpl; eauto.
-    destruct o; eauto.
+    destruct m; eauto.
     specialize (H 0); compute in H; congruence.
     eapply IHn; intros.
     specialize (H (S tid0)).
@@ -478,7 +464,7 @@ Qed.
 
 Lemma no_runnable_threads_list_upd : forall `(ts : @threads_state opT opHiT) tid,
   no_runnable_threads ts ->
-  no_runnable_threads (list_upd ts tid None).
+  no_runnable_threads (list_upd ts tid NoProc).
 Proof.
   unfold no_runnable_threads, thread_get.
   induction ts; simpl; eauto; intros.
@@ -488,9 +474,9 @@ Proof.
     eapply IHts; intros. specialize (H (S tid1)). apply H.
 Qed.
 
-Lemma no_runnable_threads_upd_None : forall tid `(ts : @threads_state opT opHiT),
+Lemma no_runnable_threads_upd_NoProc : forall tid `(ts : @threads_state opT opHiT),
   no_runnable_threads ts ->
-  no_runnable_threads (ts [[ tid ::= None ]]).
+  no_runnable_threads (ts [[ tid := NoProc ]]).
 Proof.
   unfold thread_upd; intros.
   eapply no_runnable_threads_list_upd.
@@ -498,7 +484,11 @@ Proof.
   eauto.
 Qed.
 
-Hint Resolve no_runnable_threads_upd_None.
+Hint Resolve no_runnable_threads_upd_NoProc.
 Hint Resolve threads_empty_no_runnable.
 
 Hint Rewrite thread_upd_upd_eq : t.
+Hint Rewrite thread_upd_eq : t.
+Hint Rewrite thread_upd_ne using (solve [ auto ]) : t.
+
+Hint Extern 1 (exec_tid _ _ _ _ _ _ _) => econstructor.
