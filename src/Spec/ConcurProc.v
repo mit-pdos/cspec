@@ -437,6 +437,27 @@ Proof.
   reflexivity.
 Qed.
 
+Lemma thread_upd_inv : forall `(ts : @threads_state opT opHiT) tid1 `(p : proc _ _ T) tid2 `(p' : proc _ _ T'),
+  ts [[ tid1 := Proc p ]] [[ tid2 ]] = Proc p' ->
+  tid1 = tid2 /\ Proc p = Proc p' \/
+  tid1 <> tid2 /\ ts [[ tid2 ]] = Proc p'.
+Proof.
+  intros.
+  destruct (tid1 == tid2).
+  - left; intuition eauto; subst.
+    rewrite thread_upd_eq in H. congruence.
+  - right; intuition eauto.
+    rewrite thread_upd_ne in H; eauto.
+Qed.
+
+Lemma thread_empty_inv : forall opT opHiT tid `(p' : proc _ _ T),
+  (@threads_empty opT opHiT) [[ tid ]] = Proc p' ->
+  False.
+Proof.
+  unfold threads_empty; intros.
+  destruct tid; compute in H; congruence.
+Qed.
+
 Theorem threads_empty_no_runnable : forall opT opHiT,
   no_runnable_threads (@threads_empty opT opHiT).
 Proof.
@@ -484,6 +505,26 @@ Proof.
   eauto.
 Qed.
 
+Lemma thread_upd_not_empty : forall tid `(ts : @threads_state opT opHiT) `(p : proc _ _ T),
+  no_runnable_threads (ts [[ tid := Proc p ]]) ->
+  False.
+Proof.
+  unfold no_runnable_threads; intros.
+  specialize (H tid).
+  rewrite thread_upd_eq in H.
+  congruence.
+Qed.
+
+Lemma no_runnable_threads_some :
+  forall `(ts : @threads_state opT opHiT) tid `(p : proc _ _ T),
+  ts [[ tid ]] = Proc p ->
+  no_runnable_threads ts ->
+  False.
+Proof.
+  unfold no_runnable_threads; intros.
+  specialize (H0 tid). congruence.
+Qed.
+
 Hint Resolve no_runnable_threads_upd_NoProc.
 Hint Resolve threads_empty_no_runnable.
 
@@ -492,3 +533,22 @@ Hint Rewrite thread_upd_eq : t.
 Hint Rewrite thread_upd_ne using (solve [ auto ]) : t.
 
 Hint Extern 1 (exec_tid _ _ _ _ _ _ _) => econstructor.
+
+
+Ltac maybe_proc_inv := match goal with
+  | H : ?a = ?a |- _ =>
+    clear H
+  | H : Proc _ = Proc _ |- _ =>
+    inversion H; clear H; subst
+  | H : existT _ _ _ = existT _ _ _ |- _ =>
+    sigT_eq
+  | H : existT _ _ _ = existT _ _ _ |- _ =>
+    inversion H; clear H; subst
+  end.
+
+Ltac exec_tid_inv :=
+  match goal with
+  | H : exec_tid _ _ _ _ _ _ _ |- _ =>
+    inversion H; clear H; subst; repeat maybe_proc_inv
+  end;
+  autorewrite with t in *.
