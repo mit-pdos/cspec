@@ -1,30 +1,10 @@
 ## Common library code
-CODE := $(wildcard src/POCS.v)
 CODE += $(wildcard src/Helpers/*.v)
-CODE += $(wildcard src/Common/*.v)
 CODE += $(wildcard src/Spec/*.v)
-
-## Lab 1: StatDB
-CODE += $(wildcard src/Lab1/*.v)
-
-## Lab 2: bad block remapping
-CODE += $(wildcard src/Lab2/*.v)
-
-## Lab 3: atomic pair
-CODE += $(wildcard src/Lab3/*.v)
-
-## Lab 4: disk mirroring
-CODE += $(wildcard src/Lab4/*.v)
-
-## FS experiment
-CODE += $(wildcard src/FS/SepLogic/Mem/*.v)
-CODE += $(wildcard src/FS/SepLogic/Pred/*.v)
-CODE += $(wildcard src/FS/SepLogic/*.v)
-CODE += $(wildcard src/FS/*.v)
 
 COQRFLAGS := -R build POCS
 
-BINS	:= statdb-cli remap-nbd replicate-nbd mail-cli
+BINS	:= 
 
 .PHONY: default
 default: $(patsubst %,bin/%,$(BINS)) docs
