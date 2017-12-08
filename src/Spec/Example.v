@@ -4,6 +4,9 @@ Require Import ConcurProc.
 Require Import Equiv.
 Require Import Omega.
 Require Import FunctionalExtensionality.
+Require Import Relations.Relation_Operators.
+Require Import RelationClasses.
+Require Import Morphisms.
 
 Global Set Implicit Arguments.
 Global Generalizable All Variables.
@@ -476,4 +479,158 @@ Proof.
   setoid_rewrite exec_equiv_bind_bind with (p1 := Op _).
   rewrite inc_commutes_final.
   reflexivity.
+Qed.
+
+
+(** Correctness for 1 thread *)
+
+Definition trace_match_one_thread {opLoT opMidT opHiT State T} lo_step hi_step
+                                            (p1 : proc opLoT opMidT T)
+                                            (p2 : proc opMidT opHiT T) :=
+  forall (s : State) tr1,
+    exec lo_step s (threads_empty [[ 1 := Proc p1 ]]) tr1 ->
+    exists tr2,
+      exec hi_step s (threads_empty [[ 1 := Proc p2 ]]) tr2 /\
+      traces_match tr1 tr2.
+
+Instance trace_match_one_thread_proper {opLoT opMidT opHiT State T lo_step hi_step} :
+  Proper (exec_equiv ==> exec_equiv ==> Basics.flip Basics.impl)
+         (@trace_match_one_thread opLoT opMidT opHiT State T lo_step hi_step).
+Proof.
+  intros p1 p1'; intros.
+  intros p2 p2'; intros.
+  unfold Basics.flip, Basics.impl; intros.
+  unfold trace_match_one_thread in *; intros.
+  apply H in H2.
+  apply H1 in H2.
+  destruct H2.
+  eexists; intuition eauto.
+  apply H0. eauto.
+Qed.
+
+Instance trace_match_one_thread_proper2 {opLoT opMidT opHiT State T lo_step hi_step} :
+  Proper (hitrace_incl lo_step ==> exec_equiv ==> Basics.flip Basics.impl)
+         (@trace_match_one_thread opLoT opMidT opHiT State T lo_step hi_step).
+Proof.
+  intros p1 p1'; intros.
+  intros p2 p2'; intros.
+  unfold Basics.flip, Basics.impl; intros.
+  unfold trace_match_one_thread in *; intros.
+  eapply H in H2. deex.
+  apply H1 in H2. deex.
+  eexists; intuition eauto.
+  apply H0. eauto.
+  rewrite H3. eauto.
+Qed.
+
+Theorem all_single_thread_traces_match' :
+  forall T T' (p1 : proc opT opHiT T) (p2 : proc opHiT opHi2T T) (p1rest : T -> proc opT opHiT T') (p2rest : T -> proc opHiT opHi2T T'),
+  (forall x, trace_match_one_thread op_step opHi_step (p1rest x) (p2rest x)) ->
+  compile_ok p1 p2 ->
+  trace_match_one_thread op_step opHi_step (Bind p1 p1rest) (Bind p2 p2rest).
+Proof.
+  intros.
+  generalize dependent p2rest.
+  generalize dependent p1rest.
+  induction H0; intros.
+
+  - rewrite inc_twice_atomic.
+
+    unfold trace_match_one_thread; intros.
+
+    exec_inv; repeat thread_inv.
+    autorewrite with t in *.
+    repeat ( exec_tid_inv; intuition try congruence ).
+
+    exec_inv; repeat thread_inv.
+    autorewrite with t in *.
+    repeat ( exec_tid_inv; intuition try congruence ).
+
+    repeat match goal with
+    | H : atomic_exec _ _ _ _ _ _ _ |- _ =>
+      inversion H; clear H; subst; repeat sigT_eq
+    end.
+    repeat step_inv.
+
+    exec_inv; repeat thread_inv.
+    autorewrite with t in *.
+    repeat ( exec_tid_inv; intuition try congruence ).
+
+    apply H in H3. deex.
+
+    eexists; split.
+    eapply ExecOne with (tid := 1).
+      rewrite thread_upd_eq; auto.
+      eauto.
+    eapply ExecOne with (tid := 1).
+      rewrite thread_upd_eq; auto.
+      eauto.
+    eapply ExecOne with (tid := 1).
+      rewrite thread_upd_eq; auto.
+      eauto.
+    autorewrite with t.
+
+    match goal with
+    | H : exec _ ?s1 (thread_upd _ _ (Proc ?p1)) _ |-
+          exec _ ?s2 (thread_upd _ _ (Proc ?p2)) _ =>
+      replace p2 with p1; [ replace s2 with s1; [ eauto | ] | ]
+    end.
+
+    unfold inc, inc2, state_upd; apply functional_extensionality; intros.
+      destruct_ifs; omega.
+    f_equal.
+    unfold inc, inc2, state_upd;
+      destruct_ifs; omega.
+
+    simpl.
+    replace (inc s1 1 1 + 1) with (s1 1 + 2).
+    eauto 20.
+    unfold inc, state_upd. destruct_ifs; omega.
+
+  - unfold trace_match_one_thread in *; intros.
+
+    exec_inv; repeat thread_inv; autorewrite with t in *.
+    repeat exec_tid_inv; try intuition congruence.
+
+    edestruct H; eauto. intuition try congruence.
+    eexists. split.
+
+    exec_one 1.
+      eapply ExecTidBind. eauto. eauto.
+      autorewrite with t; simpl.
+
+    eauto.
+
+  - rewrite exec_equiv_bind_bind.
+    rewrite exec_equiv_bind_bind.
+    eapply IHcompile_ok.
+    intros.
+    eapply H1.
+    eapply H2.
+Qed.
+
+Theorem all_single_thread_traces_match :
+  forall T' (p1 : proc opT opHiT T') (p2 : proc opHiT opHi2T T'),
+  compile_ok p1 p2 ->
+  trace_match_one_thread op_step opHi_step p1 p2.
+Proof.
+  intros.
+  unfold trace_match_one_thread; intros.
+  eapply exec_equiv_bind_ret in H0.
+  eapply all_single_thread_traces_match' in H0; eauto.
+  deex.
+  eexists; split; eauto.
+  eapply exec_equiv_bind_ret.
+  eauto.
+
+  clear H0.
+  unfold trace_match_one_thread; intros.
+  eapply exec_equiv_ret_None in H0.
+  exec_inv; repeat thread_inv.
+
+  eexists; split.
+  eapply exec_equiv_ret_None.
+  eapply ExecEmpty; eauto.
+
+  eauto.
 Qed.

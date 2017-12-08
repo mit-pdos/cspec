@@ -50,11 +50,13 @@ Fixpoint trace_filter_hi `(t : trace opLoT opHiT) : trace opLoT opHiT :=
 Definition trace_match_hi {opLoT opHiT} (t1 t2 : trace opLoT opHiT) :=
   trace_filter_hi t1 = trace_filter_hi t2.
 
-Instance trace_match_hi_preorder :
-  PreOrder (@trace_match_hi opLoT opHiT).
+Instance trace_match_hi_equiv :
+  Equivalence (@trace_match_hi opLoT opHiT).
 Proof.
   split.
   - firstorder.
+  - unfold trace_match_hi, Symmetric; intros.
+    symmetry; eauto.
   - unfold trace_match_hi, Transitive; intros.
     congruence.
 Qed.
@@ -95,6 +97,39 @@ Qed.
 Hint Resolve trace_match_hi_drop_lo_l.
 Hint Resolve trace_match_hi_drop_lo_r.
 Hint Resolve trace_match_hi_refl.
+
+Instance traces_match_proper :
+  Proper (trace_match_hi ==> eq ==> iff) (@traces_match opLoT opMidT opHiT).
+Proof.
+  intros.
+  intros t1 t2 H12.
+  intros t3' t3 H; subst.
+  split; intros.
+  - generalize dependent t2.
+    induction H; simpl; intros; eauto.
+    + induction t0; simpl; intros.
+      * destruct ev.
+        constructor. eauto.
+        inversion H12; subst.
+        constructor. eauto.
+      * inversion H12.
+    + induction t2; simpl; intros; eauto.
+      destruct ev.
+      constructor. eauto.
+      inversion H12.
+  - generalize dependent t1.
+    induction H; simpl; intros; eauto.
+    + induction t0; simpl; intros.
+      * destruct ev.
+        constructor. eauto.
+        inversion H12; subst.
+        constructor. eauto.
+      * inversion H12.
+    + induction t1; simpl; intros; eauto.
+      destruct ev.
+      constructor. eauto.
+      inversion H12.
+Qed.
 
 
 (** A strong notion of execution equivalence, independent of semantics *)
