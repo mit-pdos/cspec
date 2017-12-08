@@ -555,6 +555,39 @@ Proof.
   reflexivity.
 Qed.
 
+Lemma thread_upd_nil_S : forall opT opHiT tid p,
+  @thread_upd opT opHiT nil (S tid) p = NoProc :: (nil [[ tid := p ]]).
+Proof.
+  reflexivity.
+Qed.
+
+Lemma length_thread_upd : forall tid `(ts : @threads_state opT opHiT) p,
+  length (ts [[ tid := p ]]) = Nat.max (S tid) (length ts).
+Proof.
+  induction tid; simpl; intros.
+  - destruct ts; cbn; eauto.
+  - destruct ts.
+    + rewrite thread_upd_nil_S.
+      simpl length. rewrite IHtid.
+      simpl. omega.
+    + rewrite thread_upd_S.
+      simpl length. rewrite IHtid.
+      simpl. omega.
+Qed.
+
+Lemma thread_get_oob : forall tid `(ts : @threads_state opT opHiT),
+  tid >= length ts ->
+  ts [[ tid ]] = NoProc.
+Proof.
+  induction tid; simpl; intros.
+  - destruct ts; simpl in *; eauto.
+    omega.
+  - destruct ts.
+    rewrite thread_get_nil; eauto.
+    rewrite thread_get_S. eapply IHtid.
+    simpl in *; omega.
+Qed.
+
 Theorem threads_empty_no_runnable : forall opT opHiT,
   no_runnable_threads (@threads_empty opT opHiT).
 Proof.

@@ -137,7 +137,7 @@ Qed.
 
 (** Compilation *)
 
-Inductive compile_ok : forall `(p1 : proc opT opHiT T) `(p2 : proc opHiT opHi2T T), Prop :=
+Inductive compile_ok : forall T `(p1 : proc opT opHiT T) `(p2 : proc opHiT opHi2T T), Prop :=
 | CompileIncTwice :
   compile_ok (inc_twice_impl) (Op IncTwice)
 | CompileRet : forall `(x : T),
@@ -633,4 +633,399 @@ Proof.
   eapply ExecEmpty; eauto.
 
   eauto.
+Qed.
+
+
+(** Many-thread correctness *)
+
+Inductive compile_ok_atomic : forall T (p1 : proc opT opHiT T) (p2 : proc opHiT opHi2T T), Prop :=
+| CompileAIncTwiceCall :
+  compile_ok_atomic (OpCallHi IncTwice) (OpCall IncTwice)
+| CompileAIncTwiceExec :
+  compile_ok_atomic (Atomic (_ <- Op Inc; Op Inc)) (OpExec IncTwice)
+| CompileAIncTwiceRet : forall `(r : T),
+  compile_ok_atomic (OpRetHi r) (OpRet r)
+| CompileARet : forall `(x : T),
+  compile_ok_atomic (Ret x) (Ret x)
+| CompileABind : forall `(p1a : proc opT opHiT T1) (p2a : proc opHiT opHi2T T1)
+                        `(p1b : T1 -> proc opT opHiT T2) (p2b : T1 -> proc opHiT opHi2T T2),
+  compile_ok_atomic p1a p2a ->
+  (forall x, compile_ok_atomic (p1b x) (p2b x)) ->
+  compile_ok_atomic (Bind p1a p1b) (Bind p2a p2b).
+
+Definition compile_ok_all_atomic (ts1 ts2 : threads_state) :=
+  proc_match compile_ok_atomic ts1 ts2.
+
+Lemma compile_ok_atomic_exec_tid : forall T (p1 : proc _ _ T) p2,
+  compile_ok_atomic p1 p2 ->
+  forall tid s s' result evs,
+  exec_tid op_step tid s p1 s' result evs ->
+  exists result' evs',
+  exec_tid opHi_step tid s p2 s' result' evs' /\
+  traces_match (prepend tid evs TraceEmpty) (prepend tid evs' TraceEmpty) /\
+  match result with
+  | inl v => match result' with
+    | inl v' => v = v'
+    | inr _ => False
+    end
+  | inr p' => match result' with
+    | inl _ => False
+    | inr p'' => compile_ok_atomic p' p''
+    end
+  end.
+Proof.
+  induction 1; intros.
+
+  - exec_tid_inv.
+    do 2 eexists; split.
+    constructor.
+    split.
+    simpl; eauto.
+    eauto.
+
+  - exec_tid_inv.
+    repeat match goal with
+    | H : atomic_exec _ _ _ _ _ _ _ |- _ =>
+      inversion H; clear H; subst; repeat sigT_eq
+    end.
+    repeat step_inv.
+    do 2 eexists; split.
+    constructor.
+
+    replace (inc (inc s1 tid) tid) with (inc2 s1 tid).
+    constructor.
+
+    unfold inc, inc2, state_upd; apply functional_extensionality; intros.
+      destruct_ifs; omega.
+
+    split.
+    simpl; eauto.
+
+    unfold inc, inc2, state_upd;
+      destruct_ifs; omega.
+
+  - exec_tid_inv.
+    do 2 eexists; split.
+    constructor.
+    split.
+    simpl; eauto.
+    eauto.
+
+  - exec_tid_inv.
+    do 2 eexists; split.
+    constructor.
+    split.
+    simpl; eauto.
+    eauto.
+
+  - exec_tid_inv.
+    eapply IHcompile_ok_atomic in H12.
+    repeat deex.
+
+    destruct result0; destruct result'; try solve [ exfalso; eauto ].
+
+    + do 2 eexists; split.
+      eauto.
+      split.
+      eauto.
+      subst; eauto.
+
+    + do 2 eexists; split.
+      eauto.
+      split.
+      eauto.
+      constructor.
+      eauto.
+      eauto.
+Qed.
+
+Theorem all_traces_match_0 :
+  forall ts1 ts2,
+  compile_ok_all_atomic ts1 ts2 ->
+  traces_match_ts op_step opHi_step ts1 ts2.
+Proof.
+  unfold traces_match_ts; intros.
+  generalize dependent ts3.
+  induction H0; intros.
+  - eapply proc_match_pick with (tid := tid) in H2 as H'.
+    intuition try congruence.
+    repeat deex.
+    rewrite H3 in H; inversion H; clear H; subst.
+    repeat maybe_proc_inv.
+
+    edestruct compile_ok_atomic_exec_tid; eauto.
+    repeat deex.
+
+    edestruct IHexec.
+    shelve.
+    intuition idtac.
+
+    eexists; split.
+    eapply ExecOne with (tid := tid).
+      eauto.
+      eauto.
+      eauto.
+
+    eapply traces_match_prepend; eauto.
+    Unshelve.
+
+    destruct result, x; simpl in *; try solve [ exfalso; eauto ].
+    eapply proc_match_del; eauto.
+    eapply proc_match_upd; eauto.
+
+  - eexists; split.
+    eapply ExecEmpty.
+    2: eauto.
+
+    unfold compile_ok_all_atomic in *.
+    eauto.
+Qed.
+
+Inductive atomize_ok : forall T (p1 : proc opT opHiT T) (p2 : proc opT opHiT T), Prop :=
+| AtomizeIncTwice :
+  atomize_ok (inc_twice_impl) (inc_twice_impl_atomic)
+| AtomizeRet : forall T (x : T),
+  atomize_ok (Ret x) (Ret x)
+| AtomizeBind : forall T1 T2 (p1a p2a : proc opT opHiT T1)
+                             (p1b p2b : T1 -> proc opT opHiT T2),
+  atomize_ok p1a p2a ->
+  (forall x, atomize_ok (p1b x) (p2b x)) ->
+  atomize_ok (Bind p1a p1b) (Bind p2a p2b).
+
+Definition atomize_ok_all (ts1 ts2 : threads_state) :=
+  proc_match atomize_ok ts1 ts2.
+
+Definition compile_ok_all (ts1 ts2 : threads_state) :=
+  proc_match compile_ok ts1 ts2.
+
+Fixpoint compile_atomic T (p : proc opHiT opHi2T T) : proc opT opHiT T :=
+  match p with
+  | Ret t => Ret t
+  | OpCall op => OpCallHi op
+  | OpExec op =>
+    match op with
+    | IncTwice => Atomic (_ <- Op Inc; Op Inc)
+    | Noop2 => Atomic (Ret tt)
+    end
+  | OpRet r => OpRetHi r
+  | Bind p1 p2 =>
+    Bind (compile_atomic p1) (fun r => compile_atomic (p2 r))
+  | OpCallHi _ => Ret tt
+  | OpRetHi v => Ret v
+  | Atomic p => Atomic (compile_atomic p)
+  end.
+
+Definition atomize_ok_all_upto n (ts1 ts2 : threads_state) :=
+  proc_match_upto n atomize_ok ts1 ts2.
+
+Print hitrace_incl_opt.
+
+Theorem atomize_ok_preserves_trace_0 :
+  forall T p1 p2,
+  atomize_ok p1 p2 ->
+  forall T' (p1rest p2rest : T -> proc _ _ T'),
+  (forall x, hitrace_incl op_step (p1rest x) (p2rest x)) ->
+  hitrace_incl op_step (Bind p1 p1rest) (Bind p2 p2rest).
+Proof.
+  induction 1; intros.
+  - rewrite inc_twice_atomic.
+    eapply hitrace_incl_bind_a.
+    eauto.
+  - eapply hitrace_incl_bind_a.
+    eauto.
+  - rewrite exec_equiv_bind_bind.
+    rewrite exec_equiv_bind_bind.
+    eapply IHatomize_ok.
+    eauto.
+Qed.
+
+Theorem atomize_ok_preserves_trace :
+  forall `(p1 : proc _ _ T) p2,
+  atomize_ok p1 p2 ->
+  hitrace_incl op_step p1 p2.
+Proof.
+  intros.
+  rewrite <- exec_equiv_bind_ret.
+  rewrite <- exec_equiv_bind_ret with (p := p4).
+  eapply atomize_ok_preserves_trace_0; eauto.
+  reflexivity.
+Qed.
+
+Theorem atomize_ok_all_upto_preserves_trace :
+  forall n ts1' ts1,
+  atomize_ok_all_upto n ts1 ts1' ->
+    forall s,
+      hitrace_incl_ts op_step s ts1 ts1'.
+Proof.
+  induction n; intros.
+  - apply proc_match_upto_0_eq in H; subst.
+    reflexivity.
+  - destruct (lt_dec n (length ts1)).
+    + etransitivity.
+      instantiate (1 := thread_upd ts1' n (thread_get ts1 n)).
+      * eapply IHn.
+        eapply proc_match_upto_Sn in H; eauto.
+      * eapply proc_match_upto_pick with (tid := n) in H; intuition idtac.
+        edestruct H0. omega.
+       -- intuition idtac.
+          rewrite H2.
+          admit.
+       -- repeat deex.
+          rewrite H.
+          rewrite atomize_ok_preserves_trace; eauto.
+          rewrite thread_upd_same; eauto.
+          reflexivity.
+    + eapply IHn.
+      eapply proc_match_upto_Sn'.
+      omega.
+      eauto.
+Admitted.
+
+Theorem atomize_ok_all_preserves_trace :
+  forall ts1' ts1,
+  atomize_ok_all ts1 ts1' ->
+    forall s,
+      hitrace_incl_ts op_step s ts1 ts1'.
+Proof.
+  intros.
+  eapply atomize_ok_all_upto_preserves_trace.
+  eapply proc_match_upto_all.
+  eauto.
+Qed.
+
+Theorem all_traces_match_1 :
+  forall ts1 ts1' ts2,
+  atomize_ok_all ts1 ts1' ->
+  compile_ok_all_atomic ts1' ts2 ->
+  traces_match_ts op_step opHi_step ts1 ts2.
+Proof.
+  unfold trace_match_threads; intros.
+  eapply atomize_ok_all_preserves_trace in H; eauto.
+  deex.
+  edestruct all_traces_match_0; eauto.
+  intuition idtac.
+  eexists; split.
+  eauto.
+  eapply traces_match_trace_match_hi; eauto.
+  symmetry; eauto.
+Qed.
+
+Theorem make_one_atomic :
+  forall T p2 (p1 : proc _ _ T),
+  compile_ok p1 p2 ->
+    atomize_ok p1 (compile_atomic p2) /\
+    compile_ok_atomic (compile_atomic p2) p2.
+Proof.
+  induction 1; simpl; intros.
+  - split. constructor. repeat constructor.
+  - split; constructor.
+  - intuition idtac.
+    constructor. eauto. intros. specialize (H1 x). intuition eauto.
+    constructor. eauto. intros. specialize (H1 x). intuition eauto.
+Qed.
+
+Lemma atomize_ok_cons : forall T (p1 : proc _ _ T) p2 ts1 ts2,
+  atomize_ok_all ts1 ts2 ->
+  atomize_ok p1 p2 ->
+  atomize_ok_all (Some (existT _ _ p1) :: ts1) (Some (existT _ _ p2) :: ts2).
+Proof.
+  intros.
+  intro tid; destruct tid.
+  - unfold thread_get; simpl. right. do 3 eexists. eauto.
+  - apply H.
+Qed.
+
+Lemma atomize_ok_cons_None : forall ts1 ts2,
+  atomize_ok_all ts1 ts2 ->
+  atomize_ok_all (None :: ts1) (None :: ts2).
+Proof.
+  intros.
+  intro tid; destruct tid.
+  - unfold thread_get; simpl. left; eauto.
+  - apply H.
+Qed.
+
+Lemma compile_ok_atomic_cons : forall T (p1 : proc _ _ T) p2 ts1 ts2,
+  compile_ok_all_atomic ts1 ts2 ->
+  compile_ok_atomic p1 p2 ->
+  compile_ok_all_atomic (Some (existT _ _ p1) :: ts1) (Some (existT _ _ p2) :: ts2).
+Proof.
+  intros.
+  intro tid; destruct tid.
+  - unfold thread_get; simpl. right. do 3 eexists. eauto.
+  - apply H.
+Qed.
+
+Lemma compile_ok_atomic_cons_None : forall ts1 ts2,
+  compile_ok_all_atomic ts1 ts2 ->
+  compile_ok_all_atomic (None :: ts1) (None :: ts2).
+Proof.
+  intros.
+  intro tid; destruct tid.
+  - unfold thread_get; simpl. left; eauto.
+  - apply H.
+Qed.
+
+Hint Resolve atomize_ok_cons.
+Hint Resolve atomize_ok_cons_None.
+Hint Resolve compile_ok_atomic_cons.
+Hint Resolve compile_ok_atomic_cons_None.
+
+Theorem make_all_atomic :
+  forall ts1 ts2,
+  compile_ok_all ts1 ts2 ->
+  exists ts1',
+    atomize_ok_all ts1 ts1' /\
+    compile_ok_all_atomic ts1' ts2.
+Proof.
+  induction ts1; intros.
+  - exists nil; split.
+    intro tid; left; unfold thread_get; repeat rewrite nth_error_nil; eauto.
+    intro tid.
+    specialize (H tid); intuition; repeat deex.
+    exfalso.
+    unfold thread_get in H.
+    rewrite nth_error_nil in H. congruence.
+  - destruct ts3.
+    + exists nil; split.
+      2: intro tid; left; unfold thread_get; repeat rewrite nth_error_nil; eauto.
+      intro tid.
+      specialize (H tid); intuition; repeat deex.
+      2: unfold thread_get in H0; rewrite nth_error_nil in H0; congruence.
+      left. intuition eauto.
+      unfold thread_get; rewrite nth_error_nil; eauto.
+    + edestruct IHts1.
+      * intro tid. specialize (H (S tid)).
+        apply H.
+      * intuition.
+        destruct o; destruct a.
+       -- destruct s.
+          destruct s0.
+          specialize (H 0) as H'.
+            unfold thread_get in H'; simpl in H'. intuition try congruence.
+          repeat deex.
+          inversion H0; clear H0.
+          inversion H3; clear H3.
+          subst; repeat sigT_eq'.
+
+          edestruct (make_one_atomic H4).
+          exists (Some (existT _ _ (compile_atomic p4)) :: x).
+          split; eauto.
+       -- specialize (H 0); unfold thread_get in H; simpl in H;
+            intuition try congruence.
+          repeat deex; intuition congruence.
+       -- specialize (H 0); unfold thread_get in H; simpl in H;
+            intuition try congruence.
+          repeat deex; intuition congruence.
+       -- exists (None :: x). eauto.
+Qed.
+
+Theorem all_traces_match :
+  forall ts1 ts2,
+  compile_ok_all ts1 ts2 ->
+  trace_match_threads op_step opHi_step ts1 ts2.
+Proof.
+  intros.
+  eapply make_all_atomic in H; deex.
+  eapply all_traces_match_1; eauto.
 Qed.

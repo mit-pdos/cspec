@@ -5,6 +5,7 @@ Require Import Morphisms.
 Require Import Helpers.Helpers.
 Require Import Helpers.ListStuff.
 Require Import List.
+Require Import Omega.
 
 Import ListNotations.
 
@@ -72,6 +73,30 @@ Proof.
 Qed.
 
 Hint Resolve trace_match_hi_prepend.
+
+
+Lemma traces_match_prepend : forall `(tr1 : trace opLoT opMidT) `(tr2 : trace opMidT opHiT) evs evs' tid,
+  traces_match tr1 tr2 ->
+  traces_match (prepend tid evs TraceEmpty) (prepend tid evs' TraceEmpty) ->
+  traces_match (prepend tid evs tr1) (prepend tid evs' tr2).
+Proof.
+  intros.
+  remember (prepend tid evs TraceEmpty).
+  remember (prepend tid evs' TraceEmpty).
+  generalize dependent evs'.
+  generalize dependent evs.
+  induction H0; intros.
+  all: destruct evs; simpl in *.
+  all: try inversion Heqt; subst.
+  all: try constructor; eauto.
+
+  all: destruct evs'; simpl in *.
+  all: try inversion Heqt0; subst.
+  all: try constructor; eauto.
+
+  specialize (IHtraces_match nil); simpl in *; eauto.
+  specialize (IHtraces_match ([e0] ++ evs)); simpl in *; eauto.
+Qed.
 
 
 Lemma trace_match_hi_drop_lo_l : forall opT opHiT e (tr1 tr2 : trace opT opHiT) tid,
@@ -576,6 +601,15 @@ Proof.
     etransitivity; eauto.
 Qed.
 
+Instance exec_equiv_ts_to_hitrace_incl_ts :
+  subrelation (@exec_equiv_ts opT opHiT) (@hitrace_incl_ts opT opHiT State op_step s).
+Proof.
+  unfold subrelation; intros.
+  unfold hitrace_incl_ts, hitrace_incl_ts_s; intros.
+  apply H in H0.
+  eauto.
+Qed.
+
 
 (** Trace inclusion for a single thread *)
 
@@ -617,6 +651,24 @@ Proof.
   - unfold Transitive; intros.
     unfold hitrace_incl; intros.
     etransitivity; eauto.
+Qed.
+
+Instance exec_equiv_opt_to_hitrace_incl_opt :
+  subrelation (@exec_equiv_opt opT opHiT) (@hitrace_incl_opt opT opHiT State op_step).
+Proof.
+  unfold subrelation; intros.
+  unfold hitrace_incl_opt, hitrace_incl_ts, hitrace_incl_ts_s; intros.
+  apply H in H0.
+  eauto.
+Qed.
+
+Instance exec_equiv_to_hitrace_incl :
+  subrelation (@exec_equiv opT opHiT T) (@hitrace_incl opT opHiT T State op_step).
+Proof.
+  unfold subrelation; intros.
+  unfold hitrace_incl, hitrace_incl_opt, hitrace_incl_ts, hitrace_incl_ts_s; intros.
+  apply H in H0.
+  eauto.
 Qed.
 
 Instance hitrace_incl_proper :
@@ -970,3 +1022,186 @@ Proof.
   rewrite hitrace_incl_opret.
   reflexivity.
 Qed.
+
+
+(** Correspondence between different layers *)
+
+Definition traces_match_ts {opLoT opMidT opHiT State} lo_step hi_step
+                           (ts1 : @threads_state opLoT opMidT)
+                           (ts2 : @threads_state opMidT opHiT) :=
+  forall (s : State) tr1,
+    exec lo_step s ts1 tr1 ->
+    exists tr2,
+      exec hi_step s ts2 tr2 /\
+      traces_match tr1 tr2.
+
+
+(** Helpers for connecting different [threads_state]s *)
+
+Definition proc_match `(R : forall T, proc opT opHiT T -> proc opT' opHiT' T -> Prop)
+                      `(ts1 : @threads_state opT opHiT)
+                      `(ts2 : @threads_state opT' opHiT') :=
+  length ts1 = length ts2 /\
+  forall tid,
+    (ts1 [[ tid ]] = NoProc /\ ts2 [[ tid ]] = NoProc) \/
+    exists T (p1 : proc _ _ T) p2,
+    ts1 [[ tid ]] = Proc p1 /\ ts2 [[ tid ]] = Proc p2 /\ R T p1 p2.
+
+Lemma proc_match_del : forall `(ts1 : @threads_state opT opHiT)
+                              `(ts2 : @threads_state opT' opHiT') R tid,
+  proc_match R ts1 ts2 ->
+  proc_match R (ts1 [[ tid := NoProc ]]) (ts2 [[ tid := NoProc ]]).
+Proof.
+  unfold proc_match; intros.
+  intuition idtac.
+  - repeat rewrite length_thread_upd.
+    congruence.
+  - specialize (H1 tid0).
+    destruct (tid == tid0); subst.
+    + repeat rewrite thread_upd_eq; intuition eauto.
+    + repeat rewrite thread_upd_ne by auto. intuition eauto.
+Qed.
+
+Lemma proc_match_upd : forall `(ts1 : @threads_state opT opHiT)
+                              `(ts2 : @threads_state opT' opHiT') R tid
+                              T (p1 : proc _ _ T) p2,
+  proc_match R ts1 ts2 ->
+  R _ p1 p2 ->
+  proc_match R (ts1 [[ tid := Proc p1 ]]) (ts2 [[ tid := Proc p2 ]]).
+Proof.
+  unfold proc_match; intros.
+  intuition idtac.
+  - repeat rewrite length_thread_upd.
+    congruence.
+  - specialize (H2 tid0).
+    destruct (tid == tid0); subst.
+    + repeat rewrite thread_upd_eq.
+      right.
+      do 3 eexists.
+      intuition eauto.
+    + repeat rewrite thread_upd_ne by auto. intuition eauto.
+Qed.
+
+Definition proc_match_upto n `(R : forall T, proc opT opHiT T -> proc opT opHiT T -> Prop)
+                             (ts1 ts2 : @threads_state opT opHiT) :=
+  length ts1 = length ts2 /\
+  forall tid,
+    (tid < n ->
+     (ts1 [[ tid ]] = NoProc /\ ts2 [[ tid ]] = NoProc) \/
+     exists T (p1 : proc _ _ T) p2,
+     ts1 [[ tid ]] = Proc p1 /\ ts2 [[ tid ]] = Proc p2 /\ R T p1 p2) /\
+    (tid >= n ->
+     ts1 [[ tid ]] = ts2 [[ tid ]]).
+
+Theorem proc_match_upto_0_eq : forall `(ts1 : @threads_state opT opHiT) ts2 R,
+  proc_match_upto 0 R ts1 ts2 ->
+  ts1 = ts2.
+Proof.
+  unfold proc_match_upto;
+    induction ts1.
+  - destruct ts2; simpl in *; intuition eauto. congruence.
+  - destruct ts2; simpl in *; intuition eauto. congruence.
+    f_equal.
+    + specialize (H1 0); intuition idtac.
+      rewrite thread_get_0 in H2.
+      rewrite thread_get_0 in H2.
+      eauto.
+    + apply IHts1 with (R := R); intuition.
+      specialize (H1 (S tid)); intuition idtac.
+      apply H3. eauto.
+Qed.
+
+Theorem proc_match_upto_0 : forall `(ts : @threads_state opT opHiT) R,
+  proc_match_upto 0 R ts ts.
+Proof.
+  unfold proc_match_upto; intros.
+  intuition idtac.
+  omega.
+Qed.
+
+Theorem proc_match_upto_all : forall `(ts : @threads_state opT opHiT) ts' R,
+  proc_match_upto (length ts) R ts ts' <->
+  proc_match R ts ts'.
+Proof.
+  unfold proc_match_upto, proc_match; split; intros.
+  - intuition idtac.
+    specialize (H1 tid); intuition idtac.
+    destruct (lt_dec tid (length ts)); intuition eauto.
+    left; split.
+    apply thread_get_oob. omega.
+    apply thread_get_oob. omega.
+  - intuition idtac.
+    specialize (H1 tid); intuition idtac.
+    repeat rewrite thread_get_oob by omega.
+    eauto.
+Qed.
+
+Lemma proc_match_upto_Sn : forall `(ts : @threads_state opT opHiT) ts' R n,
+  n < length ts ->
+  proc_match_upto (S n) R ts ts' ->
+  proc_match_upto n R ts (ts' [[ n := ts [[ n ]] ]]).
+Proof.
+  unfold proc_match_upto; intuition idtac.
+  - rewrite H1 in *. rewrite length_thread_upd.
+    edestruct Nat.max_spec; intuition eauto. omega.
+  - specialize (H2 tid). destruct H2. destruct H2.
+    omega.
+    left. intuition idtac. destruct (n == tid); subst; autorewrite with t; eauto.
+    repeat deex. right. do 3 eexists. intuition eauto.
+    destruct (n == tid); try omega; subst; autorewrite with t; eauto.
+  - destruct (n == tid); subst; autorewrite with t; eauto.
+    specialize (H2 tid). intuition idtac.
+    eapply H4. omega.
+Qed.
+
+Lemma proc_match_upto_Sn' : forall `(ts : @threads_state opT opHiT) ts' R n,
+  n >= length ts ->
+  proc_match_upto (S n) R ts ts' ->
+  proc_match_upto n R ts ts'.
+Proof.
+  unfold proc_match_upto; intuition idtac.
+  - specialize (H2 tid). destruct H2. destruct H2. omega.
+    eauto. eauto.
+  - repeat rewrite thread_get_oob by omega.
+    eauto.
+Qed.
+
+Theorem proc_match_pick : forall tid `(ts1 : @threads_state opT opHiT)
+                                     `(ts2 : @threads_state opT' opHiT') R,
+  proc_match R ts1 ts2 ->
+    (ts1 [[ tid ]] = NoProc /\ ts2 [[ tid ]] = NoProc) \/
+    exists T (p1 : proc _ _ T) p2,
+    ts1 [[ tid ]] = Proc p1 /\ ts2 [[ tid ]] = Proc p2 /\ R T p1 p2.
+Proof.
+  unfold proc_match; intuition eauto.
+Qed.
+
+Theorem proc_match_upto_pick : forall tid n
+                                     `(ts1 : @threads_state opT opHiT) ts2 R,
+  proc_match_upto n R ts1 ts2 ->
+    (tid < n ->
+     (ts1 [[ tid ]] = NoProc /\ ts2 [[ tid ]] = NoProc) \/
+     exists T (p1 : proc _ _ T) p2,
+     ts1 [[ tid ]] = Proc p1 /\ ts2 [[ tid ]] = Proc p2 /\ R T p1 p2) /\
+    (tid >= n ->
+     ts1 [[ tid ]] = ts2 [[ tid ]]).
+Proof.
+  unfold proc_match_upto; intuition idtac.
+  - specialize (H1 tid). intuition eauto.
+  - specialize (H1 tid). intuition eauto.
+Qed.
+
+Theorem no_runnable_threads_proc_match : forall `(ts1 : @threads_state opT opHiT)
+                                                `(ts2 : @threads_state opT' opHiT') R,
+  no_runnable_threads ts1 ->
+  proc_match R ts1 ts2 ->
+  no_runnable_threads ts2.
+Proof.
+  unfold no_runnable_threads, proc_match; intuition idtac.
+  specialize (H tid).
+  specialize (H2 tid).
+  intuition eauto.
+  repeat deex; congruence.
+Qed.
+
+Hint Resolve no_runnable_threads_proc_match.
