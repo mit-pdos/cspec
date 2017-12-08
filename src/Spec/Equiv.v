@@ -599,18 +599,28 @@ Definition hitrace_incl_ts {opLo opHi State} op_step (ts1 ts2 : @threads_state o
   forall (s : State),
     hitrace_incl_ts_s op_step s s ts1 ts2.
 
-Instance hitrace_incl_ts_preorder {opT opHiT State op_step} :
-  PreOrder (@hitrace_incl_ts opT opHiT State op_step).
+Instance hitrace_incl_ts_s_preorder :
+  PreOrder (@hitrace_incl_ts_s opT opHiT State op_step s s).
 Proof.
   split.
   - unfold Reflexive.
-    unfold hitrace_incl_ts, hitrace_incl_ts_s; intros.
+    unfold hitrace_incl_ts_s; intros.
     eexists; intuition eauto.
   - unfold Transitive.
-    unfold hitrace_incl_ts, hitrace_incl_ts_s; intros.
+    unfold hitrace_incl_ts_s; intros.
     eapply H in H1. deex.
     eapply H0 in H1. deex.
     eexists; intuition eauto.
+    etransitivity; eauto.
+Qed.
+
+Instance hitrace_incl_ts_preorder :
+  PreOrder (@hitrace_incl_ts opT opHiT State op_step).
+Proof.
+  split.
+  - unfold Reflexive, hitrace_incl_ts; intros.
+    reflexivity.
+  - unfold Transitive, hitrace_incl_ts; intros.
     etransitivity; eauto.
 Qed.
 
@@ -621,6 +631,18 @@ Proof.
   unfold hitrace_incl_ts, hitrace_incl_ts_s; intros.
   apply H in H0.
   eauto.
+Qed.
+
+Theorem hitrace_incl_ts_s_trans : forall `(s0 : State) s1 s2 `(op_step : OpSemantics opT State) `(ts1 : @threads_state opT opHiT) ts2 ts3,
+  hitrace_incl_ts_s op_step s0 s1 ts1 ts2 ->
+  hitrace_incl_ts_s op_step s1 s2 ts2 ts3 ->
+  hitrace_incl_ts_s op_step s0 s2 ts1 ts3.
+Proof.
+  unfold hitrace_incl_ts_s; intros.
+  apply H in H1. deex.
+  apply H0 in H1. deex.
+  eexists; intuition eauto.
+  etransitivity; eauto.
 Qed.
 
 
@@ -651,6 +673,18 @@ Proof.
     reflexivity.
   - unfold Transitive; intros.
     unfold hitrace_incl_opt; intros.
+    etransitivity; eauto.
+Qed.
+
+Instance hitrace_incl_s_preorder :
+  PreOrder (@hitrace_incl_s State s s tid opT op_step opHiT T).
+Proof.
+  split.
+  - unfold Reflexive; intros.
+    unfold hitrace_incl_s; intros.
+    reflexivity.
+  - unfold Transitive; intros.
+    unfold hitrace_incl_s; intros.
     etransitivity; eauto.
 Qed.
 
@@ -805,6 +839,15 @@ Proof.
 
   unfold hitrace_incl_opt in H.
   eauto.
+Qed.
+
+Theorem hitrace_incl_s_trans : forall `(s0 : State) s1 s2 tid `(op_step : OpSemantics opT State) `(p1 : proc opT opHiT T) p2 p3,
+  hitrace_incl_s s0 s1 tid op_step p1 p2 ->
+  hitrace_incl_s s1 s2 tid op_step p2 p3 ->
+  hitrace_incl_s s0 s2 tid op_step p1 p3.
+Proof.
+  unfold hitrace_incl_s; intros.
+  eapply hitrace_incl_ts_s_trans; eauto.
 Qed.
 
 Lemma hitrace_incl_opret :
