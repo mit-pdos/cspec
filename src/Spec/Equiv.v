@@ -574,6 +574,18 @@ Proof.
   eapply H2.
 Qed.
 
+Theorem exec_equiv_ts_upd_same : forall `(ts : @threads_state opT opHiT) p tid,
+  ts [[ tid ]] = p ->
+  exec_equiv_ts ts (ts [[ tid := p ]]).
+Proof.
+  destruct p; intros.
+  - rewrite thread_upd_same by eauto. reflexivity.
+  - destruct (lt_dec tid (length ts)).
+    + rewrite thread_upd_same' by eauto. reflexivity.
+    + rewrite thread_upd_same'' by omega.
+      eapply exec_equiv_ts_pad.
+Qed.
+
 
 (** Trace inclusion for an entire threads_state *)
 
@@ -583,11 +595,12 @@ Definition hitrace_incl_ts_s {opLo opHi State} op_step (s s' : State) (ts1 ts2 :
     exists tr', exec op_step s' ts2 tr' /\
       trace_match_hi tr tr'.
 
-Definition hitrace_incl_ts {opLo opHi State} op_step (s : State) (ts1 ts2 : @threads_state opLo opHi) :=
-  hitrace_incl_ts_s op_step s s ts1 ts2.
+Definition hitrace_incl_ts {opLo opHi State} op_step (ts1 ts2 : @threads_state opLo opHi) :=
+  forall (s : State),
+    hitrace_incl_ts_s op_step s s ts1 ts2.
 
-Instance hitrace_incl_ts_preorder {opT opHiT State op_step s} :
-  PreOrder (@hitrace_incl_ts opT opHiT State op_step s).
+Instance hitrace_incl_ts_preorder {opT opHiT State op_step} :
+  PreOrder (@hitrace_incl_ts opT opHiT State op_step).
 Proof.
   split.
   - unfold Reflexive.
@@ -602,7 +615,7 @@ Proof.
 Qed.
 
 Instance exec_equiv_ts_to_hitrace_incl_ts :
-  subrelation (@exec_equiv_ts opT opHiT) (@hitrace_incl_ts opT opHiT State op_step s).
+  subrelation (@exec_equiv_ts opT opHiT) (@hitrace_incl_ts opT opHiT State op_step).
 Proof.
   unfold subrelation; intros.
   unfold hitrace_incl_ts, hitrace_incl_ts_s; intros.
@@ -620,8 +633,8 @@ Definition hitrace_incl_s `(s : State) s' tid `(op_step : OpSemantics opT State)
       (ts [[ tid := Proc p2 ]]).
 
 Definition hitrace_incl_opt {opT opHiT} `(op_step : OpSemantics opT State) p1 p2 :=
-  forall (ts : @threads_state opT opHiT) s tid,
-    hitrace_incl_ts op_step s
+  forall (ts : @threads_state opT opHiT) tid,
+    hitrace_incl_ts op_step
       (ts [[ tid := p1 ]])
       (ts [[ tid := p2 ]]).
 
@@ -783,7 +796,7 @@ Qed.
 Instance thread_upd_hitrace_incl_proper :
   Proper (eq ==> eq ==>
           @hitrace_incl_opt opT opHiT State op_step ==>
-          hitrace_incl_ts op_step s) (@thread_upd opT opHiT).
+          hitrace_incl_ts op_step) (@thread_upd opT opHiT).
 Proof.
   intros.
   intros ts0 ts1 H; subst.
@@ -1035,6 +1048,23 @@ Definition traces_match_ts {opLoT opMidT opHiT State} lo_step hi_step
       exec hi_step s ts2 tr2 /\
       traces_match tr1 tr2.
 
+Instance traces_match_ts_proper :
+  Proper (@hitrace_incl_ts opLoT opMidT State lo_step ==>
+          eq ==>
+          Basics.flip Basics.impl)
+         (@traces_match_ts opLoT opMidT opHiT State lo_step hi_step).
+Proof.
+  intros.
+  intros ts1 ts2 H12.
+  intros ts3' ts3 H; subst.
+  unfold Basics.flip, Basics.impl.
+  unfold traces_match_ts; intros.
+  apply H12 in H0. deex.
+  apply H in H0. deex.
+  eexists; split. eauto.
+  rewrite H1. eauto.
+Qed.
+
 
 (** Helpers for connecting different [threads_state]s *)
 
@@ -1080,6 +1110,34 @@ Proof.
       do 3 eexists.
       intuition eauto.
     + repeat rewrite thread_upd_ne by auto. intuition eauto.
+Qed.
+
+Lemma proc_match_cons_Proc : forall `(ts1 : @threads_state opT opHiT)
+                                    `(ts2 : @threads_state opT' opHiT') R
+                                    T (p1 : proc _ _ T) p2,
+  proc_match R ts1 ts2 ->
+  R _ p1 p2 ->
+  proc_match R (Proc p1 :: ts1) (Proc p2 :: ts2).
+Proof.
+  unfold proc_match; intros.
+  intuition idtac.
+  - simpl; omega.
+  - destruct tid.
+    + right. do 3 eexists. intuition eauto.
+    + repeat rewrite thread_get_S. eauto.
+Qed.
+
+Lemma proc_match_cons_NoProc : forall `(ts1 : @threads_state opT opHiT)
+                                      `(ts2 : @threads_state opT' opHiT') R,
+  proc_match R ts1 ts2 ->
+  proc_match R (NoProc :: ts1) (NoProc :: ts2).
+Proof.
+  unfold proc_match; intros.
+  intuition idtac.
+  - simpl; omega.
+  - destruct tid.
+    + left. intuition eauto.
+    + repeat rewrite thread_get_S. eauto.
 Qed.
 
 Definition proc_match_upto n `(R : forall T, proc opT opHiT T -> proc opT opHiT T -> Prop)

@@ -2491,7 +2491,7 @@ Inductive atomize_ok : forall T (p1 : proc opT opHiT T) (p2 : proc opT opHiT T),
   atomize_ok (inc_twice_impl) (inc_twice_impl_atomic)
 | AtomizeRet : forall T (x : T),
   atomize_ok (Ret x) (Ret x)
-| AtomizeBind : forall T1 T2 (p1a p2a : proc opT opHiT T1) 
+| AtomizeBind : forall T1 T2 (p1a p2a : proc opT opHiT T1)
                              (p1b p2b : T1 -> proc opT opHiT T2),
   atomize_ok p1a p2a ->
   (forall x, atomize_ok (p1b x) (p2b x)) ->

@@ -7,6 +7,9 @@ Require Import FunctionalExtensionality.
 Require Import Relations.Relation_Operators.
 Require Import RelationClasses.
 Require Import Morphisms.
+Require Import List.
+
+Import ListNotations.
 
 Global Set Implicit Arguments.
 Global Generalizable All Variables.
@@ -434,8 +437,8 @@ Definition p1_a :=
 Definition ts_a := threads_empty [[ 1 := Proc p1_a ]].
 
 
-Theorem ts_equiv_ts_a : forall s,
-  hitrace_incl_ts op_step s ts ts_a.
+Theorem ts_equiv_ts_a :
+  hitrace_incl_ts op_step ts ts_a.
 Proof.
   unfold hitrace_incl_ts, hitrace_incl_ts_s.
   intros.
@@ -854,8 +857,7 @@ Qed.
 Theorem atomize_ok_all_upto_preserves_trace :
   forall n ts1' ts1,
   atomize_ok_all_upto n ts1 ts1' ->
-    forall s,
-      hitrace_incl_ts op_step s ts1 ts1'.
+    hitrace_incl_ts op_step ts1 ts1'.
 Proof.
   induction n; intros.
   - apply proc_match_upto_0_eq in H; subst.
@@ -869,7 +871,8 @@ Proof.
         edestruct H0. omega.
        -- intuition idtac.
           rewrite H2.
-          admit.
+          rewrite <- exec_equiv_ts_upd_same; eauto.
+          reflexivity.
        -- repeat deex.
           rewrite H.
           rewrite atomize_ok_preserves_trace; eauto.
@@ -879,13 +882,12 @@ Proof.
       eapply proc_match_upto_Sn'.
       omega.
       eauto.
-Admitted.
+Qed.
 
 Theorem atomize_ok_all_preserves_trace :
   forall ts1' ts1,
   atomize_ok_all ts1 ts1' ->
-    forall s,
-      hitrace_incl_ts op_step s ts1 ts1'.
+    hitrace_incl_ts op_step ts1 ts1'.
 Proof.
   intros.
   eapply atomize_ok_all_upto_preserves_trace.
@@ -899,15 +901,9 @@ Theorem all_traces_match_1 :
   compile_ok_all_atomic ts1' ts2 ->
   traces_match_ts op_step opHi_step ts1 ts2.
 Proof.
-  unfold trace_match_threads; intros.
-  eapply atomize_ok_all_preserves_trace in H; eauto.
-  deex.
-  edestruct all_traces_match_0; eauto.
-  intuition idtac.
-  eexists; split.
-  eauto.
-  eapply traces_match_trace_match_hi; eauto.
-  symmetry; eauto.
+  intros.
+  rewrite atomize_ok_all_preserves_trace; eauto.
+  eapply all_traces_match_0; eauto.
 Qed.
 
 Theorem make_one_atomic :
@@ -927,43 +923,35 @@ Qed.
 Lemma atomize_ok_cons : forall T (p1 : proc _ _ T) p2 ts1 ts2,
   atomize_ok_all ts1 ts2 ->
   atomize_ok p1 p2 ->
-  atomize_ok_all (Some (existT _ _ p1) :: ts1) (Some (existT _ _ p2) :: ts2).
+  atomize_ok_all (Proc p1 :: ts1) (Proc p2 :: ts2).
 Proof.
   intros.
-  intro tid; destruct tid.
-  - unfold thread_get; simpl. right. do 3 eexists. eauto.
-  - apply H.
+  eapply proc_match_cons_Proc; eauto.
 Qed.
 
 Lemma atomize_ok_cons_None : forall ts1 ts2,
   atomize_ok_all ts1 ts2 ->
-  atomize_ok_all (None :: ts1) (None :: ts2).
+  atomize_ok_all (NoProc :: ts1) (NoProc :: ts2).
 Proof.
   intros.
-  intro tid; destruct tid.
-  - unfold thread_get; simpl. left; eauto.
-  - apply H.
+  eapply proc_match_cons_NoProc; eauto.
 Qed.
 
 Lemma compile_ok_atomic_cons : forall T (p1 : proc _ _ T) p2 ts1 ts2,
   compile_ok_all_atomic ts1 ts2 ->
   compile_ok_atomic p1 p2 ->
-  compile_ok_all_atomic (Some (existT _ _ p1) :: ts1) (Some (existT _ _ p2) :: ts2).
+  compile_ok_all_atomic (Proc p1 :: ts1) (Proc p2 :: ts2).
 Proof.
   intros.
-  intro tid; destruct tid.
-  - unfold thread_get; simpl. right. do 3 eexists. eauto.
-  - apply H.
+  eapply proc_match_cons_Proc; eauto.
 Qed.
 
 Lemma compile_ok_atomic_cons_None : forall ts1 ts2,
   compile_ok_all_atomic ts1 ts2 ->
-  compile_ok_all_atomic (None :: ts1) (None :: ts2).
+  compile_ok_all_atomic (NoProc :: ts1) (NoProc :: ts2).
 Proof.
   intros.
-  intro tid; destruct tid.
-  - unfold thread_get; simpl. left; eauto.
-  - apply H.
+  eapply proc_match_cons_NoProc; eauto.
 Qed.
 
 Hint Resolve atomize_ok_cons.
@@ -1023,7 +1011,7 @@ Qed.
 Theorem all_traces_match :
   forall ts1 ts2,
   compile_ok_all ts1 ts2 ->
-  trace_match_threads op_step opHi_step ts1 ts2.
+  traces_match_ts op_step opHi_step ts1 ts2.
 Proof.
   intros.
   eapply make_all_atomic in H; deex.

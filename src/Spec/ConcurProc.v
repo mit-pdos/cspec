@@ -391,6 +391,22 @@ Proof.
   rewrite list_upd_noop; eauto.
 Qed.
 
+Lemma thread_upd_same' : forall tid `(ts : @threads_state opT opHiT),
+  tid < length ts ->
+  ts [[ tid ]] = NoProc ->
+  ts [[ tid := NoProc ]] = ts.
+Proof.
+  unfold thread_upd; intros.
+  rewrite pad_noop by eauto.
+  rewrite list_upd_noop_NoProc; eauto.
+Qed.
+
+Lemma thread_upd_same'' : forall tid `(ts : @threads_state opT opHiT),
+  tid >= length ts ->
+  ts [[ tid := NoProc ]] = pad ts (S tid) NoProc.
+Proof.
+Admitted.
+
 Lemma thread_upd_eq : forall tid `(ts : @threads_state opT opHiT) p,
   ts [[ tid := p ]] [[ tid ]] = p.
 Proof.
