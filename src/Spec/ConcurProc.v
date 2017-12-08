@@ -523,6 +523,38 @@ Proof.
   destruct tid; compute in H; congruence.
 Qed.
 
+Lemma thread_get_S : forall `(ts : @threads_state opT opHiT) tid a,
+  (a :: ts) [[ S tid ]] = ts [[ tid ]].
+Proof.
+  reflexivity.
+Qed.
+
+Lemma thread_get_0 : forall `(ts : @threads_state opT opHiT) a,
+  (a :: ts) [[ 0 ]] = a.
+Proof.
+  reflexivity.
+Qed.
+
+Lemma thread_upd_S : forall `(ts : @threads_state opT opHiT) tid a p,
+  (a :: ts) [[ S tid := p ]] = a :: (ts [[ tid := p ]]).
+Proof.
+  reflexivity.
+Qed.
+
+Lemma thread_upd_0 : forall `(ts : @threads_state opT opHiT) a p,
+  (a :: ts) [[ 0 := p ]] = p :: ts.
+Proof.
+  reflexivity.
+Qed.
+
+Lemma thread_get_nil : forall opT opHiT tid,
+  @thread_get opT opHiT nil tid = NoProc.
+Proof.
+  unfold thread_get; intros.
+  rewrite nth_error_nil.
+  reflexivity.
+Qed.
+
 Theorem threads_empty_no_runnable : forall opT opHiT,
   no_runnable_threads (@threads_empty opT opHiT).
 Proof.
@@ -590,8 +622,39 @@ Proof.
   specialize (H0 tid). congruence.
 Qed.
 
+Lemma no_runnable_threads_nil : forall opT opHiT,
+  @no_runnable_threads opT opHiT nil.
+Proof.
+  apply threads_empty_no_runnable.
+Qed.
+
+Lemma no_runnable_threads_cons : forall `(ts : @threads_state opT opHiT),
+  no_runnable_threads ts ->
+  no_runnable_threads (NoProc :: ts).
+Proof.
+  intros.
+  unfold no_runnable_threads; intros.
+  destruct tid.
+  - rewrite thread_get_0; auto.
+  - rewrite thread_get_S; auto.
+Qed.
+
+Lemma no_runnable_threads_cons' : forall `(ts : @threads_state opT opHiT),
+  no_runnable_threads (NoProc :: ts) ->
+  no_runnable_threads ts.
+Proof.
+  intros.
+  unfold no_runnable_threads; intros.
+  specialize (H (S tid)).
+  rewrite thread_get_S in H; auto.
+Qed.
+
 Hint Resolve no_runnable_threads_upd_NoProc.
 Hint Resolve threads_empty_no_runnable.
+Hint Resolve no_runnable_threads_nil.
+Hint Resolve no_runnable_threads_cons.
+Hint Resolve no_runnable_threads_some.
+Hint Resolve thread_upd_not_empty.
 
 Hint Rewrite thread_upd_upd_eq : t.
 Hint Rewrite thread_upd_eq : t.
@@ -599,6 +662,71 @@ Hint Rewrite thread_upd_ne using (solve [ auto ]) : t.
 
 Hint Extern 1 (exec_tid _ _ _ _ _ _ _) => econstructor.
 Hint Extern 1 (atomic_exec _ _ _ _ _ _ _) => econstructor.
+
+
+Lemma thread_get_app_NoProc : forall `(ts : @threads_state opT opHiT) tid `(p : proc _ _ T),
+  ts [[ tid ]] = Proc p <->
+  (ts ++ [NoProc]) [[ tid ]] = Proc p.
+Proof.
+  split; intros.
+  - generalize dependent tid.
+    induction ts; simpl; intros.
+    + exfalso. eapply no_runnable_threads_some; eauto.
+    + destruct tid; cbn in *; eauto.
+  - generalize dependent tid.
+    induction ts; simpl; intros.
+    + destruct tid; cbn in *.
+      congruence.
+      rewrite thread_get_S in H.
+      exfalso. eapply no_runnable_threads_some; eauto.
+    + destruct tid; cbn in *; eauto.
+Qed.
+
+Lemma thread_upd_app_NoProc : forall `(ts : @threads_state opT opHiT) tid p,
+  tid < length ts ->
+  ts [[ tid := p ]] ++ [NoProc] = (ts ++ [NoProc]) [[ tid := p ]].
+Proof.
+  induction ts; simpl; intros; try omega.
+  destruct tid.
+  - repeat rewrite thread_upd_0.
+    reflexivity.
+  - repeat rewrite thread_upd_S.
+    simpl; f_equal.
+    rewrite IHts; auto.
+    omega.
+Qed.
+
+Lemma no_runnable_threads_app_NoProc : forall `(ts : @threads_state opT opHiT),
+  no_runnable_threads ts <->
+  no_runnable_threads (ts ++ [NoProc]).
+Proof.
+  split; intros; unfold no_runnable_threads; intros.
+  - generalize dependent tid.
+    induction ts.
+    + rewrite app_nil_l.
+      destruct tid. rewrite thread_get_0; eauto. rewrite thread_get_S.
+      rewrite thread_get_nil; auto.
+    + destruct tid; simpl.
+      * specialize (H 0).
+        rewrite thread_get_0.
+        rewrite thread_get_0 in H.
+        auto.
+      * rewrite thread_get_S.
+        eapply IHts.
+        unfold no_runnable_threads; intros.
+        specialize (H (S tid0)). rewrite thread_get_S in H. auto.
+  - generalize dependent tid.
+    induction ts.
+    + intros. apply thread_get_nil.
+    + destruct tid; simpl in *.
+      * specialize (H 0).
+        rewrite thread_get_0.
+        rewrite thread_get_0 in H.
+        auto.
+      * rewrite thread_get_S. apply IHts.
+        intros tid'.
+        specialize (H (S tid')). rewrite thread_get_S in H. auto.
+Qed.
 
 
 Ltac maybe_proc_inv := match goal with

@@ -3,6 +3,7 @@ Require Import Helpers.ListStuff.
 Require Import ConcurProc.
 Require Import Equiv.
 Require Import Omega.
+Require Import FunctionalExtensionality.
 
 Global Set Implicit Arguments.
 Global Generalizable All Variables.
@@ -238,6 +239,189 @@ Proof.
 Qed.
 
 
+(** Commutativity *)
+
+Ltac destruct_ifs :=
+  repeat match goal with
+  | |- context[if ?a == ?b then _ else _] =>
+    destruct (a == b)
+  end.
+
+Lemma inc_commutes_op_step : forall T (op : opT T) tid s v s',
+  op_step op tid s v s' ->
+  forall tid0,
+  tid0 <> tid ->
+  op_step op tid
+    (inc s tid0)
+    v
+    (inc s' tid0).
+Proof.
+  intros; step_inv.
+  + replace (s tid + 1) with ((inc s tid0) tid + 1).
+    replace (inc (inc s tid) tid0) with (inc (inc s tid0) tid).
+    constructor.
+    unfold inc, state_upd; apply functional_extensionality; intros.
+      destruct_ifs; omega.
+    unfold inc, state_upd.
+      destruct_ifs; omega.
+  + constructor.
+Qed.
+
+Lemma inc_commutes_op_step' : forall T (op : opT T) tid s v s',
+  op_step op tid s v s' ->
+  forall tid0,
+  tid0 <> tid ->
+  s tid0 = s' tid0.
+Proof.
+  intros; step_inv.
+  + unfold inc, state_upd.
+      destruct_ifs; omega.
+  + congruence.
+Qed.
+
+Lemma inc_commutes_exec_tid : forall tid0 tid1 T s p s' result' evs,
+  tid0 <> tid1 ->
+  @exec_tid opT opHiT State op_step T tid1 s p s' result' evs ->
+  @exec_tid opT opHiT State op_step T tid1 (inc s tid0) p (inc s' tid0) result' evs.
+Proof.
+  intros.
+  induction H0; simpl; eauto.
+  - constructor.
+    eapply inc_commutes_op_step; eauto.
+  - constructor.
+    induction H0; eauto.
+    constructor.
+    eapply inc_commutes_op_step; eauto.
+Qed.
+
+Lemma inc_commutes_exec_tid' : forall T tid0 s p s' result' evs,
+  @exec_tid opT opHiT State op_step T tid0 s p s' result' evs ->
+  forall tid1, tid0 <> tid1 ->
+  s tid1 = s' tid1.
+Proof.
+  intros.
+  induction H; eauto.
+  - eapply inc_commutes_op_step'; eauto.
+  - induction H; eauto.
+    + eapply eq_trans.
+      apply IHatomic_exec1; eauto.
+      apply IHatomic_exec2; eauto.
+    + eapply inc_commutes_op_step'; eauto.
+Qed.
+
+Theorem inc_commutes_0 :
+  forall T (p1 p2 : _ -> proc opT opHiT T),
+  (forall r, hitrace_incl op_step (p1 r) (p2 r)) ->
+  forall s tid,
+  hitrace_incl_s s (inc s tid) tid
+    op_step
+    (r <- OpExec Inc; p1 r) (p2 (s tid + 1)).
+Proof.
+  unfold hitrace_incl_s, hitrace_incl_ts_s; intros.
+
+  match goal with
+  | H : exec _ _ (thread_upd ?ts ?tid ?p) _ |- _ =>
+    remember (thread_upd ts tid p);
+    generalize dependent ts;
+    induction H0; intros; subst
+  end.
+
+  - destruct (tid0 == tid); subst.
+    + autorewrite with t in *.
+      repeat maybe_proc_inv.
+      repeat exec_tid_inv.
+      step_inv.
+      edestruct H; eauto.
+
+    + edestruct IHexec.
+      rewrite thread_upd_upd_ne; eauto.
+      intuition idtac.
+
+      eexists; split.
+      eapply ExecOne with (tid := tid0).
+        autorewrite with t in *; eauto.
+        eapply inc_commutes_exec_tid; eauto.
+        rewrite thread_upd_upd_ne; eauto.
+        erewrite inc_commutes_exec_tid' with (s := s) (tid1 := tid);
+          eauto.
+      eauto.
+
+  - exfalso; eauto.
+Qed.
+
+Theorem inc_commutes_1 :
+  forall `(ap : proc opT opHiT TA)
+         `(p1 : proc opT opHiT T')
+         (p2 : _ -> proc opT opHiT T'),
+  (forall s tid,
+    hitrace_incl_s s (inc s tid) tid op_step
+      p1 (p2 (s tid + 1))) ->
+  hitrace_incl op_step
+    (_ <- Atomic ap; p1)
+    (r <- Atomic (_ <- ap; Op Inc); p2 r).
+Proof.
+  unfold hitrace_incl, hitrace_incl_opt,
+         hitrace_incl_ts, hitrace_incl_ts_s; intros.
+
+  match goal with
+  | H : exec _ _ (thread_upd ?ts ?tid ?p) _ |- _ =>
+    remember (thread_upd ts tid p);
+    generalize dependent ts;
+    induction H0; intros; subst
+  end.
+
+  - destruct (tid0 == tid); subst.
+    + autorewrite with t in *.
+      repeat maybe_proc_inv.
+      repeat exec_tid_inv.
+
+      eapply H in H2. deex.
+
+      eexists; split.
+
+      eapply ExecOne with (tid := tid).
+        autorewrite with t; eauto.
+        eauto 20.
+        autorewrite with t; eauto.
+
+      rewrite prepend_app. simpl. eauto.
+
+    + edestruct IHexec.
+      rewrite thread_upd_upd_ne; eauto.
+      intuition idtac.
+
+      eexists; split.
+      eapply ExecOne with (tid := tid0).
+        autorewrite with t in *; eauto.
+        eauto.
+        rewrite thread_upd_upd_ne; auto.
+      eauto.
+      eauto.
+
+  - exfalso; eauto.
+Qed.
+
+Theorem inc_commutes_final :
+  forall `(ap : proc _ _ TA) `(p : _ -> proc opT opHiT T'),
+  hitrace_incl op_step
+    (_ <- Atomic ap; r <- Op Inc; p r)
+    (r <- Atomic (_ <- ap; Op Inc); p r).
+Proof.
+  intros.
+  eapply inc_commutes_1.
+
+  intros; unfold Op.
+  rewrite exec_equiv_bind_bind.
+  setoid_rewrite exec_equiv_bind_bind.
+  rewrite hitrace_incl_opcall.
+  eapply inc_commutes_0.
+
+  intros.
+  rewrite hitrace_incl_opret.
+  reflexivity.
+Qed.
+
+
 (** Atomicity *)
 
 Definition p1_a :=
@@ -248,9 +432,9 @@ Definition ts_a := threads_empty [[ 1 := Proc p1_a ]].
 
 
 Theorem ts_equiv_ts_a : forall s,
-  same_traces op_step s ts ts_a.
+  hitrace_incl_ts op_step s ts ts_a.
 Proof.
-  unfold same_traces, same_traces_s.
+  unfold hitrace_incl_ts, hitrace_incl_ts_s.
   intros.
   unfold ts, ts_a in *.
 
@@ -266,5 +450,30 @@ Proof.
   exec_one 1; eauto 20; simpl; autorewrite with t.
   eapply ExecEmpty; eauto.
 
+  reflexivity.
+Qed.
+
+
+Definition inc_twice_impl_atomic :=
+  _ <- OpCallHi IncTwice;
+  r <- Atomic (_ <- Op Inc; Op Inc);
+  OpRetHi r.
+
+Theorem inc_twice_atomic : forall `(rx : _ -> proc _ _ T),
+  hitrace_incl op_step
+    (Bind inc_twice_impl rx) (Bind inc_twice_impl_atomic rx).
+Proof.
+  unfold inc_twice_impl, inc_twice_impl_atomic; intros.
+
+  rewrite exec_equiv_bind_bind.
+  rewrite exec_equiv_bind_bind with (p1 := OpCallHi _).
+  eapply hitrace_incl_bind_a; intros.
+
+  rewrite exec_equiv_bind_bind.
+  rewrite exec_equiv_bind_bind with (p1 := Atomic _).
+  rewrite hitrace_incl_op.
+
+  setoid_rewrite exec_equiv_bind_bind with (p1 := Op _).
+  rewrite inc_commutes_final.
   reflexivity.
 Qed.

@@ -1,4 +1,6 @@
+Require Import Omega.
 Require Import List.
+
 Import ListNotations.
 
 Global Set Implicit Arguments.
@@ -25,3 +27,36 @@ Fixpoint list_upd `(l : list T) (idx : nat) (v : T) :=
     | S idx' => x :: list_upd l' idx' v
     end
   end.
+
+Lemma pad_is_append : forall n `(l : list T) v,
+  pad l n v = l ++ repeat v (n - length l).
+Proof.
+  induction n; simpl; intros.
+  - rewrite app_nil_r; eauto.
+  - destruct l; simpl.
+    + rewrite IHn; simpl. replace (n - 0) with n by omega. reflexivity.
+    + rewrite IHn. eauto.
+Qed.
+
+Lemma repeat_app : forall n m `(x : T),
+  repeat x (n + m) = repeat x n ++ repeat x m.
+Proof.
+  induction n; simpl; eauto; intros.
+  f_equal. eauto.
+Qed.
+
+Lemma repeat_tl : forall n `(x : T),
+  repeat x (S n) = repeat x n ++ [x].
+Proof.
+  induction n; simpl; eauto; intros.
+  f_equal. rewrite <- IHn. reflexivity.
+Qed.
+
+Lemma rev_repeat : forall n T (x : T),
+  rev (repeat x n) = repeat x n.
+Proof.
+  induction n; simpl; eauto; intros.
+  rewrite IHn.
+  rewrite <- repeat_tl.
+  reflexivity.
+Qed.
