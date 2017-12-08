@@ -8,6 +8,7 @@ Require Import Relations.Relation_Operators.
 Require Import RelationClasses.
 Require Import Morphisms.
 Require Import List.
+Require Import Compile.
 
 Import ListNotations.
 
@@ -19,10 +20,12 @@ Global Generalizable All Variables.
 
 Inductive opT : Type -> Type :=
 | Inc : opT nat
+| Dec : opT nat
 | Noop : opT unit.
 
 Inductive opHiT : Type -> Type :=
 | IncTwice : opHiT nat
+| DecThrice : opHiT nat
 | Noop2 : opHiT unit.
 
 Inductive opHi2T : Type -> Type :=
@@ -35,15 +38,17 @@ Definition State := forall (tid : nat), nat.
 
 Definition init_state : State := fun tid' => 4.
 
-Definition state_upd (s : State) (tid : nat) (val : nat) :=
-  fun tid' =>
-    if tid' == tid then val else s tid'.
-
 Definition inc s tid :=
   state_upd s tid (s tid + 1).
 
 Definition inc2 s tid :=
   state_upd s tid (s tid + 2).
+
+Definition dec s tid :=
+  state_upd s tid (s tid - 1).
+
+Definition dec3 s tid :=
+  state_upd s tid (s tid - 3).
 
 
 (** Semantics *)
@@ -51,23 +56,43 @@ Definition inc2 s tid :=
 Inductive op_step : forall T, opT T -> nat -> State -> T -> State -> Prop :=
 | StepInc : forall tid s,
   op_step Inc tid s (s tid + 1) (inc s tid)
+| StepDec : forall tid s,
+  op_step Dec tid s (s tid - 1) (dec s tid)
 | StepNoop : forall tid s,
   op_step Noop tid s tt s.
 
 Inductive opHi_step : forall T, opHiT T -> nat -> State -> T -> State -> Prop :=
 | StepIncTwice : forall tid s,
   opHi_step IncTwice tid s (s tid + 2) (inc2 s tid)
+| StepDecThrice : forall tid s,
+  opHi_step DecThrice tid s (s tid - 3) (dec3 s tid)
 | StepNoop2 : forall tid s,
   opHi_step Noop2 tid s tt s.
 
 
 (** Implementations *)
 
-Definition inc_twice_impl :=
-  _ <- OpCallHi IncTwice;
+Definition inc_twice_core : proc opT opHiT _ :=
   _ <- Op Inc;
-  i2 <- Op Inc;
-  OpRetHi i2.
+  Op Inc.
+
+Definition dec_thrice_core : proc opT opHiT _ :=
+  _ <- Op Dec;
+  _ <- Op Dec;
+  Op Dec.
+
+Definition compile_op T (op : opHiT T) : proc opT opHiT T :=
+  match op with
+  | IncTwice => inc_twice_core
+  | DecThrice => dec_thrice_core
+  | Noop2 => Ret tt
+  end.
+
+Definition inc_twice_impl :=
+  hicall compile_op IncTwice.
+
+Definition dec_thrice_impl :=
+  hicall compile_op DecThrice.
 
 Definition p1 :=
   _ <- inc_twice_impl;
@@ -99,15 +124,15 @@ Proof.
   eexists.
   unfold ts.
   unfold init_state.
-  exec_one 1; eauto; simpl; autorewrite with t.
-  exec_one 1; eauto; simpl; autorewrite with t.
-  exec_one 1; eauto; simpl; autorewrite with t.
-  exec_one 1; eauto; simpl; autorewrite with t.
-  exec_one 1; eauto; simpl; autorewrite with t.
-  exec_one 1; eauto; simpl; autorewrite with t.
-  exec_one 1; eauto; simpl; autorewrite with t.
-  exec_one 1; eauto; simpl; autorewrite with t.
-  exec_one 1; eauto; simpl; autorewrite with t.
+  exec_one 1; eauto 20; simpl; autorewrite with t.
+  exec_one 1; eauto 20; simpl; autorewrite with t.
+  exec_one 1; eauto 20; simpl; autorewrite with t.
+  exec_one 1; eauto 20; simpl; autorewrite with t.
+  exec_one 1; eauto 20; simpl; autorewrite with t.
+  exec_one 1; eauto 20; simpl; autorewrite with t.
+  exec_one 1; eauto 20; simpl; autorewrite with t.
+  exec_one 1; eauto 20; simpl; autorewrite with t.
+  exec_one 1; eauto 20; simpl; autorewrite with t.
   eapply ExecEmpty; eauto.
 Defined.
 
@@ -140,41 +165,39 @@ Qed.
 
 (** Compilation *)
 
-Inductive compile_ok : forall T `(p1 : proc opT opHiT T) `(p2 : proc opHiT opHi2T T), Prop :=
-| CompileIncTwice :
-  compile_ok (inc_twice_impl) (Op IncTwice)
-| CompileRet : forall `(x : T),
-  compile_ok (Ret x) (Ret x)
-| CompileBind : forall `(p1a : proc opT opHiT T1) (p2a : proc opHiT opHi2T T1)
-                       `(p1b : T1 -> proc opT opHiT T2) (p2b : T1 -> proc opHiT opHi2T T2),
-  compile_ok p1a p2a ->
-  (forall x, compile_ok (p1b x) (p2b x)) ->
-  compile_ok (Bind p1a p1b) (Bind p2a p2b).
+Definition inc2_compile_ok :=
+  @compile_ok opT opHiT opHi2T compile_op.
 
-Hint Constructors compile_ok.
-
-Theorem ex_compile_ok : compile_ok p1 p2.
+Theorem ex_compile_ok : inc2_compile_ok p1 p2.
 Proof.
   unfold p1, p2.
-  eauto.
+  unfold inc2_compile_ok.
+  unfold inc_twice_impl.
+  econstructor.
+  econstructor.
+  econstructor.
 Qed.
 
 Hint Resolve ex_compile_ok.
 
 
 Definition threads_compile_ok (ts1 : @threads_state opT opHiT) (ts2 : @threads_state opHiT opHi2T) :=
-  forall tid,
-    ts1 [[ tid ]] = NoProc /\ ts2 [[ tid ]] = NoProc \/
-  (exists T (p1 : proc _ _ T) p2,
-    ts1 [[ tid ]] = Proc p1 /\ ts2 [[ tid ]] = Proc p2 /\ compile_ok p1 p2).
+  proc_match inc2_compile_ok ts1 ts2.
+
+
+Opaque hicall Op.
 
 Theorem ex_ts_compile_ok : threads_compile_ok ts ts2.
 Proof.
   unfold threads_compile_ok, ts, ts2, thread_upd, threads_empty; intros.
-  destruct tid; subst; compute; eauto.
-  destruct tid; subst; compute; eauto 10.
-  destruct tid; subst; compute; eauto.
+  unfold proc_match. split. cbn. eauto.
+  intros.
+  destruct tid; subst; compute; eauto 20.
+  destruct tid; subst; compute; eauto 20.
+  destruct tid; subst; compute; eauto 20.
 Qed.
+
+Transparent hicall Op.
 
 
 Ltac thread_inv :=
@@ -247,77 +270,39 @@ Qed.
 
 (** Commutativity *)
 
-Ltac destruct_ifs :=
-  repeat match goal with
-  | |- context[if ?a == ?b then _ else _] =>
-    destruct (a == b)
-  end.
-
-Lemma inc_commutes_op_step : forall T (op : opT T) tid s v s',
-  op_step op tid s v s' ->
-  forall tid0,
-  tid0 <> tid ->
-  op_step op tid
-    (inc s tid0)
-    v
-    (inc s' tid0).
+Lemma op_step_disjoint_writes :
+  disjoint_writes op_step.
 Proof.
-  intros; step_inv.
-  + replace (s tid + 1) with ((inc s tid0) tid + 1).
-    replace (inc (inc s tid) tid0) with (inc (inc s tid0) tid).
-    constructor.
-    unfold inc, state_upd; apply functional_extensionality; intros.
-      destruct_ifs; omega.
-    unfold inc, state_upd.
-      destruct_ifs; omega.
-  + constructor.
-Qed.
-
-Lemma inc_commutes_op_step' : forall T (op : opT T) tid s v s',
-  op_step op tid s v s' ->
-  forall tid0,
-  tid0 <> tid ->
-  s tid0 = s' tid0.
-Proof.
-  intros; step_inv.
+  unfold disjoint_writes; intros; step_inv.
   + unfold inc, state_upd.
+      destruct_ifs; omega.
+  + unfold dec, state_upd.
       destruct_ifs; omega.
   + congruence.
 Qed.
 
-Lemma inc_commutes_exec_tid : forall tid0 tid1 T s p s' result' evs,
-  tid0 <> tid1 ->
-  @exec_tid opT opHiT State op_step T tid1 s p s' result' evs ->
-  @exec_tid opT opHiT State op_step T tid1 (inc s tid0) p (inc s' tid0) result' evs.
+Lemma op_step_disjoint_reads :
+  disjoint_reads op_step.
 Proof.
-  intros.
-  induction H0; simpl; eauto.
-  - constructor.
-    eapply inc_commutes_op_step; eauto.
-  - constructor.
-    induction H0; eauto.
+  unfold disjoint_reads; intros; step_inv.
+  + unfold inc.
+    rewrite state_upd_upd_ne by auto.
+    erewrite <- state_upd_ne with (s := s) by eassumption.
     constructor.
-    eapply inc_commutes_op_step; eauto.
+  + unfold dec.
+    rewrite state_upd_upd_ne by auto.
+    erewrite <- state_upd_ne with (s := s) by eassumption.
+    constructor.
+  + constructor.
 Qed.
 
-Lemma inc_commutes_exec_tid' : forall T tid0 s p s' result' evs,
-  @exec_tid opT opHiT State op_step T tid0 s p s' result' evs ->
-  forall tid1, tid0 <> tid1 ->
-  s tid1 = s' tid1.
-Proof.
-  intros.
-  induction H; eauto.
-  - eapply inc_commutes_op_step'; eauto.
-  - induction H; eauto.
-    + eapply eq_trans.
-      apply IHatomic_exec1; eauto.
-      apply IHatomic_exec2; eauto.
-    + eapply inc_commutes_op_step'; eauto.
-Qed.
+Hint Resolve op_step_disjoint_writes.
+Hint Resolve op_step_disjoint_reads.
 
 Theorem inc_commutes_0 :
   forall T (p1 p2 : _ -> proc opT opHiT T),
-  (forall r, hitrace_incl op_step (p1 r) (p2 r)) ->
+  (forall r s tid,
+    hitrace_incl_s s s tid op_step (p1 r) (p2 r)) ->
   forall s tid,
   hitrace_incl_s s (inc s tid) tid
     op_step
@@ -346,9 +331,9 @@ Proof.
       eexists; split.
       eapply ExecOne with (tid := tid0).
         autorewrite with t in *; eauto.
-        eapply inc_commutes_exec_tid; eauto.
+        eapply exec_tid_disjoint_reads; eauto.
         rewrite thread_upd_upd_ne; eauto.
-        erewrite inc_commutes_exec_tid' with (s := s) (tid1 := tid);
+        erewrite exec_tid_disjoint_writes with (s := s) (tid1 := tid);
           eauto.
       eauto.
 
@@ -821,7 +806,6 @@ Fixpoint compile_atomic T (p : proc opHiT opHi2T T) : proc opT opHiT T :=
 Definition atomize_ok_all_upto n (ts1 ts2 : threads_state) :=
   proc_match_upto n atomize_ok ts1 ts2.
 
-Print hitrace_incl_opt.
 
 Theorem atomize_ok_preserves_trace_0 :
   forall T p1 p2,
