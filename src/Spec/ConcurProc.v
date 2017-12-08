@@ -816,3 +816,10 @@ Ltac exec_tid_inv :=
     inversion H; clear H; subst; repeat maybe_proc_inv
   end;
   autorewrite with t in *.
+
+Ltac atomic_exec_inv :=
+  match goal with
+  | H : atomic_exec _ _ _ _ _ _ _ |- _ =>
+    inversion H; clear H; subst; repeat maybe_proc_inv
+  end;
+  autorewrite with t in *.
