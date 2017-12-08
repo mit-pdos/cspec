@@ -1112,6 +1112,15 @@ Proof.
     + repeat rewrite thread_upd_ne by auto. intuition eauto.
 Qed.
 
+Lemma proc_match_nil : forall `(R : forall T, proc opT opHiT T -> proc opT' opHiT' T -> Prop),
+  proc_match R nil nil.
+Proof.
+  unfold proc_match; intros.
+  intuition eauto.
+  left.
+  repeat rewrite thread_get_nil; eauto.
+Qed.
+
 Lemma proc_match_cons_Proc : forall `(ts1 : @threads_state opT opHiT)
                                     `(ts2 : @threads_state opT' opHiT') R
                                     T (p1 : proc _ _ T) p2,
@@ -1138,6 +1147,25 @@ Proof.
   - destruct tid.
     + left. intuition eauto.
     + repeat rewrite thread_get_S. eauto.
+Qed.
+
+Lemma proc_match_cons_inv : forall `(ts1 : @threads_state opT opHiT)
+                                   `(ts2 : @threads_state opT' opHiT') R
+                                   v1 v2,
+  proc_match R (v1 :: ts1) (v2 :: ts2) ->
+  proc_match R ts1 ts2 /\
+  (v1 = NoProc /\ v2 = NoProc \/
+   exists T (p1 : proc _ _ T) p2,
+   v1 = Proc p1 /\ v2 = Proc p2 /\ R T p1 p2).
+Proof.
+  unfold proc_match; simpl; intros.
+  intuition idtac; try omega.
+  - specialize (H1 (S tid)).
+    repeat rewrite thread_get_S in H1.
+    eauto.
+  - specialize (H1 0).
+    repeat rewrite thread_get_0 in H1.
+    eauto.
 Qed.
 
 Definition proc_match_upto n `(R : forall T, proc opT opHiT T -> proc opT opHiT T -> Prop)
@@ -1247,6 +1275,14 @@ Proof.
   unfold proc_match_upto; intuition idtac.
   - specialize (H1 tid). intuition eauto.
   - specialize (H1 tid). intuition eauto.
+Qed.
+
+Theorem proc_match_len : forall `(ts1 : @threads_state opT opHiT)
+                                `(ts2 : @threads_state opT' opHiT') R,
+  proc_match R ts1 ts2 ->
+  length ts1 = length ts2.
+Proof.
+  unfold proc_match; intuition eauto.
 Qed.
 
 Theorem no_runnable_threads_proc_match : forall `(ts1 : @threads_state opT opHiT)

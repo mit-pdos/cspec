@@ -401,12 +401,6 @@ Proof.
   rewrite list_upd_noop_NoProc; eauto.
 Qed.
 
-Lemma thread_upd_same'' : forall tid `(ts : @threads_state opT opHiT),
-  tid >= length ts ->
-  ts [[ tid := NoProc ]] = pad ts (S tid) NoProc.
-Proof.
-Admitted.
-
 Lemma thread_upd_eq : forall tid `(ts : @threads_state opT opHiT) p,
   ts [[ tid := p ]] [[ tid ]] = p.
 Proof.
@@ -589,6 +583,33 @@ Proof.
     + rewrite thread_upd_S.
       simpl length. rewrite IHtid.
       simpl. omega.
+Qed.
+
+Lemma thread_get_repeat_NoProc : forall opT opHiT n tid,
+  (repeat (@NoProc opT opHiT) n) [[ tid ]] = NoProc.
+Proof.
+  induction n; simpl; intros.
+  - rewrite thread_get_nil. eauto.
+  - destruct tid.
+    + rewrite thread_get_0. eauto.
+    + rewrite thread_get_S. eauto.
+Qed.
+
+Lemma thread_upd_same'' : forall tid `(ts : @threads_state opT opHiT),
+  tid >= length ts ->
+  ts [[ tid := NoProc ]] = pad ts (S tid) NoProc.
+Proof.
+  unfold thread_upd; intros.
+  rewrite list_upd_noop_NoProc; eauto.
+  rewrite pad_is_append.
+
+  generalize dependent tid.
+  induction ts; intros.
+  - rewrite app_nil_l.
+    rewrite thread_get_repeat_NoProc. eauto.
+  - destruct tid.
+    + simpl in *. omega.
+    + simpl app. rewrite thread_get_S. eapply IHts. simpl in *. omega.
 Qed.
 
 Lemma thread_get_oob : forall tid `(ts : @threads_state opT opHiT),

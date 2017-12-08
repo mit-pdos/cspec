@@ -959,6 +959,7 @@ Hint Resolve atomize_ok_cons_None.
 Hint Resolve compile_ok_atomic_cons.
 Hint Resolve compile_ok_atomic_cons_None.
 
+
 Theorem make_all_atomic :
   forall ts1 ts2,
   compile_ok_all ts1 ts2 ->
@@ -967,45 +968,20 @@ Theorem make_all_atomic :
     compile_ok_all_atomic ts1' ts2.
 Proof.
   induction ts1; intros.
-  - exists nil; split.
-    intro tid; left; unfold thread_get; repeat rewrite nth_error_nil; eauto.
-    intro tid.
-    specialize (H tid); intuition; repeat deex.
-    exfalso.
-    unfold thread_get in H.
-    rewrite nth_error_nil in H. congruence.
-  - destruct ts3.
-    + exists nil; split.
-      2: intro tid; left; unfold thread_get; repeat rewrite nth_error_nil; eauto.
-      intro tid.
-      specialize (H tid); intuition; repeat deex.
-      2: unfold thread_get in H0; rewrite nth_error_nil in H0; congruence.
-      left. intuition eauto.
-      unfold thread_get; rewrite nth_error_nil; eauto.
-    + edestruct IHts1.
-      * intro tid. specialize (H (S tid)).
-        apply H.
-      * intuition.
-        destruct o; destruct a.
-       -- destruct s.
-          destruct s0.
-          specialize (H 0) as H'.
-            unfold thread_get in H'; simpl in H'. intuition try congruence.
-          repeat deex.
-          inversion H0; clear H0.
-          inversion H3; clear H3.
-          subst; repeat sigT_eq'.
+  - eapply proc_match_len in H.
+    destruct ts3; simpl in *; try omega.
+    eexists; split.
+    eapply proc_match_nil.
+    eapply proc_match_nil.
+  - eapply proc_match_len in H as H'.
+    destruct ts3; simpl in *; try omega.
 
-          edestruct (make_one_atomic H4).
-          exists (Some (existT _ _ (compile_atomic p4)) :: x).
-          split; eauto.
-       -- specialize (H 0); unfold thread_get in H; simpl in H;
-            intuition try congruence.
-          repeat deex; intuition congruence.
-       -- specialize (H 0); unfold thread_get in H; simpl in H;
-            intuition try congruence.
-          repeat deex; intuition congruence.
-       -- exists (None :: x). eauto.
+    eapply proc_match_cons_inv in H.
+    edestruct IHts1; intuition eauto.
+    + exists (NoProc :: x); subst; intuition eauto.
+    + repeat deex.
+      edestruct (make_one_atomic H4).
+      eexists (Proc _ :: x); intuition eauto.
 Qed.
 
 Theorem all_traces_match :
