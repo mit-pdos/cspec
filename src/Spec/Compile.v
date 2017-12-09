@@ -149,75 +149,29 @@ Section Disjoint.
         try solve [ inversion H ]
       end.
 
-    admit.
+    - rewrite hitrace_incl_atomic.
+      rewrite exec_equiv_ret_bind.
+      reflexivity.
 
-    eapply hitrace_incl_s_trans.
-    eapply IHatomic_exec1.
+    - rewrite hitrace_incl_atomic_bind.
+      rewrite exec_equiv_bind_bind.
+      rewrite prepend_app in H0.
+      eapply trace_match_hi_prepend_empty in H0; intuition eauto.
+      eapply hitrace_incl_s_trans; eauto.
 
-XXX
+    - rewrite hitrace_incl_atomic.
+      rewrite hitrace_incl_opcall.
+      reflexivity.
 
-    (forall s tid r s' evs,
-      atomic_exec op_step (Atomic skew_proc) tid s r s' evs ->
-      s' = skew_effect s tid) ->
-    (forall s tid r s',
-      op_step op tid s r s' ->
-      r = op_ret s tid /\
-      s' = op_effect s tid) ->
-    (forall r s tid, hitrace_incl_s s (skew_effect s tid) tid op_step (p1 r) (p2 r)) ->
-    forall s tid,
-    hitrace_incl_s s (skew_effect (op_effect s tid) tid) tid
-      op_step (r <- OpExec op; p1 r) (p2 (op_ret s tid)).
+    - rewrite hitrace_incl_atomic.
+      admit.
 
+    - rewrite hitrace_incl_atomic.
+      rewrite hitrace_incl_opret.
+      reflexivity.
 
-
-    forall ST (skew_proc : proc opT opHiT ST)
-           (skew_effect : State -> nat -> State)
-           (op_effect : State -> nat -> State)
-           (op_ret : State -> nat -> T'),
-    (forall s tid r s' evs,
-      atomic_exec op_step (Atomic skew_proc) tid s r s' evs ->
-      s' = skew_effect s tid) ->
-    (forall s tid r s',
-      op_step op tid s r s' ->
-      r = op_ret s tid /\
-      s' = op_effect s tid) ->
-    (forall r s tid, hitrace_incl_s s (skew_effect s tid) tid op_step (p1 r) (p2 r)) ->
-    forall s tid,
-    hitrace_incl_s s (skew_effect (op_effect s tid) tid) tid
-      op_step (r <- OpExec op; p1 r) (p2 (op_ret s tid)).
-  Proof.
-    unfold hitrace_incl_s, hitrace_incl_ts_s; intros.
-
-    match goal with
-    | H : exec _ _ (thread_upd ?ts ?tid ?p) _ |- _ =>
-      remember (thread_upd ts tid p);
-      generalize dependent ts;
-      induction H; intros; subst
-    end.
-
-    - destruct (tid0 == tid); subst.
-      + autorewrite with t in *.
-        repeat maybe_proc_inv.
-        repeat exec_tid_inv.
-        edestruct H1; eauto.
-        eexists; intuition eauto.
-
-        eapply H in H8 as H8'; intuition subst.
-
-      + edestruct IHexec.
-        rewrite thread_upd_upd_ne; eauto.
-        intuition idtac.
-
-        eexists; split.
-        eapply ExecOne with (tid := tid0).
-          autorewrite with t in *; eauto.
-          eapply exec_tid_disjoint_reads; eauto.
-          rewrite thread_upd_upd_ne; eauto.
-          erewrite exec_tid_disjoint_writes with (s := s) (tid1 := tid);
-            eauto.
-        eauto.
-
-    - exfalso; eauto.
-  Qed.
+    - rewrite hitrace_incl_atomic.
+      eauto.
+  Admitted.
 
 End Disjoint.
