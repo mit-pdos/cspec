@@ -84,6 +84,21 @@ Section Disjoint.
       destruct_ifs; congruence.
   Qed.
 
+  Theorem state_upd_upd_eq : forall tid v1 v2 s,
+    state_upd (state_upd s tid v1) tid v2 =
+    state_upd s tid v2.
+  Proof.
+    intros; apply functional_extensionality; intros.
+    unfold state_upd.
+      destruct_ifs; congruence.
+  Qed.
+
+  Theorem state_upd_eq : forall tid v1 s,
+    state_upd s tid v1 tid = v1.
+  Proof.
+    intros; unfold state_upd; destruct_ifs; congruence.
+  Qed.
+
   Theorem state_upd_ne : forall tid1 v1 tid2 s, tid1 <> tid2 ->
     state_upd s tid1 v1 tid2 = s tid2.
   Proof.
@@ -134,44 +149,34 @@ Section Disjoint.
     induction H0; eauto.
   Qed.
 
-  Theorem hitrace_incl_s_op_step :
-    forall AT (ap : proc opT opHiT AT) T (rx : AT -> proc _ _ T) s s' r tid evs,
-      atomic_exec op_step ap tid s r s' evs ->
-      trace_match_hi (prepend tid evs TraceEmpty) TraceEmpty ->
-      hitrace_incl_s s s' tid
-        op_step (Bind (Atomic ap) rx) (rx r).
+  Theorem hitrace_incl_atomic_start :
+    forall `(ap : proc opT opHiT TA)
+           `(p1 : proc _ _ T')
+            (p2 : _ -> proc _ _ T'),
+    (forall s tid,
+      exists r s' evs,
+      atomic_exec op_step ap tid s r s' evs /\
+      (forall tr1 tr2, trace_match_hi tr1 tr2 ->
+                       trace_match_hi tr1 (prepend tid evs tr2)) /\
+      hitrace_incl_s s s' tid op_step
+        p1 (p2 r)) ->
+    hitrace_incl op_step
+      p1
+      (Bind (Atomic ap) p2).
   Proof.
-    intros.
+    unfold hitrace_incl, hitrace_incl_opt,
+           hitrace_incl_ts, hitrace_incl_ts_s; intros.
 
-    induction H; simpl in *; intros;
-      match goal with
-      | H : trace_match_hi _ _ |- _ =>
-        try solve [ inversion H ]
-      end.
+    edestruct H; repeat deex.
+    edestruct H3; eauto; repeat deex.
+    intuition idtac.
 
-    - rewrite hitrace_incl_atomic.
-      rewrite exec_equiv_ret_bind.
-      reflexivity.
-
-    - rewrite hitrace_incl_atomic_bind.
-      rewrite exec_equiv_bind_bind.
-      rewrite prepend_app in H0.
-      eapply trace_match_hi_prepend_empty in H0; intuition eauto.
-      eapply hitrace_incl_s_trans; eauto.
-
-    - rewrite hitrace_incl_atomic.
-      rewrite hitrace_incl_opcall.
-      reflexivity.
-
-    - rewrite hitrace_incl_atomic.
-      admit.
-
-    - rewrite hitrace_incl_atomic.
-      rewrite hitrace_incl_opret.
-      reflexivity.
-
-    - rewrite hitrace_incl_atomic.
-      eauto.
-  Admitted.
+    eexists; split.
+    eapply ExecOne with (tid := tid).
+      autorewrite with t; eauto.
+      eauto 20.
+      simpl. autorewrite with t. eauto.
+    eauto.
+  Qed.
 
 End Disjoint.
