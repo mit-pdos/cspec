@@ -340,6 +340,63 @@ Proof.
       congruence.
 Qed.
 
+Theorem exec_equiv_atomicret_bind : forall `(v : T) `(p : T -> proc opT opHiT T'),
+  exec_equiv (Bind (Atomic (Ret v)) p) (p v).
+Proof.
+  split; intros.
+  - match goal with
+    | H : exec _ _ (thread_upd ?ts ?tid (Proc ?p)) _ |- _ =>
+      remember (thread_upd ts tid (Proc p));
+      generalize dependent ts;
+      induction H; intros; subst
+    end.
+    + destruct (tid0 == tid); subst; autorewrite with t in *.
+      * repeat maybe_proc_inv; repeat exec_tid_inv.
+        repeat atomic_exec_inv.
+        simpl. eauto.
+
+      * eapply ExecOne with (tid := tid0).
+          rewrite thread_upd_ne in * by auto. eauto.
+          eauto.
+        rewrite thread_upd_upd_ne by eauto.
+        eapply IHexec.
+        rewrite thread_upd_upd_ne; eauto.
+    + exfalso; eapply thread_upd_not_empty; eauto.
+
+  - match goal with
+    | H : exec _ _ (thread_upd ?ts ?tid (Proc ?p)) _ |- _ =>
+      remember (thread_upd ts tid (Proc p));
+      generalize dependent ts;
+      induction H; intros; subst
+    end.
+    + destruct (tid0 == tid); subst.
+      * autorewrite with t in *.
+        repeat maybe_proc_inv.
+        rewrite <- app_nil_l with (l := evs).
+        rewrite prepend_app.
+        eapply ExecOne with (tid := tid).
+          autorewrite with t; eauto.
+          eauto.
+          autorewrite with t.
+        eapply ExecOne with (tid := tid).
+          autorewrite with t; eauto.
+          eauto.
+          autorewrite with t.
+        eauto.
+
+      * eapply ExecOne with (tid := tid0).
+          autorewrite with t in *; eauto.
+          eauto.
+          rewrite thread_upd_upd_ne by eauto.
+        eapply IHexec.
+        rewrite thread_upd_upd_ne by auto.
+        eauto.
+
+    + specialize (H tid).
+      rewrite thread_upd_eq in H.
+      congruence.
+Qed.
+
 Theorem exec_equiv_ret_None : forall opT opHiT `(v : T),
   @exec_equiv_opt opT opHiT (Proc (Ret v)) NoProc.
 Proof.
@@ -574,7 +631,7 @@ Proof.
   reflexivity.
 Qed.
 
-Instance Bind_exec_equiv_proper_2 :
+Instance Bind_exec_equiv_proper :
   Proper (eq ==>
           pointwise_relation T0 exec_equiv ==>
           @exec_equiv opT opHiT T) Bind.

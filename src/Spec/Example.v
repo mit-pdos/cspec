@@ -69,6 +69,9 @@ Inductive opHi_step : forall T, opHiT T -> nat -> State -> T -> State -> Prop :=
 | StepNoop2 : forall tid s,
   opHi_step Noop2 tid s tt s.
 
+Hint Extern 1 (op_step _ _ _ _ _) => econstructor.
+Hint Extern 1 (opHi_step _ _ _ _ _) => econstructor.
+
 
 (** Implementations *)
 
@@ -270,147 +273,22 @@ Qed.
 
 (** Commutativity *)
 
-Lemma op_step_disjoint_writes :
-  disjoint_writes op_step.
+Lemma op_step_commutes :
+  step_commutes op_step.
 Proof.
-  unfold disjoint_writes; intros; step_inv.
-  + unfold inc, state_upd.
-      destruct_ifs; omega.
-  + unfold dec, state_upd.
-      destruct_ifs; omega.
-  + congruence.
+  unfold step_commutes; intros; repeat step_inv;
+    unfold inc, dec.
+  all: eexists; split; eauto.
+  all: rewrite state_upd_ne; eauto.
+  all: rewrite state_upd_upd_ne; eauto.
+  all: match goal with
+    | |- op_step _ ?tid ?ss ?r _ =>
+      replace (s tid) with (ss tid); eauto;
+        unfold inc, dec; rewrite state_upd_ne; eauto
+    end.
 Qed.
 
-Lemma op_step_disjoint_reads :
-  disjoint_reads op_step.
-Proof.
-  unfold disjoint_reads; intros; step_inv.
-  + unfold inc.
-    rewrite state_upd_upd_ne by auto.
-    erewrite <- state_upd_ne with (s := s) by eassumption.
-    constructor.
-  + unfold dec.
-    rewrite state_upd_upd_ne by auto.
-    erewrite <- state_upd_ne with (s := s) by eassumption.
-    constructor.
-  + constructor.
-Qed.
-
-Hint Resolve op_step_disjoint_writes.
-Hint Resolve op_step_disjoint_reads.
-
-Theorem inc_commutes_0 :
-  forall T (p1 p2 : _ -> proc opT opHiT T),
-  (forall r s tid,
-    hitrace_incl_s s s tid op_step (p1 r) (p2 r)) ->
-  forall s tid,
-  hitrace_incl_s s (inc s tid) tid
-    op_step
-    (r <- OpExec Inc; p1 r) (p2 (s tid + 1)).
-Proof.
-  unfold hitrace_incl_s, hitrace_incl_ts_s; intros.
-
-  match goal with
-  | H : exec _ _ (thread_upd ?ts ?tid ?p) _ |- _ =>
-    remember (thread_upd ts tid p);
-    generalize dependent ts;
-    induction H0; intros; subst
-  end.
-
-  - destruct (tid0 == tid); subst.
-    + autorewrite with t in *.
-      repeat maybe_proc_inv.
-      repeat exec_tid_inv.
-      step_inv.
-      edestruct H; eauto.
-
-    + edestruct IHexec.
-      rewrite thread_upd_upd_ne; eauto.
-      intuition idtac.
-
-      eexists; split.
-      eapply ExecOne with (tid := tid0).
-        autorewrite with t in *; eauto.
-        eapply exec_tid_disjoint_reads; eauto.
-        rewrite thread_upd_upd_ne; eauto.
-        erewrite exec_tid_disjoint_writes with (s := s) (tid1 := tid);
-          eauto.
-      eauto.
-
-  - exfalso; eauto.
-Qed.
-
-Theorem inc_commutes_1 :
-  forall `(ap : proc opT opHiT TA)
-         `(p1 : proc opT opHiT T')
-         (p2 : _ -> proc opT opHiT T'),
-  (forall s tid,
-    hitrace_incl_s s (inc s tid) tid op_step
-      p1 (p2 (s tid + 1))) ->
-  hitrace_incl op_step
-    (_ <- Atomic ap; p1)
-    (r <- Atomic (_ <- ap; Op Inc); p2 r).
-Proof.
-  unfold hitrace_incl, hitrace_incl_opt,
-         hitrace_incl_ts, hitrace_incl_ts_s; intros.
-
-  match goal with
-  | H : exec _ _ (thread_upd ?ts ?tid ?p) _ |- _ =>
-    remember (thread_upd ts tid p);
-    generalize dependent ts;
-    induction H0; intros; subst
-  end.
-
-  - destruct (tid0 == tid); subst.
-    + autorewrite with t in *.
-      repeat maybe_proc_inv.
-      repeat exec_tid_inv.
-
-      eapply H in H2. deex.
-
-      eexists; split.
-
-      eapply ExecOne with (tid := tid).
-        autorewrite with t; eauto.
-        eauto 20.
-        autorewrite with t; eauto.
-
-      rewrite prepend_app. simpl. eauto.
-
-    + edestruct IHexec.
-      rewrite thread_upd_upd_ne; eauto.
-      intuition idtac.
-
-      eexists; split.
-      eapply ExecOne with (tid := tid0).
-        autorewrite with t in *; eauto.
-        eauto.
-        rewrite thread_upd_upd_ne; auto.
-      eauto.
-      eauto.
-
-  - exfalso; eauto.
-Qed.
-
-Theorem inc_commutes_final :
-  forall `(ap : proc _ _ TA) `(p : _ -> proc opT opHiT T'),
-  hitrace_incl op_step
-    (_ <- Atomic ap; r <- Op Inc; p r)
-    (r <- Atomic (_ <- ap; Op Inc); p r).
-Proof.
-  intros.
-  eapply inc_commutes_1.
-
-  intros; unfold Op.
-  rewrite exec_equiv_bind_bind.
-  setoid_rewrite exec_equiv_bind_bind.
-  rewrite hitrace_incl_opcall.
-  eapply inc_commutes_0.
-
-  intros.
-  rewrite hitrace_incl_opret.
-  reflexivity.
-Qed.
+Hint Resolve op_step_commutes.
 
 
 (** Atomicity *)
@@ -454,20 +332,68 @@ Theorem inc_twice_atomic : forall `(rx : _ -> proc _ _ T),
   hitrace_incl op_step
     (Bind inc_twice_impl rx) (Bind inc_twice_impl_atomic rx).
 Proof.
-  unfold inc_twice_impl, inc_twice_impl_atomic; intros.
+  unfold inc_twice_impl, inc_twice_impl_atomic, hicall; simpl.
+  unfold inc_twice_core, Op; intros.
 
   rewrite exec_equiv_bind_bind.
   rewrite exec_equiv_bind_bind with (p1 := OpCallHi _).
   eapply hitrace_incl_bind_a; intros.
 
-  rewrite exec_equiv_bind_bind.
+  repeat rewrite exec_equiv_bind_bind.
   rewrite exec_equiv_bind_bind with (p1 := Atomic _).
-  rewrite hitrace_incl_op.
 
-  setoid_rewrite exec_equiv_bind_bind with (p1 := Op _).
-  rewrite inc_commutes_final.
+  etransitivity.
+
+  (* Step 1 *)
+  etransitivity.
+  2: eapply hitrace_incl_atomize_opcall.
+  setoid_rewrite exec_equiv_bind_bind with (p1 := OpCall _).
+  eapply hitrace_incl_bind_a; intros.
+
+  etransitivity.
+  2: eapply hitrace_incl_atomize_opexec; eauto.
+  setoid_rewrite exec_equiv_bind_bind with (p1 := OpExec _).
+  eapply hitrace_incl_bind_a; intros.
+
+  etransitivity.
+  2: eapply hitrace_incl_atomize_opret.
+  setoid_rewrite exec_equiv_bind_bind with (p1 := OpRet _).
+  eapply hitrace_incl_bind_a; intros.
+
+  (* Step 2 *)
+  etransitivity.
+  2: eapply hitrace_incl_atomize_opcall.
+  setoid_rewrite exec_equiv_bind_bind with (p1 := OpCall _).
+  eapply hitrace_incl_bind_a; intros.
+
+  etransitivity.
+  2: eapply hitrace_incl_atomize_opexec; eauto.
+  setoid_rewrite exec_equiv_bind_bind with (p1 := OpExec _).
+  eapply hitrace_incl_bind_a; intros.
+
+  etransitivity.
+  2: eapply hitrace_incl_atomize_opret.
+  setoid_rewrite exec_equiv_bind_bind with (p1 := OpRet _).
+  eapply hitrace_incl_bind_a; intros.
+
+  instantiate (2 := Ret).
+  rewrite exec_equiv_atomicret_bind.
+
+  instantiate (1 := fun x5 => Bind (OpRetHi x5) rx).
   reflexivity.
-Qed.
+
+  (* TODO: some kind of [exec_equiv] that can fit under [Atomic].
+
+  - augment [exec_equiv] with [exec_equiv_rx] which talks about a continuation
+
+  - this will help with [Bind_exec_equiv_proper] first argument
+
+  - which in turn will allow [rewrite exec_equiv_bind_bind] in
+    [inc_twice_atomic] in an [Atomic] that is the first step of a [Bind]
+
+  *)
+
+Admitted.
 
 
 (** Correctness for 1 thread *)
