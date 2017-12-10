@@ -57,13 +57,114 @@ Arguments hicall {opLoT opMidT} compile_op {T}.
 Hint Constructors compile_ok.
 
 
+Section Commutes.
+
+  Variable opT : Type -> Type.
+  Variable opHiT : Type -> Type.
+  Variable State : Type.
+  Variable op_step : OpSemantics opT State.
+
+  Definition step_commutes :=
+    forall `(op0 : opT T1) `(op1 : opT T2) tid0 tid1 s s0 s1 v0 v1,
+      tid0 <> tid1 ->
+      op_step op0 tid0 s v0 s0 ->
+      op_step op1 tid1 s0 v1 s1 ->
+      exists s',
+        op_step op1 tid1 s v1 s' /\
+        op_step op0 tid0 s' v0 s1.
+
+  Variable commutes : step_commutes.
+
+  Lemma atomic_exec_commutes : forall tid0 tid1 s s0 `(ap : proc opT opHiT T) s1 v1 evs `(op : opT T') v0,
+    tid0 <> tid1 ->
+    op_step op tid0 s v0 s0 ->
+    atomic_exec op_step ap tid1 s0 v1 s1 evs ->
+      exists s0',
+      atomic_exec op_step ap tid1 s v1 s0' evs /\
+      op_step op tid0 s0' v0 s1.
+  Proof.
+    intros.
+    generalize dependent s.
+    induction H1; intros; eauto.
+    - edestruct IHatomic_exec1; eauto.
+      edestruct IHatomic_exec2; intuition eauto.
+    - edestruct commutes; intuition eauto.
+    - edestruct IHatomic_exec; intuition eauto.
+  Qed.
+
+  Lemma exec_tid_commutes : forall tid0 tid1 s s0 `(p : proc opT opHiT T) s1 result' evs `(op : opT T') v0,
+    tid0 <> tid1 ->
+    op_step op tid0 s v0 s0 ->
+    exec_tid op_step tid1 s0 p s1 result' evs ->
+      exists s0',
+      exec_tid op_step tid1 s p s0' result' evs /\
+      op_step op tid0 s0' v0 s1.
+  Proof.
+    intros.
+    induction H1; simpl; eauto.
+    - edestruct commutes; intuition eauto.
+    - edestruct atomic_exec_commutes; intuition eauto.
+    - edestruct IHexec_tid; intuition eauto.
+  Qed.
+
+  Theorem hitrace_incl_atomize_opexec :
+    forall `(op : opT T)
+           `(p : _ -> proc opT opHiT TP)
+           `(rx : _ -> proc opT opHiT TF),
+    hitrace_incl op_step
+      (Bind (Bind (OpExec op) (fun r => (Atomic (p r)))) rx)
+      (Bind (Atomic (Bind (OpExec op) p)) rx).
+  Proof.
+    intros.
+    eapply hitrace_incl_proof_helper; intros.
+    repeat exec_tid_inv.
+
+    match goal with
+    | H : exec _ _ (thread_upd ?ts ?tid ?pp) _ |- _ =>
+      remember (thread_upd ts tid pp);
+      generalize dependent ts;
+      generalize dependent s;
+      induction H; simpl; intros; subst
+    end.
+
+    - destruct (tid == tid0); subst.
+      + autorewrite with t in *.
+        repeat maybe_proc_inv.
+        repeat exec_tid_inv.
+
+        eexists; split.
+        eapply ExecOne with (tid := tid0).
+          autorewrite with t in *; eauto.
+          eauto.
+          simpl. autorewrite with t. eauto.
+        simpl; eauto.
+
+      + autorewrite with t in *.
+        edestruct exec_tid_commutes; intuition eauto.
+        edestruct IHexec; eauto.
+          rewrite thread_upd_upd_ne; eauto.
+        intuition idtac.
+
+        eexists; split.
+        eapply ExecOne with (tid := tid0).
+          autorewrite with t; eauto.
+          eauto.
+          rewrite thread_upd_upd_ne; eauto.
+        eauto.
+
+    - exfalso; eauto.
+  Qed.
+
+End Commutes.
+
+
 Ltac destruct_ifs :=
   repeat match goal with
   | |- context[if ?a == ?b then _ else _] =>
     destruct (a == b)
   end.
 
-Section Disjoint.
+Section PerThreadState.
 
   Variable opT : Type -> Type.
   Variable opHiT : Type -> Type.
@@ -105,79 +206,4 @@ Section Disjoint.
     intros; unfold state_upd; destruct_ifs; congruence.
   Qed.
 
-
-  Definition disjoint_writes := forall T (op : opT T) tid s v s',
-    op_step op tid s v s' ->
-    forall tid0,
-      tid0 <> tid ->
-      s tid0 = s' tid0.
-
-  Definition disjoint_reads := forall T (op : opT T) tid s v s',
-    op_step op tid s v s' ->
-    forall tid0 x,
-    tid0 <> tid ->
-    op_step op tid
-      (state_upd s tid0 x)
-      v
-      (state_upd s' tid0 x).
-
-
-  Variable disjoint_w : disjoint_writes.
-  Variable disjoint_r : disjoint_reads.
-
-  Lemma exec_tid_disjoint_writes : forall tid0 `(s : State) `(p : proc opT opHiT T) s' result' evs,
-    exec_tid op_step tid0 s p s' result' evs ->
-    forall tid1,
-      tid0 <> tid1 ->
-      s tid1 = s' tid1.
-  Proof.
-    intros.
-    induction H; eauto.
-    induction H; eauto.
-    + eapply eq_trans.
-      apply IHatomic_exec1; eauto.
-      apply IHatomic_exec2; eauto.
-  Qed.
-
-  Lemma exec_tid_disjoint_reads : forall tid0 v tid1 `(s : State) `(p : proc opT opHiT T) s' result' evs,
-    tid0 <> tid1 ->
-    exec_tid op_step tid1 s p s' result' evs ->
-    exec_tid op_step tid1 (state_upd s tid0 v) p (state_upd s' tid0 v) result' evs.
-  Proof.
-    intros.
-    induction H0; simpl; eauto.
-    constructor.
-    induction H0; eauto.
-  Qed.
-
-  Theorem hitrace_incl_atomic_start :
-    forall `(ap : proc opT opHiT TA)
-           `(p1 : proc _ _ T')
-            (p2 : _ -> proc _ _ T'),
-    (forall s tid,
-      exists r s' evs,
-      atomic_exec op_step ap tid s r s' evs /\
-      (forall tr1 tr2, trace_match_hi tr1 tr2 ->
-                       trace_match_hi tr1 (prepend tid evs tr2)) /\
-      hitrace_incl_s s s' tid op_step
-        p1 (p2 r)) ->
-    hitrace_incl op_step
-      p1
-      (Bind (Atomic ap) p2).
-  Proof.
-    unfold hitrace_incl, hitrace_incl_opt,
-           hitrace_incl_ts, hitrace_incl_ts_s; intros.
-
-    edestruct H; repeat deex.
-    edestruct H3; eauto; repeat deex.
-    intuition idtac.
-
-    eexists; split.
-    eapply ExecOne with (tid := tid).
-      autorewrite with t; eauto.
-      eauto 20.
-      simpl. autorewrite with t. eauto.
-    eauto.
-  Qed.
-
-End Disjoint.
+End PerThreadState.
