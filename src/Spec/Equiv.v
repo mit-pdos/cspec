@@ -862,9 +862,9 @@ Proof.
   eapply hitrace_incl_ts_s_trans; eauto.
 Qed.
 
-Lemma hitrace_incl_proof_helper :
-  forall `(p1 : proc opT opHiT T) p2 `(op_step : OpSemantics opT State),
-  (forall tid ts s s' result tr evs,
+Lemma hitrace_incl_ts_proof_helper :
+  forall `(p1 : proc opT opHiT T) (p2 : proc _ _ T) ts tid `(op_step : OpSemantics opT State),
+  (forall ts s s' result tr evs,
     exec_tid op_step tid s p1 s' result evs ->
     exec op_step s' (ts [[tid := match result with
                                  | inl _ => NoProc
@@ -873,11 +873,11 @@ Lemma hitrace_incl_proof_helper :
     exists tr',
       exec op_step s ts [[tid := Proc p2]] tr' /\
       trace_match_hi (prepend tid evs tr) tr') ->
-  hitrace_incl op_step
-    p1 p2.
+  hitrace_incl_ts op_step
+    (ts [[ tid := Proc p1 ]])
+    (ts [[ tid := Proc p2 ]]).
 Proof.
-  unfold hitrace_incl, hitrace_incl_opt,
-         hitrace_incl_ts, hitrace_incl_ts_s.
+  unfold hitrace_incl_ts, hitrace_incl_ts_s.
   intros.
 
   match goal with
@@ -905,6 +905,27 @@ Proof.
       eauto.
 
   - exfalso; eauto.
+Qed.
+
+Lemma hitrace_incl_proof_helper :
+  forall `(p1 : proc opT opHiT T) p2 `(op_step : OpSemantics opT State),
+  (forall tid ts s s' result tr evs,
+    exec_tid op_step tid s p1 s' result evs ->
+    exec op_step s' (ts [[tid := match result with
+                                 | inl _ => NoProc
+                                 | inr p' => Proc p'
+                                 end]]) tr ->
+    exists tr',
+      exec op_step s ts [[tid := Proc p2]] tr' /\
+      trace_match_hi (prepend tid evs tr) tr') ->
+  hitrace_incl op_step
+    p1 p2.
+Proof.
+  unfold hitrace_incl, hitrace_incl_opt.
+  intros.
+
+  eapply hitrace_incl_ts_proof_helper.
+  eauto.
 Qed.
 
 Lemma hitrace_incl_opret :
@@ -953,6 +974,66 @@ Proof.
     eauto 20.
     autorewrite with t; eauto.
 
+  simpl; eauto.
+Qed.
+
+Theorem hitrace_incl_atomize_opcall :
+  forall `(op : opT T)
+         `(p : _ -> proc opT opHiT TP)
+         `(rx : _ -> proc opT opHiT TF)
+         `(op_step : OpSemantics opT State),
+  hitrace_incl op_step
+    (Bind (Bind (OpCall op) (fun r => (Atomic (p r)))) rx)
+    (Bind (Atomic (Bind (OpCall op) p)) rx).
+Proof.
+  intros.
+  eapply hitrace_incl_proof_helper; intros.
+  repeat exec_tid_inv.
+
+  eapply hitrace_incl_ts_proof_helper in H0.
+  deex.
+  eexists; split.
+  eassumption.
+  eauto.
+
+  intros.
+  repeat exec_tid_inv.
+
+  eexists; split.
+  eapply ExecOne with (tid := tid).
+    autorewrite with t; eauto.
+    eauto.
+    simpl. autorewrite with t. eauto.
+  simpl; eauto.
+Qed.
+
+Theorem hitrace_incl_atomize_opret :
+  forall `(v : T)
+         `(p : _ -> proc opT opHiT TP)
+         `(rx : _ -> proc opT opHiT TF)
+         `(op_step : OpSemantics opT State),
+  hitrace_incl op_step
+    (Bind (Bind (OpRet v) (fun r => (Atomic (p r)))) rx)
+    (Bind (Atomic (Bind (OpRet v) p)) rx).
+Proof.
+  intros.
+  eapply hitrace_incl_proof_helper; intros.
+  repeat exec_tid_inv.
+
+  eapply hitrace_incl_ts_proof_helper in H0.
+  deex.
+  eexists; split.
+  eassumption.
+  eauto.
+
+  intros.
+  repeat exec_tid_inv.
+
+  eexists; split.
+  eapply ExecOne with (tid := tid).
+    autorewrite with t; eauto.
+    eauto.
+    simpl. autorewrite with t. eauto.
   simpl; eauto.
 Qed.
 
