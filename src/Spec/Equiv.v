@@ -862,11 +862,19 @@ Proof.
   eapply hitrace_incl_ts_s_trans; eauto.
 Qed.
 
-Lemma hitrace_incl_opret :
-  forall `(p : T -> proc opT opHiT T') (v : T) `(op_step : OpSemantics opT State),
+Lemma hitrace_incl_proof_helper :
+  forall `(p1 : proc opT opHiT T) p2 `(op_step : OpSemantics opT State),
+  (forall tid ts s s' result tr evs,
+    exec_tid op_step tid s p1 s' result evs ->
+    exec op_step s' (ts [[tid := match result with
+                                 | inl _ => NoProc
+                                 | inr p' => Proc p'
+                                 end]]) tr ->
+    exists tr',
+      exec op_step s ts [[tid := Proc p2]] tr' /\
+      trace_match_hi (prepend tid evs tr) tr') ->
   hitrace_incl op_step
-    (Bind (OpRet v) p)
-    (p v).
+    p1 p2.
 Proof.
   unfold hitrace_incl, hitrace_incl_opt,
          hitrace_incl_ts, hitrace_incl_ts_s.
@@ -882,12 +890,7 @@ Proof.
   - destruct (tid == tid0); subst.
     + autorewrite with t in *.
       repeat maybe_proc_inv.
-      exec_tid_inv.
-      exec_tid_inv.
-
-      eexists; split.
       eauto.
-      constructor.
 
     + edestruct IHexec; intuition idtac.
       rewrite thread_upd_upd_ne; eauto.
@@ -898,10 +901,25 @@ Proof.
       eapply ExecOne with (tid := tid0).
         autorewrite with t; eauto.
         eauto.
-        rewrite thread_upd_upd_ne by assumption; eauto.
+        rewrite thread_upd_upd_ne; eauto.
       eauto.
 
   - exfalso; eauto.
+Qed.
+
+Lemma hitrace_incl_opret :
+  forall `(p : T -> proc opT opHiT T') (v : T) `(op_step : OpSemantics opT State),
+  hitrace_incl op_step
+    (Bind (OpRet v) p)
+    (p v).
+Proof.
+  intros.
+  eapply hitrace_incl_proof_helper; intros.
+  repeat exec_tid_inv.
+
+  eexists; split.
+  eauto.
+  constructor.
 Qed.
 
 Lemma hitrace_incl_opcall :
@@ -910,39 +928,12 @@ Lemma hitrace_incl_opcall :
     (Bind (OpCall op) p)
     (p tt).
 Proof.
-  unfold hitrace_incl, hitrace_incl_opt,
-         hitrace_incl_ts, hitrace_incl_ts_s.
   intros.
+  eapply hitrace_incl_proof_helper; intros.
+  repeat exec_tid_inv.
 
-  match goal with
-  | H : exec _ _ (thread_upd ?ts ?tid ?p) _ |- _ =>
-    remember (thread_upd ts tid p);
-    generalize dependent ts;
-    induction H; intros; subst
-  end.
-
-  - destruct (tid == tid0); subst.
-    + autorewrite with t in *.
-      repeat maybe_proc_inv.
-      exec_tid_inv.
-      exec_tid_inv.
-
-      eexists; intuition eauto.
-      constructor.
-
-    + edestruct IHexec; intuition idtac.
-      rewrite thread_upd_upd_ne; eauto.
-
-      autorewrite with t in *.
-      eexists; split.
-
-      eapply ExecOne with (tid := tid0).
-        autorewrite with t; eauto.
-        eauto.
-        rewrite thread_upd_upd_ne; eauto.
-      eauto.
-
-  - exfalso; eauto.
+  eexists; intuition eauto.
+  constructor.
 Qed.
 
 Theorem hitrace_incl_opexec :
@@ -951,44 +942,18 @@ Theorem hitrace_incl_opexec :
     (Bind (OpExec op) p)
     (Bind (Atomic (Op op)) p).
 Proof.
-  unfold hitrace_incl, hitrace_incl_opt,
-         hitrace_incl_ts, hitrace_incl_ts_s.
   intros.
+  eapply hitrace_incl_proof_helper; intros.
+  repeat exec_tid_inv.
 
-  match goal with
-  | H : exec _ _ (thread_upd ?ts ?tid ?p) _ |- _ =>
-    remember (thread_upd ts tid p);
-    generalize dependent ts;
-    induction H; intros; subst
-  end.
+  eexists; split.
 
-  - destruct (tid == tid0); subst.
-    + autorewrite with t in *.
-      repeat maybe_proc_inv.
-      repeat exec_tid_inv.
+  eapply ExecOne with (tid := tid).
+    autorewrite with t; eauto.
+    eauto 20.
+    autorewrite with t; eauto.
 
-      eexists; split.
-
-      eapply ExecOne with (tid := tid0).
-        autorewrite with t; eauto.
-        eauto 20.
-        autorewrite with t; eauto.
-
-      simpl; eauto.
-
-    + edestruct IHexec; intuition idtac.
-      rewrite thread_upd_upd_ne; eauto.
-
-      autorewrite with t in *.
-      eexists; split.
-
-      eapply ExecOne with (tid := tid0).
-        autorewrite with t; eauto.
-        eauto.
-        rewrite thread_upd_upd_ne; eauto.
-      eauto.
-
-  - exfalso; eauto.
+  simpl; eauto.
 Qed.
 
 Theorem hitrace_incl_bind_a : forall `(p : proc opT opHiT T) `(p2 : T -> proc _ _ T') p2' `(op_step : OpSemantics opT State),
@@ -1005,6 +970,7 @@ Proof.
     generalize dependent ts;
     generalize dependent p;
     induction H; intros; subst
+
   end.
 
   - destruct (tid0 == tid); subst.
@@ -1100,52 +1066,25 @@ Lemma hitrace_incl_atomic_bind :
     (Bind (Atomic (Bind p1 p2)) p3)
     (Bind (Bind (Atomic p1) (fun r => Atomic (p2 r))) p3).
 Proof.
-  unfold hitrace_incl, hitrace_incl_opt,
-         hitrace_incl_ts, hitrace_incl_ts_s.
   intros.
+  eapply hitrace_incl_proof_helper; intros.
+  repeat exec_tid_inv.
+  atomic_exec_inv.
 
-  match goal with
-  | H : exec _ _ (thread_upd ?ts ?tid ?p) _ |- _ =>
-    remember (thread_upd ts tid p);
-    generalize dependent ts;
-    induction H; intros; subst
-  end.
+  eexists; intuition eauto.
+  rewrite prepend_app.
 
-  - destruct (tid == tid0); subst.
-    + autorewrite with t in *.
-      repeat maybe_proc_inv.
-      exec_tid_inv.
-      exec_tid_inv.
-      atomic_exec_inv.
+  eapply ExecOne with (tid := tid).
+    autorewrite with t; eauto.
+    eauto.
+    autorewrite with t.
 
-      eexists; intuition eauto.
-      rewrite prepend_app.
+  eapply ExecOne with (tid := tid).
+    autorewrite with t; eauto.
+    eauto.
+    autorewrite with t.
 
-      eapply ExecOne with (tid := tid0).
-        autorewrite with t; eauto.
-        eauto.
-        autorewrite with t.
-
-      eapply ExecOne with (tid := tid0).
-        autorewrite with t; eauto.
-        eauto.
-        autorewrite with t.
-
-      eauto.
-
-    + edestruct IHexec; intuition idtac.
-      rewrite thread_upd_upd_ne; eauto.
-
-      autorewrite with t in *.
-      eexists; split.
-
-      eapply ExecOne with (tid := tid0).
-        autorewrite with t; eauto.
-        eauto.
-        rewrite thread_upd_upd_ne; eauto.
-      eauto.
-
-  - exfalso; eauto.
+  eauto.
 Qed.
 
 Lemma hitrace_incl_atomic :
@@ -1156,56 +1095,28 @@ Lemma hitrace_incl_atomic :
     (Bind (Atomic p1) p2)
     (Bind p1 p2).
 Proof.
-  unfold hitrace_incl, hitrace_incl_opt,
-         hitrace_incl_ts, hitrace_incl_ts_s.
   intros.
+  eapply hitrace_incl_proof_helper; intros.
+  repeat exec_tid_inv.
+
+  eexists; intuition eauto.
+
+  generalize dependent p2.
+  generalize dependent tr.
 
   match goal with
-  | H : exec _ _ (thread_upd ?ts ?tid ?p) _ |- _ =>
-    remember (thread_upd ts tid p);
-    generalize dependent ts;
+  | H : atomic_exec _ _ _ _ _ _ _ |- _ =>
     induction H; intros; subst
   end.
 
-  - destruct (tid == tid0); subst.
-    + autorewrite with t in *.
-      repeat maybe_proc_inv.
-      exec_tid_inv.
-      exec_tid_inv.
+  all: try solve [ eapply ExecOne with (tid := tid);
+      [ autorewrite with t; eauto
+      | eauto
+      | autorewrite with t; eauto ] ].
 
-      eexists; intuition eauto.
-
-      clear IHexec.
-      generalize dependent p2.
-      generalize dependent trace.
-
-      match goal with
-      | H : atomic_exec _ _ _ _ _ _ _ |- _ =>
-        induction H; intros; subst
-      end.
-
-      all: try solve [ eapply ExecOne with (tid := tid);
-          [ autorewrite with t; eauto
-          | eauto
-          | autorewrite with t; eauto ] ].
-
-      rewrite prepend_app.
-      eapply exec_equiv_bind_bind.
-      eauto.
-
-    + edestruct IHexec; intuition idtac.
-      rewrite thread_upd_upd_ne; eauto.
-
-      autorewrite with t in *.
-      eexists; split.
-
-      eapply ExecOne with (tid := tid0).
-        autorewrite with t; eauto.
-        eauto.
-        rewrite thread_upd_upd_ne; eauto.
-      eauto.
-
-  - exfalso; eauto.
+  rewrite prepend_app.
+  eapply exec_equiv_bind_bind.
+  eauto.
 Qed.
 
 
