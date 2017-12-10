@@ -121,11 +121,12 @@ Section Disjoint.
       v
       (state_upd s' tid0 x).
 
+
   Variable disjoint_w : disjoint_writes.
   Variable disjoint_r : disjoint_reads.
 
-  Lemma exec_tid_disjoint_writes : forall T tid0 s p s' result' evs,
-    @exec_tid opT opHiT State op_step T tid0 s p s' result' evs ->
+  Lemma exec_tid_disjoint_writes : forall tid0 `(s : State) `(p : proc opT opHiT T) s' result' evs,
+    exec_tid op_step tid0 s p s' result' evs ->
     forall tid1,
       tid0 <> tid1 ->
       s tid1 = s' tid1.
@@ -138,10 +139,10 @@ Section Disjoint.
       apply IHatomic_exec2; eauto.
   Qed.
 
-  Lemma exec_tid_disjoint_reads : forall tid0 v tid1 T s p s' result' evs,
+  Lemma exec_tid_disjoint_reads : forall tid0 v tid1 `(s : State) `(p : proc opT opHiT T) s' result' evs,
     tid0 <> tid1 ->
-    @exec_tid opT opHiT State op_step T tid1 s p s' result' evs ->
-    @exec_tid opT opHiT State op_step T tid1 (state_upd s tid0 v) p (state_upd s' tid0 v) result' evs.
+    exec_tid op_step tid1 s p s' result' evs ->
+    exec_tid op_step tid1 (state_upd s tid0 v) p (state_upd s' tid0 v) result' evs.
   Proof.
     intros.
     induction H0; simpl; eauto.
