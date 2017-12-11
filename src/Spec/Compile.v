@@ -3,6 +3,9 @@ Require Import Equiv.
 Require Import Helpers.Helpers.
 Require Import FunctionalExtensionality.
 Require Import Omega.
+Require Import List.
+
+Import ListNotations.
 
 Global Set Implicit Arguments.
 Global Generalizable All Variables.
@@ -78,6 +81,138 @@ Section Compiler.
     | OpRetHi v => Ret v
     | Atomic p => Atomic (compile p)
     end.
+
+
+  Variable State : Type.
+  Variable lo_step : OpSemantics opLoT State.
+  Variable hi_step : OpSemantics opMidT State.
+
+  Definition compile_correct :=
+    forall `(op : opMidT T) tid s v s' evs,
+      atomic_exec lo_step (compile_op op) tid s v s' evs ->
+      traces_match (prepend tid evs TraceEmpty) (@TraceEmpty opMidT opHiT) /\
+      hi_step op tid s v s'.
+
+  Variable compile_is_correct : compile_correct.
+
+  Lemma atomic_compile_ok_exec_tid : forall T (p1 : proc _ _ T) p2,
+    atomic_compile_ok p1 p2 ->
+    forall tid s s' result evs,
+      exec_tid lo_step tid s p1 s' result evs ->
+      exists result' evs',
+        exec_tid hi_step tid s p2 s' result' evs' /\
+        traces_match (prepend tid evs TraceEmpty) (prepend tid evs' TraceEmpty) /\
+        match result with
+        | inl v => match result' with
+          | inl v' => v = v'
+          | inr _ => False
+          end
+        | inr p' => match result' with
+          | inl _ => False
+          | inr p'' => atomic_compile_ok p' p''
+          end
+        end.
+  Proof.
+    induction 1; intros.
+
+    - exec_tid_inv.
+      do 2 eexists; split.
+      constructor.
+      split.
+      simpl; eauto.
+      eauto.
+
+    - exec_tid_inv.
+      eapply compile_is_correct in H6.
+      do 2 eexists; intuition eauto.
+
+    - exec_tid_inv.
+      do 2 eexists; split.
+      constructor.
+      split.
+      simpl; eauto.
+      eauto.
+
+    - exec_tid_inv.
+      do 2 eexists; split.
+      constructor.
+      split.
+      simpl; eauto.
+      eauto.
+
+    - exec_tid_inv.
+      eapply IHatomic_compile_ok in H12.
+      repeat deex.
+
+      destruct result0; destruct result'; try solve [ exfalso; eauto ].
+
+      + do 2 eexists; split.
+        eauto.
+        split.
+        eauto.
+        subst; eauto.
+
+      + do 2 eexists; split.
+        eauto.
+        split.
+        eauto.
+        constructor.
+        eauto.
+        eauto.
+
+    - exec_tid_inv.
+      do 2 eexists; split.
+      constructor.
+      split.
+      simpl; eauto.
+      eauto.
+
+    - exec_tid_inv.
+      do 2 eexists; split.
+      constructor.
+      split.
+      simpl; eauto.
+      eauto.
+  Qed.
+
+  Theorem atomic_compile_ok_traces_match_ts :
+    forall ts1 ts2,
+      proc_match atomic_compile_ok ts1 ts2 ->
+      traces_match_ts lo_step hi_step ts1 ts2.
+  Proof.
+    unfold traces_match_ts; intros.
+    generalize dependent ts2.
+    induction H0; intros.
+    - eapply proc_match_pick with (tid := tid) in H2 as H'.
+      intuition try congruence.
+      repeat deex.
+      rewrite H3 in H; inversion H; clear H; subst.
+      repeat maybe_proc_inv.
+
+      edestruct atomic_compile_ok_exec_tid; eauto.
+      repeat deex.
+
+      edestruct IHexec.
+      shelve.
+      intuition idtac.
+
+      eexists; split.
+      eapply ExecOne with (tid := tid).
+        eauto.
+        eauto.
+        eauto.
+
+      eapply traces_match_prepend; eauto.
+      Unshelve.
+
+      destruct result, x; simpl in *; try solve [ exfalso; eauto ].
+      eapply proc_match_del; eauto.
+      eapply proc_match_upd; eauto.
+
+    - eexists; split.
+      eapply ExecEmpty; eauto.
+      eauto.
+  Qed.
 
 End Compiler.
 
@@ -194,6 +329,68 @@ Section Atomization.
   Qed.
 
 End Atomization.
+
+
+Theorem atomize_proc_match_helper :
+  forall T `(p1 : proc opLoT opMidT T) `(p2 : proc opMidT opHiT T)
+         compile_op,
+  compile_ok compile_op p1 p2 ->
+    atomize_ok compile_op p1 (compile (atomize compile_op) p2) /\
+    atomic_compile_ok compile_op (compile (atomize compile_op) p2) p2.
+Proof.
+  induction 1; simpl; intros.
+  - split. constructor. repeat constructor.
+  - split; constructor.
+  - intuition idtac.
+    constructor. eauto. intros. specialize (H1 x). intuition eauto.
+    constructor. eauto. intros. specialize (H1 x). intuition eauto.
+  - split; constructor.
+  - split; constructor.
+Qed.
+
+Hint Resolve proc_match_cons_Proc.
+Hint Resolve proc_match_cons_NoProc.
+
+Theorem atomize_proc_match :
+  forall `(ts1 : @threads_state opLoT opMidT)
+         `(ts2 : @threads_state opMidT opHiT)
+         compile_op,
+  proc_match (compile_ok compile_op) ts1 ts2 ->
+  exists ts1',
+    proc_match (atomize_ok compile_op) ts1 ts1' /\
+    proc_match (atomic_compile_ok compile_op) ts1' ts2.
+Proof.
+  induction ts1; intros.
+  - eapply proc_match_len in H.
+    destruct ts2; simpl in *; try omega.
+    eexists; split.
+    eapply proc_match_nil.
+    eapply proc_match_nil.
+  - eapply proc_match_len in H as H'.
+    destruct ts2; simpl in *; try omega.
+
+    eapply proc_match_cons_inv in H.
+    edestruct IHts1; intuition eauto.
+    + exists (NoProc :: x); subst; intuition eauto.
+    + repeat deex.
+      edestruct (atomize_proc_match_helper H4).
+      eexists (Proc _ :: x); intuition eauto.
+Qed.
+
+Theorem compile_traces_match_ts :
+  forall `(ts1 : @threads_state opLoT opMidT)
+         `(ts2 : @threads_state opMidT opHiT)
+         `(lo_step : OpSemantics opLoT State) hi_step compile_op,
+  compile_correct opHiT compile_op lo_step hi_step ->
+  atomize_correct compile_op lo_step ->
+  proc_match (compile_ok compile_op) ts1 ts2 ->
+  traces_match_ts lo_step hi_step ts1 ts2.
+Proof.
+  intros.
+  eapply atomize_proc_match in H1; deex.
+  rewrite atomize_ok_hitrace_incl_ts; eauto.
+  eapply atomic_compile_ok_traces_match_ts; eauto.
+Qed.
 
 
 Section Commutes.
