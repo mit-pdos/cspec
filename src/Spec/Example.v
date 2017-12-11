@@ -454,50 +454,11 @@ Qed.
 
 (** Correctness for 1 thread *)
 
-Definition trace_match_one_thread {opLoT opMidT opHiT State T} lo_step hi_step
-                                            (p1 : proc opLoT opMidT T)
-                                            (p2 : proc opMidT opHiT T) :=
-  forall (s : State) tr1,
-    exec lo_step s (threads_empty [[ 1 := Proc p1 ]]) tr1 ->
-    exists tr2,
-      exec hi_step s (threads_empty [[ 1 := Proc p2 ]]) tr2 /\
-      traces_match tr1 tr2.
-
-Instance trace_match_one_thread_proper {opLoT opMidT opHiT State T lo_step hi_step} :
-  Proper (exec_equiv ==> exec_equiv ==> Basics.flip Basics.impl)
-         (@trace_match_one_thread opLoT opMidT opHiT State T lo_step hi_step).
-Proof.
-  intros p1 p1'; intros.
-  intros p2 p2'; intros.
-  unfold Basics.flip, Basics.impl; intros.
-  unfold trace_match_one_thread in *; intros.
-  apply H in H2.
-  apply H1 in H2.
-  destruct H2.
-  eexists; intuition eauto.
-  apply H0. eauto.
-Qed.
-
-Instance trace_match_one_thread_proper2 {opLoT opMidT opHiT State T lo_step hi_step} :
-  Proper (hitrace_incl lo_step ==> exec_equiv ==> Basics.flip Basics.impl)
-         (@trace_match_one_thread opLoT opMidT opHiT State T lo_step hi_step).
-Proof.
-  intros p1 p1'; intros.
-  intros p2 p2'; intros.
-  unfold Basics.flip, Basics.impl; intros.
-  unfold trace_match_one_thread in *; intros.
-  eapply H in H2. deex.
-  apply H1 in H2. deex.
-  eexists; intuition eauto.
-  apply H0. eauto.
-  rewrite H3. eauto.
-Qed.
-
 Theorem all_single_thread_traces_match' :
   forall T T' (p1 : proc opT opHiT T) (p2 : proc opHiT opHi2T T) (p1rest : T -> proc opT opHiT T') (p2rest : T -> proc opHiT opHi2T T'),
   (forall x, trace_match_one_thread op_step opHi_step (p1rest x) (p2rest x)) ->
-  compile_ok p1 p2 ->
-  trace_match_one_thread op_step opHi_step (Bind p1 p1rest) (Bind p2 p2rest).
+  inc2_compile_ok p1 p2 ->
+  traces_match_one_thread op_step opHi_step (Bind p1 p1rest) (Bind p2 p2rest).
 Proof.
   intros.
   generalize dependent p2rest.
@@ -581,7 +542,7 @@ Qed.
 
 Theorem all_single_thread_traces_match :
   forall T' (p1 : proc opT opHiT T') (p2 : proc opHiT opHi2T T'),
-  compile_ok p1 p2 ->
+  inc2_compile_ok p1 p2 ->
   trace_match_one_thread op_step opHi_step p1 p2.
 Proof.
   intros.
@@ -608,26 +569,14 @@ Qed.
 
 (** Many-thread correctness *)
 
-Inductive compile_ok_atomic : forall T (p1 : proc opT opHiT T) (p2 : proc opHiT opHi2T T), Prop :=
-| CompileAIncTwiceCall :
-  compile_ok_atomic (OpCallHi IncTwice) (OpCall IncTwice)
-| CompileAIncTwiceExec :
-  compile_ok_atomic (Atomic (_ <- Op Inc; Op Inc)) (OpExec IncTwice)
-| CompileAIncTwiceRet : forall `(r : T),
-  compile_ok_atomic (OpRetHi r) (OpRet r)
-| CompileARet : forall `(x : T),
-  compile_ok_atomic (Ret x) (Ret x)
-| CompileABind : forall `(p1a : proc opT opHiT T1) (p2a : proc opHiT opHi2T T1)
-                        `(p1b : T1 -> proc opT opHiT T2) (p2b : T1 -> proc opHiT opHi2T T2),
-  compile_ok_atomic p1a p2a ->
-  (forall x, compile_ok_atomic (p1b x) (p2b x)) ->
-  compile_ok_atomic (Bind p1a p1b) (Bind p2a p2b).
+Definition inc2_compile_ok_atomic :=
+  @atomic_compile_ok opT opHiT opHi2T compile_op.
 
 Definition compile_ok_all_atomic (ts1 ts2 : threads_state) :=
-  proc_match compile_ok_atomic ts1 ts2.
+  proc_match inc2_compile_ok_atomic ts1 ts2.
 
 Lemma compile_ok_atomic_exec_tid : forall T (p1 : proc _ _ T) p2,
-  compile_ok_atomic p1 p2 ->
+  inc2_compile_ok_atomic p1 p2 ->
   forall tid s s' result evs,
   exec_tid op_step tid s p1 s' result evs ->
   exists result' evs',
@@ -640,7 +589,7 @@ Lemma compile_ok_atomic_exec_tid : forall T (p1 : proc _ _ T) p2,
     end
   | inr p' => match result' with
     | inl _ => False
-    | inr p'' => compile_ok_atomic p' p''
+    | inr p'' => inc2_compile_ok_atomic p' p''
     end
   end.
 Proof.

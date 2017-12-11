@@ -38,6 +38,34 @@ Section Compiler.
   | CompileOpRetHi : forall `(v : T),
     compile_ok (Ret v) (OpRetHi v).
 
+  (* [atomic_compile_ok] is not quite [compile_ok] with [atomize]
+     added to [compile_op].  It also breaks out [OpCallHi] and [OpRetHi]
+     into separate matches, so that the [atomic_compile_ok] relation keeps
+     holding across atomic steps taken by each thread.
+
+     This means that [atomic_compile_ok] does not enforce the calling
+     convention in itself: a program might have way too many [OpCallHi]s
+     and not enough [OpRetHi]s, etc.
+   *)
+  Inductive atomic_compile_ok : forall T (p1 : proc opLoT opMidT T) (p2 : proc opMidT opHiT T), Prop :=
+  | ACompileOpCall : forall `(op : opMidT T),
+    atomic_compile_ok (OpCallHi op) (OpCall op)
+  | ACompileOpExec : forall `(op : opMidT T),
+    atomic_compile_ok (Atomic (compile_op op)) (OpExec op)
+  | ACompileOpRet : forall `(v : T),
+    atomic_compile_ok (OpRetHi v) (OpRet v)
+  | ACompileRet : forall `(x : T),
+    atomic_compile_ok (Ret x) (Ret x)
+  | ACompileBind : forall `(p1a : proc opLoT opMidT T1) (p2a : proc opMidT opHiT T1)
+                         `(p1b : T1 -> proc _ _ T2) (p2b : T1 -> proc _ _ T2),
+    atomic_compile_ok p1a p2a ->
+    (forall x, atomic_compile_ok (p1b x) (p2b x)) ->
+    atomic_compile_ok (Bind p1a p1b) (Bind p2a p2b)
+  | ACompileOpCallHi : forall `(op : opHiT T),
+    atomic_compile_ok (Ret tt) (OpCallHi op)
+  | ACompileOpRetHi : forall `(v : T),
+    atomic_compile_ok (Ret v) (OpRetHi v).
+
   Fixpoint compile T (p : proc opMidT opHiT T) : proc opLoT opMidT T :=
     match p with
     | Ret t => Ret t

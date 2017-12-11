@@ -1384,19 +1384,61 @@ Definition traces_match_ts {opLoT opMidT opHiT State} lo_step hi_step
 
 Instance traces_match_ts_proper :
   Proper (@hitrace_incl_ts opLoT opMidT State lo_step ==>
-          eq ==>
+          exec_equiv_ts ==>
           Basics.flip Basics.impl)
          (@traces_match_ts opLoT opMidT opHiT State lo_step hi_step).
 Proof.
   intros.
-  intros ts1 ts2 H12.
-  intros ts3' ts3 H; subst.
+  intros ts1 ts1' H1.
+  intros ts2 ts2' H2.
   unfold Basics.flip, Basics.impl.
   unfold traces_match_ts; intros.
-  apply H12 in H0. deex.
+  apply H1 in H0. deex.
   apply H in H0. deex.
+  apply H2 in H0.
   eexists; split. eauto.
-  rewrite H1. eauto.
+  rewrite H3. eauto.
+Qed.
+
+Definition traces_match_one_thread opLoT opMidT opHiT State T
+    (lo_step : OpSemantics opLoT State)
+    (hi_step : OpSemantics opMidT State)
+    (p1 : proc opLoT opMidT T)
+    (p2 : proc opMidT opHiT T) :=
+  traces_match_ts lo_step hi_step
+    (threads_empty [[ 1 := Proc p1 ]])
+    (threads_empty [[ 1 := Proc p2 ]]).
+
+Instance traces_match_one_thread_proper :
+  Proper (@hitrace_incl opLoT opMidT T State lo_step ==>
+          @exec_equiv opMidT opHiT T ==>
+          Basics.flip Basics.impl)
+         (@traces_match_one_thread opLoT opMidT opHiT State T lo_step hi_step).
+Proof.
+  intros.
+  intros p1 p1'; intros.
+  intros p2 p2'; intros.
+  unfold Basics.flip, Basics.impl; intros.
+  unfold traces_match_one_thread in *; intros.
+  rewrite H.
+  rewrite H0.
+  eauto.
+Qed.
+
+Instance traces_match_one_thread_proper_flip :
+  Proper (Basics.flip (@hitrace_incl opLoT opMidT T State lo_step) ==>
+          @exec_equiv opMidT opHiT T ==>
+          Basics.impl)
+         (@traces_match_one_thread opLoT opMidT opHiT State T lo_step hi_step).
+Proof.
+  intros.
+  intros p1 p1'; intros.
+  intros p2 p2'; intros.
+  unfold Basics.flip, Basics.impl; intros.
+  unfold traces_match_one_thread in *; intros.
+  rewrite <- H.
+  rewrite <- H0.
+  eauto.
 Qed.
 
 
