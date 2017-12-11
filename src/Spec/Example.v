@@ -323,77 +323,133 @@ Proof.
 Qed.
 
 
-Definition inc_twice_impl_atomic :=
-  _ <- OpCallHi IncTwice;
-  r <- Atomic (_ <- Op Inc; Op Inc);
-  OpRetHi r.
+
+Definition inc_twice_impl_atomic := hicall (atomize compile_op) IncTwice.
+Definition dec_thrice_impl_atomic := hicall (atomize compile_op) DecThrice.
+
 
 Theorem inc_twice_atomic : forall `(rx : _ -> proc _ _ T),
   hitrace_incl op_step
     (Bind inc_twice_impl rx) (Bind inc_twice_impl_atomic rx).
 Proof.
-  unfold inc_twice_impl, inc_twice_impl_atomic, hicall; simpl.
-  unfold inc_twice_core, Op; intros.
+  unfold inc_twice_impl, inc_twice_impl_atomic, hicall, atomize; simpl.
+  unfold inc_twice_core; intros.
 
   rewrite exec_equiv_bind_bind.
   rewrite exec_equiv_bind_bind with (p1 := OpCallHi _).
   eapply hitrace_incl_bind_a; intros.
-
   repeat rewrite exec_equiv_bind_bind.
-  rewrite exec_equiv_bind_bind with (p1 := Atomic _).
 
-  etransitivity.
+  (* First [Op Inc] *)
+  unfold Op at 3.
+  rewrite atomic_equiv_bind_bind with (p1 := OpCall _).
+  setoid_rewrite atomic_equiv_bind_bind with (p1 := OpExec _).
 
-  (* Step 1 *)
-  etransitivity.
-  2: eapply hitrace_incl_atomize_opcall.
-  setoid_rewrite exec_equiv_bind_bind with (p1 := OpCall _).
+  unfold Op at 1.
+  rewrite <- hitrace_incl_atomize_opcall.
+  rewrite exec_equiv_bind_bind.
+  setoid_rewrite exec_equiv_bind_bind.
   eapply hitrace_incl_bind_a; intros.
 
-  etransitivity.
-  2: eapply hitrace_incl_atomize_opexec; eauto.
-  setoid_rewrite exec_equiv_bind_bind with (p1 := OpExec _).
+  rewrite <- hitrace_incl_atomize_opexec; eauto.
+  rewrite exec_equiv_bind_bind.
   eapply hitrace_incl_bind_a; intros.
 
-  etransitivity.
-  2: eapply hitrace_incl_atomize_opret.
-  setoid_rewrite exec_equiv_bind_bind with (p1 := OpRet _).
+  rewrite <- hitrace_incl_atomize_opret.
+  rewrite exec_equiv_bind_bind.
   eapply hitrace_incl_bind_a; intros.
 
-  (* Step 2 *)
-  etransitivity.
-  2: eapply hitrace_incl_atomize_opcall.
-  setoid_rewrite exec_equiv_bind_bind with (p1 := OpCall _).
+  (* Second [Op Inc] *)
+  unfold Op at 2.
+
+  unfold Op at 1.
+  rewrite <- hitrace_incl_atomize_opcall.
+  rewrite exec_equiv_bind_bind.
+  setoid_rewrite exec_equiv_bind_bind.
   eapply hitrace_incl_bind_a; intros.
 
-  etransitivity.
-  2: eapply hitrace_incl_atomize_opexec; eauto.
-  setoid_rewrite exec_equiv_bind_bind with (p1 := OpExec _).
+  rewrite <- hitrace_incl_atomize_opexec; eauto.
+  rewrite exec_equiv_bind_bind.
   eapply hitrace_incl_bind_a; intros.
 
-  etransitivity.
-  2: eapply hitrace_incl_atomize_opret.
-  setoid_rewrite exec_equiv_bind_bind with (p1 := OpRet _).
+  rewrite <- atomic_equiv_bind_ret with (p := OpRet x4) at 2.
+  rewrite <- hitrace_incl_atomize_opret.
+  rewrite exec_equiv_bind_bind.
   eapply hitrace_incl_bind_a; intros.
 
-  instantiate (2 := Ret).
   rewrite exec_equiv_atomicret_bind.
-
-  instantiate (1 := fun x5 => Bind (OpRetHi x5) rx).
   reflexivity.
+Qed.
 
-  (* TODO: some kind of [exec_equiv] that can fit under [Atomic].
+Theorem dec_thrice_atomic : forall `(rx : _ -> proc _ _ T),
+  hitrace_incl op_step
+    (Bind dec_thrice_impl rx) (Bind dec_thrice_impl_atomic rx).
+Proof.
+  unfold dec_thrice_impl, dec_thrice_impl_atomic, hicall, atomize; simpl.
+  unfold dec_thrice_core; intros.
 
-  - augment [exec_equiv] with [exec_equiv_rx] which talks about a continuation
+  rewrite exec_equiv_bind_bind.
+  rewrite exec_equiv_bind_bind with (p1 := OpCallHi _).
+  eapply hitrace_incl_bind_a; intros.
+  repeat rewrite exec_equiv_bind_bind.
+  setoid_rewrite exec_equiv_bind_bind with (p1 := Atomic _).
 
-  - this will help with [Bind_exec_equiv_proper] first argument
+  (* First [Op Dec] *)
+  unfold Op at 4.
+  rewrite atomic_equiv_bind_bind with (p1 := OpCall _).
+  setoid_rewrite atomic_equiv_bind_bind with (p1 := OpExec _).
 
-  - which in turn will allow [rewrite exec_equiv_bind_bind] in
-    [inc_twice_atomic] in an [Atomic] that is the first step of a [Bind]
+  unfold Op at 1.
+  rewrite <- hitrace_incl_atomize_opcall.
+  rewrite exec_equiv_bind_bind.
+  setoid_rewrite exec_equiv_bind_bind.
+  eapply hitrace_incl_bind_a; intros.
 
-  *)
+  rewrite <- hitrace_incl_atomize_opexec; eauto.
+  setoid_rewrite exec_equiv_bind_bind with (p1 := OpExec _).
+  eapply hitrace_incl_bind_a; intros.
 
-Admitted.
+  rewrite <- hitrace_incl_atomize_opret.
+  setoid_rewrite exec_equiv_bind_bind.
+  eapply hitrace_incl_bind_a; intros.
+
+  (* Second [Op Dec] *)
+  unfold Op at 3.
+  rewrite atomic_equiv_bind_bind with (p1 := OpCall _).
+  setoid_rewrite atomic_equiv_bind_bind with (p1 := OpExec _).
+
+  unfold Op at 1.
+  rewrite <- hitrace_incl_atomize_opcall.
+  rewrite exec_equiv_bind_bind.
+  setoid_rewrite exec_equiv_bind_bind.
+  eapply hitrace_incl_bind_a; intros.
+
+  rewrite <- hitrace_incl_atomize_opexec; eauto.
+  setoid_rewrite exec_equiv_bind_bind with (p1 := OpExec _).
+  eapply hitrace_incl_bind_a; intros.
+
+  rewrite <- hitrace_incl_atomize_opret.
+  setoid_rewrite exec_equiv_bind_bind.
+  eapply hitrace_incl_bind_a; intros.
+
+  (* Third [Op Dec] *)
+  unfold Op.
+  rewrite <- hitrace_incl_atomize_opcall.
+  setoid_rewrite exec_equiv_bind_bind.
+  eapply hitrace_incl_bind_a; intros.
+
+  rewrite <- hitrace_incl_atomize_opexec; eauto.
+  rewrite exec_equiv_bind_bind.
+  eapply hitrace_incl_bind_a; intros.
+
+  rewrite <- atomic_equiv_bind_ret with (p := OpRet _) at 2.
+  rewrite <- hitrace_incl_atomize_opret.
+  rewrite exec_equiv_bind_bind.
+  eapply hitrace_incl_bind_a; intros.
+
+  rewrite exec_equiv_atomicret_bind.
+  reflexivity.
+Qed.
 
 
 (** Correctness for 1 thread *)

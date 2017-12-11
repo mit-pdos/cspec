@@ -15,7 +15,7 @@ Section Compiler.
 
   Variable compile_op : forall T, opMidT T -> proc opLoT opMidT T.
 
-  Definition atomize {T} (op : opMidT T) : proc opLoT opMidT T :=
+  Definition atomize T (op : opMidT T) : proc opLoT opMidT T :=
     Atomic (compile_op op).
 
   Definition hicall T (op : opMidT T) : proc opLoT opMidT T :=
