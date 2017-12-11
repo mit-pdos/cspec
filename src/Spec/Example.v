@@ -456,7 +456,7 @@ Qed.
 
 Theorem all_single_thread_traces_match' :
   forall T T' (p1 : proc opT opHiT T) (p2 : proc opHiT opHi2T T) (p1rest : T -> proc opT opHiT T') (p2rest : T -> proc opHiT opHi2T T'),
-  (forall x, trace_match_one_thread op_step opHi_step (p1rest x) (p2rest x)) ->
+  (forall x, traces_match_one_thread op_step opHi_step (p1rest x) (p2rest x)) ->
   inc2_compile_ok p1 p2 ->
   traces_match_one_thread op_step opHi_step (Bind p1 p1rest) (Bind p2 p2rest).
 Proof.
@@ -465,71 +465,133 @@ Proof.
   generalize dependent p1rest.
   induction H0; intros.
 
-  - rewrite inc_twice_atomic.
+  - destruct op.
+    + rewrite inc_twice_atomic.
 
-    unfold trace_match_one_thread; intros.
+      unfold traces_match_one_thread, traces_match_ts; intros.
 
-    exec_inv; repeat thread_inv.
-    autorewrite with t in *.
-    repeat ( exec_tid_inv; intuition try congruence ).
+      exec_inv; repeat thread_inv; autorewrite with t in *.
+      repeat ( exec_tid_inv; intuition try congruence ).
 
-    exec_inv; repeat thread_inv.
-    autorewrite with t in *.
-    repeat ( exec_tid_inv; intuition try congruence ).
+      exec_inv; repeat thread_inv; autorewrite with t in *.
+      repeat ( exec_tid_inv; intuition try congruence ).
 
-    repeat match goal with
-    | H : atomic_exec _ _ _ _ _ _ _ |- _ =>
-      inversion H; clear H; subst; repeat sigT_eq
-    end.
-    repeat step_inv.
+      exec_inv; repeat thread_inv; autorewrite with t in *.
+      repeat ( exec_tid_inv; intuition try congruence ).
 
-    exec_inv; repeat thread_inv.
-    autorewrite with t in *.
-    repeat ( exec_tid_inv; intuition try congruence ).
+      repeat atomic_exec_inv.
+      repeat step_inv.
 
-    apply H in H3. deex.
+      apply H in H3; deex.
 
-    eexists; split.
-    eapply ExecOne with (tid := 1).
-      rewrite thread_upd_eq; auto.
+      eexists; split.
+      eapply ExecOne with (tid := 1).
+        rewrite thread_upd_eq; auto.
+        eauto.
+      eapply ExecOne with (tid := 1).
+        rewrite thread_upd_eq; auto.
+        eauto.
+      eapply ExecOne with (tid := 1).
+        rewrite thread_upd_eq; auto.
+        eauto.
+      autorewrite with t.
+
+      match goal with
+      | H : exec _ ?s1 (thread_upd _ _ (Proc ?p1)) _ |-
+            exec _ ?s2 (thread_upd _ _ (Proc ?p2)) _ =>
+        replace p2 with p1; [ replace s2 with s1; [ eauto | ] | ]
+      end.
+
+      unfold inc, inc2, state_upd; apply functional_extensionality; intros.
+        destruct_ifs; omega.
+      f_equal.
+      unfold inc, inc2, state_upd;
+        destruct_ifs; omega.
+
+      simpl.
+      replace (inc s1 1 1 + 1) with (s1 1 + 2).
+      eauto 20.
+      unfold inc, state_upd. destruct_ifs; omega.
+
+    + rewrite dec_thrice_atomic.
+
+      unfold traces_match_one_thread, traces_match_ts; intros.
+
+      exec_inv; repeat thread_inv; autorewrite with t in *.
+      repeat ( exec_tid_inv; intuition try congruence ).
+
+      exec_inv; repeat thread_inv; autorewrite with t in *.
+      repeat ( exec_tid_inv; intuition try congruence ).
+
+      exec_inv; repeat thread_inv; autorewrite with t in *.
+      repeat ( exec_tid_inv; intuition try congruence ).
+
+      repeat atomic_exec_inv.
+      repeat step_inv.
+
+      apply H in H3; deex.
+
+      eexists; split.
+      eapply ExecOne with (tid := 1).
+        rewrite thread_upd_eq; auto.
+        eauto.
+      eapply ExecOne with (tid := 1).
+        rewrite thread_upd_eq; auto.
+        eauto.
+      eapply ExecOne with (tid := 1).
+        rewrite thread_upd_eq; auto.
+        eauto.
+      autorewrite with t.
+
+      match goal with
+      | H : exec _ ?s1 (thread_upd _ _ (Proc ?p1)) _ |-
+            exec _ ?s2 (thread_upd _ _ (Proc ?p2)) _ =>
+        replace p2 with p1; [ replace s2 with s1; [ eauto | ] | ]
+      end.
+
+      unfold dec, dec3, state_upd; apply functional_extensionality; intros.
+        destruct_ifs; omega.
+      f_equal.
+      unfold dec, dec3, state_upd;
+        destruct_ifs; omega.
+
+      simpl.
+      replace (dec (dec s1 1) 1 1 - 1) with (s1 1 - 3).
+      eauto 20.
+      unfold dec, state_upd. destruct_ifs; omega.
+
+    + unfold traces_match_one_thread, traces_match_ts; intros.
+
+      exec_inv; repeat thread_inv; autorewrite with t in *.
+      repeat ( exec_tid_inv; intuition try congruence ).
+
+      exec_inv; repeat thread_inv; autorewrite with t in *.
+      repeat ( exec_tid_inv; intuition try congruence ).
+
+      exec_inv; repeat thread_inv; autorewrite with t in *.
+      repeat ( exec_tid_inv; intuition try congruence ).
+
+      repeat atomic_exec_inv.
+      repeat step_inv.
+
+      apply H in H3; deex.
+
+      eexists; split.
+      eapply ExecOne with (tid := 1).
+        rewrite thread_upd_eq; auto.
+        eauto.
+      eapply ExecOne with (tid := 1).
+        rewrite thread_upd_eq; auto.
+        eauto.
+      eapply ExecOne with (tid := 1).
+        rewrite thread_upd_eq; auto.
+        eauto.
+      autorewrite with t.
+
       eauto.
-    eapply ExecOne with (tid := 1).
-      rewrite thread_upd_eq; auto.
-      eauto.
-    eapply ExecOne with (tid := 1).
-      rewrite thread_upd_eq; auto.
-      eauto.
-    autorewrite with t.
+      simpl; eauto.
 
-    match goal with
-    | H : exec _ ?s1 (thread_upd _ _ (Proc ?p1)) _ |-
-          exec _ ?s2 (thread_upd _ _ (Proc ?p2)) _ =>
-      replace p2 with p1; [ replace s2 with s1; [ eauto | ] | ]
-    end.
-
-    unfold inc, inc2, state_upd; apply functional_extensionality; intros.
-      destruct_ifs; omega.
-    f_equal.
-    unfold inc, inc2, state_upd;
-      destruct_ifs; omega.
-
-    simpl.
-    replace (inc s1 1 1 + 1) with (s1 1 + 2).
-    eauto 20.
-    unfold inc, state_upd. destruct_ifs; omega.
-
-  - unfold trace_match_one_thread in *; intros.
-
-    exec_inv; repeat thread_inv; autorewrite with t in *.
-    repeat exec_tid_inv; try intuition congruence.
-
-    edestruct H; eauto. intuition try congruence.
-    eexists. split.
-
-    exec_one 1.
-      eapply ExecTidBind. eauto. eauto.
-      autorewrite with t; simpl.
-
+  - repeat rewrite exec_equiv_ret_bind.
     eauto.
 
   - rewrite exec_equiv_bind_bind.
@@ -538,31 +600,50 @@ Proof.
     intros.
     eapply H1.
     eapply H2.
+
+  - rewrite exec_equiv_ret_bind.
+
+    unfold traces_match_one_thread, traces_match_ts in *; intros.
+    eapply H in H0; deex.
+
+    eexists; split.
+    eapply ExecOne with (tid := 1).
+      rewrite thread_upd_eq; auto.
+      eauto.
+    autorewrite with t; eauto.
+    simpl; eauto.
+
+  - rewrite exec_equiv_ret_bind.
+
+    unfold traces_match_one_thread, traces_match_ts in *; intros.
+    eapply H in H0; deex.
+
+    eexists; split.
+    eapply ExecOne with (tid := 1).
+      rewrite thread_upd_eq; auto.
+      eauto.
+    autorewrite with t; eauto.
+    simpl; eauto.
 Qed.
 
 Theorem all_single_thread_traces_match :
   forall T' (p1 : proc opT opHiT T') (p2 : proc opHiT opHi2T T'),
   inc2_compile_ok p1 p2 ->
-  trace_match_one_thread op_step opHi_step p1 p2.
+  traces_match_one_thread op_step opHi_step p1 p2.
 Proof.
   intros.
-  unfold trace_match_one_thread; intros.
-  eapply exec_equiv_bind_ret in H0.
-  eapply all_single_thread_traces_match' in H0; eauto.
-  deex.
-  eexists; split; eauto.
-  eapply exec_equiv_bind_ret.
-  eauto.
+  rewrite <- exec_equiv_bind_ret with (p := p3).
+  rewrite <- exec_equiv_bind_ret with (p := p4).
+  eapply all_single_thread_traces_match'; eauto; intros.
 
-  clear H0.
-  unfold trace_match_one_thread; intros.
+  unfold traces_match_one_thread, traces_match_ts; intros.
+
   eapply exec_equiv_ret_None in H0.
   exec_inv; repeat thread_inv.
 
   eexists; split.
   eapply exec_equiv_ret_None.
   eapply ExecEmpty; eauto.
-
   eauto.
 Qed.
 

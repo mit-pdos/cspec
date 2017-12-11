@@ -1441,6 +1441,24 @@ Proof.
   eauto.
 Qed.
 
+Instance traces_match_one_thread_proper_equiv :
+  Proper (@exec_equiv_rx opLoT opMidT T ==>
+          @exec_equiv_rx opMidT opHiT T ==>
+          iff)
+         (@traces_match_one_thread opLoT opMidT opHiT State T lo_step hi_step).
+Proof.
+  intros.
+  intros p1 p1'; intros.
+  intros p2 p2'; intros.
+  unfold traces_match_one_thread; split; intros.
+  - rewrite <- H.
+    rewrite <- H0.
+    eauto.
+  - rewrite H.
+    rewrite H0.
+    eauto.
+Qed.
+
 
 (** Helpers for connecting different [threads_state]s *)
 
