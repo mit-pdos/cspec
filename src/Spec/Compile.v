@@ -85,6 +85,23 @@ Arguments hicall {opLoT opMidT} compile_op {T}.
 Hint Constructors compile_ok.
 Hint Constructors atomic_compile_ok.
 
+(* [atomize_ok] captures the notion that all implementations of opcodes
+   in the left-side proc have been replaced with atomic-bracketed
+   versions in the right-side proc. *)
+
+Inductive atomize_ok
+  {opLoT opHiT} (compile_op : forall T, opHiT T -> proc opLoT opHiT T)
+  : forall T (p1 p2 : proc opLoT opHiT T), Prop :=
+| AtomizeOpcode : forall `(op : opHiT T),
+  atomize_ok compile_op (hicall compile_op op) (hicall (atomize compile_op) op)
+| AtomizeRet : forall `(x : T),
+  atomize_ok compile_op (Ret x) (Ret x)
+| AtomizeBind : forall T1 T2 (p1a p2a : proc opLoT opHiT T1)
+                             (p1b p2b : T1 -> proc opLoT opHiT T2),
+  atomize_ok compile_op p1a p2a ->
+  (forall x, atomize_ok compile_op (p1b x) (p2b x)) ->
+  atomize_ok compile_op (Bind p1a p1b) (Bind p2a p2b).
+
 
 Section Commutes.
 
