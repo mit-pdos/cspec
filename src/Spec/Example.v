@@ -814,91 +814,31 @@ Proof.
 Qed.
 
 
-Theorem atomize_ok_preserves_trace_0 :
-  forall T p1 p2,
-  atomize_ok compile_op p1 p2 ->
-  forall T' (p1rest p2rest : T -> proc _ _ T'),
-  (forall x, hitrace_incl op_step (p1rest x) (p2rest x)) ->
-  hitrace_incl op_step (Bind p1 p1rest) (Bind p2 p2rest).
+Theorem my_atomize_correct :
+  atomize_correct compile_op op_step.
 Proof.
-  induction 1; intros.
-  - destruct op.
-    + rewrite inc_twice_atomic.
-      eapply hitrace_incl_bind_a.
-      eauto.
-    + rewrite dec_thrice_atomic.
-      eapply hitrace_incl_bind_a.
-      eauto.
-    + unfold hicall; cbn.
-      rewrite exec_equiv_bind_bind.
-      setoid_rewrite exec_equiv_bind_bind.
-      eapply hitrace_incl_bind_a; intros.
-      unfold atomize; cbn.
-      setoid_rewrite exec_equiv_bind_bind.
-      rewrite exec_equiv_ret_bind.
-      rewrite exec_equiv_atomicret_bind.
-      eapply hitrace_incl_bind_a; intros.
-      eauto.
-  - eapply hitrace_incl_bind_a.
+  unfold atomize_correct; intros.
+  destruct op.
+  + rewrite inc_twice_atomic.
+    eapply hitrace_incl_bind_a.
     eauto.
-  - rewrite exec_equiv_bind_bind.
+  + rewrite dec_thrice_atomic.
+    eapply hitrace_incl_bind_a.
+    eauto.
+  + unfold hicall; cbn.
     rewrite exec_equiv_bind_bind.
-    eapply IHatomize_ok.
+    setoid_rewrite exec_equiv_bind_bind.
+    eapply hitrace_incl_bind_a; intros.
+    unfold atomize; cbn.
+    setoid_rewrite exec_equiv_bind_bind.
+    rewrite exec_equiv_ret_bind.
+    rewrite exec_equiv_atomicret_bind.
+    eapply hitrace_incl_bind_a; intros.
     eauto.
 Qed.
 
-Theorem atomize_ok_preserves_trace :
-  forall `(p1 : proc _ _ T) p2,
-  atomize_ok compile_op p1 p2 ->
-  hitrace_incl op_step p1 p2.
-Proof.
-  intros.
-  rewrite <- exec_equiv_bind_ret.
-  rewrite <- exec_equiv_bind_ret with (p := p4).
-  eapply atomize_ok_preserves_trace_0; eauto.
-  reflexivity.
-Qed.
+Hint Resolve my_atomize_correct.
 
-Theorem atomize_ok_all_upto_preserves_trace :
-  forall n ts1' ts1,
-  proc_match_upto n (atomize_ok compile_op) ts1 ts1' ->
-    hitrace_incl_ts op_step ts1 ts1'.
-Proof.
-  induction n; intros.
-  - apply proc_match_upto_0_eq in H; subst.
-    reflexivity.
-  - destruct (lt_dec n (length ts1)).
-    + etransitivity.
-      instantiate (1 := thread_upd ts1' n (thread_get ts1 n)).
-      * eapply IHn.
-        eapply proc_match_upto_Sn in H; eauto.
-      * eapply proc_match_upto_pick with (tid := n) in H; intuition idtac.
-        edestruct H0. omega.
-       -- intuition idtac.
-          rewrite H2.
-          rewrite <- exec_equiv_ts_upd_same; eauto.
-          reflexivity.
-       -- repeat deex.
-          rewrite H.
-          rewrite atomize_ok_preserves_trace; eauto.
-          rewrite thread_upd_same; eauto.
-          reflexivity.
-    + eapply IHn.
-      eapply proc_match_upto_Sn'.
-      omega.
-      eauto.
-Qed.
-
-Theorem atomize_ok_all_preserves_trace :
-  forall ts1' ts1,
-  proc_match (atomize_ok compile_op) ts1 ts1' ->
-    hitrace_incl_ts op_step ts1 ts1'.
-Proof.
-  intros.
-  eapply atomize_ok_all_upto_preserves_trace.
-  eapply proc_match_upto_all.
-  eauto.
-Qed.
 
 Theorem all_traces_match_1 :
   forall ts1 ts1' (ts2 : @threads_state _ opHi2T),
@@ -907,7 +847,7 @@ Theorem all_traces_match_1 :
   traces_match_ts op_step opHi_step ts1 ts2.
 Proof.
   intros.
-  rewrite atomize_ok_all_preserves_trace; eauto.
+  rewrite atomize_ok_hitrace_incl_ts; eauto.
   eapply all_traces_match_0; eauto.
 Qed.
 

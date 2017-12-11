@@ -2,6 +2,7 @@ Require Import ConcurProc.
 Require Import Equiv.
 Require Import Helpers.Helpers.
 Require Import FunctionalExtensionality.
+Require Import Omega.
 
 Global Set Implicit Arguments.
 Global Generalizable All Variables.
@@ -85,22 +86,114 @@ Arguments hicall {opLoT opMidT} compile_op {T}.
 Hint Constructors compile_ok.
 Hint Constructors atomic_compile_ok.
 
-(* [atomize_ok] captures the notion that all implementations of opcodes
-   in the left-side proc have been replaced with atomic-bracketed
-   versions in the right-side proc. *)
 
-Inductive atomize_ok
-  {opLoT opHiT} (compile_op : forall T, opHiT T -> proc opLoT opHiT T)
-  : forall T (p1 p2 : proc opLoT opHiT T), Prop :=
-| AtomizeOpcode : forall `(op : opHiT T),
-  atomize_ok compile_op (hicall compile_op op) (hicall (atomize compile_op) op)
-| AtomizeRet : forall `(x : T),
-  atomize_ok compile_op (Ret x) (Ret x)
-| AtomizeBind : forall T1 T2 (p1a p2a : proc opLoT opHiT T1)
-                             (p1b p2b : T1 -> proc opLoT opHiT T2),
-  atomize_ok compile_op p1a p2a ->
-  (forall x, atomize_ok compile_op (p1b x) (p2b x)) ->
-  atomize_ok compile_op (Bind p1a p1b) (Bind p2a p2b).
+Section Atomization.
+
+  (* [atomize_ok] captures the notion that all implementations of opcodes
+     in the left-side proc have been replaced with atomic-bracketed
+     versions in the right-side proc. *)
+
+  Variable opLoT : Type -> Type.
+  Variable opHiT : Type -> Type.
+  Variable compile_op : forall T, opHiT T -> proc opLoT opHiT T.
+
+  Inductive atomize_ok : forall T (p1 p2 : proc opLoT opHiT T), Prop :=
+  | AtomizeOpcode : forall `(op : opHiT T),
+    atomize_ok (hicall compile_op op) (hicall (atomize compile_op) op)
+  | AtomizeRet : forall `(x : T),
+    atomize_ok (Ret x) (Ret x)
+  | AtomizeBind : forall T1 T2 (p1a p2a : proc opLoT opHiT T1)
+                               (p1b p2b : T1 -> proc opLoT opHiT T2),
+    atomize_ok p1a p2a ->
+    (forall x, atomize_ok (p1b x) (p2b x)) ->
+    atomize_ok (Bind p1a p1b) (Bind p2a p2b).
+
+
+  Variable State : Type.
+  Variable op_step : OpSemantics opLoT State.
+
+  Definition atomize_correct :=
+    forall T (op : opHiT T)
+           T' (p1rest p2rest : _ -> proc _ _ T'),
+           (forall x, hitrace_incl op_step (p1rest x) (p2rest x)) ->
+           hitrace_incl op_step
+             (Bind (hicall compile_op op) p1rest)
+             (Bind (hicall (atomize compile_op) op) p2rest).
+
+  Variable atomize_is_correct : atomize_correct.
+
+
+  Theorem atomize_ok_hitrace_incl_0 :
+    forall T p1 p2,
+    atomize_ok p1 p2 ->
+    forall T' (p1rest p2rest : T -> proc _ _ T'),
+    (forall x, hitrace_incl op_step (p1rest x) (p2rest x)) ->
+    hitrace_incl op_step (Bind p1 p1rest) (Bind p2 p2rest).
+  Proof.
+    induction 1; intros.
+    - eauto.
+    - eapply hitrace_incl_bind_a.
+      eauto.
+    - rewrite exec_equiv_bind_bind.
+      rewrite exec_equiv_bind_bind.
+      eapply IHatomize_ok.
+      eauto.
+  Qed.
+
+  Theorem atomize_ok_hitrace_incl :
+    forall `(p1 : proc _ _ T) p2,
+    atomize_ok p1 p2 ->
+    hitrace_incl op_step p1 p2.
+  Proof.
+    intros.
+    rewrite <- exec_equiv_bind_ret.
+    rewrite <- exec_equiv_bind_ret with (p := p2).
+    eapply atomize_ok_hitrace_incl_0; eauto.
+    reflexivity.
+  Qed.
+
+  Theorem atomize_ok_upto_hitrace_incl :
+    forall n ts1' ts1,
+    proc_match_upto n atomize_ok ts1 ts1' ->
+      hitrace_incl_ts op_step ts1 ts1'.
+  Proof.
+    induction n; intros.
+    - apply proc_match_upto_0_eq in H; subst.
+      reflexivity.
+    - destruct (lt_dec n (length ts1)).
+      + etransitivity.
+        instantiate (1 := thread_upd ts1' n (thread_get ts1 n)).
+        * eapply IHn.
+          eapply proc_match_upto_Sn in H; eauto.
+        * eapply proc_match_upto_pick with (tid := n) in H; intuition idtac.
+          edestruct H0. omega.
+         -- intuition idtac.
+            rewrite H2.
+            rewrite <- exec_equiv_ts_upd_same; eauto.
+            reflexivity.
+         -- repeat deex.
+            rewrite H.
+            rewrite atomize_ok_hitrace_incl; eauto.
+            rewrite thread_upd_same; eauto.
+            reflexivity.
+      + eapply IHn.
+        eapply proc_match_upto_Sn'.
+        omega.
+        eauto.
+  Qed.
+
+  Theorem atomize_ok_hitrace_incl_ts :
+    forall ts1' ts1,
+    proc_match atomize_ok ts1 ts1' ->
+      hitrace_incl_ts op_step ts1 ts1'.
+  Proof.
+    intros.
+    eapply atomize_ok_upto_hitrace_incl.
+    eapply proc_match_upto_all.
+    eauto.
+  Qed.
+
+End Atomization.
 
 
 Section Commutes.
