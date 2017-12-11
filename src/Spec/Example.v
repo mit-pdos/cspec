@@ -650,29 +650,23 @@ Qed.
 
 (** Many-thread correctness *)
 
-Definition inc2_compile_ok_atomic :=
-  @atomic_compile_ok opT opHiT opHi2T compile_op.
-
-Definition compile_ok_all_atomic (ts1 ts2 : threads_state) :=
-  proc_match inc2_compile_ok_atomic ts1 ts2.
-
 Lemma compile_ok_atomic_exec_tid : forall T (p1 : proc _ _ T) p2,
-  inc2_compile_ok_atomic p1 p2 ->
+  @atomic_compile_ok _ _ opHi2T compile_op _ p1 p2 ->
   forall tid s s' result evs,
-  exec_tid op_step tid s p1 s' result evs ->
-  exists result' evs',
-  exec_tid opHi_step tid s p2 s' result' evs' /\
-  traces_match (prepend tid evs TraceEmpty) (prepend tid evs' TraceEmpty) /\
-  match result with
-  | inl v => match result' with
-    | inl v' => v = v'
-    | inr _ => False
-    end
-  | inr p' => match result' with
-    | inl _ => False
-    | inr p'' => inc2_compile_ok_atomic p' p''
-    end
-  end.
+    exec_tid op_step tid s p1 s' result evs ->
+    exists result' evs',
+      exec_tid opHi_step tid s p2 s' result' evs' /\
+      traces_match (prepend tid evs TraceEmpty) (prepend tid evs' TraceEmpty) /\
+      match result with
+      | inl v => match result' with
+        | inl v' => v = v'
+        | inr _ => False
+        end
+      | inr p' => match result' with
+        | inl _ => False
+        | inr p'' => atomic_compile_ok compile_op p' p''
+        end
+      end.
 Proof.
   induction 1; intros.
 
@@ -684,25 +678,51 @@ Proof.
     eauto.
 
   - exec_tid_inv.
-    repeat match goal with
-    | H : atomic_exec _ _ _ _ _ _ _ |- _ =>
-      inversion H; clear H; subst; repeat sigT_eq
-    end.
-    repeat step_inv.
-    do 2 eexists; split.
-    constructor.
+    destruct op.
 
-    replace (inc (inc s1 tid) tid) with (inc2 s1 tid).
-    constructor.
+    + repeat atomic_exec_inv.
+      repeat step_inv.
+      do 2 eexists; split.
+      constructor.
 
-    unfold inc, inc2, state_upd; apply functional_extensionality; intros.
-      destruct_ifs; omega.
+      replace (inc (inc s1 tid) tid) with (inc2 s1 tid).
+      constructor.
 
-    split.
-    simpl; eauto.
+      unfold inc, inc2, state_upd; apply functional_extensionality; intros.
+        destruct_ifs; omega.
 
-    unfold inc, inc2, state_upd;
-      destruct_ifs; omega.
+      split.
+      simpl; eauto.
+
+      unfold inc, inc2, state_upd;
+        destruct_ifs; omega.
+
+    + repeat atomic_exec_inv.
+      repeat step_inv.
+      do 2 eexists; split.
+      constructor.
+
+      replace (dec (dec (dec s1 tid) tid) tid) with (dec3 s1 tid).
+      constructor.
+
+      unfold dec, dec3, state_upd; apply functional_extensionality; intros.
+        destruct_ifs; omega.
+
+      split.
+      simpl; eauto 20.
+
+      unfold dec, dec3, state_upd;
+        destruct_ifs; omega.
+
+    + repeat atomic_exec_inv.
+      repeat step_inv.
+      do 2 eexists; split.
+      constructor.
+      constructor.
+
+      split.
+      simpl; eauto.
+      eauto.
 
   - exec_tid_inv.
     do 2 eexists; split.
@@ -719,7 +739,7 @@ Proof.
     eauto.
 
   - exec_tid_inv.
-    eapply IHcompile_ok_atomic in H12.
+    eapply IHatomic_compile_ok in H12.
     repeat deex.
 
     destruct result0; destruct result'; try solve [ exfalso; eauto ].
@@ -737,11 +757,26 @@ Proof.
       constructor.
       eauto.
       eauto.
+
+  - exec_tid_inv.
+    do 2 eexists; split.
+    constructor.
+    split.
+    simpl; eauto.
+    eauto.
+
+  - exec_tid_inv.
+    do 2 eexists; split.
+    constructor.
+    split.
+    simpl; eauto.
+    eauto.
 Qed.
 
+
 Theorem all_traces_match_0 :
-  forall ts1 ts2,
-  compile_ok_all_atomic ts1 ts2 ->
+  forall ts1 (ts2 : @threads_state _ opHi2T),
+  proc_match (atomic_compile_ok compile_op) ts1 ts2 ->
   traces_match_ts op_step opHi_step ts1 ts2.
 Proof.
   unfold traces_match_ts; intros.
@@ -774,12 +809,10 @@ Proof.
     eapply proc_match_upd; eauto.
 
   - eexists; split.
-    eapply ExecEmpty.
-    2: eauto.
-
-    unfold compile_ok_all_atomic in *.
+    eapply ExecEmpty; eauto.
     eauto.
 Qed.
+
 
 Inductive atomize_ok : forall T (p1 : proc opT opHiT T) (p2 : proc opT opHiT T), Prop :=
 | AtomizeIncTwice :
@@ -795,8 +828,8 @@ Inductive atomize_ok : forall T (p1 : proc opT opHiT T) (p2 : proc opT opHiT T),
 Definition atomize_ok_all (ts1 ts2 : threads_state) :=
   proc_match atomize_ok ts1 ts2.
 
-Definition compile_ok_all (ts1 ts2 : threads_state) :=
-  proc_match compile_ok ts1 ts2.
+Definition compile_ok_all ts1 (ts2 : @threads_state _ opHi2T) :=
+  proc_match (compile_ok compile_op) ts1 ts2.
 
 Fixpoint compile_atomic T (p : proc opHiT opHi2T T) : proc opT opHiT T :=
   match p with
@@ -805,6 +838,7 @@ Fixpoint compile_atomic T (p : proc opHiT opHi2T T) : proc opT opHiT T :=
   | OpExec op =>
     match op with
     | IncTwice => Atomic (_ <- Op Inc; Op Inc)
+    | DecThrice => Atomic (_ <- Op Dec; _ <- Op Dec; Op Dec)
     | Noop2 => Atomic (Ret tt)
     end
   | OpRet r => OpRetHi r
@@ -892,9 +926,9 @@ Proof.
 Qed.
 
 Theorem all_traces_match_1 :
-  forall ts1 ts1' ts2,
+  forall ts1 ts1' (ts2 : @threads_state _ opHi2T),
   atomize_ok_all ts1 ts1' ->
-  compile_ok_all_atomic ts1' ts2 ->
+  proc_match (atomic_compile_ok compile_op) ts1' ts2 ->
   traces_match_ts op_step opHi_step ts1 ts2.
 Proof.
   intros.
@@ -904,12 +938,13 @@ Qed.
 
 Theorem make_one_atomic :
   forall T p2 (p1 : proc _ _ T),
-  compile_ok p1 p2 ->
+  compile_ok compile_op p1 p2 ->
     atomize_ok p1 (compile_atomic p2) /\
-    compile_ok_atomic (compile_atomic p2) p2.
+    atomic_compile_ok compile_op (compile_atomic p2) p2.
 Proof.
   induction 1; simpl; intros.
-  - split. constructor. repeat constructor.
+  - split.
+    (* XXX *)
   - split; constructor.
   - intuition idtac.
     constructor. eauto. intros. specialize (H1 x). intuition eauto.
@@ -933,18 +968,18 @@ Proof.
   eapply proc_match_cons_NoProc; eauto.
 Qed.
 
-Lemma compile_ok_atomic_cons : forall T (p1 : proc _ _ T) p2 ts1 ts2,
-  compile_ok_all_atomic ts1 ts2 ->
-  compile_ok_atomic p1 p2 ->
-  compile_ok_all_atomic (Proc p1 :: ts1) (Proc p2 :: ts2).
+Lemma compile_ok_atomic_cons : forall T (p1 : proc _ _ T) p2 ts1 (ts2 : @threads_state _ opHi2T),
+  proc_match (atomic_compile_ok compile_op) ts1 ts2 ->
+  atomic_compile_ok compile_op p1 p2 ->
+  proc_match (atomic_compile_ok compile_op) (Proc p1 :: ts1) (Proc p2 :: ts2).
 Proof.
   intros.
   eapply proc_match_cons_Proc; eauto.
 Qed.
 
-Lemma compile_ok_atomic_cons_None : forall ts1 ts2,
-  compile_ok_all_atomic ts1 ts2 ->
-  compile_ok_all_atomic (NoProc :: ts1) (NoProc :: ts2).
+Lemma compile_ok_atomic_cons_None : forall ts1 (ts2 : @threads_state _ opHi2T),
+  proc_match (atomic_compile_ok compile_op) ts1 ts2 ->
+  proc_match (atomic_compile_ok compile_op) (NoProc :: ts1) (NoProc :: ts2).
 Proof.
   intros.
   eapply proc_match_cons_NoProc; eauto.
@@ -961,7 +996,7 @@ Theorem make_all_atomic :
   compile_ok_all ts1 ts2 ->
   exists ts1',
     atomize_ok_all ts1 ts1' /\
-    compile_ok_all_atomic ts1' ts2.
+    proc_match (atomic_compile_ok compile_op) ts1' ts2.
 Proof.
   induction ts1; intros.
   - eapply proc_match_len in H.

@@ -83,6 +83,7 @@ End Compiler.
 Arguments hicall {opLoT opMidT} compile_op {T}.
 
 Hint Constructors compile_ok.
+Hint Constructors atomic_compile_ok.
 
 
 Section Commutes.
