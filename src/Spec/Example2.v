@@ -28,8 +28,7 @@ Inductive opMidT : Type -> Type :=
 | Inc : opMidT nat
 | Dec : opMidT nat.
 
-Inductive opHiT : Type -> Type :=
-.
+Variable opHiT : Type -> Type.
 
 
 (** State *)
