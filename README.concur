@@ -54,3 +54,17 @@ Commuting or re-ordering of operations seems important for rely/guarantee
 or protocol-style reasoning about concurrent threads WITH abstraction.
 In particular, if operations are never re-ordered, then there may never
 be a state of the system that cleanly matches a high-level abstraction.
+
+===
+
+TODO for trace-based concurrency:
+
+- State abstraction.
+
+- Left mover problem: how can we move it if it never executes?
+
+- Coinductive definitions.
+
+- Prove protocol establishment (e.g., prove Example2.v's lo_step on top of
+  a less-restrictive op_step that does not require holding a lock during
+  read/write).
