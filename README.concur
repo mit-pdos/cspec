@@ -66,3 +66,8 @@ TODO for trace-based concurrency:
 - Prove protocol establishment (e.g., prove Example2.v's lo_step on top of
   a less-restrictive op_step that does not require holding a lock during
   read/write).
+
+- Nesting refinements.  We should transform [proc opLoT opMidT T]'s into
+  [proc opLoT opHiT T]'s so that we can keep nesting layers and preserving
+  [opHiT] traces.  This will also unify compile-based refinement and
+  state-abstraction refinement.
