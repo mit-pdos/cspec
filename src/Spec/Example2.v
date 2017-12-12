@@ -42,6 +42,22 @@ Record State := mkState {
 
 (** Semantics *)
 
+(**
+ * These semantics have a built-in protocol for how threads
+ * must interact with the state.  Namely, a thread cannot acquire
+ * a lock that is already held; a thread cannot release another
+ * thread's lock; a thread cannot read or write unless it is holding
+ * the lock.
+ *
+ * Separately we should prove that a particular implementation
+ * (e.g., ours) follows this protocol on top of a lower-level
+ * semantics that does not enforce these rules.
+ *
+ * So, in our framework, a concurrency protocol (e.g., rely-guarantee)
+ * seems to be an extra level of refinement with semantics that codify
+ * protocol violations as undefined behavior?
+ *)
+
 Inductive lo_step : forall T, opLoT T -> nat -> State -> T -> State -> Prop :=
 | StepAcquire : forall tid v,
   lo_step Acquire tid (mkState v None) tt (mkState v (Some tid))
@@ -94,6 +110,40 @@ Definition compile_op T (op : opMidT T) : proc opLoT opMidT T :=
 
 
 (** Commutativity *)
+
+Lemma acquire_right_mover :
+  right_mover lo_step Acquire.
+Proof.
+  unfold right_mover; intros.
+  repeat step_inv; congruence.
+Qed.
+
+Lemma release_left_mover :
+  left_mover lo_step Release.
+Proof.
+  unfold left_mover; intros.
+  repeat step_inv; congruence.
+Qed.
+
+Lemma read_both_mover :
+  both_mover lo_step Read.
+Proof.
+  split.
+  - unfold right_mover; intros.
+    repeat step_inv; congruence.
+  - unfold left_mover; intros.
+    repeat step_inv; congruence.
+Qed.
+
+Lemma write_both_mover : forall v,
+  both_mover lo_step (Write v).
+Proof.
+  split.
+  - unfold right_mover; intros.
+    repeat step_inv; congruence.
+  - unfold left_mover; intros.
+    repeat step_inv; congruence.
+Qed.
 
 Lemma op_step_commutes :
   step_commutes lo_step.

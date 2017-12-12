@@ -494,6 +494,37 @@ Section Commutes.
 End Commutes.
 
 
+Section Movers.
+
+  Variable opT : Type -> Type.
+  Variable opHiT : Type -> Type.
+  Variable State : Type.
+  Variable op_step : OpSemantics opT State.
+
+  Definition right_mover `(op0 : opT T0) :=
+    forall `(op1 : opT T1) tid0 tid1 s s0 s1 v0 v1,
+      tid0 <> tid1 ->
+      op_step op0 tid0 s v0 s0 ->
+      op_step op1 tid1 s0 v1 s1 ->
+      exists s',
+        op_step op1 tid1 s v1 s' /\
+        op_step op0 tid0 s' v0 s1.
+
+  Definition left_mover `(op1 : opT T1) :=
+    forall `(op0 : opT T0) tid0 tid1 s s0 s1 v0 v1,
+      tid0 <> tid1 ->
+      op_step op0 tid0 s v0 s0 ->
+      op_step op1 tid1 s0 v1 s1 ->
+      exists s',
+        op_step op1 tid1 s v1 s' /\
+        op_step op0 tid0 s' v0 s1.
+
+  Definition both_mover `(op : opT T) :=
+    right_mover op /\ left_mover op.
+
+End Movers.
+
+
 Ltac destruct_ifs :=
   repeat match goal with
   | |- context[if ?a == ?b then _ else _] =>
