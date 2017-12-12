@@ -61,6 +61,28 @@ TODO for trace-based concurrency:
 
 - Left mover problem: how can we move it if it never executes?
 
+  Suppose we have two locks (A and B), two variables (X and Y)
+  protected by the two locks respectively, and two threads (1 and 2).
+
+  Non-atomic trace:
+
+    1:Acquire(A) 1:Acquire(B) 1:Write(X,2) 1:Write(Y,2) 1:Release(B) 2:Acquire(B) 2:Read(Y)->2 2:Release(B) 2:spin 2:spin 2:spin ...
+
+  Goal atomic trace:
+
+    2:... 1:<<Acquire(A); Acquire(B); Write(X,2); Write(Y,2); Release(B); Release(A)>> 2:...
+
+  We cannot move 2's actions left of 1's, because the Acquire(B)+Read(Y)+Release(B)
+    would get a different Read outcome.
+
+  But we also cannot move 1's Release(A) left, because 1:Release(A) never appears
+    in the original trace -- thread 2 just keeps doing something else forever!
+
+  More generally, some left-mover operation like Release(A) might not be enabled yet,
+    so we can't force it to execute; the semantics might not allow it.  Appearing in
+    the original trace is our proof that it is enabled (and then we can move it left),
+    but what if it doesn't appear?
+
 - Coinductive definitions.
 
 - Prove protocol establishment (e.g., prove Example2.v's lo_step on top of
