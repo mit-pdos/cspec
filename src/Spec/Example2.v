@@ -145,14 +145,10 @@ Proof.
     repeat step_inv; congruence.
 Qed.
 
-Lemma op_step_commutes :
-  step_commutes lo_step.
-Proof.
-  unfold step_commutes; intros; repeat step_inv.
-  (* XXX not actually true *)
-Admitted.
-
-Hint Resolve op_step_commutes.
+Hint Resolve acquire_right_mover.
+Hint Resolve release_left_mover.
+Hint Resolve read_both_mover.
+Hint Resolve write_both_mover.
 
 
 (** Atomicity *)

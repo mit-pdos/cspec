@@ -273,10 +273,11 @@ Qed.
 
 (** Commutativity *)
 
-Lemma op_step_commutes :
-  step_commutes op_step.
+Lemma op_step_right_mover :
+  forall `(op : opT T),
+    right_mover op_step op.
 Proof.
-  unfold step_commutes; intros; repeat step_inv;
+  unfold right_mover; intros; repeat step_inv;
     unfold inc, dec.
   all: eexists; split; eauto.
   all: rewrite state_upd_ne; eauto.
@@ -288,7 +289,7 @@ Proof.
     end.
 Qed.
 
-Hint Resolve op_step_commutes.
+Hint Resolve op_step_right_mover.
 
 
 (** Atomicity *)
@@ -351,7 +352,7 @@ Proof.
   setoid_rewrite exec_equiv_bind_bind.
   eapply hitrace_incl_bind_a; intros.
 
-  rewrite <- hitrace_incl_atomize_opexec; eauto.
+  rewrite <- hitrace_incl_atomize_opexec_right_mover; eauto.
   rewrite exec_equiv_bind_bind.
   eapply hitrace_incl_bind_a; intros.
 
@@ -368,7 +369,7 @@ Proof.
   setoid_rewrite exec_equiv_bind_bind.
   eapply hitrace_incl_bind_a; intros.
 
-  rewrite <- hitrace_incl_atomize_opexec; eauto.
+  rewrite <- hitrace_incl_atomize_opexec_right_mover; eauto.
   rewrite exec_equiv_bind_bind.
   eapply hitrace_incl_bind_a; intros.
 
@@ -405,7 +406,7 @@ Proof.
   setoid_rewrite exec_equiv_bind_bind.
   eapply hitrace_incl_bind_a; intros.
 
-  rewrite <- hitrace_incl_atomize_opexec; eauto.
+  rewrite <- hitrace_incl_atomize_opexec_right_mover; eauto.
   setoid_rewrite exec_equiv_bind_bind with (p1 := OpExec _).
   eapply hitrace_incl_bind_a; intros.
 
@@ -424,7 +425,7 @@ Proof.
   setoid_rewrite exec_equiv_bind_bind.
   eapply hitrace_incl_bind_a; intros.
 
-  rewrite <- hitrace_incl_atomize_opexec; eauto.
+  rewrite <- hitrace_incl_atomize_opexec_right_mover; eauto.
   setoid_rewrite exec_equiv_bind_bind with (p1 := OpExec _).
   eapply hitrace_incl_bind_a; intros.
 
@@ -438,7 +439,7 @@ Proof.
   setoid_rewrite exec_equiv_bind_bind.
   eapply hitrace_incl_bind_a; intros.
 
-  rewrite <- hitrace_incl_atomize_opexec; eauto.
+  rewrite <- hitrace_incl_atomize_opexec_right_mover; eauto.
   rewrite exec_equiv_bind_bind.
   eapply hitrace_incl_bind_a; intros.
 

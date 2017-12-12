@@ -393,63 +393,83 @@ Proof.
 Qed.
 
 
-Section Commutes.
+Section Movers.
 
   Variable opT : Type -> Type.
   Variable opHiT : Type -> Type.
   Variable State : Type.
   Variable op_step : OpSemantics opT State.
 
-  Definition step_commutes :=
-    forall `(op0 : opT T1) `(op1 : opT T2) tid0 tid1 s s0 s1 v0 v1,
+  Variable moverT : Type.
+  Variable opMover : opT moverT.
+
+  Definition right_mover :=
+    forall `(op1 : opT T2) tid0 tid1 s s0 s1 v0 v1,
       tid0 <> tid1 ->
-      op_step op0 tid0 s v0 s0 ->
+      op_step opMover tid0 s v0 s0 ->
       op_step op1 tid1 s0 v1 s1 ->
       exists s',
         op_step op1 tid1 s v1 s' /\
+        op_step opMover tid0 s' v0 s1.
+
+  Definition left_mover :=
+    forall `(op0 : opT T0) tid0 tid1 s s0 s1 v0 v1,
+      tid0 <> tid1 ->
+      op_step op0 tid0 s v0 s0 ->
+      op_step opMover tid1 s0 v1 s1 ->
+      exists s',
+        op_step opMover tid1 s v1 s' /\
         op_step op0 tid0 s' v0 s1.
 
-  Variable commutes : step_commutes.
+  Definition both_mover := right_mover /\ left_mover.
 
-  Lemma atomic_exec_commutes : forall tid0 tid1 s s0 `(ap : proc opT opHiT T) s1 v1 evs `(op : opT T') v0,
+  Theorem both_mover_left : both_mover -> left_mover.
+  Proof. unfold both_mover; intuition. Qed.
+
+  Theorem both_mover_right : both_mover -> right_mover.
+  Proof. unfold both_mover; intuition. Qed.
+
+
+  Variable is_right_mover : right_mover.
+
+  Lemma atomic_exec_right_mover : forall tid0 tid1 s s0 `(ap : proc opT opHiT T) s1 v1 evs v0,
     tid0 <> tid1 ->
-    op_step op tid0 s v0 s0 ->
+    op_step opMover tid0 s v0 s0 ->
     atomic_exec op_step ap tid1 s0 v1 s1 evs ->
       exists s0',
       atomic_exec op_step ap tid1 s v1 s0' evs /\
-      op_step op tid0 s0' v0 s1.
+      op_step opMover tid0 s0' v0 s1.
   Proof.
     intros.
     generalize dependent s.
     induction H1; intros; eauto.
     - edestruct IHatomic_exec1; eauto.
       edestruct IHatomic_exec2; intuition eauto.
-    - edestruct commutes; intuition eauto.
+    - edestruct is_right_mover; intuition eauto.
     - edestruct IHatomic_exec; intuition eauto.
   Qed.
 
-  Lemma exec_tid_commutes : forall tid0 tid1 s s0 `(p : proc opT opHiT T) s1 result' evs `(op : opT T') v0,
+  Lemma exec_tid_right_mover : forall tid0 tid1 s s0 `(p : proc opT opHiT T) s1 result' evs v0,
     tid0 <> tid1 ->
-    op_step op tid0 s v0 s0 ->
+    op_step opMover tid0 s v0 s0 ->
     exec_tid op_step tid1 s0 p s1 result' evs ->
       exists s0',
       exec_tid op_step tid1 s p s0' result' evs /\
-      op_step op tid0 s0' v0 s1.
+      op_step opMover tid0 s0' v0 s1.
   Proof.
     intros.
     induction H1; simpl; eauto.
-    - edestruct commutes; intuition eauto.
-    - edestruct atomic_exec_commutes; intuition eauto.
+    - edestruct is_right_mover; intuition eauto.
+    - edestruct atomic_exec_right_mover; intuition eauto.
     - edestruct IHexec_tid; intuition eauto.
   Qed.
 
-  Theorem hitrace_incl_atomize_opexec :
-    forall `(op : opT T)
-           `(p : _ -> proc opT opHiT TP)
+  Theorem hitrace_incl_atomize_opexec_right_mover :
+    forall `(p : _ -> proc opT opHiT TP)
            `(rx : _ -> proc opT opHiT TF),
     hitrace_incl op_step
-      (Bind (Bind (OpExec op) (fun r => (Atomic (p r)))) rx)
-      (Bind (Atomic (Bind (OpExec op) p)) rx).
+      (Bind (Bind (OpExec opMover) (fun r => (Atomic (p r)))) rx)
+      (Bind (Atomic (Bind (OpExec opMover) p)) rx).
   Proof.
     intros.
     eapply hitrace_incl_proof_helper; intros.
@@ -476,7 +496,7 @@ Section Commutes.
         simpl; eauto.
 
       + autorewrite with t in *.
-        edestruct exec_tid_commutes; intuition eauto.
+        edestruct exec_tid_right_mover; intuition eauto.
         edestruct IHexec; eauto.
           rewrite thread_upd_upd_ne; eauto.
         intuition idtac.
@@ -491,38 +511,14 @@ Section Commutes.
     - exfalso; eauto.
   Qed.
 
-End Commutes.
-
-
-Section Movers.
-
-  Variable opT : Type -> Type.
-  Variable opHiT : Type -> Type.
-  Variable State : Type.
-  Variable op_step : OpSemantics opT State.
-
-  Definition right_mover `(op0 : opT T0) :=
-    forall `(op1 : opT T1) tid0 tid1 s s0 s1 v0 v1,
-      tid0 <> tid1 ->
-      op_step op0 tid0 s v0 s0 ->
-      op_step op1 tid1 s0 v1 s1 ->
-      exists s',
-        op_step op1 tid1 s v1 s' /\
-        op_step op0 tid0 s' v0 s1.
-
-  Definition left_mover `(op1 : opT T1) :=
-    forall `(op0 : opT T0) tid0 tid1 s s0 s1 v0 v1,
-      tid0 <> tid1 ->
-      op_step op0 tid0 s v0 s0 ->
-      op_step op1 tid1 s0 v1 s1 ->
-      exists s',
-        op_step op1 tid1 s v1 s' /\
-        op_step op0 tid0 s' v0 s1.
-
-  Definition both_mover `(op : opT T) :=
-    right_mover op /\ left_mover op.
-
 End Movers.
+
+Hint Resolve both_mover_left.
+Hint Resolve both_mover_right.
+
+Arguments left_mover {opT State} op_step {moverT}.
+Arguments right_mover {opT State} op_step {moverT}.
+Arguments both_mover {opT State} op_step {moverT}.
 
 
 Ltac destruct_ifs :=
