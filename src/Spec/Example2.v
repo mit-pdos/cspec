@@ -48,9 +48,9 @@ Record State := mkState {
  * thread's lock; a thread cannot read or write unless it is holding
  * the lock.
  *
- * Separately we should prove that a particular implementation
+ * Separately we can prove that a particular implementation
  * (e.g., ours) follows this protocol on top of a lower-level
- * semantics that does not enforce these rules.
+ * semantics that does not enforce these rules.  See ExampleProtocol.v.
  *
  * So, in our framework, a concurrency protocol (e.g., rely-guarantee)
  * seems to be an extra level of refinement with semantics that codify

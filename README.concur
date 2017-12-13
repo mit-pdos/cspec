@@ -83,11 +83,9 @@ TODO for trace-based concurrency:
     the original trace is our proof that it is enabled (and then we can move it left),
     but what if it doesn't appear?
 
-- Coinductive definitions.
+More symbol-pushing-like things:
 
-- Prove protocol establishment (e.g., prove Example2.v's lo_step on top of
-  a less-restrictive op_step that does not require holding a lock during
-  read/write).
+- Coinductive definitions.
 
 - Nesting refinements.  We should transform [proc opLoT opMidT T]'s into
   [proc opLoT opHiT T]'s so that we can keep nesting layers and preserving
