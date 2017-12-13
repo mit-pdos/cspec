@@ -83,6 +83,12 @@ TODO for trace-based concurrency:
     the original trace is our proof that it is enabled (and then we can move it left),
     but what if it doesn't appear?
 
+  POSSIBLE SOLUTION: prove equivalence to atomic brackets containing
+    some prefix of the left-movers?
+
+  in the case of Release left-movers, this might provide sufficient atomicity for
+    the refinement proof, which is the main goal of atomicity brackets for us.
+
 More symbol-pushing-like things:
 
 - Coinductive definitions.
