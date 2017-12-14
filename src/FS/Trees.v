@@ -20,7 +20,7 @@ Record Link := mkLink {
 
 Definition Graph := list Link.
 
-Definition File := list nat.
+Definition File := string.
 Definition Files := list File.
 
 Record FS := mkFS {
