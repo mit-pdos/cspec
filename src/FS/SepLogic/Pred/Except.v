@@ -40,3 +40,15 @@ Axiom pred_eexcept_ptsto_ne : forall {A V} {AEQ: EqDec A eq} a' a (v : V),
   pred_eexcept (a |-> v) a' ===> a |-> v.
 Axiom pred_eexcept_star : forall `(p1: pred A V) p2 {AEQ: EqDec A eq} a',
   pred_eexcept (p1 * p2) a' ===> pred_eexcept p1 a' * pred_eexcept p2 a'.
+
+Theorem pred_extract_merge : forall {A V} {AEQ: EqDec A eq} m F0 F1 a (v : V),
+  m |= F0 * a |-> v ->
+  m |= F1 ->
+  m |= (pred_eexcept F1 a) * a |-> v.
+Admitted.
+
+Theorem pred_merge_eq : forall {A V} {AEQ: EqDec A eq} m F0 F1 (a : A) (v0 v1 : V),
+  m |= F0 * a |-> v0 ->
+  m |= F1 * a |-> v1 ->
+  v0 = v1.
+Admitted.

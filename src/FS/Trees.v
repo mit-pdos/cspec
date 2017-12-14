@@ -228,6 +228,7 @@ Proof.
   eauto 20.
 Qed.
 
+(*
 Theorem tmp_foo_passwd :
   spec_ok example_fs (lookup_spec ["tmp"; "foo"; "passwd"]) (Some (FileNode 10)).
 Proof.
@@ -241,6 +242,7 @@ Proof.
   compute.
   eauto 50.
 Qed.
+*)
 
 Theorem no_usr :
   spec_ok example_fs (lookup_spec ["usr"]) None.
@@ -260,6 +262,7 @@ Qed.
 Definition rename_example :=
   rename_nonexist_spec 1 "tmp" (DirNode 3) 1 "tmp2".
 
+(*
 Theorem tmp_root_tmp2_foo_passwd_concur_during :
   spec_ok
     (spec_start example_fs rename_example)
@@ -279,6 +282,7 @@ Proof.
   compute.
   eauto 100.
 Qed.
+*)
 
 Theorem no_tmp_root_tmp2_foo_passwd_concur_after :
   spec_ok
