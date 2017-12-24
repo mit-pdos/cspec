@@ -97,3 +97,9 @@ More symbol-pushing-like things:
   [proc opLoT opHiT T]'s so that we can keep nesting layers and preserving
   [opHiT] traces.  This will also unify compile-based refinement and
   state-abstraction refinement.
+
+===
+
+File system concurrency spec relwk:
+
+  https://pages.lip6.fr/Marc.Shapiro/papers/VMCAI-2018-filesys.pdf
