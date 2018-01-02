@@ -44,11 +44,11 @@ Definition starts_with_tid tid (name : string) : Prop :=
 Inductive fs_step : forall T, fsOpT T -> nat -> State -> T -> State -> Prop :=
 | StepCreate : forall dir name tid s h s' dirnum,
   path_eval_root s dir (DirNode dirnum) ->
-  (~ exists n, In (mkLink dirnum n name) (FSLinks s)) ->
-  (~ exists d name', In (mkLink d (FileNode h) name') (FSLinks s)) ->
+  (~ exists n, Graph.In (mkLink dirnum n name) (FSLinks s)) ->
+  (~ exists d name', Graph.In (mkLink d (FileNode h) name') (FSLinks s)) ->
   h < Datatypes.length (FSFiles s) ->
   s' = mkFS (FSRoot s)
-            (mkLink dirnum (FileNode h) name :: FSLinks s)
+            (Graph.add (mkLink dirnum (FileNode h) name) (FSLinks s))
             (list_upd (FSFiles s) h "") ->
   fs_step (Create dir name) tid s h s'
 
@@ -199,18 +199,18 @@ Axiom starts_with_tid_ne : forall tid0 tid1 name0 name1,
 
 Lemma path_eval_root_0 : forall fs dirnum name dirpn n files' dirnum',
   path_eval_root fs dirpn (DirNode dirnum) ->
-  (~ exists n, In (mkLink dirnum n name) (FSLinks fs)) ->
+  (~ exists n, Graph.In (mkLink dirnum n name) (FSLinks fs)) ->
   path_eval_root (mkFS (FSRoot fs)
-                       (mkLink dirnum n name :: (FSLinks fs))
+                       (Graph.add (mkLink dirnum n name) (FSLinks fs))
                        files') dirpn (DirNode dirnum') ->
   dirnum = dirnum'.
 Admitted.
 
 Lemma path_eval_root_1 : forall fs dirnum name dirpn n files',
   path_eval_root fs dirpn (DirNode dirnum) ->
-  (~ exists n, In (mkLink dirnum n name) (FSLinks fs)) ->
+  (~ exists n, Graph.In (mkLink dirnum n name) (FSLinks fs)) ->
   path_eval_root (mkFS (FSRoot fs)
-                       (mkLink dirnum n name :: (FSLinks fs))
+                       (Graph.add (mkLink dirnum n name) (FSLinks fs))
                        files') dirpn (DirNode dirnum).
 Admitted.
 
@@ -226,8 +226,12 @@ Proof.
     eexists; intuition eauto.
     + econstructor.
       * eauto.
+      * intro; repeat deex.
+        destruct H9. exists n.
+        apply Graph.add_spec; right; auto.
       * intro; repeat deex; eauto.
-      * intro; repeat deex; eauto.
+        destruct H12. exists d, name'.
+        apply Graph.add_spec; right; auto.
       * admit.
       * reflexivity.
 
@@ -235,18 +239,27 @@ Proof.
       econstructor.
       * eapply path_eval_root_1; eauto.
         intro; repeat deex; eauto.
+        destruct H9. exists n.
+        apply Graph.add_spec; right; auto.
       * intro; repeat deex; eauto.
         simpl in *. intuition eauto.
+        apply Graph.add_spec in H0.
+        intuition idtac.
         inversion H2; subst.
         eapply starts_with_tid_ne; eauto.
+        destruct H11.
+        exists n; eauto.
       * intro; repeat deex; eauto.
         simpl in *. intuition eauto.
-        inversion H2; subst.
-        eauto.
+        (* same as above *)
+        admit.
       * admit.
       * simpl.
         f_equal.
+        (* XXX these sets are semantically the same ... *)
+        rewrite Graph.equal_spec.
         admit. (* should be sets, not lists *)
+        (* XXX FSFiles should be a set too ... *)
         admit.
 
   - admit.
