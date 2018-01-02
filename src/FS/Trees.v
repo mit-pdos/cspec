@@ -207,61 +207,86 @@ Definition example_fs := mkFS 1
              Graph.empty))))))))
   [].
 
+Ltac resolve_link :=
+  simpl;
+  repeat match goal with
+         |  |- Graph.In _ (Graph.add _ _ ) => apply Graph.add_spec; eauto
+         |  |- Graph.In _ (Graph.remove _ _ ) => apply Graph.remove_spec; split; try congruence
+         |  |-  _ \/ _ => right
+         end.
+
+Ltac resolve_name :=  eapply PathEvalLink; try constructor; resolve_link.
+Ltac resolve_symname := eapply PathEvalSymlink; resolve_link.
+Ltac resolve_init := left; eexists; unfold path_eval_root; split.
+
 Theorem etc_passwd :
   spec_ok example_fs (lookup_spec ["etc"; "passwd"]) (Some (FileNode 10)).
 Proof.
-  simpl.
-  left.
-  eexists.
-  simpl; subst.
-  split.
+  resolve_init.
   Focus 2.
-  
-  econstructor; simpl.
-  constructor; simpl.
-  apply Graph.add_spec.
-  eauto.
-
-  econstructor; simpl.
-  constructor; simpl.
-  apply Graph.add_spec.
-  right.
-  apply Graph.add_spec.
-  eauto.
-  eauto. reflexivity. 
+  resolve_name.
+  resolve_name.
+  reflexivity.
 Qed.
-
-
-(*
 
 Theorem etc_passwd' :
   spec_ok example_fs (lookup_spec ["etc"; "passwd~"]) (Some (FileNode 10)).
 Proof.
-  compute.
-  eauto 20.
+  resolve_init.
+  Focus 2.
+  resolve_name.
+  resolve_symname; auto.
+  resolve_name.
+  reflexivity.
 Qed.
 
 Theorem etc'_passwd :
   spec_ok example_fs (lookup_spec ["etc~"; "passwd"]) (Some (FileNode 10)).
 Proof.
-  compute.
-  eauto 20.
+  resolve_init.
+  Focus 2.
+  resolve_symname.
+  resolve_name.
+  resolve_name.
+  reflexivity.
 Qed.
 
 Theorem tmp_foo_passwd :
   spec_ok example_fs (lookup_spec ["tmp"; "foo"; "passwd"]) (Some (FileNode 10)).
 Proof.
-  compute.
-  eauto 50.
+  resolve_init.
+  Focus 2.
+  resolve_name.
+  resolve_symname.
+  eapply PathEvalLink.
+  eapply ValidDotDot; resolve_link.
+  resolve_name.
+  resolve_name.
+  reflexivity.
 Qed.
 
 Theorem tmp_foo2_passwd :
   spec_ok example_fs (lookup_spec ["tmp"; "foo2"; "passwd"]) (Some (FileNode 10)).
 Proof.
-  compute.
-  eauto 50.
+  resolve_init.
+  Focus 2.
+  resolve_name.
+  resolve_symname.
+  eapply PathEvalLink.
+  eapply ValidDotDot; resolve_link.
+  eapply PathEvalLink.
+  eapply ValidDotDotRoot; resolve_link; auto.
+  resolve_name.
+  resolve_name.
+  reflexivity.
 Qed.
-*)
+
+
+Ltac resolve_none :=
+  repeat match goal with
+         | H: Graph.In _ _ |- _ => apply Graph.add_spec in H; intuition idtac; try congruence
+         | H: Graph.In _ Graph.empty |- _ =>  apply Graph.is_empty_spec in H; eauto
+         end.
 
 Theorem no_usr :
   spec_ok example_fs (lookup_spec ["usr"]) None.
@@ -272,30 +297,8 @@ Proof.
   intuition. deex.
   inversion H; clear H; subst.
   inversion H4; clear H4; subst.
-
-  apply Graph.add_spec in H.
-  intuition idtac; try congruence.
-  apply Graph.add_spec in H0.
-  intuition idtac; try congruence.
-  apply Graph.add_spec in H.
-  intuition idtac; try congruence.
-  apply Graph.add_spec in H0.
-  intuition idtac; try congruence.
-  apply Graph.add_spec in H.
-  intuition idtac; try congruence.
-  apply Graph.add_spec in H0.
-  apply Graph.add_spec in H0.
-  intuition idtac; try congruence.
-  apply Graph.add_spec in H0.
-  intuition idtac; try congruence.
-  apply Graph.add_spec in H.
-  intuition idtac; try congruence.
-  apply Graph.add_spec in H0.
-  intuition idtac; try congruence.
-  apply Graph.is_empty_spec in H; eauto.
-
-  (* again ... *)
-    
+  resolve_none.
+  resolve_none.
 Qed.
 
 
@@ -304,15 +307,30 @@ Qed.
 Definition rename_example :=
   rename_nonexist_spec 1 "tmp" (DirNode 3) 1 "tmp2".
 
-(*
 Theorem tmp_root_tmp2_foo_passwd_concur_during :
   spec_ok
     (spec_start example_fs rename_example)
     (lookup_spec ["tmp"; "root"; "tmp2"; "foo"; "passwd"])
     (Some (FileNode 10)).
 Proof.
-  compute.
-  eauto 100.
+  simpl.
+  left.
+  eexists. split; auto.
+  unfold rename_example, spec_start, rename_nonexist_spec, transform_fs, add_link; simpl.
+  
+  (* lookup tmp, root  *)
+  resolve_name.
+  resolve_symname.
+  eapply PathEvalLink; auto.
+  eapply ValidDotDot; resolve_link.
+
+  (* finish lookup *)
+  resolve_name.
+  resolve_symname.
+  eapply PathEvalLink; auto.
+  eapply ValidDotDot; resolve_link.
+  resolve_name.
+  resolve_name.
 Qed.
 
 Theorem tmp_root_tmp2_foo_passwd_concur_after :
@@ -321,10 +339,29 @@ Theorem tmp_root_tmp2_foo_passwd_concur_after :
     (lookup_spec ["tmp2"; "foo"; "passwd"])
     (Some (FileNode 10)).
 Proof.
-  compute.
-  eauto 100.
+  simpl.
+  left.
+  eexists. split; auto.
+
+  unfold rename_example, spec_finish, transform_fs; simpl.
+  unfold remove_link, add_link; simpl.
+  
+
+  resolve_name.
+  compute. auto 20. 
+
+  resolve_symname.
+  compute. auto 20.
+  
+  eapply PathEvalLink; auto.
+  eapply ValidDotDot; resolve_link.
+  compute. auto 20.
+  resolve_name.
+  compute. auto 20.
+  resolve_name.
+  compute. auto 20.
 Qed.
-*)
+
 
 Theorem no_tmp_root_tmp2_foo_passwd_concur_after :
   spec_ok
@@ -332,26 +369,32 @@ Theorem no_tmp_root_tmp2_foo_passwd_concur_after :
     (lookup_spec ["tmp"; "root"; "tmp2"; "foo"; "passwd"])
     None.
 Proof.
-  compute.
-
-  right. intuition. deex.
+  simpl.
+  right.
+  split; auto.
+  intuition. deex.
   inversion H; clear H; subst.
   inversion H4; clear H4; subst.
-  compute in *. intuition.
-  compute in *. intuition.
+  
+  unfold rename_example, spec_finish, transform_fs in *; simpl in *.
+  unfold remove_link, add_link in *; simpl in *.
+
+  apply Graph.add_spec in H; intuition idtac; try congruence.
+  apply Graph.remove_spec in H0; intuition idtac; try congruence.
+  resolve_none.
+  resolve_none.
+  apply Graph.remove_spec in H; intuition idtac; try congruence.
+  resolve_none.
 Qed.
-
-
-(** TODO: readdir spec *)
 
 Definition names := list string.
 
-Definition dirents dirnum g :=
-  filter (fun (l: Link) => (beq_nat (LinkFrom l) dirnum)) g.
+Definition dirents dirnum (g: Graph.t) :=
+  Graph.filter (fun (l: Link) => (beq_nat (LinkFrom l) dirnum)) g.
 
 Definition dirnames dirnum g : names :=
-  let lf := dirents dirnum g in
-  map (fun (l:Link) => (LinkName l)) lf.
+  let dir := dirents dirnum g in
+  map (fun (l:Link) => (LinkName l)) (Graph.elements dir).
 
 Definition readdir_spec pn : specification (option names)  := {|
   Result := fun result fs =>
