@@ -207,78 +207,60 @@ Definition example_fs := mkFS 1
              Graph.empty))))))))
   [].
 
-Ltac resolve_link :=
-  simpl;
-  repeat match goal with
-         |  |- Graph.In _ (Graph.add _ _ ) => apply Graph.add_spec; eauto
-         |  |- Graph.In _ (Graph.remove _ _ ) => apply Graph.remove_spec; split; try congruence
-         |  |-  _ \/ _ => right
-         end.
-
+Ltac resolve_link := compute; auto 20.
 Ltac resolve_name :=  eapply PathEvalLink; try constructor; resolve_link.
 Ltac resolve_symname := eapply PathEvalSymlink; resolve_link.
-Ltac resolve_init := left; eexists; unfold path_eval_root; split.
+Ltac resolve_dotdot :=  eapply PathEvalLink; try eapply ValidDotDot; resolve_link.
+Ltac resolve_dotdotRoot :=  eapply PathEvalLink; try eapply ValidDotDotRoot; resolve_link.
+Ltac resolve_init := left; eexists; unfold path_eval_root; split; auto.
 
 Theorem etc_passwd :
   spec_ok example_fs (lookup_spec ["etc"; "passwd"]) (Some (FileNode 10)).
 Proof.
   resolve_init.
-  Focus 2.
   resolve_name.
   resolve_name.
-  reflexivity.
 Qed.
 
 Theorem etc_passwd' :
   spec_ok example_fs (lookup_spec ["etc"; "passwd~"]) (Some (FileNode 10)).
 Proof.
   resolve_init.
-  Focus 2.
   resolve_name.
-  resolve_symname; auto.
+  resolve_symname.
   resolve_name.
-  reflexivity.
 Qed.
 
 Theorem etc'_passwd :
   spec_ok example_fs (lookup_spec ["etc~"; "passwd"]) (Some (FileNode 10)).
 Proof.
   resolve_init.
-  Focus 2.
   resolve_symname.
   resolve_name.
   resolve_name.
-  reflexivity.
 Qed.
 
 Theorem tmp_foo_passwd :
   spec_ok example_fs (lookup_spec ["tmp"; "foo"; "passwd"]) (Some (FileNode 10)).
 Proof.
   resolve_init.
-  Focus 2.
   resolve_name.
   resolve_symname.
-  eapply PathEvalLink.
-  eapply ValidDotDot; resolve_link.
+  resolve_dotdot.
   resolve_name.
   resolve_name.
-  reflexivity.
 Qed.
 
 Theorem tmp_foo2_passwd :
   spec_ok example_fs (lookup_spec ["tmp"; "foo2"; "passwd"]) (Some (FileNode 10)).
 Proof.
   resolve_init.
-  Focus 2.
   resolve_name.
   resolve_symname.
-  eapply PathEvalLink.
-  eapply ValidDotDot; resolve_link.
-  eapply PathEvalLink.
-  eapply ValidDotDotRoot; resolve_link; auto.
+  resolve_dotdot.
+  resolve_dotdotRoot.
   resolve_name.
   resolve_name.
-  reflexivity.
 Qed.
 
 
@@ -313,22 +295,19 @@ Theorem tmp_root_tmp2_foo_passwd_concur_during :
     (lookup_spec ["tmp"; "root"; "tmp2"; "foo"; "passwd"])
     (Some (FileNode 10)).
 Proof.
-  simpl.
-  left.
-  eexists. split; auto.
+  resolve_init.
+
   unfold rename_example, spec_start, rename_nonexist_spec, transform_fs, add_link; simpl.
   
   (* lookup tmp, root  *)
   resolve_name.
   resolve_symname.
-  eapply PathEvalLink; auto.
-  eapply ValidDotDot; resolve_link.
+  resolve_dotdot; auto.
 
   (* finish lookup *)
   resolve_name.
   resolve_symname.
-  eapply PathEvalLink; auto.
-  eapply ValidDotDot; resolve_link.
+  resolve_dotdot; auto.
   resolve_name.
   resolve_name.
 Qed.
@@ -339,27 +318,16 @@ Theorem tmp_root_tmp2_foo_passwd_concur_after :
     (lookup_spec ["tmp2"; "foo"; "passwd"])
     (Some (FileNode 10)).
 Proof.
-  simpl.
-  left.
-  eexists. split; auto.
+  resolve_init.
 
   unfold rename_example, spec_finish, transform_fs; simpl.
   unfold remove_link, add_link; simpl.
   
-
   resolve_name.
-  compute. auto 20. 
-
   resolve_symname.
-  compute. auto 20.
-  
-  eapply PathEvalLink; auto.
-  eapply ValidDotDot; resolve_link.
-  compute. auto 20.
+  resolve_dotdot.
   resolve_name.
-  compute. auto 20.
   resolve_name.
-  compute. auto 20.
 Qed.
 
 
@@ -379,10 +347,12 @@ Proof.
   unfold rename_example, spec_finish, transform_fs in *; simpl in *.
   unfold remove_link, add_link in *; simpl in *.
 
-  apply Graph.add_spec in H; intuition idtac; try congruence.
+  resolve_none.
+
   apply Graph.remove_spec in H0; intuition idtac; try congruence.
   resolve_none.
   resolve_none.
+
   apply Graph.remove_spec in H; intuition idtac; try congruence.
   resolve_none.
 Qed.
