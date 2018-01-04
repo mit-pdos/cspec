@@ -617,6 +617,37 @@ Section Movers.
     rewrite app_nil_r; eauto.
   Qed.
 
+  Theorem hitrace_incl_atomize_opexec_ret_left_mover :
+    left_mover ->
+    forall `(p : proc opT opHiT TP)
+           `(f : TP -> _ -> TR)
+           `(rx : _ -> proc opT opHiT TF),
+    hitrace_incl op_step
+      (Bind (Bind (Atomic p) (fun a => Bind (OpExec opMover) (fun b => Ret (f a b)))) rx)
+      (Bind (Atomic (Bind p (fun a => Bind (OpExec opMover) (fun b => Ret (f a b))))) rx).
+  Proof.
+    intros.
+    eapply hitrace_incl_proof_helper; intros.
+    repeat exec_tid_inv.
+    rewrite exec_equiv_bind_bind in H1.
+    eapply exec_left_mover in H1; eauto.
+    repeat deex.
+
+    eapply hitrace_incl_ts_proof_helper in H1.
+    repeat deex.
+
+    eexists; split.
+    eapply ExecOne with (tid := tid).
+      autorewrite with t; eauto.
+      eauto 10.
+      autorewrite with t. eauto.
+    rewrite app_nil_r; eauto.
+
+    intros.
+    repeat exec_tid_inv.
+    eauto.
+  Qed.
+
 End Movers.
 
 Hint Resolve both_mover_left.

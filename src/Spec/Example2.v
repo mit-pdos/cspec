@@ -159,6 +159,88 @@ Theorem inc_atomic : forall `(rx : _ -> proc _ _ T),
 Proof.
   unfold hicall, atomize; simpl.
   unfold inc_core; intros.
+
+  rewrite exec_equiv_bind_bind.
+  rewrite exec_equiv_bind_bind with (p1 := OpCallHi _).
+  eapply hitrace_incl_bind_a; intros.
+  repeat rewrite exec_equiv_bind_bind.
+  setoid_rewrite exec_equiv_bind_bind with (p1 := Atomic _).
+
+  (* [Acquire] *)
+  unfold Op at 5.
+  rewrite atomic_equiv_bind_bind with (p1 := OpCall _).
+  setoid_rewrite atomic_equiv_bind_bind with (p1 := OpExec _).
+
+  unfold Op at 1.
+  rewrite <- hitrace_incl_atomize_opcall.
+  rewrite exec_equiv_bind_bind.
+  setoid_rewrite exec_equiv_bind_bind.
+  eapply hitrace_incl_bind_a; intros.
+
+  rewrite <- hitrace_incl_atomize_opexec_right_mover; eauto.
+  setoid_rewrite exec_equiv_bind_bind.
+  eapply hitrace_incl_bind_a; intros.
+
+  rewrite <- hitrace_incl_atomize_opret.
+  rewrite exec_equiv_bind_bind.
+  eapply hitrace_incl_bind_a; intros.
+
+  (* [Read] *)
+  unfold Op at 4.
+  rewrite atomic_equiv_bind_bind with (p1 := OpCall _).
+  setoid_rewrite atomic_equiv_bind_bind with (p1 := OpExec _).
+
+  unfold Op at 1.
+  rewrite <- hitrace_incl_atomize_opcall.
+  rewrite exec_equiv_bind_bind.
+  setoid_rewrite exec_equiv_bind_bind.
+  eapply hitrace_incl_bind_a; intros.
+
+  rewrite <- hitrace_incl_atomize_opexec_right_mover; eauto.
+  setoid_rewrite exec_equiv_bind_bind.
+  eapply hitrace_incl_bind_a; intros.
+
+  rewrite <- hitrace_incl_atomize_opret.
+  rewrite exec_equiv_bind_bind.
+  eapply hitrace_incl_bind_a; intros.
+
+  (* [Write] *)
+  unfold Op at 3.
+  rewrite atomic_equiv_bind_bind with (p1 := OpCall _).
+  setoid_rewrite atomic_equiv_bind_bind with (p1 := OpExec _).
+
+  unfold Op at 1.
+  rewrite <- hitrace_incl_atomize_opcall.
+  rewrite exec_equiv_bind_bind.
+  setoid_rewrite exec_equiv_bind_bind.
+  eapply hitrace_incl_bind_a; intros.
+
+  rewrite <- hitrace_incl_atomize_opexec_right_mover; eauto.
+  setoid_rewrite exec_equiv_bind_bind.
+  eapply hitrace_incl_bind_a; intros.
+
+  rewrite <- hitrace_incl_atomize_opret.
+  rewrite exec_equiv_bind_bind.
+  eapply hitrace_incl_bind_a; intros.
+
+  (* [Release] *)
+  unfold Op at 2.
+  rewrite atomic_equiv_bind_bind with (p1 := OpCall _).
+  setoid_rewrite atomic_equiv_bind_bind with (p1 := OpExec _).
+
+eapply hitrace_incl_exec_equiv_proper. reflexivity.
+eapply exec_equiv_rx_to_exec_equiv.
+eapply Bind_exec_equiv_proper.
+eapply Atomic_proper_atomic_equiv.
+eapply atomic_equiv_bind_bind'.
+instantiate (1 := fun v => Bind (OpRetHi v) rx). reflexivity.
+simpl.
+
+rewrite <- hitrace_incl_atomize_opret_ret_l.
+rewrite exec_equiv_bind_bind.
+
+rewrite <- hitrace_incl_atomize_opexec_ret_left_mover; eauto.
+
 Admitted.
 
 Theorem dec_atomic : forall `(rx : _ -> proc _ _ T),

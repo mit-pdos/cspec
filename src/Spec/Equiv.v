@@ -672,6 +672,17 @@ Proof.
       eapply exec_equiv_ts_pad.
 Qed.
 
+Instance exec_proper_exec_equiv :
+  Proper (eq ==> eq ==> exec_equiv_ts ==> eq ==> iff) (@exec opT opHiT State).
+Proof.
+  intros.
+  intros ? ? ?; subst.
+  intros ? ? ?; subst.
+  intros ? ? ?; subst.
+  intros ? ? ?; subst.
+  apply H.
+Qed.
+
 
 (** A strong notion of equivalence for programs inside atomic sections.
     Basically the same as above, but defined as an underlying [atomic_exec]
@@ -693,6 +704,22 @@ Proof.
     split; intros.
     + apply H0. apply H. eauto.
     + apply H. apply H0. eauto.
+Qed.
+
+Instance atomic_equiv_proper :
+  Proper (atomic_equiv ==> atomic_equiv ==> iff) (@atomic_equiv opT opHiT T).
+Proof.
+  intros.
+  intros ? ? ?.
+  intros ? ? ?.
+  split; intros.
+  - symmetry.
+    etransitivity; eauto.
+    symmetry.
+    etransitivity; eauto.
+  - etransitivity; eauto.
+    etransitivity; eauto.
+    symmetry; eauto.
 Qed.
 
 Theorem atomic_equiv_ret_bind : forall `(v : T) `(p : T -> proc opT opHiT T'),
@@ -730,6 +757,34 @@ Proof.
     inversion H10; clear H10; subst; repeat sigT_eq.
     rewrite app_assoc.
     eauto.
+Qed.
+
+Theorem atomic_equiv_bind_a : forall `(p : proc opT opHiT T) `(p1 : T -> proc _ _ T') p2,
+  (forall x, atomic_equiv (p1 x) (p2 x)) ->
+  atomic_equiv (Bind p p1) (Bind p p2).
+Proof.
+  unfold atomic_equiv; intros.
+  split; intros.
+  - inversion H0; clear H0; repeat sigT_eq.
+    econstructor; eauto.
+    eapply H; eauto.
+  - inversion H0; clear H0; repeat sigT_eq.
+    econstructor; eauto.
+    eapply H; eauto.
+Qed.
+
+Theorem atomic_equiv_bind_bind' : forall `(p1 : proc opT opHiT T1) `(p2 : T1 -> proc _ _ T2) `(p3 : T1 -> T2 -> proc _ _ T3),
+  atomic_equiv (Bind p1 (fun x => Bind (p2 x) (p3 x)))
+               (Bind (Bind p1 (fun x => Bind (p2 x) (fun y => Ret (x, y))))
+                     (fun p => p3 (fst p) (snd p))).
+Proof.
+  intros.
+  rewrite atomic_equiv_bind_bind.
+  eapply atomic_equiv_bind_a; intros.
+  rewrite atomic_equiv_bind_bind.
+  eapply atomic_equiv_bind_a; intros.
+  rewrite atomic_equiv_ret_bind; simpl.
+  reflexivity.
 Qed.
 
 Instance Atomic_proper_atomic_equiv :
@@ -1204,6 +1259,127 @@ Proof.
     autorewrite with t; eauto.
     eauto.
     simpl. autorewrite with t. eauto.
+  simpl; eauto.
+Qed.
+
+Theorem hitrace_incl_atomize_ret_l :
+  forall `(f : T1 -> T2)
+         `(p : proc opT opHiT T1)
+         `(rx : _ -> proc opT opHiT TF)
+         `(op_step : OpSemantics opT State),
+  hitrace_incl op_step
+    (Bind (Bind (Atomic p) (fun r => Ret (f r))) rx)
+    (Bind (Atomic (Bind p (fun r => Ret (f r)))) rx).
+Proof.
+  intros.
+  eapply hitrace_incl_proof_helper; intros.
+  repeat exec_tid_inv.
+
+  eapply hitrace_incl_ts_proof_helper in H0.
+  deex.
+  eexists; split.
+  eapply ExecOne with (tid := tid).
+    autorewrite with t; eauto.
+    eauto.
+    simpl. autorewrite with t. eauto.
+  rewrite app_nil_r. eauto.
+
+  intros.
+  repeat exec_tid_inv.
+  eauto.
+Qed.
+
+Theorem hitrace_incl_atomize_opret_l :
+  forall `(f : T1 -> T2)
+         `(p : proc opT opHiT T1)
+         `(rx : _ -> proc opT opHiT TF)
+         `(op_step : OpSemantics opT State),
+  hitrace_incl op_step
+    (Bind (Bind (Atomic p) (fun r => OpRet (f r))) rx)
+    (Bind (Atomic (Bind p (fun r => OpRet (f r)))) rx).
+Proof.
+  intros.
+  eapply hitrace_incl_proof_helper; intros.
+  repeat exec_tid_inv.
+
+  eapply hitrace_incl_ts_proof_helper in H0.
+  deex.
+  eexists; split.
+  eapply ExecOne with (tid := tid).
+    autorewrite with t; eauto.
+    eauto.
+    simpl. autorewrite with t. eauto.
+  rewrite prepend_app. eauto.
+
+  intros.
+  repeat exec_tid_inv.
+  eexists; split; eauto.
+  simpl; eauto.
+Qed.
+
+Theorem hitrace_incl_atomize_opret_ret_l :
+  forall `(f : T1 -> T2)
+         `(f2 : T1 -> T2 -> T3)
+         `(p : proc opT opHiT T1)
+         `(rx : _ -> proc opT opHiT TF)
+         `(op_step : OpSemantics opT State),
+  hitrace_incl op_step
+    (Bind (Bind (Atomic p) (fun r => Bind (OpRet (f r)) (fun a => Ret (f2 r a)))) rx)
+    (Bind (Atomic (Bind p (fun r => Bind (OpRet (f r)) (fun a => Ret (f2 r a))))) rx).
+Proof.
+  intros.
+  eapply hitrace_incl_proof_helper; intros.
+  repeat exec_tid_inv.
+
+  eapply hitrace_incl_ts_proof_helper in H0.
+  deex.
+  eexists; split.
+  eapply ExecOne with (tid := tid).
+    autorewrite with t; eauto.
+    eauto.
+    simpl. autorewrite with t. eauto.
+  rewrite prepend_app. rewrite app_nil_r. eauto.
+
+  intros.
+  repeat exec_tid_inv.
+
+  eapply hitrace_incl_ts_proof_helper in H1.
+  deex.
+  eexists; split.
+  eauto.
+  eauto.
+
+  intros.
+  repeat exec_tid_inv.
+  eexists; split; eauto.
+Qed.
+
+Theorem hitrace_incl_atomize_opcall_l :
+  forall `(p : proc opT opHiT T1)
+         `(fT : T1 -> Type)
+         `(f : forall (a : T1), opT (fT a))
+         `(rx : unit -> proc opT opHiT TF)
+         `(op_step : OpSemantics opT State),
+  hitrace_incl op_step
+    (Bind (Bind (Atomic p) (fun r => @OpCall opT opHiT (fT r) (f r))) rx)
+    (Bind (Atomic (Bind p (fun r => @OpCall opT opHiT (fT r) (f r)))) rx).
+Proof.
+  intros.
+  eapply hitrace_incl_proof_helper; intros.
+  repeat exec_tid_inv.
+
+  eapply hitrace_incl_ts_proof_helper in H0.
+  deex.
+  eexists; split.
+  eapply ExecOne with (tid := tid).
+    autorewrite with t; eauto.
+    eauto.
+    simpl. autorewrite with t. eauto.
+  rewrite prepend_app. eauto.
+
+  intros.
+  repeat exec_tid_inv.
+  eexists; split; eauto.
   simpl; eauto.
 Qed.
 
