@@ -506,6 +506,47 @@ Section Movers.
     - edestruct IHexec_tid; intuition eauto.
   Qed.
 
+  Lemma exec_left_mover : forall s ts tid `(rx : _ -> proc opT opHiT T) tr,
+    left_mover ->
+    exec op_step s ts [[ tid := Proc (x <- OpExec opMover; rx x) ]] tr ->
+    exists s' r,
+      op_step opMover tid s r s' /\
+      exec op_step s' ts [[ tid := Proc (rx r) ]] tr.
+  Proof.
+    intros.
+
+    match goal with
+    | H : exec _ _ (thread_upd ?ts ?tid ?p) _ |- _ =>
+      remember (thread_upd ts tid p);
+      generalize dependent ts;
+      induction H; intros; subst
+    end.
+
+    - destruct (tid == tid0); subst.
+      + autorewrite with t in *.
+        repeat maybe_proc_inv.
+        repeat exec_tid_inv.
+        do 2 eexists; intuition eauto.
+
+      + autorewrite with t in *.
+
+        edestruct IHexec; intuition idtac.
+        rewrite thread_upd_upd_ne; eauto.
+        repeat deex.
+
+        eapply exec_tid_left_mover in H1; eauto.
+        repeat deex.
+
+        do 2 eexists; intuition eauto.
+
+        eapply ExecOne with (tid := tid0).
+          autorewrite with t; eauto.
+          eauto.
+          rewrite thread_upd_upd_ne; eauto.
+
+    - exfalso; eauto.
+  Qed.
+
   Theorem hitrace_incl_atomize_opexec_right_mover :
     right_mover ->
     forall `(p : _ -> proc opT opHiT TP)
@@ -565,49 +606,16 @@ Section Movers.
     intros.
     eapply hitrace_incl_proof_helper; intros.
     repeat exec_tid_inv.
+    eapply exec_left_mover in H1; eauto.
+    repeat deex.
 
-    match goal with
-    | H : exec _ _ (thread_upd ?ts ?tid ?pp) _ |- _ =>
-      remember (thread_upd ts tid pp);
-      generalize dependent ts;
-      generalize dependent s;
-      induction H; simpl; intros; subst
-    end.
-
-    - destruct (tid == tid0); subst.
-      + autorewrite with t in *.
-        repeat maybe_proc_inv.
-        repeat exec_tid_inv.
-
-        eexists; split.
-        eapply ExecOne with (tid := tid0).
-          autorewrite with t in *; eauto.
-          eauto.
-          simpl. autorewrite with t. eauto.
-        rewrite app_nil_r.
-        simpl; eauto.
-
-      + admit.
-        (*
-        autorewrite with t in *.
-        edestruct exec_tid_left_mover.
-          eauto.
-          3: eauto.
-
-        edestruct IHexec; eauto.
-          rewrite thread_upd_upd_ne; eauto.
-        intuition idtac.
-
-        eexists; split.
-        eapply ExecOne with (tid := tid0).
-          autorewrite with t; eauto.
-          eauto.
-          rewrite thread_upd_upd_ne; eauto.
-        eauto.
-        *)
-
-    - exfalso; eauto.
-  Admitted.
+    eexists; split.
+    eapply ExecOne with (tid := tid).
+      autorewrite with t; eauto.
+      eauto.
+      autorewrite with t. eauto.
+    rewrite app_nil_r; eauto.
+  Qed.
 
 End Movers.
 
