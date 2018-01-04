@@ -51,9 +51,8 @@ Section StepXform.
   Variable EquivR : Relation_Definitions.relation State.
 
   Inductive equiv_step : OpSemantics opT State :=
-  | StepEquiv : forall `(op : opT T) tid s0 s0' s1 s1' r,
-    op_step op tid s0' r s1' ->
-    EquivR s0 s0' ->
+  | StepEquiv : forall `(op : opT T) tid s0 s1 s1' r,
+    op_step op tid s0 r s1' ->
     EquivR s1 s1' ->
     equiv_step op tid s0 r s1.
 
@@ -254,7 +253,7 @@ Hint Resolve starts_with_tid_ne.
 
 
 Instance fs_step_equiv_proper :
-  Proper (eq ==> eq ==> FSEquiv ==> eq ==> FSEquiv ==> iff) (@fs_step_equiv T).
+  Proper (eq ==> eq ==> eq ==> eq ==> FSEquiv ==> iff) (@fs_step_equiv T).
 Proof.
   intros.
   intros ? ? ?; subst.
@@ -263,15 +262,12 @@ Proof.
   intros ? ? ?; subst.
   intros fs2 fs2' ?.
   unfold fs_step_equiv; intuition.
-  - inversion H1; clear H1; repeat sigT_eq.
+  - inversion H0; clear H0; repeat sigT_eq.
     econstructor; eauto.
     etransitivity; eauto.
       symmetry; eauto.
-    etransitivity; eauto.
-      symmetry; eauto.
-  - inversion H1; clear H1; repeat sigT_eq.
+  - inversion H0; clear H0; repeat sigT_eq.
     econstructor; eauto.
-    etransitivity; eauto.
     etransitivity; eauto.
 Qed.
 
@@ -471,18 +467,17 @@ Proof.
     repeat subst_fsequiv.
 
     (* Use the fact that tmpdir is unique to show that dirnum=dirnum0 *)
-    destruct H20; intuition idtac.
-    eapply path_eval_root_updfile in H12 as Hx.
+    destruct H18; intuition idtac.
+    eapply path_eval_root_updfile in H8 as Hx.
     eapply path_eval_root_addlink in Hx.
     2: apply does_not_exist_updfile'; eauto.
-    eapply H6 in H8 as H8'; subst.
+    eapply H6 in H7 as H7'; subst.
     eapply H6 in Hx; inversion Hx; clear Hx; subst.
 
     eexists; split; subst_fsequiv.
     + intuition idtac.
 
       econstructor.
-      2: reflexivity.
       2: reflexivity.
 
       econstructor; eauto.
@@ -492,7 +487,6 @@ Proof.
     + intuition idtac.
 
       econstructor.
-      2: reflexivity.
 
       econstructor.
 
@@ -514,14 +508,14 @@ Proof.
         {
           eapply Graph.add_spec in H0; intuition idtac; subst.
           eapply Graph.add_spec; right. eapply Graph.add_spec; eauto.
-          eapply Graph.add_spec in H7; intuition idtac; subst.
+          eapply Graph.add_spec in H9; intuition idtac; subst.
           eapply Graph.add_spec; eauto.
           eapply Graph.add_spec; right. eapply Graph.add_spec; eauto.
         }
         {
           eapply Graph.add_spec in H0; intuition idtac; subst.
           eapply Graph.add_spec; right. eapply Graph.add_spec; eauto.
-          eapply Graph.add_spec in H7; intuition idtac; subst.
+          eapply Graph.add_spec in H9; intuition idtac; subst.
           eapply Graph.add_spec; eauto.
           eapply Graph.add_spec; right. eapply Graph.add_spec; eauto.
         }
