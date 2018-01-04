@@ -1,4 +1,7 @@
 Require Import POCS.
+Require Import Relations.Relation_Operators.
+Require Import RelationClasses.
+Require Import Morphisms.
 
 
 Import ListNotations.
@@ -41,15 +44,50 @@ Definition starts_with_tid tid (name : string) : Prop :=
     name = (tid_to_string tid ++ "." ++ namesuffix)%string.
 
 
+Section StepXform.
+
+  Variable opT : Type -> Type.
+  Variable op_step : OpSemantics opT State.
+  Variable EquivR : Relation_Definitions.relation State.
+
+  Inductive equiv_step : OpSemantics opT State :=
+  | StepEquiv : forall `(op : opT T) tid s0 s0' s1 s1' r,
+    op_step op tid s0' r s1' ->
+    EquivR s0 s0' ->
+    EquivR s1 s1' ->
+    equiv_step op tid s0 r s1.
+
+End StepXform.
+
+
+(* These mutators should go into Trees.v *)
+
+Definition does_not_exist (fs : FS) dirnum name :=
+  ~ exists n, Graph.In (mkLink dirnum n name) (FSLinks fs).
+
+Definition file_handle_unused (fs : FS) h :=
+  ~ exists d name, Graph.In (mkLink d (FileNode h) name) (FSLinks fs).
+
+Definition file_handle_valid (fs : FS) h :=
+  h < Datatypes.length (FSFiles fs).
+
+Definition upd_file h data (fs : FS) :=
+  mkFS (FSRoot fs) (FSLinks fs) (list_upd (FSFiles fs) h data).
+
+Definition add_link dir node name (fs : FS) :=
+  mkFS (FSRoot fs) (Graph.add (mkLink dir node name) (FSLinks fs)) (FSFiles fs).
+
+Definition valid_dir dir (fs : FS) :=
+  exists pn, path_eval_root fs pn (DirNode dir).
+
+
 Inductive fs_step : forall T, fsOpT T -> nat -> State -> T -> State -> Prop :=
-| StepCreate : forall dir name tid s h s' dirnum,
+| StepCreateAt : forall dir dirnum name tid s h s',
   path_eval_root s dir (DirNode dirnum) ->
-  (~ exists n, Graph.In (mkLink dirnum n name) (FSLinks s)) ->
-  (~ exists d name', Graph.In (mkLink d (FileNode h) name') (FSLinks s)) ->
-  h < Datatypes.length (FSFiles s) ->
-  s' = mkFS (FSRoot s)
-            (Graph.add (mkLink dirnum (FileNode h) name) (FSLinks s))
-            (list_upd (FSFiles s) h "") ->
+  does_not_exist s dirnum name ->
+  file_handle_unused s h ->
+  file_handle_valid s h ->
+  s' = add_link dirnum (FileNode h) name (upd_file h "" s) ->
   fs_step (Create dir name) tid s h s'
 
 (*
@@ -129,8 +167,9 @@ Inductive mailfs_step_allowed : forall T, fsOpT T -> nat -> Prop :=
 | MailStepCreateTmp : forall dir name tid,
   dir = tmpdir ->
   starts_with_tid tid name ->
-  mailfs_step_allowed (Create dir name) tid
+  mailfs_step_allowed (Create dir name) tid.
 
+(*
 | MailStepFindAvailableNameTmp : forall tid,
   mailfs_step_allowed (FindAvailableName tmpdir) tid
 
@@ -151,11 +190,25 @@ Inductive mailfs_step_allowed : forall T, fsOpT T -> nat -> Prop :=
   starts_with_tid tid dstname ->
   mailfs_step_allowed (Rename src dstdir dstname) tid
 .
+*)
+
+Definition fs_step_equiv : OpSemantics fsOpT State :=
+  equiv_step fs_step FSEquiv.
+
+Definition unique_pathname (fs : FS) pn :=
+  exists node,
+    path_eval_root fs pn node /\
+    forall node',
+      path_eval_root fs pn node' -> node' = node.
+
+Definition invariant (fs : FS) :=
+  unique_pathname fs tmpdir.
 
 Definition mailfs_step T (op : fsOpT T) tid s r s' :=
-  fs_step op tid s r s' /\
-  mailfs_step_allowed op tid.
-
+  fs_step_equiv op tid s r s' /\
+  mailfs_step_allowed op tid /\
+  invariant s /\
+  invariant s'.
 
 
 Definition message := string.
@@ -177,6 +230,8 @@ Ltac step_inv :=
   match goal with
   | H : fs_step _ _ _ _ _ |- _ =>
     inversion H; clear H; subst; repeat sigT_eq
+  | H : fs_step_equiv _ _ _ _ _ |- _ =>
+    inversion H; clear H; subst; repeat sigT_eq
   | H : mailfs_step _ _ _ _ _ |- _ =>
     inversion H; clear H; subst; repeat sigT_eq
   | H : mailfs_step_allowed _ _ |- _ =>
@@ -195,25 +250,216 @@ Axiom starts_with_tid_ne : forall tid0 tid1 name0 name1,
   starts_with_tid tid1 name1 ->
   name0 <> name1.
 
+Hint Resolve starts_with_tid_ne.
 
 
-Lemma path_eval_root_0 : forall fs dirnum name dirpn n files' dirnum',
+Instance fs_step_equiv_proper :
+  Proper (eq ==> eq ==> FSEquiv ==> eq ==> FSEquiv ==> iff) (@fs_step_equiv T).
+Proof.
+  intros.
+  intros ? ? ?; subst.
+  intros ? ? ?; subst.
+  intros fs1 fs1' ?.
+  intros ? ? ?; subst.
+  intros fs2 fs2' ?.
+  unfold fs_step_equiv; intuition.
+  - inversion H1; clear H1; repeat sigT_eq.
+    econstructor; eauto.
+    etransitivity; eauto.
+      symmetry; eauto.
+    etransitivity; eauto.
+      symmetry; eauto.
+  - inversion H1; clear H1; repeat sigT_eq.
+    econstructor; eauto.
+    etransitivity; eauto.
+    etransitivity; eauto.
+Qed.
+
+Instance file_handle_unused_proper :
+  Proper (FSEquiv ==> eq ==> iff) file_handle_unused.
+Proof.
+  intros ? ? ?; subst.
+  intros ? ? ?; subst.
+  unfold FSEquiv in H.
+  unfold file_handle_unused; intuition; repeat deex.
+  - apply H2 in H3. eauto.
+  - apply H2 in H3. eauto.
+Qed.
+
+Instance file_handle_valid_proper :
+  Proper (FSEquiv ==> eq ==> iff) file_handle_valid.
+Proof.
+  intros ? ? ?; subst.
+  intros ? ? ?; subst.
+  unfold FSEquiv in H.
+  unfold file_handle_valid; intuition; congruence.
+Qed.
+
+Instance does_not_exist_proper :
+  Proper (FSEquiv ==> eq ==> eq ==> iff) does_not_exist.
+Proof.
+  intros ? ? ?; subst.
+  intros ? ? ?; subst.
+  intros ? ? ?; subst.
+  unfold FSEquiv in H.
+  unfold does_not_exist; intuition; repeat deex.
+  - apply H2 in H3. eauto.
+  - apply H2 in H3. eauto.
+Qed.
+
+Instance FSEquiv_proper :
+  Proper (FSEquiv ==> FSEquiv ==> iff) FSEquiv.
+Proof.
+  intros ? ? ?; subst.
+  intros ? ? ?; subst.
+  rewrite H. rewrite H0. reflexivity.
+Qed.
+
+Instance upd_file_proper :
+  Proper (eq ==> eq ==> FSEquiv ==> FSEquiv) upd_file.
+Proof.
+  intros ? ? ?; subst.
+  intros ? ? ?; subst.
+  intros ? ? ?; subst.
+  unfold upd_file.
+  unfold FSEquiv in *.
+  intuition; simpl.
+  rewrite H; eauto.
+Qed.
+
+Instance add_link_proper :
+  Proper (eq ==> eq ==> eq ==> FSEquiv ==> FSEquiv) add_link.
+Proof.
+  intros ? ? ?; subst.
+  intros ? ? ?; subst.
+  intros ? ? ?; subst.
+  intros ? ? ?; subst.
+  unfold add_link.
+  unfold FSEquiv in *.
+  intuition; simpl.
+
+  unfold Graph.Equal; split; intros; apply Graph.add_spec.
+  - apply Graph.add_spec in H1; intuition; subst.
+    apply H2 in H3. eauto.
+  - apply Graph.add_spec in H1; intuition; subst.
+    apply H2 in H3. eauto.
+Qed.
+
+Instance invariant_proper :
+  Proper (FSEquiv ==> iff) invariant.
+Proof.
+  intros ? ? ?; subst.
+  unfold invariant, unique_pathname; intuition; repeat deex.
+  - rewrite H in H0; eexists; intuition eauto.
+    eapply H1. rewrite H. eauto.
+  - rewrite <- H in H0; eexists; intuition eauto.
+    eapply H1. rewrite <- H. eauto.
+Qed.
+
+
+Lemma path_eval_root_addlink : forall fs dirnum name dirpn n,
   path_eval_root fs dirpn (DirNode dirnum) ->
-  (~ exists n, Graph.In (mkLink dirnum n name) (FSLinks fs)) ->
-  path_eval_root (mkFS (FSRoot fs)
-                       (Graph.add (mkLink dirnum n name) (FSLinks fs))
-                       files') dirpn (DirNode dirnum') ->
-  dirnum = dirnum'.
+  does_not_exist fs dirnum name ->
+  path_eval_root (add_link dirnum n name fs) dirpn (DirNode dirnum).
 Admitted.
 
-Lemma path_eval_root_1 : forall fs dirnum name dirpn n files',
+Lemma path_eval_root_updfile : forall fs dirnum h data dirpn,
   path_eval_root fs dirpn (DirNode dirnum) ->
-  (~ exists n, Graph.In (mkLink dirnum n name) (FSLinks fs)) ->
-  path_eval_root (mkFS (FSRoot fs)
-                       (Graph.add (mkLink dirnum n name) (FSLinks fs))
-                       files') dirpn (DirNode dirnum).
+  path_eval_root (upd_file h data fs) dirpn (DirNode dirnum).
 Admitted.
 
+Lemma does_not_exist_addlink : forall fs dirnum name dirnum0 n0 name0,
+  does_not_exist (add_link dirnum0 n0 name0 fs) dirnum name ->
+  does_not_exist fs dirnum name.
+Admitted.
+
+Lemma does_not_exist_addlink_same_dirnum : forall fs dirnum name n0 name0,
+  does_not_exist fs dirnum name ->
+  name <> name0 ->
+  does_not_exist (add_link dirnum n0 name0 fs) dirnum name.
+Admitted.
+
+Lemma does_not_exist_updfile : forall fs h data dirnum name,
+  does_not_exist (upd_file h data fs) dirnum name ->
+  does_not_exist fs dirnum name.
+Admitted.
+
+Lemma does_not_exist_updfile' : forall fs h data dirnum name,
+  does_not_exist fs dirnum name ->
+  does_not_exist (upd_file h data fs) dirnum name.
+Admitted.
+
+Hint Resolve does_not_exist_addlink.
+Hint Resolve does_not_exist_addlink_same_dirnum.
+Hint Resolve does_not_exist_updfile.
+Hint Resolve does_not_exist_updfile'.
+
+Lemma file_handle_unused_updfile : forall fs h0 data0 h,
+  file_handle_unused (upd_file h0 data0 fs) h ->
+  file_handle_unused fs h.
+Admitted.
+
+Lemma file_handle_unused_addlink : forall fs dirnum n name h,
+  file_handle_unused (add_link dirnum n name fs) h ->
+  file_handle_unused fs h.
+Admitted.
+
+Lemma file_handle_unused_updfile' : forall fs h0 data0 h,
+  file_handle_unused fs h ->
+  file_handle_unused (upd_file h0 data0 fs) h.
+Admitted.
+
+Lemma file_handle_unused_addlink' : forall fs dirnum n name h,
+  file_handle_unused fs h ->
+  n <> FileNode h ->
+  file_handle_unused (add_link dirnum n name fs) h.
+Admitted.
+
+Lemma file_handle_unused_ne : forall fs dirnum v0 v1 name,
+  file_handle_unused (add_link dirnum (FileNode v0) name fs) v1 ->
+  FileNode v1 <> FileNode v0.
+Admitted.
+
+Hint Resolve file_handle_unused_updfile.
+Hint Resolve file_handle_unused_addlink.
+Hint Resolve file_handle_unused_addlink'.
+Hint Resolve file_handle_unused_ne.
+
+Lemma file_handle_valid_updfile : forall fs h0 data0 h,
+  file_handle_valid (upd_file h0 data0 fs) h ->
+  file_handle_valid fs h.
+Admitted.
+
+Lemma file_handle_valid_addlink : forall fs dirnum n name h,
+  file_handle_valid (add_link dirnum n name fs) h ->
+  file_handle_valid fs h.
+Admitted.
+
+Lemma file_handle_valid_updfile' : forall fs h0 data0 h,
+  file_handle_valid fs h ->
+  file_handle_valid (upd_file h0 data0 fs) h.
+Admitted.
+
+Lemma file_handle_valid_addlink' : forall fs dirnum n name h,
+  file_handle_valid fs h ->
+  file_handle_valid (add_link dirnum n name fs) h.
+Admitted.
+
+Hint Resolve file_handle_valid_updfile.
+Hint Resolve file_handle_valid_addlink.
+Hint Resolve file_handle_valid_updfile'.
+Hint Resolve file_handle_valid_addlink'.
+
+
+Ltac subst_fsequiv :=
+  match goal with
+  | H : FSEquiv ?s1 ?s2 |- _ =>
+    idtac "substituting" s1 "using" H; rewrite H in *; clear H; clear s1;
+    idtac "cleared" s1
+  | H : FSEquiv ?s1 ?s2 |- _ =>
+    idtac "substituting" s2 "using" H; rewrite <- H in *; clear H; clear s2;
+    idtac "cleared" s2
+  end.
 
 Theorem create_tmpdir_both_mover : forall dir name,
   both_mover mailfs_step (Create dir name).
@@ -221,46 +467,68 @@ Proof.
   split; intros.
   - unfold right_mover; intros.
     repeat step_inv; unfold mailfs_step; intuition eauto; simpl in *.
-    eapply path_eval_root_0 in H7 as H7'; eauto; subst.
+    repeat step_inv.
+    repeat subst_fsequiv.
 
-    eexists; intuition eauto.
-    + econstructor.
-      * eauto.
-      * intro; repeat deex.
-        destruct H9. exists n.
-        apply Graph.add_spec; right; auto.
-      * intro; repeat deex; eauto.
-        destruct H12. exists d, name'.
-        apply Graph.add_spec; right; auto.
-      * admit.
-      * reflexivity.
+    (* Use the fact that tmpdir is unique to show that dirnum=dirnum0 *)
+    destruct H20; intuition idtac.
+    eapply path_eval_root_updfile in H12 as Hx.
+    eapply path_eval_root_addlink in Hx.
+    2: apply does_not_exist_updfile'; eauto.
+    eapply H6 in H8 as H8'; subst.
+    eapply H6 in Hx; inversion Hx; clear Hx; subst.
 
-    + simpl in *.
+    eexists; split; subst_fsequiv.
+    + intuition idtac.
+
       econstructor.
-      * eapply path_eval_root_1; eauto.
-        intro; repeat deex; eauto.
-        destruct H9. exists n.
-        apply Graph.add_spec; right; auto.
-      * intro; repeat deex; eauto.
-        simpl in *. intuition eauto.
-        apply Graph.add_spec in H0.
-        intuition idtac.
-        inversion H2; subst.
-        eapply starts_with_tid_ne; eauto.
-        destruct H11.
-        exists n; eauto.
-      * intro; repeat deex; eauto.
-        simpl in *. intuition eauto.
-        (* same as above *)
+      2: reflexivity.
+      2: reflexivity.
+
+      econstructor; eauto.
+      eauto.
+      admit.
+
+    + intuition idtac.
+
+      econstructor.
+      2: reflexivity.
+
+      econstructor.
+
+      admit.
+      eauto.
+      eauto.
+      eauto.
+      reflexivity.
+
+      {
+        destruct s.
+        unfold add_link, upd_file.
+        unfold FSEquiv.
+        simpl.
+        intuition eauto.
         admit.
-      * admit.
-      * simpl.
-        f_equal.
-        (* XXX these sets are semantically the same ... *)
-        rewrite Graph.equal_spec.
-        admit. (* should be sets, not lists *)
-        (* XXX FSFiles should be a set too ... *)
-        admit.
+
+        unfold Graph.Equal; split; intros.
+        {
+          eapply Graph.add_spec in H0; intuition idtac; subst.
+          eapply Graph.add_spec; right. eapply Graph.add_spec; eauto.
+          eapply Graph.add_spec in H7; intuition idtac; subst.
+          eapply Graph.add_spec; eauto.
+          eapply Graph.add_spec; right. eapply Graph.add_spec; eauto.
+        }
+        {
+          eapply Graph.add_spec in H0; intuition idtac; subst.
+          eapply Graph.add_spec; right. eapply Graph.add_spec; eauto.
+          eapply Graph.add_spec in H7; intuition idtac; subst.
+          eapply Graph.add_spec; eauto.
+          eapply Graph.add_spec; right. eapply Graph.add_spec; eauto.
+        }
+      }
+
+      eauto.
+      admit.
 
   - admit.
 Admitted.

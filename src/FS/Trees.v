@@ -2,6 +2,10 @@ Require Import POCS.
 Require Import String.
 Require Import Equalities.
 Require Import MSets.MSetWeakList.
+Require Import Relations.Relation_Operators.
+Require Import RelationClasses.
+Require Import Morphisms.
+
 
 Import ListNotations.
 Open Scope string.
@@ -65,6 +69,26 @@ Record FS := mkFS {
 
 Definition Pathname := list string.
 
+
+Definition FSEquiv (fs1 fs2 : FS) : Prop :=
+  FSRoot fs1 = FSRoot fs2 /\
+  FSFiles fs1 = FSFiles fs2 /\
+  Graph.Equal (FSLinks fs1) (FSLinks fs2).
+
+Instance FSEquiv_Equiv : Equivalence FSEquiv.
+Proof.
+  split; unfold FSEquiv.
+  - intros f; intuition eauto.
+    reflexivity.
+  - intros f1 f2; intuition eauto.
+    symmetry. eauto.
+  - intros f1 f2 f3; intuition eauto.
+    congruence.
+    congruence.
+    etransitivity; eauto.
+Qed.
+
+
 (** [path_evaluates] is used to specify lookup *)
 
 Inductive valid_link : forall (fs : FS) (dir : nat) (name : string) (target : Node), Prop :=
@@ -80,6 +104,30 @@ Inductive valid_link : forall (fs : FS) (dir : nat) (name : string) (target : No
   dir = FSRoot fs ->
   valid_link fs dir ".." (DirNode dir).
 
+Instance valid_link_proper :
+  Proper (FSEquiv ==> eq ==> eq ==> eq ==> iff) valid_link.
+Proof.
+  intros fs1 fs2 H.
+  intros ? ? ?; subst.
+  intros ? ? ?; subst.
+  intros ? ? ?; subst.
+  unfold FSEquiv in H; intuition idtac.
+  - inversion H1.
+    + eapply ValidLink.
+      eapply H2; eauto.
+    + eapply ValidDot.
+    + eapply ValidDotDot.
+      eapply H2; eauto.
+    + eapply ValidDotDotRoot. congruence.
+  - inversion H1.
+    + eapply ValidLink.
+      eapply H2; eauto.
+    + eapply ValidDot.
+    + eapply ValidDotDot.
+      eapply H2; eauto.
+    + eapply ValidDotDotRoot. congruence.
+Qed.
+
 Inductive path_evaluates : forall (fs : FS) (start : Node) (pn : Pathname) (target : Node), Prop :=
 | PathEvalEmpty : forall fs start,
   path_evaluates fs start nil start
@@ -93,8 +141,43 @@ Inductive path_evaluates : forall (fs : FS) (start : Node) (pn : Pathname) (targ
   path_evaluates fs symtarget pn target ->
   path_evaluates fs (DirNode startdir) (name :: pn) target.
 
+Instance path_evaluates_proper :
+  Proper (FSEquiv ==> eq ==> eq ==> eq ==> iff) path_evaluates.
+Proof.
+  intros fs1 fs2 H.
+  intros ? ? ?; subst.
+  intros ? ? ?; subst.
+  intros ? ? ?; subst.
+  intuition.
+  - induction H0.
+    + eapply PathEvalEmpty.
+    + eapply PathEvalLink; eauto.
+      rewrite H in H0. eauto.
+    + eapply PathEvalSymlink; eauto.
+      unfold FSEquiv in H; intuition.
+      eapply H3; eauto.
+  - induction H0.
+    + eapply PathEvalEmpty.
+    + eapply PathEvalLink; eauto.
+      rewrite <- H in H0. eauto.
+    + eapply PathEvalSymlink; eauto.
+      unfold FSEquiv in H; intuition.
+      eapply H3; eauto.
+Qed.
+
 Definition path_eval_root (fs : FS) (pn : Pathname) (target : Node) : Prop :=
   path_evaluates fs (DirNode (FSRoot fs)) pn target.
+
+Instance path_eval_root_proper :
+  Proper (FSEquiv ==> eq ==> eq ==> iff) path_eval_root.
+Proof.
+  intros fs1 fs2 H.
+  intros ? ? ?; subst.
+  intros ? ? ?; subst.
+  unfold path_eval_root.
+  eapply path_evaluates_proper; eauto.
+  unfold FSEquiv in *; intuition.
+Qed.
 
 
 (** Largely boilerplate helpers and proof hints *)
