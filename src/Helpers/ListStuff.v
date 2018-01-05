@@ -60,3 +60,16 @@ Proof.
   rewrite <- repeat_tl.
   reflexivity.
 Qed.
+
+Lemma length_list_upd: forall `(l: list T) i d,
+  Datatypes.length (list_upd l i d) = Datatypes.length l.
+Proof.
+  induction l; intros; simpl.
+  + auto.
+  + destruct i.
+    replace (d::l) with ([d]++l) by auto.
+    apply app_length.
+    replace (a :: (list_upd l i d)) with ([a] ++ (list_upd l i d)) by auto.
+    rewrite app_length. simpl.
+    rewrite IHl; auto.
+Qed.

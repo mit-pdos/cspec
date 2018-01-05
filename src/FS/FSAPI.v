@@ -403,24 +403,54 @@ Qed.
 Lemma does_not_exist_addlink : forall fs dirnum name dirnum0 n0 name0,
   does_not_exist (add_link dirnum0 n0 name0 fs) dirnum name ->
   does_not_exist fs dirnum name.
-Admitted.
-
+Proof.
+  intros.
+  unfold does_not_exist, add_link in *.
+  simpl in *.
+  intro.
+  destruct H.
+  deex.
+  eexists.
+  apply Graph.add_spec. right.
+  apply H.
+Qed.
+  
 Lemma does_not_exist_addlink_same_dirnum : forall fs dirnum name n0 name0,
   does_not_exist fs dirnum name ->
   name <> name0 ->
   does_not_exist (add_link dirnum n0 name0 fs) dirnum name.
-Admitted.
-
+Proof.
+  intros.
+  unfold does_not_exist, add_link in *.
+  simpl in *.
+  intro.
+  deex.
+  apply Graph.add_spec in H1.
+  intuition idtac.
+  inversion H2; congruence.
+  destruct H.
+  eexists.
+  apply H2.
+Qed.
+  
 Lemma does_not_exist_updfile : forall fs h data dirnum name,
   does_not_exist (upd_file h data fs) dirnum name ->
   does_not_exist fs dirnum name.
-Admitted.
+Proof.
+  intros.
+  unfold does_not_exist, upd_file in *.
+  simpl in *; auto.
+Qed.
 
 Lemma does_not_exist_updfile' : forall fs h data dirnum name,
   does_not_exist fs dirnum name ->
   does_not_exist (upd_file h data fs) dirnum name.
-Admitted.
-
+Proof.
+  intros.
+  unfold does_not_exist, upd_file in *.
+  simpl in *; auto.
+Qed.
+  
 Hint Resolve does_not_exist_addlink.
 Hint Resolve does_not_exist_addlink_same_dirnum.
 Hint Resolve does_not_exist_updfile.
@@ -429,28 +459,67 @@ Hint Resolve does_not_exist_updfile'.
 Lemma file_handle_unused_updfile : forall fs h0 data0 h,
   file_handle_unused (upd_file h0 data0 fs) h ->
   file_handle_unused fs h.
-Admitted.
+Proof.
+  intros.
+  unfold file_handle_unused, upd_file in *.
+  simpl in *; auto.
+Qed.
 
 Lemma file_handle_unused_addlink : forall fs dirnum n name h,
   file_handle_unused (add_link dirnum n name fs) h ->
   file_handle_unused fs h.
-Admitted.
-
+Proof.
+  intros.
+  unfold file_handle_unused, add_link in *.
+  simpl in *.
+  intro.
+  repeat deex.
+  destruct H.
+  repeat eexists.
+  apply Graph.add_spec.
+  right. apply H0.
+Qed.
+  
 Lemma file_handle_unused_updfile' : forall fs h0 data0 h,
   file_handle_unused fs h ->
   file_handle_unused (upd_file h0 data0 fs) h.
-Admitted.
+Proof.
+  intros.
+  unfold file_handle_unused, upd_file in *.
+  simpl in *; auto.
+Qed.
 
 Lemma file_handle_unused_addlink' : forall fs dirnum n name h,
   file_handle_unused fs h ->
   n <> FileNode h ->
   file_handle_unused (add_link dirnum n name fs) h.
-Admitted.
-
+Proof.
+  intros.
+  unfold file_handle_unused, add_link in *.
+  simpl in *.
+  intro.
+  repeat deex.
+  apply Graph.add_spec in H1.
+  intuition idtac.
+  inversion H2; congruence.
+  destruct H.
+  repeat eexists.
+  apply H2.
+Qed.
+  
 Lemma file_handle_unused_ne : forall fs dirnum v0 v1 name,
   file_handle_unused (add_link dirnum (FileNode v0) name fs) v1 ->
   FileNode v1 <> FileNode v0.
-Admitted.
+Proof.
+  intros.
+  unfold file_handle_unused, add_link in *.
+  simpl in *.
+  intro.
+  destruct H.
+  repeat eexists.
+  apply Graph.add_spec.
+  left. rewrite H0; eauto.
+Qed.
 
 Hint Resolve file_handle_unused_updfile.
 Hint Resolve file_handle_unused_addlink.
@@ -460,23 +529,41 @@ Hint Resolve file_handle_unused_ne.
 Lemma file_handle_valid_updfile : forall fs h0 data0 h,
   file_handle_valid (upd_file h0 data0 fs) h ->
   file_handle_valid fs h.
-Admitted.
+Proof.
+  intros.
+  unfold file_handle_valid, file_handle_valid, upd_file in *.
+  simpl in *.
+  rewrite length_list_upd in H; auto.
+Qed.
 
 Lemma file_handle_valid_addlink : forall fs dirnum n name h,
   file_handle_valid (add_link dirnum n name fs) h ->
   file_handle_valid fs h.
-Admitted.
+Proof.
+  intros.
+  unfold file_handle_valid, file_handle_valid, add_link in *.
+  simpl in *; auto.
+Qed.
 
 Lemma file_handle_valid_updfile' : forall fs h0 data0 h,
   file_handle_valid fs h ->
   file_handle_valid (upd_file h0 data0 fs) h.
-Admitted.
-
+Proof.
+  intros.
+  unfold file_handle_valid, file_handle_valid, upd_file in *.
+  simpl in *.
+  rewrite length_list_upd; auto.
+Qed.
+  
 Lemma file_handle_valid_addlink' : forall fs dirnum n name h,
   file_handle_valid fs h ->
   file_handle_valid (add_link dirnum n name fs) h.
-Admitted.
-
+Proof.
+  intros.
+  unfold file_handle_valid, file_handle_valid, add_link in *.
+  simpl in *; auto.
+Qed.
+  
 Hint Resolve file_handle_valid_updfile.
 Hint Resolve file_handle_valid_addlink.
 Hint Resolve file_handle_valid_updfile'.
