@@ -382,8 +382,24 @@ Qed.
 Lemma path_eval_root_updfile : forall fs dirnum h data dirpn,
   path_eval_root fs dirpn (DirNode dirnum) ->
   path_eval_root (upd_file h data fs) dirpn (DirNode dirnum).
-Admitted.
-
+Proof.
+  intros.
+  unfold path_eval_root, upd_file; simpl.
+  induction H.
+  + constructor.
+  + eapply PathEvalLink; eauto.
+    edestruct H.
+    - constructor; simpl; auto.
+    - apply ValidDot.
+    - eapply ValidDotDot; simpl; auto.
+      apply H1.
+    - apply ValidDotDotRoot; auto.
+  + eapply PathEvalSymlink; simpl.
+    apply H.
+    apply IHpath_evaluates1; eauto.
+    apply IHpath_evaluates2; eauto.
+Qed.
+    
 Lemma does_not_exist_addlink : forall fs dirnum name dirnum0 n0 name0,
   does_not_exist (add_link dirnum0 n0 name0 fs) dirnum name ->
   does_not_exist fs dirnum name.
