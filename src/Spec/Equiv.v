@@ -173,8 +173,8 @@ Qed.
 
 Definition exec_equiv_ts {opT opHiT} (ts1 ts2 : @threads_state opT opHiT) :=
   forall State op_step (s : State) tr,
-    exec op_step s ts1 tr <->
-    exec op_step s ts2 tr.
+    exec_prefix op_step s ts1 tr <->
+    exec_prefix op_step s ts2 tr.
 
 Definition exec_equiv_opt `(p1 : maybe_proc opT opHiT) p2 :=
   forall (ts : threads_state) tid,

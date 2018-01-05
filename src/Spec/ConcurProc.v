@@ -13,7 +13,6 @@ Global Set Implicit Arguments.
 Global Generalizable All Variables.
 
 
-
 Section Event.
 
   Variable opT : Type -> Type.
@@ -63,7 +62,7 @@ Section Proc.
   Variable opHiT : Type -> Type.
   Variable State : Type.
 
-  Inductive proc : Type -> Type :=
+  CoInductive proc : Type -> Type :=
   | OpCall : forall T (op : opT T), proc unit
   | OpExec : forall T (op : opT T), proc T
   | OpRet : forall T (v : T), proc T
@@ -187,21 +186,29 @@ Section Proc.
                     ) evs.
 
 
-  Inductive exec : State -> threads_state -> trace opT opHiT -> Prop :=
+  Inductive exec : State -> threads_state -> trace opT opHiT -> nat -> Prop :=
 
-  | ExecOne : forall T tid (ts : threads_state) trace p s s' evs result,
+  | ExecOne : forall T tid (ts : threads_state) trace p s s' evs result ctr,
     thread_get ts tid = @Proc T p ->
     exec_tid tid s p s' result evs ->
     exec s' (thread_upd ts tid
               match result with
               | inl _ => NoProc
               | inr p' => Proc p'
-              end) trace ->
-    exec s ts (prepend tid evs trace)
+              end) trace ctr ->
+    exec s ts (prepend tid evs trace) (S ctr)
 
-  | ExecEmpty : forall (ts : threads_state) s,
+  | ExecEmpty : forall (ts : threads_state) s ctr,
     no_runnable_threads ts ->
-    exec s ts TraceEmpty.
+    exec s ts TraceEmpty ctr
+
+  | ExecExpired : forall (ts : threads_state) s,
+    exec s ts TraceEmpty 0.
+
+
+  Definition exec_prefix (s : State) (ts : threads_state) (tr : trace opT opHiT) : Prop :=
+    exists n,
+      exec s ts tr n.
 
 End Proc.
 
