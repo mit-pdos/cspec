@@ -203,13 +203,15 @@ Qed.
 Theorem exec_equiv_ts_app_None : forall `(ts : @threads_state opT opHiT),
   exec_equiv_ts ts (ts ++ [NoProc]).
 Proof.
-  split; intros.
+  split; intros;
+    unfold exec_prefix in *; repeat deex; exists n.
   - induction H.
     + eapply ExecOne with (tid := tid); eauto.
       eapply thread_get_app_NoProc in H; eauto.
       erewrite <- thread_upd_app_NoProc; eauto.
     + eapply ExecEmpty.
       eapply no_runnable_threads_app_NoProc in H; eauto.
+    + eapply ExecExpired.
   - remember (ts ++ [NoProc]); generalize dependent ts;
       induction H; intros; subst.
     + eapply ExecOne with (tid := tid); eauto.
@@ -219,6 +221,7 @@ Proof.
       eapply thread_get_app_NoProc in H. eauto.
     + eapply ExecEmpty.
       eapply no_runnable_threads_app_NoProc; eauto.
+    + eapply ExecExpired.
 Qed.
 
 Theorem exec_equiv_ts_pad : forall n `(ts : @threads_state opT opHiT),
@@ -304,9 +307,10 @@ Qed.
 Theorem exec_equiv_ret_None : forall opT opHiT `(v : T),
   @exec_equiv_opt opT opHiT (Proc (Ret v)) NoProc.
 Proof.
-  split; intros.
+  split; intros;
+    unfold exec_prefix in *; repeat deex.
   - match goal with
-    | H : exec _ _ (thread_upd ?ts ?tid (Proc ?p)) _ |- _ =>
+    | H : exec _ _ (thread_upd ?ts ?tid (Proc ?p)) _ _ |- _ =>
       remember (thread_upd ts tid (Proc p));
       generalize dependent ts;
       induction H; intros; subst
@@ -318,16 +322,23 @@ Proof.
         simpl. eauto.
 
       * rewrite thread_upd_upd_ne in * by eauto.
+        edestruct IHexec. eauto.
+
+        eexists.
         eapply ExecOne with (tid := tid0).
           rewrite thread_upd_ne in * by auto. eauto.
           eauto.
         rewrite thread_upd_upd_ne by auto.
         eauto.
+
     + specialize (H tid).
       rewrite thread_upd_eq in H.
       congruence.
 
+    + eexists. eapply ExecExpired.
+
   - replace tr with (prepend tid nil tr) by reflexivity.
+    eexists.
     eapply ExecOne with (tid := tid).
       rewrite thread_upd_eq. eauto.
       eauto.
@@ -338,9 +349,10 @@ Qed.
 Theorem exec_equiv_bind_ret : forall `(p : proc opT opHiT T),
   exec_equiv (Bind p Ret) p.
 Proof.
-  unfold exec_equiv; split; intros.
+  unfold exec_equiv; split; intros;
+    unfold exec_prefix in *; repeat deex.
   - match goal with
-    | H : exec _ _ (thread_upd ?ts ?tid (Proc ?pp)) _ |- _ =>
+    | H : exec _ _ (thread_upd ?ts ?tid (Proc ?pp)) _ _ |- _ =>
       remember (thread_upd ts tid (Proc pp));
       generalize dependent ts;
       generalize dependent p;
@@ -350,17 +362,35 @@ Proof.
       * autorewrite with t in *.
         repeat maybe_proc_inv.
         exec_tid_inv.
-        eapply ExecOne with (tid := tid).
-          rewrite thread_upd_eq in * by auto. eauto.
+
+        destruct result0.
+        {
+          edestruct exec_equiv_ret_None.
+          edestruct H.
+          unfold exec_prefix; eauto.
+
+          eexists.
+          eapply ExecOne with (tid := tid).
+            rewrite thread_upd_eq in * by auto. eauto.
+            eauto.
+          autorewrite with t.
           eauto.
-        autorewrite with t.
+        }
 
-        destruct result0; eauto.
+        {
+          edestruct IHexec. eauto.
 
-        eapply exec_equiv_ret_None in H1.
-        eauto.
+          eexists.
+          eapply ExecOne with (tid := tid).
+            rewrite thread_upd_eq in * by auto. eauto.
+            eauto.
+          autorewrite with t.
+          eauto.
+        }
 
       * rewrite thread_upd_upd_ne in * by eauto.
+        edestruct IHexec; eauto.
+        eexists.
         eapply ExecOne with (tid := tid0).
           rewrite thread_upd_ne in * by auto. eauto.
           eauto.
@@ -369,9 +399,10 @@ Proof.
     + specialize (H tid).
       rewrite thread_upd_eq in H.
       congruence.
+    + eexists. eapply ExecExpired.
 
   - match goal with
-    | H : exec _ _ (thread_upd ?ts ?tid (Proc ?pp)) _ |- _ =>
+    | H : exec _ _ (thread_upd ?ts ?tid (Proc ?pp)) _ _ |- _ =>
       remember (thread_upd ts tid (Proc pp));
       generalize dependent ts;
       generalize dependent p;
@@ -380,14 +411,34 @@ Proof.
     + destruct (tid0 == tid); subst.
       * autorewrite with t in *.
         repeat maybe_proc_inv.
-        eapply ExecOne with (tid := tid).
-          rewrite thread_upd_eq. eauto.
+
+        destruct result.
+        {
+          edestruct exec_equiv_ret_None.
+          edestruct H2.
+          unfold exec_prefix; eauto.
+
+          eexists.
+          eapply ExecOne with (tid := tid).
+            rewrite thread_upd_eq. eauto.
+            eauto.
+          autorewrite with t in *.
           eauto.
-        autorewrite with t in *.
-        destruct result; eauto.
-        apply exec_equiv_ret_None; eauto.
+        }
+
+        {
+          edestruct IHexec; eauto.
+          eexists.
+          eapply ExecOne with (tid := tid).
+            rewrite thread_upd_eq. eauto.
+            eauto.
+          autorewrite with t in *.
+          eauto.
+        }
 
       * rewrite thread_upd_upd_ne in * by eauto.
+        edestruct IHexec; eauto.
+        eexists.
         eapply ExecOne with (tid := tid0).
           rewrite thread_upd_ne in * by auto. eauto.
           eauto.
@@ -396,6 +447,7 @@ Proof.
     + specialize (H tid).
       rewrite thread_upd_eq in H.
       congruence.
+    + eexists. eapply ExecExpired.
 Qed.
 
 Instance exec_equiv_rx_to_exec_equiv :
