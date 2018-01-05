@@ -357,8 +357,28 @@ Lemma path_eval_root_addlink : forall fs dirnum name dirpn n,
   path_eval_root fs dirpn (DirNode dirnum) ->
   does_not_exist fs dirnum name ->
   path_eval_root (add_link dirnum n name fs) dirpn (DirNode dirnum).
-Admitted.
-
+Proof.
+  unfold path_eval_root, add_link, does_not_exist in *.
+  simpl in *.
+  intros.
+  induction H.
+  + constructor.
+  + eapply PathEvalLink; eauto.
+    edestruct H.
+    (* validlink constructors: *)
+    - constructor; simpl.
+      apply Graph.add_spec; auto.
+    - apply ValidDot.
+    - eapply ValidDotDot.
+      apply Graph.add_spec; auto.
+      right; eauto.
+    - apply ValidDotDotRoot; auto.
+  + eapply PathEvalSymlink; simpl.
+    apply Graph.add_spec; right; eauto.
+    apply IHpath_evaluates1; eauto.
+    apply IHpath_evaluates2; eauto.
+Qed.
+    
 Lemma path_eval_root_updfile : forall fs dirnum h data dirpn,
   path_eval_root fs dirpn (DirNode dirnum) ->
   path_eval_root (upd_file h data fs) dirpn (DirNode dirnum).
