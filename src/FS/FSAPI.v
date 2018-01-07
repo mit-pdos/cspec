@@ -3,7 +3,6 @@ Require Import Relations.Relation_Operators.
 Require Import RelationClasses.
 Require Import Morphisms.
 
-
 Import ListNotations.
 Require Import String.
 Require Import Trees.
@@ -86,7 +85,7 @@ Inductive fs_step : forall T, fsOpT T -> nat -> State -> T -> State -> Prop :=
   does_not_exist s dirnum name ->
   file_handle_unused s h ->
   file_handle_valid s h ->
-  s' = add_link dirnum (FileNode h) name (upd_file h "" s) ->
+  s' = add_link dirnum (FileNode h) name (upd_file h "" s) ->   (* XXX introduce add_file *)
   fs_step (Create dir name) tid s h s'
 
 (*
@@ -352,6 +351,45 @@ Proof.
     eapply H1. rewrite <- H. eauto.
 Qed.
 
+Lemma valid_link_eq: forall fs dir a node node0,
+    valid_link fs dir a node ->
+    valid_link fs dir a node0 ->
+    node = node0.
+Proof.
+  intros.
+  inversion H.
+  inversion H0; subst; try congruence.
+  (* XXX We need uniques of names in a directory *)
+Admitted.
+
+Lemma path_evaluates_eq: forall pn fs dir node node',
+    path_evaluates fs dir pn node ->
+    path_evaluates fs dir pn node'->
+    node = node'.
+Proof.
+  induction pn; intros.
+  + inversion H.
+    inversion H0; subst; eauto.
+  + inversion H.
+    inversion H0; subst.
+    inversion H5; subst; try congruence.
+    inversion H12; subst; try congruence.
+    inversion H11; subst. clear H11.
+
+    eapply valid_link_eq in H5 as H5x; eauto.
+    inversion H5x; subst.
+    eapply IHpn; eauto.
+
+Admitted.
+
+Lemma path_eval_root_eq: forall pn fs node node',
+    path_evaluates fs (DirNode (FSRoot fs)) pn node ->
+    path_evaluates fs (DirNode (FSRoot fs)) pn node' ->
+    node = node'.
+Proof.
+  intros.
+  eapply path_evaluates_eq; eauto.
+Qed.
 
 Lemma path_eval_root_addlink : forall fs dirnum name dirpn n,
   path_eval_root fs dirpn (DirNode dirnum) ->
@@ -378,7 +416,7 @@ Proof.
     apply IHpath_evaluates1; eauto.
     apply IHpath_evaluates2; eauto.
 Qed.
-    
+
 Lemma path_eval_root_updfile : forall fs dirnum h data dirpn,
   path_eval_root fs dirpn (DirNode dirnum) ->
   path_eval_root (upd_file h data fs) dirpn (DirNode dirnum).
@@ -399,7 +437,43 @@ Proof.
     apply IHpath_evaluates1; eauto.
     apply IHpath_evaluates2; eauto.
 Qed.
-    
+
+Lemma path_eval_root_addfile': forall dirpn fs dirnum name h node,
+    path_eval_root (add_link dirnum (FileNode h) name (upd_file h "" fs)) dirpn node  ->
+    does_not_exist fs dirnum name ->
+    path_eval_root fs dirpn node.
+Proof.
+  intros.
+Admitted.
+
+Lemma invariant_add_link: forall dirnum v0 v1 name name0 fs,
+    name <> name0 ->
+    path_eval_root fs tmpdir (DirNode dirnum) ->
+    path_eval_root (add_link dirnum (FileNode v0) name (upd_file v0 "" fs)) tmpdir (DirNode dirnum) ->
+    does_not_exist (add_link dirnum (FileNode v0) name (upd_file v0 "" fs)) dirnum name0 ->
+    does_not_exist fs dirnum name ->
+    invariant fs ->
+    invariant
+      (add_link dirnum (FileNode v1) name0
+                (upd_file v1 "" (add_link dirnum (FileNode v0) name (upd_file v0 "" fs)))) ->
+    invariant (add_link dirnum (FileNode v1) name0 (upd_file v1 "" fs)).
+Proof.
+  unfold invariant, unique_pathname.
+  intros.
+  exists (DirNode dirnum).
+  split.
+  eapply path_eval_root_updfile with (h := v1) (data := "") in H0 as Hx.
+  eapply path_eval_root_addlink with (dirnum := dirnum) (n := FileNode v1) (name := name0)  in Hx.
+  apply Hx.
+  admit.  (* follow from H2 *)
+  clear H5.  (* may not need this one *)
+  intro.
+  intro.
+  eapply path_eval_root_addfile' in H5 as H5x.
+  eapply path_eval_root_eq; eauto.
+  admit. (* follow from H2 *)
+Admitted.
+  
 Lemma does_not_exist_addlink : forall fs dirnum name dirnum0 n0 name0,
   does_not_exist (add_link dirnum0 n0 name0 fs) dirnum name ->
   does_not_exist fs dirnum name.
@@ -605,15 +679,21 @@ Proof.
 
       econstructor; eauto.
       eauto.
-      admit.
 
+      eapply invariant_add_link; eauto.
+      
     + intuition idtac.
 
       econstructor.
 
       econstructor.
 
-      admit.
+      eapply path_eval_root_updfile with (h := v1) in H8 as H8x.
+      eapply path_eval_root_addlink with (dirnum := dirnum) in H8x.
+      apply H8x.
+
+      eauto.
+      
       eauto.
       eauto.
       eauto.
@@ -645,7 +725,8 @@ Proof.
       }
 
       eauto.
-      admit.
 
+      eapply invariant_add_link; eauto.
+      
   - admit.
 Admitted.
