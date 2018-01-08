@@ -52,6 +52,11 @@ Inductive proto_step : forall T, opLoT T -> nat -> State -> T -> State -> Prop :
   proto_step Acquire tid (mkState v None) tt (mkState v (Some tid))
 | ProtoStepRelease : forall tid v,
   proto_step Release tid (mkState v (Some tid)) tt (mkState v None)
+| ProtoStepReleaseHack0 : forall tid v,
+  proto_step Release tid (mkState v None) tt (mkState v None)
+| ProtoStepReleaseHack1 : forall tid tid' v,
+  tid <> tid' ->
+  proto_step Release tid (mkState v (Some tid')) tt (mkState v (Some tid'))
 | ProtoStepRead : forall tid v,
   proto_step Read tid (mkState v (Some tid)) v (mkState v (Some tid))
 | ProtoStepWrite : forall tid v0 v,

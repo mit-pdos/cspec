@@ -537,6 +537,24 @@ Proof.
     eauto.
 Qed.
 
+Theorem exec_equiv_atomicret_ret : forall opLoT opHiT `(v : T),
+  @exec_equiv_rx opLoT opHiT _ (Atomic (Ret v)) (Ret v).
+Proof.
+  intros.
+  eapply exec_equiv_rx_proof_helper; intros.
+  - repeat exec_tid_inv.
+    repeat atomic_exec_inv.
+    eapply ExecPrefixOne with (tid := tid).
+      autorewrite with t; eauto.
+      eauto.
+      autorewrite with t; eauto.
+  - repeat exec_tid_inv.
+    eapply ExecPrefixOne with (tid := tid).
+      autorewrite with t; eauto.
+      eauto.
+      autorewrite with t; eauto.
+Qed.
+
 Theorem exec_equiv_bind_bind : forall `(p1 : proc opT opHiT T1) `(p2 : T1 -> proc opT opHiT T2) `(p3 : T2 -> proc opT opHiT T3),
   exec_equiv_rx (Bind (Bind p1 p2) p3) (Bind p1 (fun v => Bind (p2 v) p3)).
 Proof.
@@ -1419,6 +1437,44 @@ Proof.
   repeat exec_tid_inv.
   eexists; split; eauto.
   simpl; eauto.
+Qed.
+
+Theorem hitrace_incl_atomize_opcall_ret_l :
+  forall `(fT : T1 -> Type)
+         `(f : forall (a : T1), opT (fT a))
+         `(f2 : T1 -> unit -> T3)
+         `(p : proc opT opHiT T1)
+         `(rx : _ -> proc opT opHiT TF)
+         `(op_step : OpSemantics opT State),
+  hitrace_incl op_step
+    (Bind (Bind (Atomic p) (fun r => Bind (@OpCall opT opHiT (fT r) (f r)) (fun a => Ret (f2 r a)))) rx)
+    (Bind (Atomic (Bind p (fun r => Bind (@OpCall opT opHiT (fT r) (f r)) (fun a => Ret (f2 r a))))) rx).
+Proof.
+  intros.
+  eapply hitrace_incl_proof_helper; intros.
+  repeat exec_tid_inv.
+
+  eapply hitrace_incl_ts_proof_helper in H0.
+  deex.
+  eexists; split.
+  eapply ExecPrefixOne with (tid := tid).
+    autorewrite with t; eauto.
+    eauto.
+    simpl. autorewrite with t. eauto.
+  rewrite prepend_app. rewrite app_nil_r. eauto.
+
+  intros.
+  repeat exec_tid_inv.
+
+  eapply hitrace_incl_ts_proof_helper in H1.
+  deex.
+  eexists; split.
+  eauto.
+  eauto.
+
+  intros.
+  repeat exec_tid_inv.
+  eexists; split; eauto.
 Qed.
 
 Theorem hitrace_incl_bind_a : forall `(p : proc opT opHiT T) `(p2 : T -> proc _ _ T') p2' `(op_step : OpSemantics opT State),

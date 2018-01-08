@@ -461,6 +461,11 @@ Section Movers.
   Variable moverT : Type.
   Variable opMover : opT moverT.
 
+  Definition always_enabled :=
+    forall tid s,
+      exists r s',
+        op_step opMover tid s r s'.
+
   Definition right_mover :=
     forall `(op1 : opT T2) tid0 tid1 s s0 s1 v0 v1,
       tid0 <> tid1 ->
@@ -471,6 +476,7 @@ Section Movers.
         op_step opMover tid0 s' v0 s1.
 
   Definition left_mover :=
+    always_enabled /\
     forall `(op0 : opT T0) tid0 tid1 s s0 s1 v0 v1,
       tid0 <> tid1 ->
       op_step op0 tid0 s v0 s0 ->
@@ -521,6 +527,7 @@ Section Movers.
     - edestruct IHatomic_exec2; eauto.
       edestruct IHatomic_exec1; intuition eauto.
     - edestruct H.
+      edestruct H4.
       3: eauto.
       2: eauto.
       eauto.
@@ -556,6 +563,7 @@ Section Movers.
     intros.
     induction H1; simpl; eauto.
     - edestruct H.
+      edestruct H4.
       3: eauto.
       2: eauto.
       eauto.
@@ -603,8 +611,12 @@ Section Movers.
           eauto.
           rewrite thread_upd_upd_ne; eauto.
 
-    - admit.
-  Admitted.
+    - destruct H.
+      edestruct H; repeat deex.
+      do 2 eexists; split.
+      eauto.
+      eauto.
+  Qed.
 
   Theorem hitrace_incl_atomize_opexec_right_mover :
     right_mover ->
@@ -755,7 +767,32 @@ Section Movers.
     reflexivity.
 
     rewrite <- hitrace_incl_atomize_opret_ret_l.
-  Admitted.
+
+    repeat rewrite exec_equiv_bind_bind.
+    rewrite <- hitrace_incl_atomize_opexec_ret_left_mover by eauto.
+
+    repeat rewrite exec_equiv_bind_bind.
+    rewrite <- hitrace_incl_atomize_opcall_ret_l.
+
+    repeat rewrite exec_equiv_bind_bind.
+    eapply hitrace_incl_bind_a; intros.
+
+    repeat rewrite exec_equiv_bind_bind with (p1 := OpCall _).
+    eapply hitrace_incl_bind_a; intros.
+
+    rewrite exec_equiv_ret_bind.
+    repeat rewrite exec_equiv_bind_bind with (p1 := OpExec _).
+    eapply hitrace_incl_bind_a; intros.
+
+    rewrite exec_equiv_ret_bind.
+    repeat rewrite exec_equiv_bind_bind with (p1 := OpRet _).
+    eapply hitrace_incl_bind_a; intros.
+
+    rewrite exec_equiv_ret_bind.
+    rewrite exec_equiv_ret_bind.
+    simpl.
+    reflexivity.
+  Qed.
 
 End Movers.
 

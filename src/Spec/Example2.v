@@ -62,6 +62,11 @@ Inductive lo_step : forall T, opLoT T -> nat -> State -> T -> State -> Prop :=
   lo_step Acquire tid (mkState v None) tt (mkState v (Some tid))
 | StepRelease : forall tid v,
   lo_step Release tid (mkState v (Some tid)) tt (mkState v None)
+| StepReleaseHack0 : forall tid v,
+  lo_step Release tid (mkState v None) tt (mkState v None)
+| StepReleaseHack1 : forall tid tid' v,
+  tid' <> tid ->
+  lo_step Release tid (mkState v (Some tid')) tt (mkState v (Some tid'))
 | StepRead : forall tid v,
   lo_step Read tid (mkState v (Some tid)) v (mkState v (Some tid))
 | StepWrite : forall tid v0 v,
@@ -91,6 +96,7 @@ Definition inc_core : proc opLoT opMidT _ :=
   _ <- Op Acquire;
   v <- Op Read;
   _ <- Op (Write (v + 1));
+  _ <- Ret tt;
   _ <- Op Release;
   Ret v.
 
@@ -98,6 +104,7 @@ Definition dec_core : proc opLoT opMidT _ :=
   _ <- Op Acquire;
   v <- Op Read;
   _ <- Op (Write (v - 1));
+  _ <- Ret tt;
   _ <- Op Release;
   Ret v.
 
@@ -114,40 +121,38 @@ Lemma acquire_right_mover :
   right_mover lo_step Acquire.
 Proof.
   unfold right_mover; intros.
-  repeat step_inv; congruence.
+  repeat step_inv; try congruence; eauto.
 Qed.
 
 Lemma release_left_mover :
   left_mover lo_step Release.
 Proof.
-  unfold left_mover; intros.
-  repeat step_inv; congruence.
+  split.
+  - unfold always_enabled; intros.
+    destruct s. destruct Lock0. destruct (n == tid); subst.
+    all: eauto.
+  - unfold left_mover; intros.
+    repeat step_inv; try congruence; eauto.
 Qed.
 
-Lemma read_both_mover :
-  both_mover lo_step Read.
+Lemma read_right_mover :
+  right_mover lo_step Read.
 Proof.
-  split.
-  - unfold right_mover; intros.
-    repeat step_inv; congruence.
-  - unfold left_mover; intros.
-    repeat step_inv; congruence.
+  unfold right_mover; intros.
+  repeat step_inv; try congruence; eauto.
 Qed.
 
-Lemma write_both_mover : forall v,
-  both_mover lo_step (Write v).
+Lemma write_right_mover : forall v,
+  right_mover lo_step (Write v).
 Proof.
-  split.
-  - unfold right_mover; intros.
-    repeat step_inv; congruence.
-  - unfold left_mover; intros.
-    repeat step_inv; congruence.
+  unfold right_mover; intros.
+  repeat step_inv; try congruence; eauto.
 Qed.
 
 Hint Resolve acquire_right_mover.
 Hint Resolve release_left_mover.
-Hint Resolve read_both_mover.
-Hint Resolve write_both_mover.
+Hint Resolve read_right_mover.
+Hint Resolve write_right_mover.
 
 
 (** Atomicity *)
@@ -167,81 +172,26 @@ Proof.
   setoid_rewrite exec_equiv_bind_bind with (p1 := Atomic _).
 
   (* [Acquire] *)
-  unfold Op at 5.
-  rewrite atomic_equiv_bind_bind with (p1 := OpCall _).
-  setoid_rewrite atomic_equiv_bind_bind with (p1 := OpExec _).
-
-  unfold Op at 1.
-  rewrite <- hitrace_incl_atomize_opcall.
-  rewrite exec_equiv_bind_bind.
-  setoid_rewrite exec_equiv_bind_bind.
-  eapply hitrace_incl_bind_a; intros.
-
-  rewrite <- hitrace_incl_atomize_opexec_right_mover; eauto.
-  setoid_rewrite exec_equiv_bind_bind.
-  eapply hitrace_incl_bind_a; intros.
-
-  rewrite <- hitrace_incl_atomize_opret.
-  rewrite exec_equiv_bind_bind.
+  rewrite <- hitrace_incl_atomize_op_right_mover by eauto.
+  setoid_rewrite exec_equiv_bind_bind with (p1 := Op _).
   eapply hitrace_incl_bind_a; intros.
 
   (* [Read] *)
-  unfold Op at 4.
-  rewrite atomic_equiv_bind_bind with (p1 := OpCall _).
-  setoid_rewrite atomic_equiv_bind_bind with (p1 := OpExec _).
-
-  unfold Op at 1.
-  rewrite <- hitrace_incl_atomize_opcall.
-  rewrite exec_equiv_bind_bind.
-  setoid_rewrite exec_equiv_bind_bind.
-  eapply hitrace_incl_bind_a; intros.
-
-  rewrite <- hitrace_incl_atomize_opexec_right_mover; eauto.
-  setoid_rewrite exec_equiv_bind_bind.
-  eapply hitrace_incl_bind_a; intros.
-
-  rewrite <- hitrace_incl_atomize_opret.
-  rewrite exec_equiv_bind_bind.
+  rewrite <- hitrace_incl_atomize_op_right_mover by eauto.
+  setoid_rewrite exec_equiv_bind_bind with (p1 := Op _).
   eapply hitrace_incl_bind_a; intros.
 
   (* [Write] *)
-  unfold Op at 3.
-  rewrite atomic_equiv_bind_bind with (p1 := OpCall _).
-  setoid_rewrite atomic_equiv_bind_bind with (p1 := OpExec _).
-
-  unfold Op at 1.
-  rewrite <- hitrace_incl_atomize_opcall.
-  rewrite exec_equiv_bind_bind.
-  setoid_rewrite exec_equiv_bind_bind.
-  eapply hitrace_incl_bind_a; intros.
-
-  rewrite <- hitrace_incl_atomize_opexec_right_mover; eauto.
-  setoid_rewrite exec_equiv_bind_bind.
-  eapply hitrace_incl_bind_a; intros.
-
-  rewrite <- hitrace_incl_atomize_opret.
-  rewrite exec_equiv_bind_bind.
+  rewrite <- hitrace_incl_atomize_op_right_mover by eauto.
+  setoid_rewrite exec_equiv_bind_bind with (p1 := Op _).
   eapply hitrace_incl_bind_a; intros.
 
   (* [Release] *)
-  unfold Op at 2.
-  rewrite atomic_equiv_bind_bind with (p1 := OpCall _).
-  setoid_rewrite atomic_equiv_bind_bind with (p1 := OpExec _).
+  rewrite <- hitrace_incl_atomize_op_ret_left_mover by eauto.
 
-eapply hitrace_incl_exec_equiv_proper. reflexivity.
-eapply exec_equiv_rx_to_exec_equiv.
-eapply Bind_exec_equiv_proper.
-eapply Atomic_proper_atomic_equiv.
-eapply atomic_equiv_bind_bind'.
-instantiate (1 := fun v => Bind (OpRetHi v) rx). reflexivity.
-simpl.
-
-rewrite <- hitrace_incl_atomize_opret_ret_l.
-rewrite exec_equiv_bind_bind.
-
-rewrite <- hitrace_incl_atomize_opexec_ret_left_mover; eauto.
-
-Admitted.
+  rewrite exec_equiv_atomicret_ret.
+  reflexivity.
+Qed.
 
 Theorem dec_atomic : forall `(rx : _ -> proc _ _ T),
   hitrace_incl lo_step
@@ -250,7 +200,34 @@ Theorem dec_atomic : forall `(rx : _ -> proc _ _ T),
 Proof.
   unfold hicall, atomize; simpl.
   unfold dec_core; intros.
-Admitted.
+
+  rewrite exec_equiv_bind_bind.
+  rewrite exec_equiv_bind_bind with (p1 := OpCallHi _).
+  eapply hitrace_incl_bind_a; intros.
+  repeat rewrite exec_equiv_bind_bind.
+  setoid_rewrite exec_equiv_bind_bind with (p1 := Atomic _).
+
+  (* [Acquire] *)
+  rewrite <- hitrace_incl_atomize_op_right_mover by eauto.
+  setoid_rewrite exec_equiv_bind_bind with (p1 := Op _).
+  eapply hitrace_incl_bind_a; intros.
+
+  (* [Read] *)
+  rewrite <- hitrace_incl_atomize_op_right_mover by eauto.
+  setoid_rewrite exec_equiv_bind_bind with (p1 := Op _).
+  eapply hitrace_incl_bind_a; intros.
+
+  (* [Write] *)
+  rewrite <- hitrace_incl_atomize_op_right_mover by eauto.
+  setoid_rewrite exec_equiv_bind_bind with (p1 := Op _).
+  eapply hitrace_incl_bind_a; intros.
+
+  (* [Release] *)
+  rewrite <- hitrace_incl_atomize_op_ret_left_mover by eauto.
+
+  rewrite exec_equiv_atomicret_ret.
+  reflexivity.
+Qed.
 
 
 (** Many-thread correctness *)
@@ -264,9 +241,11 @@ Proof.
   + repeat atomic_exec_inv.
     repeat step_inv.
     simpl; intuition eauto 20.
+    simpl; intuition eauto 20.
 
   + repeat atomic_exec_inv.
     repeat step_inv.
+    simpl; intuition eauto 20.
     simpl; intuition eauto 20.
 Qed.
 
