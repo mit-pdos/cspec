@@ -210,6 +210,33 @@ Section Proc.
     exists n,
       exec s ts tr n.
 
+  Theorem ExecPrefixOne
+       : forall (T : Type) 
+           (tid : nat) (ts : threads_state) (trace : trace opT opHiT)
+           (p : proc T) (s s' : State)
+           (evs : list (event opT opHiT)) (result : T + proc T),
+         thread_get ts tid = Proc p ->
+         exec_tid tid s p s' result evs ->
+         exec_prefix s'
+           (thread_upd ts tid
+             (match result with
+              | inl _ => NoProc
+              | inr p' => Proc p'
+              end)) trace ->
+         exec_prefix s ts (prepend tid evs trace).
+  Proof.
+    unfold exec_prefix; intros; deex.
+    eexists; eapply ExecOne; eauto.
+  Qed.
+
+
+  Theorem exec_to_exec_prefix : forall s ts tr ctr,
+    exec s ts tr ctr ->
+    exec_prefix s ts tr.
+  Proof.
+    unfold exec_prefix; eauto.
+  Qed.
+
 End Proc.
 
 Arguments OpCall {opT opHiT T}.
@@ -225,6 +252,9 @@ Arguments Proc {opT opHiT T}.
 Arguments NoProc {opT opHiT}.
 
 Arguments threads_state {opT opHiT}.
+
+Hint Constructors exec.
+Hint Resolve exec_to_exec_prefix.
 
 
 Notation "x <- p1 ; p2" := (Bind p1 (fun x => p2))

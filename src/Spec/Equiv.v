@@ -462,52 +462,80 @@ Qed.
 Theorem exec_equiv_rx_proof_helper : forall `(p1 : proc opT opHiT T) p2,
   (forall tid `(s : State) s' op_step ts tr evs `(rx : _ -> proc _ _ TR) result,
     exec_tid op_step tid s (Bind p1 rx) s' result evs ->
-    exec op_step s' (ts [[tid := match result with
+    exec_prefix op_step s' (ts [[tid := match result with
                                  | inl _ => NoProc
                                  | inr p' => Proc p'
                                  end]]) tr ->
-    exec op_step s (ts [[tid := Proc (Bind p2 rx)]]) (prepend tid evs tr)) ->
+    exec_prefix op_step s (ts [[tid := Proc (Bind p2 rx)]]) (prepend tid evs tr)) ->
   (forall tid `(s : State) s' op_step ts tr evs `(rx : _ -> proc _ _ TR) result,
     exec_tid op_step tid s (Bind p2 rx) s' result evs ->
-    exec op_step s' (ts [[tid := match result with
+    exec_prefix op_step s' (ts [[tid := match result with
                                  | inl _ => NoProc
                                  | inr p' => Proc p'
                                  end]]) tr ->
-    exec op_step s (ts [[tid := Proc (Bind p1 rx)]]) (prepend tid evs tr)) ->
+    exec_prefix op_step s (ts [[tid := Proc (Bind p1 rx)]]) (prepend tid evs tr)) ->
   exec_equiv_rx p1 p2.
 Proof.
   split; intros.
   - match goal with
-    | H : exec _ _ (thread_upd ?ts ?tid (Proc ?p)) _ |- _ =>
+    | H : exec_prefix _ _ (thread_upd ?ts ?tid (Proc ?p)) _ |- _ =>
       remember (thread_upd ts tid (Proc p));
       generalize dependent ts;
+      unfold exec_prefix in H; repeat deex;
       induction H; intros; subst
     end.
     + destruct (tid0 == tid); subst; autorewrite with t in *.
-      * repeat maybe_proc_inv. eauto.
-      * eapply ExecOne with (tid := tid0).
+      * repeat maybe_proc_inv. eapply H; eauto.
+        unfold exec_prefix; eauto.
+      * edestruct IHexec.
+        rewrite thread_upd_upd_ne; eauto.
+        eexists. eapply ExecOne with (tid := tid0).
           rewrite thread_upd_ne in * by auto. eauto.
           eauto.
         rewrite thread_upd_upd_ne by eauto.
-        eapply IHexec.
-        rewrite thread_upd_upd_ne; eauto.
+        eauto.
     + exfalso; eauto.
+    + exists 0; apply ExecExpired.
 
   - match goal with
-    | H : exec _ _ (thread_upd ?ts ?tid (Proc ?p)) _ |- _ =>
+    | H : exec_prefix _ _ (thread_upd ?ts ?tid (Proc ?p)) _ |- _ =>
       remember (thread_upd ts tid (Proc p));
       generalize dependent ts;
+      unfold exec_prefix in H; repeat deex;
       induction H; intros; subst
     end.
     + destruct (tid0 == tid); subst; autorewrite with t in *.
-      * repeat maybe_proc_inv. eauto.
-      * eapply ExecOne with (tid := tid0).
+      * repeat maybe_proc_inv. eapply H0; eauto.
+        unfold exec_prefix; eauto.
+      * edestruct IHexec.
+        rewrite thread_upd_upd_ne; auto.
+        eexists. eapply ExecOne with (tid := tid0).
           autorewrite with t in *; eauto.
           eauto.
           rewrite thread_upd_upd_ne by eauto.
-        eapply IHexec.
-        rewrite thread_upd_upd_ne; auto.
+        eauto.
     + exfalso; eauto.
+    + exists 0; apply ExecExpired.
+Qed.
+
+Theorem ExecPrefixOne
+     : forall (opT opHiT : Type -> Type) (State : Type)
+         (op_step : OpSemantics opT State) (T : Type) 
+         (tid : nat) (ts : threads_state) (trace : trace opT opHiT)
+         (p : proc opT opHiT T) (s s' : State)
+         (evs : list (event opT opHiT)) (result : T + proc opT opHiT T),
+       ts [[tid]] = Proc p ->
+       exec_tid op_step tid s p s' result evs ->
+       exec_prefix op_step s'
+         ts [[tid
+         := match result with
+            | inl _ => NoProc
+            | inr p' => Proc p'
+            end]] trace ->
+       exec_prefix op_step s ts (prepend tid evs trace).
+Proof.
+  unfold exec_prefix; intros; deex.
+  eexists; eapply ExecOne; eauto.
 Qed.
 
 Theorem exec_equiv_ret_bind : forall `(v : T) `(p : T -> proc opT opHiT T'),
@@ -518,11 +546,11 @@ Proof.
   - repeat exec_tid_inv; eauto.
   - rewrite <- app_nil_l with (l := evs).
     rewrite prepend_app.
-    eapply ExecOne with (tid := tid).
+    eapply ExecPrefixOne with (tid := tid).
       autorewrite with t; eauto.
       eauto.
       autorewrite with t.
-    eapply ExecOne with (tid := tid).
+    eapply ExecPrefixOne with (tid := tid).
       autorewrite with t; eauto.
       eauto.
       autorewrite with t.
