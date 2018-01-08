@@ -237,6 +237,7 @@ Ltac step_inv :=
   end.
 
 
+(*
 Theorem ex_all_traces_match :
   forall s tr1 tr2,
   exec op_step s ts tr1 ->
@@ -254,7 +255,7 @@ Proof.
   replace (s' 1 + 1 + 1) with (s' 1 + 2) by omega.
   eauto 20.
 Qed.
-
+*)
 
 (** Commutativity *)
 
@@ -286,6 +287,7 @@ Definition p1_a :=
 Definition ts_a := threads_empty [[ 1 := Proc p1_a ]].
 
 
+(*
 Theorem ts_equiv_ts_a :
   hitrace_incl_ts op_step ts ts_a.
 Proof.
@@ -301,19 +303,19 @@ Proof.
 
   eexists; split.
 
-  exec_one 1; eauto 20; simpl; autorewrite with t.
-  exec_one 1; eauto 20; simpl; autorewrite with t.
-  eapply ExecEmpty; eauto.
-
+  repeat exec_one 1; [ eauto 20 | simpl; autorewrite with t ].
+  eauto.
+  simpl.
   reflexivity.
 Qed.
-
+*)
 
 
 Definition inc_twice_impl_atomic := hicall (atomize compile_op) IncTwice.
 Definition dec_thrice_impl_atomic := hicall (atomize compile_op) DecThrice.
 
 
+(*
 Theorem inc_twice_atomic : forall `(rx : _ -> proc _ _ T),
   hitrace_incl op_step
     (Bind inc_twice_impl rx) (Bind inc_twice_impl_atomic rx).
@@ -708,3 +710,4 @@ Proof.
   intros.
   eapply compile_traces_match_ts; eauto.
 Qed.
+*)

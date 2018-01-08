@@ -74,15 +74,16 @@ Section StateAbstraction.
   Theorem trace_incl_abs :
     forall s1 s2 (ts : @threads_state opLoT opHiT) tr,
       absR s1 s2 ->
-      exec lo_step s1 ts tr ->
-      exec hi_step s2 ts tr.
+      exec_prefix lo_step s1 ts tr ->
+      exec_prefix hi_step s2 ts tr.
   Proof.
     intros.
     generalize dependent s2.
+    destruct H0 as [? H0].
     induction H0; intros.
     - eapply exec_tid_abs in H0; eauto; deex.
-      eapply ExecOne with (tid := tid); eauto.
-    - eapply ExecEmpty; eauto.
+      eapply ExecPrefixOne with (tid := tid); eauto.
+    - eauto.
   Qed.
 
 End StateAbstraction.

@@ -92,8 +92,8 @@ Hint Resolve absR_ok.
 Theorem sanity_check :
   forall s1 s2 (ts : @threads_state opLoT opHiT) tr,
     absR s1 s2 ->
-    exec op_step1 s1 ts tr ->
-    exec op_step2 s2 ts tr.
+    exec_prefix op_step1 s1 ts tr ->
+    exec_prefix op_step2 s2 ts tr.
 Proof.
   intros.
   eapply trace_incl_abs; eauto.
