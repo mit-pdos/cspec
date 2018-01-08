@@ -199,7 +199,17 @@ Definition unique_pathname (fs : FS) pn :=
     forall node',
       path_eval_root fs pn node' -> node' = node.
 
+Definition unique_dirents (fs : FS) :=
+  forall dir name target target0,
+    valid_link fs dir name target ->
+    valid_link fs dir name target0 ->
+    target0 = target.
+
+Definition fs_invariant (fs : FS) :=
+  unique_dirents fs.
+
 Definition invariant (fs : FS) :=
+  fs_invariant fs /\
   unique_pathname fs tmpdir.
 
 Definition mailfs_step T (op : fsOpT T) tid s r s' :=
@@ -207,7 +217,6 @@ Definition mailfs_step T (op : fsOpT T) tid s r s' :=
   mailfs_step_allowed op tid /\
   invariant s /\
   invariant s'.
-
 
 Definition message := string.
 
@@ -340,6 +349,7 @@ Proof.
     apply H2 in H3. eauto.
 Qed.
 
+(*
 Instance invariant_proper :
   Proper (FSEquiv ==> iff) invariant.
 Proof.
@@ -350,39 +360,66 @@ Proof.
   - rewrite <- H in H0; eexists; intuition eauto.
     eapply H1. rewrite <- H. eauto.
 Qed.
+ *)
 
 Lemma valid_link_eq: forall fs dir a node node0,
+    fs_invariant fs ->
     valid_link fs dir a node ->
     valid_link fs dir a node0 ->
     node = node0.
 Proof.
-  intros.
-  inversion H.
-  inversion H0; subst; try congruence.
-  (* XXX We need uniques of names in a directory *)
-Admitted.
+  unfold fs_invariant, unique_dirents in *.
+  intros; eauto.
+Qed.
 
 Lemma path_evaluates_eq: forall pn fs dir node node',
+    fs_invariant fs ->
     path_evaluates fs dir pn node ->
     path_evaluates fs dir pn node'->
     node = node'.
 Proof.
-  induction pn; intros.
-  + inversion H.
-    inversion H0; subst; eauto.
-  + inversion H.
-    inversion H0; subst.
-    inversion H5; subst; try congruence.
-    inversion H12; subst; try congruence.
-    inversion H11; subst. clear H11.
-
-    eapply valid_link_eq in H5 as H5x; eauto.
-    inversion H5x; subst.
-    eapply IHpn; eauto.
-
-Admitted.
+  intros.
+  generalize dependent node'.
+  induction H0; intros.
+  + inversion H1; subst.
+    inversion H1; subst; auto.
+  + inversion H1; subst.
+    eapply valid_link_eq in H0; eauto.
+    exfalso.
+    eapply valid_link_eq with (node := (DirNode inum0)) in H0; auto.
+    inversion H0.
+    exfalso.
+    eapply valid_link_eq with (node := (SymlinkNode sympath)) in H0; auto.
+    inversion H0.
+  + inversion H2; subst.
+    - exfalso.
+      eapply valid_link_eq with (node := (FileNode inum0)) in H0; auto.
+      inversion H0.
+    - eapply valid_link_eq in H0; eauto.
+      inversion H0; subst.
+      apply IHpath_evaluates; auto.
+    - exfalso.
+      eapply valid_link_eq with (node := (SymlinkNode sympath)) in H0; auto.
+      inversion H0.
+  + inversion H1; subst.
+    - exfalso.
+      eapply valid_link_eq with (node := (FileNode inum)) in H0; auto.
+      inversion H0.
+    -  exfalso.
+      eapply valid_link_eq with (node := (DirNode inum)) in H0; auto.
+      inversion H0.
+    - 
+      eapply valid_link_eq in H0; eauto.
+      inversion H0; subst. clear H0.
+      erewrite <- IHpath_evaluates1 with (node' := symtarget0) in H9.
+      apply IHpath_evaluates2; auto.
+      auto.
+      auto.
+Qed.
+  
 
 Lemma path_eval_root_eq: forall pn fs node node',
+    fs_invariant fs ->
     path_evaluates fs (DirNode (FSRoot fs)) pn node ->
     path_evaluates fs (DirNode (FSRoot fs)) pn node' ->
     node = node'.

@@ -69,7 +69,6 @@ Record FS := mkFS {
 
 Definition Pathname := list string.
 
-
 Definition FSEquiv (fs1 fs2 : FS) : Prop :=
   FSRoot fs1 = FSRoot fs2 /\
   FSFiles fs1 = FSFiles fs2 /\
@@ -131,12 +130,15 @@ Qed.
 Inductive path_evaluates : forall (fs : FS) (start : Node) (pn : Pathname) (target : Node), Prop :=
 | PathEvalEmpty : forall fs start,
   path_evaluates fs start nil start
-| PathEvalLink : forall fs startdir name namenode pn target,
-  valid_link fs startdir name namenode ->
-  path_evaluates fs namenode pn target ->
-  path_evaluates fs (DirNode startdir) (name :: pn) target
+| PathEvalFileLink : forall fs startdir name inum,
+  valid_link fs startdir name (FileNode inum)  ->
+  path_evaluates fs (DirNode startdir) ([name]) (FileNode inum)
+| PathEvalDirLink : forall fs startdir name inum pn namenode,
+  valid_link fs startdir name (DirNode inum) ->
+  path_evaluates fs (DirNode inum) pn namenode ->
+  path_evaluates fs (DirNode startdir) (name :: pn) namenode
 | PathEvalSymlink : forall fs startdir name sympath symtarget pn target,
-  Graph.In (mkLink startdir (SymlinkNode sympath) name) (FSLinks fs) ->
+  valid_link fs startdir name (SymlinkNode sympath) ->
   path_evaluates fs (DirNode startdir) sympath symtarget ->
   path_evaluates fs symtarget pn target ->
   path_evaluates fs (DirNode startdir) (name :: pn) target.
@@ -151,18 +153,20 @@ Proof.
   intuition.
   - induction H0.
     + eapply PathEvalEmpty.
-    + eapply PathEvalLink; eauto.
+    + eapply PathEvalFileLink; eauto.
+      rewrite H in H0. eauto.
+    + eapply PathEvalDirLink; eauto.
       rewrite H in H0. eauto.
     + eapply PathEvalSymlink; eauto.
-      unfold FSEquiv in H; intuition.
-      eapply H3; eauto.
+      rewrite H in H0; eauto.
   - induction H0.
     + eapply PathEvalEmpty.
-    + eapply PathEvalLink; eauto.
+    + eapply PathEvalFileLink; eauto.
+      rewrite <- H in H0. eauto.
+    + eapply PathEvalDirLink; eauto.
       rewrite <- H in H0. eauto.
     + eapply PathEvalSymlink; eauto.
-      unfold FSEquiv in H; intuition.
-      eapply H3; eauto.
+      rewrite <- H in H0; eauto.
 Qed.
 
 Definition path_eval_root (fs : FS) (pn : Pathname) (target : Node) : Prop :=
@@ -291,20 +295,22 @@ Definition example_fs := mkFS 1
   [].
 
 Ltac resolve_link := compute; auto 20.
-Ltac resolve_name :=  eapply PathEvalLink; try constructor; resolve_link.
+Ltac resolve_filename :=  try constructor; resolve_link.
+Ltac resolve_dirname :=  eapply PathEvalDirLink; try constructor; resolve_link.
 Ltac resolve_symname := eapply PathEvalSymlink; resolve_link.
-Ltac resolve_dotdot :=  eapply PathEvalLink; try eapply ValidDotDot; resolve_link.
-Ltac resolve_dotdotRoot :=  eapply PathEvalLink; try eapply ValidDotDotRoot; resolve_link.
+Ltac resolve_dotdot :=  eapply PathEvalDirLink; try eapply ValidDotDot; resolve_link.
+Ltac resolve_dotdotRoot :=  eapply PathEvalDirLink; try eapply ValidDotDotRoot; resolve_link.
 Ltac resolve_init := left; eexists; unfold path_eval_root; split; auto.
 
 Theorem etc_passwd :
   spec_ok example_fs (lookup_spec ["etc"; "passwd"]) (Some (FileNode 10)).
 Proof.
   resolve_init.
-  resolve_name.
-  resolve_name.
+  resolve_dirname.
+  resolve_filename.
 Qed.
 
+(* 
 Theorem etc_passwd' :
   spec_ok example_fs (lookup_spec ["etc"; "passwd~"]) (Some (FileNode 10)).
 Proof.
@@ -439,6 +445,8 @@ Proof.
   apply Graph.remove_spec in H; intuition idtac; try congruence.
   resolve_none.
 Qed.
+
+ *)
 
 Definition names := list string.
 
