@@ -736,6 +736,27 @@ Section Movers.
     eauto.
   Qed.
 
+  Theorem hitrace_incl_atomize_op_ret_left_mover :
+    left_mover ->
+    forall `(p : proc opT opHiT TP)
+           `(f : TP -> _ -> TR)
+           `(rx : _ -> proc opT opHiT TF),
+    hitrace_incl op_step
+      (Bind (Bind (Atomic p) (fun a => Bind (Op opMover) (fun b => Ret (f a b)))) rx)
+      (Bind (Atomic (Bind p (fun a => Bind (Op opMover) (fun b => Ret (f a b))))) rx).
+  Proof.
+    unfold Op; intros.
+
+    etransitivity.
+    2: setoid_rewrite atomic_equiv_bind_bind with (p1 := OpCall _).
+    2: setoid_rewrite atomic_equiv_bind_bind'.
+    2: setoid_rewrite atomic_equiv_bind_bind with (p1 := OpExec _).
+    2: setoid_rewrite atomic_equiv_bind_bind'.
+    reflexivity.
+
+    rewrite <- hitrace_incl_atomize_opret_ret_l.
+  Admitted.
+
 End Movers.
 
 Hint Resolve both_mover_left.
