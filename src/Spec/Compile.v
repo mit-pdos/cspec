@@ -70,7 +70,7 @@ Section Compiler.
   | ACompileOpRetHi : forall `(v : T),
     atomic_compile_ok (Ret v) (OpRetHi v).
 
-  Fixpoint compile T (p : proc opMidT opHiT T) : proc opLoT opMidT T :=
+  CoFixpoint compile T (p : proc opMidT opHiT T) : proc opLoT opMidT T :=
     match p with
     | Ret t => Ret t
     | OpCall op => OpCallHi op
@@ -182,36 +182,34 @@ Section Compiler.
   Proof.
     unfold traces_match_ts; intros.
     generalize dependent ts2.
-    induction H0; intros.
-    - eapply proc_match_pick with (tid := tid) in H2 as H'.
-      intuition try congruence.
-      repeat deex.
-      rewrite H3 in H; inversion H; clear H; subst.
-      repeat maybe_proc_inv.
+    unfold exec_prefix in H0; repeat deex.
+    induction H; intros; eauto.
 
-      edestruct atomic_compile_ok_exec_tid; eauto.
-      repeat deex.
+    eapply proc_match_pick with (tid := tid) in H2 as H'.
+    intuition try congruence.
+    repeat deex.
+    rewrite H3 in H; inversion H; clear H; subst.
+    repeat maybe_proc_inv.
 
-      edestruct IHexec.
-      shelve.
-      intuition idtac.
+    edestruct atomic_compile_ok_exec_tid; eauto.
+    repeat deex.
 
-      eexists; split.
-      eapply ExecOne with (tid := tid).
-        eauto.
-        eauto.
-        eauto.
+    edestruct IHexec.
+    shelve.
+    intuition idtac.
 
-      eapply traces_match_prepend; eauto.
-      Unshelve.
-
-      destruct result, x; simpl in *; try solve [ exfalso; eauto ].
-      eapply proc_match_del; eauto.
-      eapply proc_match_upd; eauto.
-
-    - eexists; split.
-      eapply ExecEmpty; eauto.
+    eexists; split.
+    eapply ExecPrefixOne with (tid := tid).
       eauto.
+      eauto.
+      eauto.
+
+    eapply traces_match_prepend; eauto.
+    Unshelve.
+
+    destruct result, x; simpl in *; try solve [ exfalso; eauto ].
+    eapply proc_match_del; eauto.
+    eapply proc_match_upd; eauto.
   Qed.
 
 End Compiler.
@@ -331,6 +329,59 @@ Section Atomization.
 End Atomization.
 
 
+Ltac compile_eq_step :=
+  match goal with
+  | |- ?x = _ =>
+    rewrite frob_proc_eq with (p := x); simpl;
+      try reflexivity; f_equal
+  | _ =>
+    apply functional_extensionality; intros
+  end.
+
+Theorem compile_op_eq : forall opLoT opMidT opHiT T (op : opMidT T) f,
+  @compile opLoT opMidT opHiT f T (Op op) =
+    _ <- OpCallHi op; r <- f T op; OpRetHi r.
+Proof.
+  intros.
+  compile_eq_step.
+  compile_eq_step.
+  compile_eq_step.
+  compile_eq_step.
+  compile_eq_step.
+  destruct (f T op); congruence.
+  repeat compile_eq_step.
+Qed.
+
+Theorem compile_ret_eq : forall opLoT opMidT opHiT T (v : T) f,
+  @compile opLoT opMidT opHiT f T (Ret v) = Ret v.
+Proof.
+  intros.
+  compile_eq_step.
+Qed.
+
+Theorem compile_bind_eq : forall opLoT opMidT opHiT T1 T2 (p1 : proc opMidT opHiT T1) (p2 : _ -> proc opMidT opHiT T2) f,
+  @compile opLoT opMidT opHiT f T2 (Bind p1 p2) =
+    Bind (compile f p1) (fun x => compile f (p2 x)).
+Proof.
+  intros.
+  compile_eq_step.
+Qed.
+
+Theorem compile_callhi_eq : forall opLoT opMidT opHiT T (op : opHiT T) f,
+  @compile opLoT opMidT opHiT f _ (OpCallHi op) = Ret tt.
+Proof.
+  intros.
+  compile_eq_step.
+Qed.
+
+Theorem compile_rethi_eq : forall opLoT opMidT opHiT T (v : T) f,
+  @compile opLoT opMidT opHiT f T (OpRetHi v) = Ret v.
+Proof.
+  intros.
+  compile_eq_step.
+Qed.
+
+
 Theorem atomize_proc_match_helper :
   forall T `(p1 : proc opLoT opMidT T) `(p2 : proc opMidT opHiT T)
          compile_op,
@@ -339,13 +390,20 @@ Theorem atomize_proc_match_helper :
     atomic_compile_ok compile_op (compile (atomize compile_op) p2) p2.
 Proof.
   induction 1; simpl; intros.
-  - split. constructor. repeat constructor.
-  - split; constructor.
-  - intuition idtac.
+  - rewrite compile_op_eq.
+    split.
+    constructor.
+    repeat constructor.
+  - rewrite compile_ret_eq.
+    split; constructor.
+  - rewrite compile_bind_eq.
+    intuition idtac.
     constructor. eauto. intros. specialize (H1 x). intuition eauto.
     constructor. eauto. intros. specialize (H1 x). intuition eauto.
-  - split; constructor.
-  - split; constructor.
+  - rewrite compile_callhi_eq.
+    split; constructor.
+  - rewrite compile_rethi_eq.
+    split; constructor.
 Qed.
 
 Hint Resolve proc_match_cons_Proc.
