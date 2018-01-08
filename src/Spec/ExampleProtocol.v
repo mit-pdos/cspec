@@ -113,18 +113,48 @@ Qed.
 Hint Resolve follows_protocol_step.
 
 
-Fixpoint follows_protocol_proc `(p : proc opLoT opHiT T) (tid : nat)
-                                (old_owner : bool) (new_owner : bool) :=
-  match p with
-  | OpExec op => follows_protocol_op op tid old_owner new_owner
-  | Bind p1 p2 =>
-    exists mid_owner,
-    follows_protocol_proc p1 tid old_owner mid_owner /\
-    forall x, follows_protocol_proc (p2 x) tid mid_owner new_owner
-  | Atomic p =>
-    follows_protocol_proc p tid old_owner new_owner
-  | _ => old_owner = new_owner
-  end.
+(** XXX
+  This seems to restrict us to finite programs...
+ *)
+
+Inductive follows_protocol_proc (tid : nat) (old_owner : bool) (new_owner : bool) :
+  forall T (p : proc opLoT opHiT T), Prop :=
+| FollowsProtocolProcOpExec :
+  forall T (op : opLoT T),
+  follows_protocol_op op tid old_owner new_owner ->
+  follows_protocol_proc tid old_owner new_owner (OpExec op)
+| FollowsProtocolProcBind :
+  forall T1 T2 (p1 : proc opLoT opHiT T1) (p2 : T1 -> proc opLoT opHiT T2) mid_owner,
+  follows_protocol_proc tid old_owner mid_owner p1 ->
+  (forall x, follows_protocol_proc tid mid_owner new_owner (p2 x)) ->
+  follows_protocol_proc tid old_owner new_owner (Bind p1 p2)
+| FollowsProtocolProcAtomic :
+  forall T (p : proc opLoT opHiT T),
+  follows_protocol_proc tid old_owner new_owner p ->
+  follows_protocol_proc tid old_owner new_owner (Atomic p)
+
+| FollowsProtocolProcOpCall :
+  forall T (op : opLoT T),
+  old_owner = new_owner ->
+  follows_protocol_proc tid old_owner new_owner (OpCall op)
+| FollowsProtocolProcOpRet :
+  forall T (v : T),
+  old_owner = new_owner ->
+  follows_protocol_proc tid old_owner new_owner (OpRet v)
+| FollowsProtocolProcRet :
+  forall T (v : T),
+  old_owner = new_owner ->
+  follows_protocol_proc tid old_owner new_owner (Ret v)
+| FollowsProtocolProcOpCallHi :
+  forall T (op : opHiT T),
+  old_owner = new_owner ->
+  follows_protocol_proc tid old_owner new_owner (OpCallHi op)
+| FollowsProtocolProcOpRetHi :
+  forall T (v : T),
+  old_owner = new_owner ->
+  follows_protocol_proc tid old_owner new_owner (OpRetHi v).
+
+Hint Constructors follows_protocol_proc.
 
 
 Lemma follows_protocol_op_owner : forall `(op : opLoT T) tid s v s' b,
@@ -140,30 +170,37 @@ Qed.
 Theorem follows_protocol_atomic_owner :
   forall `(p : proc opLoT opHiT T) tid s0 r s1 evs b,
   atomic_exec raw_step p tid s0 r s1 evs ->
-  follows_protocol_proc p tid (lock_match s0 tid) b ->
+  follows_protocol_proc tid (lock_match s0 tid) b p ->
   b = lock_match s1 tid.
 Proof.
   intros.
   generalize dependent b.
-  induction H; simpl in *; intros; eauto.
+  induction H; simpl in *; intros; eauto;
+    match goal with
+    | H : follows_protocol_proc _ _ _ _ |- _ =>
+      inversion H; clear H; repeat sigT_eq; subst
+    end; eauto.
   - repeat deex.
-    eapply IHatomic_exec1 in H1; subst.
-    specialize (H2 v1); eauto.
+    eapply IHatomic_exec1 in H5; subst.
+    specialize (H7 v1); eauto.
   - eapply follows_protocol_op_owner; eauto.
 Qed.
 
 
 Theorem follows_protocol_atomic : forall `(p : proc opLoT opHiT T) tid s v s' evs b,
   atomic_exec raw_step p tid s v s' evs ->
-  follows_protocol_proc p tid (lock_match s tid) b ->
+  follows_protocol_proc tid (lock_match s tid) b p ->
   atomic_exec proto_step p tid s v s' evs.
 Proof.
   intros.
-  erewrite follows_protocol_atomic_owner in H0; eauto.
-  induction H; intros; eauto.
+  erewrite follows_protocol_atomic_owner with (b0 := b) in H0; eauto.
+  induction H; intros; eauto;
+    match goal with
+    | H : follows_protocol_proc _ _ _ _ |- _ =>
+      inversion H; clear H; repeat sigT_eq; subst
+    end; eauto.
 
-  inversion H0; clear H0; intuition idtac.
-  eapply follows_protocol_atomic_owner in H0 as H0'; eauto; subst.
+  eapply follows_protocol_atomic_owner in H5 as H5'; eauto; subst.
   eauto.
 Qed.
 
@@ -174,7 +211,7 @@ Definition follows_protocol (ts : @threads_state opLoT opHiT) (s : State) :=
   forall tid T (p : proc _ _ T),
     ts [[ tid ]] = Proc p ->
     exists b,
-      follows_protocol_proc p tid (lock_match s tid) b.
+      follows_protocol_proc tid (lock_match s tid) b p.
 
 Lemma follows_protocol_exec_tid :
   forall ts tid `(p : proc _ _ T) s s' result evs,
@@ -187,8 +224,11 @@ Proof.
   specialize (H tid _ p); intuition idtac; deex.
   generalize dependent ts.
   generalize dependent b.
-  induction H1; simpl in *; intros; eauto.
-  deex.
+  induction H1; simpl in *; intros; eauto;
+    match goal with
+    | H : follows_protocol_proc _ _ _ _ |- _ =>
+      inversion H; clear H; repeat sigT_eq; subst
+    end; eauto.
 
   constructor.
   eapply IHexec_tid.
@@ -215,16 +255,21 @@ Hint Resolve lock_match_op_ne.
 
 Lemma lock_match_atomic_ne : forall `(p : proc opLoT opHiT T) tid tid' s s' r evs b,
   atomic_exec raw_step p tid s r s' evs ->
-  follows_protocol_proc p tid (lock_match s tid) b ->
+  follows_protocol_proc tid (lock_match s tid) b p ->
   tid <> tid' ->
   lock_match s tid' = lock_match s' tid'.
 Proof.
   intros.
   generalize dependent b.
-  induction H; simpl in *; intros; eauto.
-  intuition idtac. deex.
-  eapply follows_protocol_atomic_owner in H2 as H2'; eauto; subst.
-  erewrite H3; eauto.
+  induction H; simpl in *; intros; eauto;
+    match goal with
+    | H : follows_protocol_proc _ _ _ _ |- _ =>
+      inversion H; clear H; repeat sigT_eq; subst
+    end; eauto.
+
+  intuition idtac.
+  eapply follows_protocol_atomic_owner in H6 as H6'; eauto; subst.
+  erewrite H2; eauto.
 Qed.
 
 Hint Resolve lock_match_atomic_ne.
@@ -232,35 +277,47 @@ Hint Resolve lock_match_atomic_ne.
 
 Lemma lock_match_exec_tid_ne : forall `(p : proc opLoT opHiT T) tid tid' s s' r evs b,
   exec_tid raw_step tid s p s' r evs ->
-  follows_protocol_proc p tid (lock_match s tid) b ->
+  follows_protocol_proc tid (lock_match s tid) b p ->
   tid <> tid' ->
   lock_match s tid' = lock_match s' tid'.
 Proof.
   intros.
   generalize dependent b.
-  induction H; simpl in *; intros; eauto.
-  intuition idtac. deex.
-  eauto.
+  induction H; simpl in *; intros; eauto;
+    match goal with
+    | H : follows_protocol_proc _ _ _ _ |- _ =>
+      inversion H; clear H; repeat sigT_eq; subst
+    end; eauto.
 Qed.
 
 Lemma follows_protocol_proc_exec_tid :
   forall `(p : proc opLoT opHiT T) tid s s' p' evs b,
-  follows_protocol_proc p tid (lock_match s tid) b ->
+  follows_protocol_proc tid (lock_match s tid) b p ->
   exec_tid raw_step tid s p s' (inr p') evs ->
-  follows_protocol_proc p' tid (lock_match s' tid) b.
+  follows_protocol_proc tid (lock_match s' tid) b p'.
 Proof.
   intros.
   remember (inr p').
   generalize dependent p'.
   generalize dependent b.
-  induction H0; intros; simpl in *; try congruence; deex.
+  induction H0; intros; simpl in *; try congruence.
+
+  match goal with
+  | H : follows_protocol_proc _ _ _ _ |- _ =>
+    inversion H; clear H; repeat sigT_eq; subst
+  end; eauto.
+
   inversion Heqs0; clear Heqs0; subst.
   destruct result.
   - inversion H0; repeat sigT_eq; simpl in *; subst;
-                  repeat sigT_eq; simpl in *; subst; eauto.
-    eapply follows_protocol_op_owner in H; eauto; subst; eauto.
-    eapply follows_protocol_atomic_owner in H; eauto; subst; eauto.
-  - specialize (IHexec_tid _ H _ eq_refl).
+                  repeat sigT_eq; simpl in *; subst; eauto;
+      match goal with
+      | H : follows_protocol_proc _ _ _ _ |- _ =>
+        inversion H; clear H; repeat sigT_eq; subst
+      end; eauto.
+    eapply follows_protocol_op_owner in H2; eauto; subst; eauto.
+    eapply follows_protocol_atomic_owner in H2; eauto; subst; eauto.
+  - specialize (IHexec_tid _ H4 _ eq_refl).
     simpl. eauto.
 Qed.
 
@@ -301,12 +358,13 @@ Hint Constructors exec.
 Theorem protocol_ok :
   forall s ts tr,
     follows_protocol ts s ->
-    exec raw_step s ts tr ->
-    exec proto_step s ts tr.
+    exec_prefix raw_step s ts tr ->
+    exec_prefix proto_step s ts tr.
 Proof.
   intros.
-  induction H0.
-  - specialize (H tid _ p) as Htid.
-    intuition eauto.
-  - eapply ExecEmpty; eauto.
+  destruct H0.
+  induction H0; eauto.
+  specialize (H tid _ p) as Htid.
+  intuition idtac; repeat deex.
+  eapply ExecPrefixOne; eauto.
 Qed.
