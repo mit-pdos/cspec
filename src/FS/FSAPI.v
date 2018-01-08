@@ -42,6 +42,14 @@ Definition starts_with_tid tid (name : string) : Prop :=
   exists namesuffix,
     name = (tid_to_string tid ++ "." ++ namesuffix)%string.
 
+Axiom starts_with_tid_not_dot : forall tid name,
+  starts_with_tid tid name -> name <> ".".
+Axiom starts_with_tid_not_dotdot : forall tid name,
+  starts_with_tid tid name -> name <> "..".
+
+Hint Resolve starts_with_tid_not_dot.
+Hint Resolve starts_with_tid_not_dotdot.
+
 
 Section StepXform.
 
@@ -75,6 +83,9 @@ Definition upd_file h data (fs : FS) :=
 Definition add_link dir node name (fs : FS) :=
   mkFS (FSRoot fs) (Graph.add (mkLink dir node name) (FSLinks fs)) (FSFiles fs).
 
+Definition create_file dir h name (fs : FS) :=
+  add_link dir (FileNode h) name (upd_file h "" fs).
+
 Definition valid_dir dir (fs : FS) :=
   exists pn, path_eval_root fs pn (DirNode dir).
 
@@ -85,7 +96,7 @@ Inductive fs_step : forall T, fsOpT T -> nat -> State -> T -> State -> Prop :=
   does_not_exist s dirnum name ->
   file_handle_unused s h ->
   file_handle_valid s h ->
-  s' = add_link dirnum (FileNode h) name (upd_file h "" s) ->   (* XXX introduce add_file *)
+  s' = create_file dirnum h name s ->
   fs_step (Create dir name) tid s h s'
 
 (*
@@ -349,18 +360,43 @@ Proof.
     apply H2 in H3. eauto.
 Qed.
 
-(*
+Instance create_file_proper :
+  Proper (eq ==> eq ==> eq ==> FSEquiv ==> FSEquiv) create_file.
+Proof.
+  intros ? ? ?; subst.
+  intros ? ? ?; subst.
+  intros ? ? ?; subst.
+  intros ? ? ?; subst.
+  unfold create_file.
+  rewrite H.
+  reflexivity.
+Qed.
+
+Instance fs_invariant_proper :
+  Proper (FSEquiv ==> iff) fs_invariant.
+Proof.
+  intros ? ? ?; subst.
+  unfold fs_invariant, unique_dirents; intuition.
+  - rewrite <- H in *.
+    eauto.
+  - rewrite H in *.
+    eauto.
+Qed.
+
 Instance invariant_proper :
   Proper (FSEquiv ==> iff) invariant.
 Proof.
   intros ? ? ?; subst.
   unfold invariant, unique_pathname; intuition; repeat deex.
+  - rewrite <- H in *.
+    eauto.
   - rewrite H in H0; eexists; intuition eauto.
-    eapply H1. rewrite H. eauto.
+    eapply H2. rewrite H. eauto.
+  - rewrite H in *.
+    eauto.
   - rewrite <- H in H0; eexists; intuition eauto.
-    eapply H1. rewrite <- H. eauto.
+    eapply H2. rewrite <- H. eauto.
 Qed.
- *)
 
 Lemma valid_link_eq: forall fs dir a node node0,
     fs_invariant fs ->
@@ -420,8 +456,8 @@ Qed.
 
 Lemma path_eval_root_eq: forall pn fs node node',
     fs_invariant fs ->
-    path_evaluates fs (DirNode (FSRoot fs)) pn node ->
-    path_evaluates fs (DirNode (FSRoot fs)) pn node' ->
+    path_eval_root fs pn node ->
+    path_eval_root fs pn node' ->
     node = node'.
 Proof.
   intros.
@@ -438,7 +474,7 @@ Proof.
   intros.
   induction H.
   + constructor.
-  + eapply PathEvalLink; eauto.
+  + eapply PathEvalFileLink; eauto.
     edestruct H.
     (* validlink constructors: *)
     - constructor; simpl.
@@ -448,11 +484,34 @@ Proof.
       apply Graph.add_spec; auto.
       right; eauto.
     - apply ValidDotDotRoot; auto.
-  + eapply PathEvalSymlink; simpl.
-    apply Graph.add_spec; right; eauto.
-    apply IHpath_evaluates1; eauto.
-    apply IHpath_evaluates2; eauto.
+  + eapply PathEvalDirLink; eauto.
+    edestruct H.
+    - constructor; simpl.
+      apply Graph.add_spec; auto.
+    - apply ValidDot.
+    - eapply ValidDotDot.
+      apply Graph.add_spec; auto.
+      right; eauto.
+    - apply ValidDotDotRoot; auto.
+  + inversion H; subst.
+    eapply PathEvalSymlink; simpl.
+    - constructor.
+      apply Graph.add_spec.
+      eauto.
+    - apply IHpath_evaluates1; eauto.
+    - apply IHpath_evaluates2; eauto.
 Qed.
+
+Lemma path_eval_root_addlink' : forall fs dirnum0 dirnum name dirpn n node',
+  fs_invariant fs ->
+  path_eval_root fs dirpn (DirNode dirnum0) ->
+  path_eval_root (add_link dirnum n name fs) dirpn node' ->
+  path_eval_root fs dirpn node'.
+Proof.
+  unfold path_eval_root, add_link in *.
+  simpl in *.
+  intros.
+Admitted.
 
 Lemma path_eval_root_updfile : forall fs dirnum h data dirpn,
   path_eval_root fs dirpn (DirNode dirnum) ->
@@ -462,55 +521,87 @@ Proof.
   unfold path_eval_root, upd_file; simpl.
   induction H.
   + constructor.
-  + eapply PathEvalLink; eauto.
+  + eapply PathEvalFileLink; eauto.
     edestruct H.
     - constructor; simpl; auto.
     - apply ValidDot.
-    - eapply ValidDotDot; simpl; auto.
-      apply H1.
+    - eapply ValidDotDot; simpl; eauto.
+    - apply ValidDotDotRoot; auto.
+  + eapply PathEvalDirLink; eauto.
+    edestruct H.
+    - constructor; simpl; auto.
+    - apply ValidDot.
+    - eapply ValidDotDot; simpl; eauto.
     - apply ValidDotDotRoot; auto.
   + eapply PathEvalSymlink; simpl.
-    apply H.
+    inversion H. constructor. eauto.
     apply IHpath_evaluates1; eauto.
     apply IHpath_evaluates2; eauto.
 Qed.
 
-Lemma path_eval_root_addfile': forall dirpn fs dirnum name h node,
-    path_eval_root (add_link dirnum (FileNode h) name (upd_file h "" fs)) dirpn node  ->
-    does_not_exist fs dirnum name ->
-    path_eval_root fs dirpn node.
+Lemma path_evaluates_updfile' : forall fs node h data dirpn startdir,
+  path_evaluates (upd_file h data fs) startdir dirpn node ->
+  path_evaluates fs startdir dirpn node.
 Proof.
   intros.
-Admitted.
+  match goal with
+  | H : path_evaluates ?fs0 ?dir0 ?pn0 ?node0 |- _ =>
+    remember fs0;
+    induction H; intros; subst; simpl
+  end.
+  + constructor.
+  + eapply PathEvalFileLink; eauto.
+    inversion H; clear H; subst.
+    constructor. eauto.
+  + eapply PathEvalDirLink; eauto.
+    inversion H; clear H; subst.
+    - constructor. eauto.
+    - apply ValidDot.
+    - eapply ValidDotDot; simpl; eauto.
+    - apply ValidDotDotRoot; auto.
+  + eapply PathEvalSymlink; simpl.
+    inversion H; clear H; subst.
+    constructor; eauto.
+    eapply IHpath_evaluates1; eauto.
+    apply IHpath_evaluates2; eauto.
+Qed.
 
-Lemma invariant_add_link: forall dirnum v0 v1 name name0 fs,
-    name <> name0 ->
-    path_eval_root fs tmpdir (DirNode dirnum) ->
-    path_eval_root (add_link dirnum (FileNode v0) name (upd_file v0 "" fs)) tmpdir (DirNode dirnum) ->
-    does_not_exist (add_link dirnum (FileNode v0) name (upd_file v0 "" fs)) dirnum name0 ->
-    does_not_exist fs dirnum name ->
-    invariant fs ->
-    invariant
-      (add_link dirnum (FileNode v1) name0
-                (upd_file v1 "" (add_link dirnum (FileNode v0) name (upd_file v0 "" fs)))) ->
-    invariant (add_link dirnum (FileNode v1) name0 (upd_file v1 "" fs)).
+Lemma path_eval_root_updfile' : forall fs node h data dirpn,
+  path_eval_root (upd_file h data fs) dirpn node ->
+  path_eval_root fs dirpn node.
 Proof.
-  unfold invariant, unique_pathname.
   intros.
-  exists (DirNode dirnum).
-  split.
-  eapply path_eval_root_updfile with (h := v1) (data := "") in H0 as Hx.
-  eapply path_eval_root_addlink with (dirnum := dirnum) (n := FileNode v1) (name := name0)  in Hx.
-  apply Hx.
-  admit.  (* follow from H2 *)
-  clear H5.  (* may not need this one *)
-  intro.
-  intro.
-  eapply path_eval_root_addfile' in H5 as H5x.
-  eapply path_eval_root_eq; eauto.
-  admit. (* follow from H2 *)
-Admitted.
-  
+  eapply path_evaluates_updfile'; eauto.
+Qed.
+
+Lemma fs_invariant_create : forall dirnum h name fs,
+    name <> "." ->
+    name <> ".." ->
+    does_not_exist fs dirnum name ->
+    file_handle_unused fs h ->
+    file_handle_valid fs h ->
+    fs_invariant fs ->
+    fs_invariant (create_file dirnum h name fs).
+Proof.
+  unfold fs_invariant.
+  intros.
+
+  unfold unique_dirents; intros.
+
+  repeat match goal with
+  | H : valid_link _ _ _ _ |- _ =>
+    inversion H; clear H; subst
+  | H : Graph.In _ _ |- _ =>
+    apply Graph.add_spec in H; intuition idtac
+  | H : mkLink _ _ _ = mkLink _ _ _ |- _ =>
+    inversion H; clear H; subst
+  | _ =>
+    solve [ exfalso; eauto ]
+  | _ =>
+    eauto
+  end.
+Qed.
+
 Lemma does_not_exist_addlink : forall fs dirnum name dirnum0 n0 name0,
   does_not_exist (add_link dirnum0 n0 name0 fs) dirnum name ->
   does_not_exist fs dirnum name.
@@ -680,6 +771,54 @@ Hint Resolve file_handle_valid_addlink.
 Hint Resolve file_handle_valid_updfile'.
 Hint Resolve file_handle_valid_addlink'.
 
+Lemma valid_link_updfile' : forall fs h data dir name target,
+  valid_link (upd_file h data fs) dir name target ->
+  valid_link fs dir name target.
+Proof.
+  intros.
+  remember (upd_file h data fs); generalize dependent fs.
+  induction H; intros; subst.
+  - constructor. eauto.
+  - eapply ValidDot.
+  - eapply ValidDotDot. eauto.
+  - eapply ValidDotDotRoot. eauto.
+Qed.
+
+Lemma invariant_create : forall dirnum h name fs,
+    name <> "." ->
+    name <> ".." ->
+    does_not_exist fs dirnum name ->
+    file_handle_unused fs h ->
+    file_handle_valid fs h ->
+    path_eval_root fs tmpdir (DirNode dirnum) ->
+    invariant fs ->
+    invariant (create_file dirnum h name fs).
+Proof.
+  unfold invariant; intuition idtac.
+  eapply fs_invariant_create; eauto.
+
+  unfold unique_pathname in *; repeat deex.
+  exists (DirNode dirnum); split.
+  eapply path_eval_root_updfile in H4 as Hx.
+  eapply path_eval_root_addlink in Hx.
+  apply Hx.
+  eapply does_not_exist_updfile'; eauto.
+
+  intros.
+
+  eapply path_eval_root_addlink' in H8 as H8x.
+  eapply path_eval_root_updfile' in H8x.
+  eapply path_eval_root_eq; eauto.
+
+  unfold fs_invariant, unique_dirents; intros.
+  apply valid_link_updfile' in H9.
+  apply valid_link_updfile' in H10.
+  eapply H6; eauto.
+
+  eapply path_eval_root_updfile; eauto.
+Qed.
+
+
 
 Ltac subst_fsequiv :=
   match goal with
@@ -701,12 +840,17 @@ Proof.
     repeat subst_fsequiv.
 
     (* Use the fact that tmpdir is unique to show that dirnum=dirnum0 *)
+    assert (DirNode dirnum = DirNode dirnum0) as Hy.
     destruct H18; intuition idtac.
     eapply path_eval_root_updfile in H8 as Hx.
     eapply path_eval_root_addlink in Hx.
     2: apply does_not_exist_updfile'; eauto.
-    eapply H6 in H7 as H7'; subst.
-    eapply H6 in Hx; inversion Hx; clear Hx; subst.
+    eapply path_eval_root_eq.
+    3: apply Hx.
+    2: eauto.
+    eapply fs_invariant_create; eauto.
+    unfold invariant in *; intuition idtac.
+    inversion Hy; clear Hy; subst.
 
     eexists; split; subst_fsequiv.
     + intuition idtac.
@@ -717,24 +861,24 @@ Proof.
       econstructor; eauto.
       eauto.
 
-      eapply invariant_add_link; eauto.
-      
+      eapply invariant_create; eauto.
+
     + intuition idtac.
 
       econstructor.
 
       econstructor.
 
-      eapply path_eval_root_updfile with (h := v1) in H8 as H8x.
-      eapply path_eval_root_addlink with (dirnum := dirnum) in H8x.
+      eapply path_eval_root_updfile in H8 as H8x.
+      eapply path_eval_root_addlink in H8x.
       apply H8x.
 
       eauto.
-      
-      eauto.
-      eauto.
-      eauto.
-      reflexivity.
+      unfold create_file; eauto.
+      unfold create_file; eauto.
+      unfold create_file; eauto.
+      unfold create_file; eauto.
+      unfold create_file; eauto.
 
       {
         destruct s.
@@ -748,14 +892,14 @@ Proof.
         {
           eapply Graph.add_spec in H0; intuition idtac; subst.
           eapply Graph.add_spec; right. eapply Graph.add_spec; eauto.
-          eapply Graph.add_spec in H9; intuition idtac; subst.
+          eapply Graph.add_spec in H3; intuition idtac; subst.
           eapply Graph.add_spec; eauto.
           eapply Graph.add_spec; right. eapply Graph.add_spec; eauto.
         }
         {
           eapply Graph.add_spec in H0; intuition idtac; subst.
           eapply Graph.add_spec; right. eapply Graph.add_spec; eauto.
-          eapply Graph.add_spec in H9; intuition idtac; subst.
+          eapply Graph.add_spec in H3; intuition idtac; subst.
           eapply Graph.add_spec; eauto.
           eapply Graph.add_spec; right. eapply Graph.add_spec; eauto.
         }
@@ -763,7 +907,7 @@ Proof.
 
       eauto.
 
-      eapply invariant_add_link; eauto.
-      
+      eapply invariant_create; eauto.
+
   - admit.
 Admitted.
