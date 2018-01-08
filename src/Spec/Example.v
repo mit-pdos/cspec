@@ -115,44 +115,33 @@ Definition ts2 := threads_empty [[ 1 := Proc p2 ]].
 (** Example traces *)
 
 Ltac exec_one tid' :=
-  eapply ExecOne with (tid := tid');
+  eapply ExecPrefixOne with (tid := tid');
     [ rewrite thread_upd_eq; reflexivity | | autorewrite with t ].
 
 Hint Constructors op_step.
 Hint Constructors opHi_step.
 
 Definition ex_trace :
-  { t : trace opT opHiT | exec op_step init_state ts t }.
+  { t : trace opT opHiT | exec_prefix op_step init_state ts t }.
 Proof.
   eexists.
   unfold ts.
   unfold init_state.
-  exec_one 1; eauto 20; simpl; autorewrite with t.
-  exec_one 1; eauto 20; simpl; autorewrite with t.
-  exec_one 1; eauto 20; simpl; autorewrite with t.
-  exec_one 1; eauto 20; simpl; autorewrite with t.
-  exec_one 1; eauto 20; simpl; autorewrite with t.
-  exec_one 1; eauto 20; simpl; autorewrite with t.
-  exec_one 1; eauto 20; simpl; autorewrite with t.
-  exec_one 1; eauto 20; simpl; autorewrite with t.
-  exec_one 1; eauto 20; simpl; autorewrite with t.
-  eapply ExecEmpty; eauto.
+  repeat ( exec_one 1; [ eauto 20 | simpl; autorewrite with t ] ).
+  eauto.
 Defined.
 
 Eval compute in (proj1_sig ex_trace).
 
 
 Definition ex_trace2 :
-  { t : trace opHiT opHi2T | exec opHi_step init_state ts2 t }.
+  { t : trace opHiT opHi2T | exec_prefix opHi_step init_state ts2 t }.
 Proof.
   eexists.
   unfold ts2.
   unfold init_state.
-  exec_one 1; eauto; simpl; autorewrite with t.
-  exec_one 1; eauto; simpl; autorewrite with t.
-  exec_one 1; eauto; simpl; autorewrite with t.
-  exec_one 1; eauto; simpl; autorewrite with t.
-  eapply ExecEmpty; eauto.
+  repeat ( exec_one 1; [ eauto | simpl; autorewrite with t ] ).
+  eauto.
 Defined.
 
 Eval compute in (proj1_sig ex_trace2).
@@ -215,10 +204,6 @@ Ltac thread_inv :=
     solve [ inversion H ]
   | H : _ = Ret _ |- _ =>
     solve [ inversion H ]
-  | H : no_runnable_threads (thread_upd _ _ _) |- _ =>
-    solve [ eapply thread_upd_not_empty in H; exfalso; eauto ]
-  | H : _ _ = Proc _ |- _ =>
-    solve [ exfalso; eapply no_runnable_threads_some; eauto ]
   | H : _ = _ |- _ =>
     congruence
   | H : _ = _ \/ _ = _ |- _ =>
