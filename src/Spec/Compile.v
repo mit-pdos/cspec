@@ -566,17 +566,18 @@ Section Movers.
 
   Lemma exec_left_mover : forall s ts tid `(rx : _ -> proc opT opHiT T) tr,
     left_mover ->
-    exec op_step s ts [[ tid := Proc (x <- OpExec opMover; rx x) ]] tr ->
+    exec_prefix op_step s ts [[ tid := Proc (x <- OpExec opMover; rx x) ]] tr ->
     exists s' r,
       op_step opMover tid s r s' /\
-      exec op_step s' ts [[ tid := Proc (rx r) ]] tr.
+      exec_prefix op_step s' ts [[ tid := Proc (rx r) ]] tr.
   Proof.
     intros.
 
     match goal with
-    | H : exec _ _ (thread_upd ?ts ?tid ?p) _ |- _ =>
+    | H : exec_prefix _ _ (thread_upd ?ts ?tid ?p) _ |- _ =>
       remember (thread_upd ts tid p);
       generalize dependent ts;
+      unfold exec_prefix in H; repeat deex;
       induction H; intros; subst
     end.
 
@@ -597,13 +598,13 @@ Section Movers.
 
         do 2 eexists; intuition eauto.
 
-        eapply ExecOne with (tid := tid0).
+        eapply ExecPrefixOne with (tid := tid0).
           autorewrite with t; eauto.
           eauto.
           rewrite thread_upd_upd_ne; eauto.
 
-    - exfalso; eauto.
-  Qed.
+    - admit.
+  Admitted.
 
   Theorem hitrace_incl_atomize_opexec_right_mover :
     right_mover ->
@@ -618,39 +619,38 @@ Section Movers.
     repeat exec_tid_inv.
 
     match goal with
-    | H : exec _ _ (thread_upd ?ts ?tid ?pp) _ |- _ =>
+    | H : exec_prefix _ _ (thread_upd ?ts ?tid ?pp) _ |- _ =>
       remember (thread_upd ts tid pp);
       generalize dependent ts;
       generalize dependent s;
-      induction H; simpl; intros; subst
+      destruct H as [? H];
+      induction H; simpl; intros; subst; eauto
     end.
 
-    - destruct (tid == tid0); subst.
-      + autorewrite with t in *.
-        repeat maybe_proc_inv.
-        repeat exec_tid_inv.
+    destruct (tid == tid0); subst.
+    + autorewrite with t in *.
+      repeat maybe_proc_inv.
+      repeat exec_tid_inv.
 
-        eexists; split.
-        eapply ExecOne with (tid := tid0).
-          autorewrite with t in *; eauto.
-          eauto.
-          simpl. autorewrite with t. eauto.
-        simpl; eauto.
-
-      + autorewrite with t in *.
-        edestruct exec_tid_right_mover; intuition eauto.
-        edestruct IHexec; eauto.
-          rewrite thread_upd_upd_ne; eauto.
-        intuition idtac.
-
-        eexists; split.
-        eapply ExecOne with (tid := tid0).
-          autorewrite with t; eauto.
-          eauto.
-          rewrite thread_upd_upd_ne; eauto.
+      eexists; split.
+      eapply ExecPrefixOne with (tid := tid0).
+        autorewrite with t in *; eauto.
         eauto.
+        simpl. autorewrite with t. eauto.
+      simpl; eauto.
 
-    - exfalso; eauto.
+    + autorewrite with t in *.
+      edestruct exec_tid_right_mover; intuition eauto.
+      edestruct IHexec; eauto.
+        rewrite thread_upd_upd_ne; eauto.
+      intuition idtac.
+
+      eexists; split.
+      eapply ExecPrefixOne with (tid := tid0).
+        autorewrite with t; eauto.
+        eauto.
+        rewrite thread_upd_upd_ne; eauto.
+      eauto.
   Qed.
 
   Theorem hitrace_incl_atomize_opexec_left_mover :
@@ -668,7 +668,7 @@ Section Movers.
     repeat deex.
 
     eexists; split.
-    eapply ExecOne with (tid := tid).
+    eapply ExecPrefixOne with (tid := tid).
       autorewrite with t; eauto.
       eauto.
       autorewrite with t. eauto.
@@ -695,7 +695,7 @@ Section Movers.
     repeat deex.
 
     eexists; split.
-    eapply ExecOne with (tid := tid).
+    eapply ExecPrefixOne with (tid := tid).
       autorewrite with t; eauto.
       eauto 10.
       autorewrite with t. eauto.
