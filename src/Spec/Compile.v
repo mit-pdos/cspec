@@ -804,6 +804,285 @@ Arguments right_mover {opT State} op_step {moverT}.
 Arguments both_mover {opT State} op_step {moverT}.
 
 
+Section YSA.
+
+  Variable opT : Type -> Type.
+  Variable opHiT : Type -> Type.
+  Variable State : Type.
+  Variable op_step : OpSemantics opT State.
+
+  (** Something similar to the Yield Sufficiency Automaton from the GC paper *)
+
+  Inductive left_movers : forall T, proc opT opHiT T -> Prop :=
+  | LeftMoversOne :
+    forall `(opMover : opT oT) `(rx : _ -> proc _ _ T),
+    left_mover op_step opMover ->
+    (forall a, left_movers (rx a)) ->
+    left_movers (Bind (Op opMover) rx)
+  | LeftMoversRet :
+    forall `(v : T),
+    left_movers (Ret v).
+
+  Inductive at_most_one_non_mover : forall T, proc opT opHiT T -> Prop :=
+  | ZeroNonMovers :
+    forall `(p : proc _ _ T),
+    left_movers p ->
+    at_most_one_non_mover p
+  | OneNonMover :
+    forall `(op : opT T) `(rx : _ -> proc _ _ R),
+    (forall a, left_movers (rx a)) ->
+    at_most_one_non_mover (Bind (Op op) rx).
+
+  Inductive ysa_movers : forall T, proc opT opHiT T -> Prop :=
+  | RightMoversOne :
+    forall `(opMover : opT oT) `(rx : _ -> proc _ _ T),
+    right_mover op_step opMover ->
+    (forall a, ysa_movers (rx a)) ->
+    ysa_movers (Bind (Op opMover) rx)
+  | RightMoversDone :
+    forall `(p : proc _ _ T),
+    at_most_one_non_mover p ->
+    ysa_movers p.
+
+(*
+  Inductive left_movers_rev : forall T, proc opT opHiT T -> Prop :=
+  | LeftMoversRevOne :
+    forall `(p : proc _ _ T) `(opMover : opT oT) `(f : _ -> _ -> R),
+    left_mover op_step opMover ->
+    left_movers_rev (Bind p (fun a => Bind (Op opMover) (fun b => Ret (f a b))))
+  | LeftMoversRevRet :
+    forall T (v : T),
+    left_movers_rev (Ret v).
+
+  Theorem left_movers_left_movers_rev :
+    forall T (p : proc _ _ T),
+      left_movers p ->
+      exists p',
+        exec_equiv p p' /\
+        left_movers_rev p'.
+  Proof.
+    intros.
+    induction H.
+    - admit.
+    - eexists; split.
+      reflexivity.
+      constructor.
+  Admitted.
+*)
+
+  Lemma exec_OpCall : forall s ts tid `(opMover : opT oT) `(rx : _ -> proc opT opHiT T) tr,
+    exec_prefix op_step s ts [[ tid := Proc (x <- OpCall opMover; rx x) ]] tr ->
+    exists tr',
+      exec_prefix op_step s ts [[ tid := Proc (rx tt) ]] tr' /\
+      trace_match_hi tr tr'.
+  Proof.
+    intros.
+
+    match goal with
+    | H : exec_prefix _ _ (thread_upd ?ts ?tid ?p) ?t |- _ =>
+      remember (thread_upd ts tid p);
+      remember t;
+      generalize dependent ts;
+      generalize dependent tr;
+      destruct H as [? H];
+      induction H; intros; subst
+    end.
+
+    - destruct (tid == tid0); subst; autorewrite with t in *.
+      + repeat maybe_proc_inv.
+        repeat exec_tid_inv.
+        simpl; eauto.
+
+      + edestruct IHexec.
+          autorewrite with t; eauto.
+          rewrite thread_upd_upd_ne; eauto.
+        intuition idtac.
+
+        eexists; split.
+        eapply ExecPrefixOne with (tid := tid0).
+          autorewrite with t; eauto.
+          eauto.
+          rewrite thread_upd_upd_ne; eauto.
+
+        eauto.
+
+    - eauto.
+  Qed.
+
+  Lemma exec_OpRet : forall s ts tid `(v : oT) `(rx : _ -> proc opT opHiT T) tr,
+    exec_prefix op_step s ts [[ tid := Proc (x <- OpRet v; rx x) ]] tr ->
+    exists tr',
+      exec_prefix op_step s ts [[ tid := Proc (rx v) ]] tr' /\
+      trace_match_hi tr tr'.
+  Proof.
+    intros.
+
+    match goal with
+    | H : exec_prefix _ _ (thread_upd ?ts ?tid ?p) ?t |- _ =>
+      remember (thread_upd ts tid p);
+      remember t;
+      generalize dependent ts;
+      generalize dependent tr;
+      destruct H as [? H];
+      induction H; intros; subst
+    end.
+
+    - destruct (tid == tid0); subst; autorewrite with t in *.
+      + repeat maybe_proc_inv.
+        repeat exec_tid_inv.
+        simpl; eauto.
+
+      + edestruct IHexec.
+          autorewrite with t; eauto.
+          rewrite thread_upd_upd_ne; eauto.
+        intuition idtac.
+
+        eexists; split.
+        eapply ExecPrefixOne with (tid := tid0).
+          autorewrite with t; eauto.
+          eauto.
+          rewrite thread_upd_upd_ne; eauto.
+
+        eauto.
+
+    - eauto.
+  Qed.
+
+  Theorem hitrace_incl_atomize_ysa_left_movers :
+    forall T L R (p : proc _ _ T) (l : _ -> proc _ _ L) (rx : _ -> proc _ _ R),
+      (forall a, left_movers (l a)) ->
+      hitrace_incl op_step
+        (Bind (Bind (Atomic p) l) rx)
+        (Bind (Atomic (Bind p l)) rx).
+  Proof.
+    intros.
+    eapply hitrace_incl_proof_helper; intros.
+    repeat exec_tid_inv.
+
+    specialize (H v); remember (l v).
+    generalize dependent p.
+    generalize dependent l.
+    generalize dependent T.
+    generalize dependent s'.
+    generalize dependent tr.
+    generalize dependent evs.
+    induction H; intros.
+
+    - unfold Op in H2.
+      repeat rewrite exec_equiv_bind_bind in H2.
+      eapply exec_OpCall in H2; repeat deex.
+      repeat rewrite exec_equiv_bind_bind in H2.
+      eapply exec_left_mover in H2; eauto; repeat deex.
+      repeat rewrite exec_equiv_bind_bind in H4.
+      eapply exec_OpRet in H4; repeat deex.
+
+      edestruct H1 with (p := Bind p (fun _ => Op opMover)).
+      eassumption.
+      reflexivity.
+      eauto.
+
+      intuition idtac.
+      rewrite atomic_equiv_bind_bind in H8.
+      rewrite Heqp0 in H8.
+      admit.
+
+    - rewrite exec_equiv_ret_bind in H1.
+      eexists; split.
+      eapply ExecPrefixOne with (tid := tid).
+        autorewrite with t; eauto.
+        repeat econstructor; eauto.
+        rewrite <- Heqp0. eauto.
+        autorewrite with t; eauto.
+      rewrite app_nil_r; eauto.
+  Admitted.
+
+(*
+  Theorem hitrace_incl_atomize_ysa_left_movers :
+    forall T L R (p : proc _ _ T) (l : _ -> proc _ _ L) (rx : _ -> proc _ _ R),
+      (forall a, left_movers (l a)) ->
+      hitrace_incl op_step
+        (Bind (Bind (Atomic p) l) rx)
+        (Bind (Atomic (Bind p l)) rx).
+  Proof.
+    intros.
+
+    unfold hitrace_incl, hitrace_incl_opt.
+    unfold hitrace_incl_ts, hitrace_incl_ts_s.
+    intros.
+
+    match goal with
+    | H : exec_prefix _ _ (thread_upd ?ts ?tid ?pp) _ |- _ =>
+      remember (thread_upd ts tid pp);
+      generalize dependent ts;
+      generalize dependent p;
+      destruct H as [? H];
+      induction H; intros; subst; eauto
+    end.
+
+    destruct (tid0 == tid); subst; autorewrite with t in *.
+    - clear IHexec.
+      repeat maybe_proc_inv.
+      repeat exec_tid_inv.
+      specialize (H v); remember (l v).
+      apply exec_to_exec_prefix in H2; clear ctr.
+      generalize dependent p0.
+      induction H; intros.
+
+      + edestruct H1 with (a := 
+
+      + rewrite exec_equiv_ret_bind in H2.
+        eexists; split.
+        eapply ExecPrefixOne with (tid := tid).
+          autorewrite with t; eauto.
+          repeat econstructor; eauto.
+          rewrite <- Heqp. eauto.
+          autorewrite with t; eauto.
+        rewrite app_nil_r; eauto.
+
+    - edestruct IHexec.
+      rewrite thread_upd_upd_ne; eauto.
+      intuition idtac.
+
+      eexists; split.
+      eapply ExecPrefixOne with (tid := tid0).
+        autorewrite with t; eauto.
+        eauto.
+        rewrite thread_upd_upd_ne; eauto.
+      eauto.
+  Admitted.
+*)
+
+  Theorem hitrace_incl_atomize_ysa :
+    forall T R (p : proc _ _ T) (rx : _ -> proc _ _ R),
+      ysa_movers p ->
+      hitrace_incl op_step
+        (Bind p rx)
+        (Bind (Atomic p) rx).
+  Proof.
+    intros.
+    induction H.
+    {
+      rewrite <- hitrace_incl_atomize_op_right_mover by eauto.
+      repeat rewrite exec_equiv_bind_bind.
+      eapply hitrace_incl_bind_a; intros.
+      eauto.
+    }
+
+    inversion H; clear H; repeat sigT_eq.
+    - rewrite <- exec_equiv_ret_bind with (v := tt) (p0 := (fun _ => p)) at 1.
+      rewrite <- atomic_equiv_ret_bind with (v := tt) (p0 := (fun _ => p)).
+      erewrite <- hitrace_incl_atomize_ysa_left_movers; eauto.
+      rewrite exec_equiv_atomicret_ret.
+      reflexivity.
+    - erewrite <- hitrace_incl_atomize_ysa_left_movers; eauto.
+      repeat rewrite exec_equiv_bind_bind.
+      rewrite hitrace_incl_op.
+      reflexivity.
+  Qed.
+
+End YSA.
+
+
 Ltac destruct_ifs :=
   repeat match goal with
   | |- context[if ?a == ?b then _ else _] =>
