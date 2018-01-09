@@ -886,6 +886,8 @@ Proof.
         unfold FSEquiv.
         simpl.
         intuition eauto.
+
+        
         admit.
 
         unfold Graph.Equal; split; intros.

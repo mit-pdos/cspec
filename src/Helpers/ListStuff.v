@@ -73,3 +73,17 @@ Proof.
     rewrite app_length. simpl.
     rewrite IHl; auto.
 Qed.
+
+Lemma list_upd_commutes: forall `(l: list T) i0 i1 v0 v1,
+    i0 <> i1 ->
+    list_upd (list_upd l i0 v0) i1 v1 = list_upd (list_upd l i1 v1) i0 v0.
+Proof.
+  induction l; intros; auto.
+  simpl.
+  destruct i0; subst; simpl.
+  destruct i1; try congruence.
+  simpl; reflexivity.
+  destruct i1; simpl.
+  reflexivity.
+  rewrite IHl; auto.
+Qed.
