@@ -332,7 +332,7 @@ End Atomization.
 Ltac compile_eq_step :=
   match goal with
   | |- ?x = _ =>
-    rewrite frob_proc_eq with (p := x); simpl;
+    rewrite frob_proc_eq with (p := x) at 1; simpl;
       try reflexivity; f_equal
   | _ =>
     apply functional_extensionality; intros

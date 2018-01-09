@@ -729,7 +729,7 @@ Proof.
       eapply exec_equiv_ts_pad.
 Qed.
 
-Instance exec_proper_exec_equiv :
+Instance exec_prefix_proper_exec_equiv :
   Proper (eq ==> eq ==> exec_equiv_ts ==> eq ==> iff) (@exec_prefix opT opHiT State).
 Proof.
   intros.
@@ -1729,6 +1729,84 @@ Proof.
   - rewrite H.
     rewrite H0.
     eauto.
+Qed.
+
+Theorem traces_match_one_thread_opcall :
+  forall opLoT opMidT opHiT State R T
+         (p1rest : _ -> proc opLoT opMidT R)
+         (p2rest : _ -> proc opMidT opHiT R)
+         (op : opMidT T)
+         (lo_step : OpSemantics opLoT State)
+         (mid_step : OpSemantics opMidT State),
+  (forall x, traces_match_one_thread lo_step mid_step (p1rest x) (p2rest x)) ->
+  traces_match_one_thread lo_step mid_step
+    (Bind (OpCallHi op) p1rest) (Bind (OpCall op) p2rest).
+Proof.
+  intros.
+  unfold traces_match_one_thread, traces_match_ts; intros.
+
+  match goal with
+  | H : exec_prefix _ _ (thread_upd ?ts ?tid (Proc ?p)) _ |- _ =>
+    remember (thread_upd ts tid (Proc p));
+    destruct H as [? H];
+    induction H; intros; subst; eauto
+  end.
+
+  destruct (tid == 1); subst; autorewrite with t in *.
+  * repeat maybe_proc_inv.
+    repeat exec_tid_inv.
+
+    edestruct H; eauto.
+    intuition idtac.
+
+    eexists; split.
+    eapply ExecPrefixOne with (tid := 1).
+      autorewrite with t; eauto.
+      eauto.
+      autorewrite with t; eauto.
+    simpl.
+    eauto.
+
+  * exfalso; eapply thread_empty_inv; eauto.
+Qed.
+
+Theorem traces_match_one_thread_opret :
+  forall opLoT opMidT opHiT State R T
+         (p1rest : _ -> proc opLoT opMidT R)
+         (p2rest : _ -> proc opMidT opHiT R)
+         (v : T)
+         (lo_step : OpSemantics opLoT State)
+         (mid_step : OpSemantics opMidT State),
+  (forall x, traces_match_one_thread lo_step mid_step (p1rest x) (p2rest x)) ->
+  traces_match_one_thread lo_step mid_step
+    (Bind (OpRetHi v) p1rest) (Bind (OpRet v) p2rest).
+Proof.
+  intros.
+  unfold traces_match_one_thread, traces_match_ts; intros.
+
+  match goal with
+  | H : exec_prefix _ _ (thread_upd ?ts ?tid (Proc ?p)) _ |- _ =>
+    remember (thread_upd ts tid (Proc p));
+    destruct H as [? H];
+    induction H; intros; subst; eauto
+  end.
+
+  destruct (tid == 1); subst; autorewrite with t in *.
+  * repeat maybe_proc_inv.
+    repeat exec_tid_inv.
+
+    edestruct H; eauto.
+    intuition idtac.
+
+    eexists; split.
+    eapply ExecPrefixOne with (tid := 1).
+      autorewrite with t; eauto.
+      eauto.
+      autorewrite with t; eauto.
+    simpl.
+    eauto.
+
+  * exfalso; eapply thread_empty_inv; eauto.
 Qed.
 
 
