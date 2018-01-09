@@ -502,17 +502,180 @@ Proof.
     - apply IHpath_evaluates2; eauto.
 Qed.
 
-Lemma path_eval_root_addlink' : forall fs dirnum0 dirnum name dirpn n node',
-  fs_invariant fs ->
-  path_eval_root fs dirpn (DirNode dirnum0) ->
-  path_eval_root (add_link dirnum n name fs) dirpn node' ->
-  path_eval_root fs dirpn node'.
+Lemma valid_link_addlink_does_not_exists: forall fs dirnum name h node' node'' startdir name0,
+    name <> "." ->
+    name <> ".." ->
+    fs_invariant fs ->
+    does_not_exist fs dirnum name ->
+    valid_link fs startdir name0 node'' ->
+    valid_link (add_link dirnum (FileNode h) name fs) startdir name0 node' ->
+    valid_link fs startdir name0 node'.
 Proof.
-  unfold path_eval_root, add_link in *.
-  simpl in *.
   intros.
-Admitted.
+  inversion H4; subst.
+  apply Graph.add_spec in H5.
+  intuition; subst. 
+  inversion H6; subst. clear H6.
+  destruct H2.
+  eexists.
+  inversion H3; subst; eauto; try congruence.
+  apply ValidDot.
+  eapply ValidDotDot.
+  apply Graph.add_spec in H5.
+  intuition; subst; try congruence.
+  eauto.
+  eapply ValidDotDotRoot.
+  unfold add_link; simpl; auto.
+Qed.
 
+
+Lemma path_evaluates_addlink_does_not_exists: forall fs dirnum name h node' node'' startdir path,
+    name <> "." ->
+    name <> ".." ->
+    fs_invariant fs ->
+    does_not_exist fs dirnum name ->
+    path_evaluates fs (DirNode startdir) path node'' ->
+    path_evaluates (add_link dirnum (FileNode h) name fs) (DirNode startdir) path node' ->
+    path_evaluates fs (DirNode startdir) path node'.
+Proof.
+  intros.
+  remember ((add_link dirnum (FileNode h) name fs)).
+  generalize dependent fs.
+  generalize dependent node''.
+  induction H4; intros; subst.
+  + constructor.
+  + apply PathEvalFileLink.
+    eapply valid_link_addlink_does_not_exists in H1; eauto.
+    inversion H4; subst; eauto.
+    inversion H11; subst; eauto.
+    eapply valid_link_addlink_does_not_exists in H1; eauto.
+    eapply H2 in H1.
+    apply H1 in  H9.
+    congruence.
+  + inversion H5; subst; eauto.
+
+    eapply valid_link_addlink_does_not_exists in H1; eauto.
+
+    eapply PathEvalDirLink; eauto.
+    eapply valid_link_addlink_does_not_exists in H1; eauto.
+    eapply valid_link_eq with (node := (DirNode inum0)) in H1; eauto.
+    inversion H1; subst.
+    eapply IHpath_evaluates; eauto.
+
+    eapply valid_link_addlink_does_not_exists in H1; eauto.
+    eapply H2 in H1.
+    apply H1 in  H10.
+    congruence.
+
+  + inversion H4; subst; auto.
+    
+    eapply valid_link_addlink_does_not_exists in H1; eauto.
+    eapply H2 in H1.
+    apply H1 in  H10.
+    congruence.
+
+    eapply valid_link_addlink_does_not_exists in H1; eauto.
+    eapply H2 in H1.
+    apply H1 in  H9.
+    congruence.
+
+    eapply PathEvalSymlink; eauto.
+
+    eapply valid_link_addlink_does_not_exists in H1; eauto.
+    eapply valid_link_eq with (node := (SymlinkNode sympath0)) in H1; eauto.
+    inversion H1; subst. clear H1.
+
+    replace symtarget0 with symtarget in *; eauto.
+    eapply path_evaluates_eq; try eassumption.
+    eapply IHpath_evaluates1; eauto.
+Qed.
+
+Lemma path_eval_addlink' : forall fs startdir dirpn dirnum h name node',
+    name <> "." ->
+    name <> ".." ->
+    fs_invariant fs ->
+    does_not_exist fs dirnum name ->
+    path_evaluates fs startdir dirpn (DirNode dirnum) ->
+    path_evaluates (add_link dirnum (FileNode h) name fs) startdir dirpn node' ->
+    node' = (DirNode dirnum).
+Proof.
+  intros.
+  generalize dependent fs; intros.
+  induction H3.
+  + inversion H4; subst.
+    constructor.
+  + inversion H4; subst. clear H4.
+    eapply valid_link_addlink_does_not_exists in H8; eauto.
+    eapply valid_link_addlink_does_not_exists in H9; eauto.
+    exfalso.
+    eapply H1 in H3.
+    eapply H3 in H9.
+    congruence.
+
+    eapply valid_link_addlink_does_not_exists in H9; eauto.
+    exfalso.
+    eapply H1 in H3.
+    eapply H3 in H9.
+    congruence.
+    
+  + inversion H4; subst. clear H4.
+    eapply valid_link_addlink_does_not_exists in H11; eauto.
+    exfalso.
+    eapply H1 in H3.
+    eapply H3 in H11.
+    congruence.
+
+    eapply valid_link_addlink_does_not_exists in H10; eauto.
+    eapply H1 in H3.
+    eapply H3 in H10.
+    inversion H10; subst. clear H10.
+    apply IHpath_evaluates; eauto.
+
+    
+    eapply valid_link_addlink_does_not_exists in H10; eauto.
+    eapply H1 in H3.
+    eapply H3 in H10.
+    inversion H10.
+    
+  + inversion H4; subst. clear H4.
+    eapply valid_link_addlink_does_not_exists in H10; eauto.
+    exfalso.
+    eapply H1 in H3.
+    eapply H3 in H10.
+    congruence.
+
+    eapply valid_link_addlink_does_not_exists in H9; eauto.
+    exfalso.
+    eapply H1 in H3.
+    eapply H3 in H9.
+    congruence.
+
+    eapply valid_link_addlink_does_not_exists in H9; eauto.
+    eapply H1 in H3.
+    eapply H3 in H9. clear H3.
+    inversion H9; subst. clear H9.
+    intuition idtac.
+    apply H3.
+    replace symtarget with symtarget0; eauto.
+    eapply path_evaluates_eq. eassumption.
+    2: eassumption.
+    eapply path_evaluates_addlink_does_not_exists; eauto.
+Qed.
+
+Lemma path_eval_root_addlink' : forall fs dirnum name dirpn h node',
+    name <> "." ->
+    name <> ".." ->
+    fs_invariant fs ->
+    does_not_exist fs dirnum name ->
+    path_eval_root fs dirpn (DirNode dirnum) ->
+    path_eval_root (add_link dirnum (FileNode h) name fs) dirpn node' ->
+    path_eval_root fs dirpn node'.
+Proof.
+  unfold path_eval_root.
+  intros.
+  eapply path_eval_addlink' in H4; subst; eauto.
+Qed.
+  
 Lemma path_eval_root_updfile : forall fs dirnum h data dirpn,
   path_eval_root fs dirpn (DirNode dirnum) ->
   path_eval_root (upd_file h data fs) dirpn (DirNode dirnum).
@@ -806,7 +969,8 @@ Proof.
 
   intros.
 
-  eapply path_eval_root_addlink' in H8 as H8x.
+  eapply path_eval_root_addlink' in H8 as H8x; eauto.
+  
   eapply path_eval_root_updfile' in H8x.
   eapply path_eval_root_eq; eauto.
 
@@ -886,9 +1050,9 @@ Proof.
         unfold FSEquiv.
         simpl.
         intuition eauto.
+        eapply list_upd_commutes.
+        eapply file_handle_unused_ne in H13 as Hx; eauto.
 
-        
-        admit.
 
         unfold Graph.Equal; split; intros.
         {
