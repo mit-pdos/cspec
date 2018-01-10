@@ -294,12 +294,13 @@ Definition example_fs := mkFS 1
              Graph.empty))))))))
   [].
 
-Ltac resolve_link := compute; auto 20.
-Ltac resolve_filename :=  try constructor; resolve_link.
-Ltac resolve_dirname :=  eapply PathEvalDirLink; try constructor; resolve_link.
-Ltac resolve_symname := eapply PathEvalSymlink; resolve_link.
-Ltac resolve_dotdot :=  eapply PathEvalDirLink; try eapply ValidDotDot; resolve_link.
-Ltac resolve_dotdotRoot :=  eapply PathEvalDirLink; try eapply ValidDotDotRoot; resolve_link.
+Ltac resolve_link := constructor; compute; auto 20.
+Ltac resolve_filename :=  apply PathEvalFileLink; resolve_link.
+Ltac resolve_dirname :=  eapply PathEvalDirLink; [ resolve_link |].
+Ltac resolve_fsymname := eapply PathEvalSymlink; [ resolve_link | resolve_filename; auto | auto].
+Ltac resolve_dsymname := eapply PathEvalSymlink; [ resolve_link | resolve_dirname; auto | auto].
+Ltac resolve_dotdot := eapply PathEvalDirLink; [ eapply ValidDotDot; compute; auto | ].
+Ltac resolve_dotdotRoot :=  eapply PathEvalDirLink; [ eapply ValidDotDotRoot; compute; auto| ].
 Ltac resolve_init := left; eexists; unfold path_eval_root; split; auto.
 
 Theorem etc_passwd :
@@ -310,53 +311,64 @@ Proof.
   resolve_filename.
 Qed.
 
-(* 
 Theorem etc_passwd' :
   spec_ok example_fs (lookup_spec ["etc"; "passwd~"]) (Some (FileNode 10)).
 Proof.
   resolve_init.
-  resolve_name.
-  resolve_symname.
-  resolve_name.
+  resolve_dirname.
+  resolve_fsymname.
 Qed.
 
 Theorem etc'_passwd :
   spec_ok example_fs (lookup_spec ["etc~"; "passwd"]) (Some (FileNode 10)).
 Proof.
   resolve_init.
-  resolve_symname.
-  resolve_name.
-  resolve_name.
+  resolve_dsymname.
+  resolve_filename.
 Qed.
 
 Theorem tmp_foo_passwd :
   spec_ok example_fs (lookup_spec ["tmp"; "foo"; "passwd"]) (Some (FileNode 10)).
 Proof.
   resolve_init.
-  resolve_name.
-  resolve_symname.
+  resolve_dirname.
+  
+  eapply PathEvalSymlink.
+  resolve_link.
+ 
   resolve_dotdot.
-  resolve_name.
-  resolve_name.
+  
+  resolve_dirname; auto.
+  resolve_filename.
 Qed.
 
 Theorem tmp_foo2_passwd :
   spec_ok example_fs (lookup_spec ["tmp"; "foo2"; "passwd"]) (Some (FileNode 10)).
 Proof.
   resolve_init.
-  resolve_name.
-  resolve_symname.
-  resolve_dotdot.
-  resolve_dotdotRoot.
-  resolve_name.
-  resolve_name.
-Qed.
+  resolve_dirname.
 
+  eapply PathEvalSymlink.
+  resolve_link.
+ 
+  resolve_dotdot.
+  2: resolve_filename.
+  resolve_dotdotRoot.
+  resolve_dirname.
+  auto.
+Qed.
 
 Ltac resolve_none :=
   repeat match goal with
          | H: Graph.In _ _ |- _ => apply Graph.add_spec in H; intuition idtac; try congruence
          | H: Graph.In _ Graph.empty |- _ =>  apply Graph.is_empty_spec in H; eauto
+         end.
+
+Ltac resolve_none' :=
+  repeat match goal with
+         | H: Graph.In  _ _ |- _ => inversion H; subst; clear H
+         | H: _ = _ |- _ => inversion H; subst; clear H
+         | H: SetoidList.InA eq _ _ |- _ => inversion H; subst; clear H
          end.
 
 Theorem no_usr :
@@ -367,8 +379,11 @@ Proof.
   split; eauto.
   intuition. deex.
   inversion H; clear H; subst.
-  inversion H4; clear H4; subst.
+  inversion H3; clear H3; subst.
   resolve_none.
+  inversion H4; subst.
+  resolve_none.
+  inversion H4; subst.
   resolve_none.
 Qed.
 
@@ -389,16 +404,20 @@ Proof.
   unfold rename_example, spec_start, rename_nonexist_spec, transform_fs, add_link; simpl.
   
   (* lookup tmp, root  *)
-  resolve_name.
-  resolve_symname.
+  resolve_dirname.
+  
+  eapply PathEvalSymlink.
+  resolve_link.
   resolve_dotdot; auto.
 
   (* finish lookup *)
-  resolve_name.
-  resolve_symname.
+  resolve_dirname.
+
+  eapply PathEvalSymlink.
+  resolve_link.
   resolve_dotdot; auto.
-  resolve_name.
-  resolve_name.
+  resolve_dirname; auto.
+  resolve_filename.
 Qed.
 
 Theorem tmp_root_tmp2_foo_passwd_concur_after :
@@ -410,13 +429,17 @@ Proof.
   resolve_init.
 
   unfold rename_example, spec_finish, transform_fs; simpl.
-  unfold remove_link, add_link; simpl.
-  
-  resolve_name.
-  resolve_symname.
-  resolve_dotdot.
-  resolve_name.
-  resolve_name.
+  unfold remove_link, add_link;
+    
+  resolve_dirname.
+  eapply PathEvalSymlink.
+  resolve_link.
+  resolve_dotdot. auto.
+  2: resolve_dirname; auto.
+  2: resolve_filename; auto.
+  Unshelve.
+  2: exact "tmp2".
+  compute. auto 20.
 Qed.
 
 
@@ -429,24 +452,25 @@ Proof.
   simpl.
   right.
   split; auto.
+  unfold rename_example, spec_finish, transform_fs, rename_nonexist_spec in *.
   intuition. deex.
   inversion H; clear H; subst.
   inversion H4; clear H4; subst.
-  
-  unfold rename_example, spec_finish, transform_fs in *; simpl in *.
-  unfold remove_link, add_link in *; simpl in *.
 
   resolve_none.
-
   apply Graph.remove_spec in H0; intuition idtac; try congruence.
   resolve_none.
   resolve_none.
 
-  apply Graph.remove_spec in H; intuition idtac; try congruence.
+  inversion H4; subst; clear H4.
   resolve_none.
+  apply Graph.remove_spec in H0.
+  intuition idtac; try congruence.
+  
+  inversion H5; subst; clear H5.
+  all: resolve_none'.
 Qed.
 
- *)
 
 Definition names := list string.
 
