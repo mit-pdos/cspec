@@ -96,7 +96,6 @@ Definition inc_core : proc opLoT opMidT _ :=
   _ <- Op Acquire;
   v <- Op Read;
   _ <- Op (Write (v + 1));
-  _ <- Ret tt;
   _ <- Op Release;
   Ret v.
 
@@ -104,7 +103,6 @@ Definition dec_core : proc opLoT opMidT _ :=
   _ <- Op Acquire;
   v <- Op Read;
   _ <- Op (Write (v - 1));
-  _ <- Ret tt;
   _ <- Op Release;
   Ret v.
 
@@ -162,35 +160,10 @@ Theorem inc_atomic : forall `(rx : _ -> proc _ _ T),
     (Bind (hicall compile_op Inc) rx)
     (Bind (hicall (atomize compile_op) Inc) rx).
 Proof.
-  unfold hicall, atomize; simpl.
-  unfold inc_core; intros.
-
-  rewrite exec_equiv_bind_bind.
-  rewrite exec_equiv_bind_bind with (p1 := OpCallHi _).
-  eapply hitrace_incl_bind_a; intros.
-  repeat rewrite exec_equiv_bind_bind.
-  setoid_rewrite exec_equiv_bind_bind with (p1 := Atomic _).
-
-  (* [Acquire] *)
-  rewrite <- hitrace_incl_atomize_op_right_mover by eauto.
-  setoid_rewrite exec_equiv_bind_bind with (p1 := Op _).
-  eapply hitrace_incl_bind_a; intros.
-
-  (* [Read] *)
-  rewrite <- hitrace_incl_atomize_op_right_mover by eauto.
-  setoid_rewrite exec_equiv_bind_bind with (p1 := Op _).
-  eapply hitrace_incl_bind_a; intros.
-
-  (* [Write] *)
-  rewrite <- hitrace_incl_atomize_op_right_mover by eauto.
-  setoid_rewrite exec_equiv_bind_bind with (p1 := Op _).
-  eapply hitrace_incl_bind_a; intros.
-
-  (* [Release] *)
-  rewrite <- hitrace_incl_atomize_op_ret_left_mover by eauto.
-
-  rewrite exec_equiv_atomicret_ret.
-  reflexivity.
+  intros.
+  eapply hitrace_incl_atomize_ysa_hicall.
+  simpl.
+  unfold inc_core; eauto 20.
 Qed.
 
 Theorem dec_atomic : forall `(rx : _ -> proc _ _ T),
@@ -198,35 +171,10 @@ Theorem dec_atomic : forall `(rx : _ -> proc _ _ T),
     (Bind (hicall compile_op Dec) rx)
     (Bind (hicall (atomize compile_op) Dec) rx).
 Proof.
-  unfold hicall, atomize; simpl.
-  unfold dec_core; intros.
-
-  rewrite exec_equiv_bind_bind.
-  rewrite exec_equiv_bind_bind with (p1 := OpCallHi _).
-  eapply hitrace_incl_bind_a; intros.
-  repeat rewrite exec_equiv_bind_bind.
-  setoid_rewrite exec_equiv_bind_bind with (p1 := Atomic _).
-
-  (* [Acquire] *)
-  rewrite <- hitrace_incl_atomize_op_right_mover by eauto.
-  setoid_rewrite exec_equiv_bind_bind with (p1 := Op _).
-  eapply hitrace_incl_bind_a; intros.
-
-  (* [Read] *)
-  rewrite <- hitrace_incl_atomize_op_right_mover by eauto.
-  setoid_rewrite exec_equiv_bind_bind with (p1 := Op _).
-  eapply hitrace_incl_bind_a; intros.
-
-  (* [Write] *)
-  rewrite <- hitrace_incl_atomize_op_right_mover by eauto.
-  setoid_rewrite exec_equiv_bind_bind with (p1 := Op _).
-  eapply hitrace_incl_bind_a; intros.
-
-  (* [Release] *)
-  rewrite <- hitrace_incl_atomize_op_ret_left_mover by eauto.
-
-  rewrite exec_equiv_atomicret_ret.
-  reflexivity.
+  intros.
+  eapply hitrace_incl_atomize_ysa_hicall.
+  simpl.
+  unfold dec_core; eauto 20.
 Qed.
 
 

@@ -844,32 +844,6 @@ Section YSA.
     at_most_one_non_mover p ->
     ysa_movers p.
 
-(*
-  Inductive left_movers_rev : forall T, proc opT opHiT T -> Prop :=
-  | LeftMoversRevOne :
-    forall `(p : proc _ _ T) `(opMover : opT oT) `(f : _ -> _ -> R),
-    left_mover op_step opMover ->
-    left_movers_rev (Bind p (fun a => Bind (Op opMover) (fun b => Ret (f a b))))
-  | LeftMoversRevRet :
-    forall T (v : T),
-    left_movers_rev (Ret v).
-
-  Theorem left_movers_left_movers_rev :
-    forall T (p : proc _ _ T),
-      left_movers p ->
-      exists p',
-        exec_equiv p p' /\
-        left_movers_rev p'.
-  Proof.
-    intros.
-    induction H.
-    - admit.
-    - eexists; split.
-      reflexivity.
-      constructor.
-  Admitted.
-*)
-
   Lemma exec_OpCall : forall s ts tid `(opMover : opT oT) `(rx : _ -> proc opT opHiT T) tr,
     exec_prefix op_step s ts [[ tid := Proc (x <- OpCall opMover; rx x) ]] tr ->
     exists tr',
@@ -959,6 +933,22 @@ Section YSA.
     eapply hitrace_incl_proof_helper; intros.
     repeat exec_tid_inv.
 
+    cut (exists tr' v1 s1 evs1,
+      atomic_exec op_step (l v) tid s' v1 s1 evs1 /\
+      exec_prefix op_step s1 ts [[ tid := Proc (rx v1) ]] tr' /\
+      trace_match_hi tr (prepend tid evs1 tr')); intros.
+    {
+      repeat deex.
+      eexists; split.
+
+      eapply ExecPrefixOne with (tid := tid).
+        autorewrite with t; eauto.
+        eauto.
+        autorewrite with t; eauto.
+      rewrite prepend_app.
+      eauto.
+    }
+
     specialize (H v); remember (l v).
     generalize dependent p.
     generalize dependent l.
@@ -981,76 +971,22 @@ Section YSA.
       reflexivity.
       eauto.
 
-      intuition idtac.
-      rewrite atomic_equiv_bind_bind in H8.
-      rewrite Heqp0 in H8.
-      admit.
+      repeat deex.
+      do 4 eexists; intuition idtac.
+
+      eauto.
+      eauto.
+      rewrite app_nil_l in *.
+
+      unfold trace_match_hi; simpl.
+      congruence.
 
     - rewrite exec_equiv_ret_bind in H1.
-      eexists; split.
-      eapply ExecPrefixOne with (tid := tid).
-        autorewrite with t; eauto.
-        repeat econstructor; eauto.
-        rewrite <- Heqp0. eauto.
-        autorewrite with t; eauto.
-      rewrite app_nil_r; eauto.
-  Admitted.
-
-(*
-  Theorem hitrace_incl_atomize_ysa_left_movers :
-    forall T L R (p : proc _ _ T) (l : _ -> proc _ _ L) (rx : _ -> proc _ _ R),
-      (forall a, left_movers (l a)) ->
-      hitrace_incl op_step
-        (Bind (Bind (Atomic p) l) rx)
-        (Bind (Atomic (Bind p l)) rx).
-  Proof.
-    intros.
-
-    unfold hitrace_incl, hitrace_incl_opt.
-    unfold hitrace_incl_ts, hitrace_incl_ts_s.
-    intros.
-
-    match goal with
-    | H : exec_prefix _ _ (thread_upd ?ts ?tid ?pp) _ |- _ =>
-      remember (thread_upd ts tid pp);
-      generalize dependent ts;
-      generalize dependent p;
-      destruct H as [? H];
-      induction H; intros; subst; eauto
-    end.
-
-    destruct (tid0 == tid); subst; autorewrite with t in *.
-    - clear IHexec.
-      repeat maybe_proc_inv.
-      repeat exec_tid_inv.
-      specialize (H v); remember (l v).
-      apply exec_to_exec_prefix in H2; clear ctr.
-      generalize dependent p0.
-      induction H; intros.
-
-      + edestruct H1 with (a := 
-
-      + rewrite exec_equiv_ret_bind in H2.
-        eexists; split.
-        eapply ExecPrefixOne with (tid := tid).
-          autorewrite with t; eauto.
-          repeat econstructor; eauto.
-          rewrite <- Heqp. eauto.
-          autorewrite with t; eauto.
-        rewrite app_nil_r; eauto.
-
-    - edestruct IHexec.
-      rewrite thread_upd_upd_ne; eauto.
-      intuition idtac.
-
-      eexists; split.
-      eapply ExecPrefixOne with (tid := tid0).
-        autorewrite with t; eauto.
-        eauto.
-        rewrite thread_upd_upd_ne; eauto.
+      do 4 eexists; intuition idtac.
       eauto.
-  Admitted.
-*)
+      eauto.
+      eauto.
+  Qed.
 
   Theorem hitrace_incl_atomize_ysa :
     forall T R (p : proc _ _ T) (rx : _ -> proc _ _ R),
@@ -1080,7 +1016,30 @@ Section YSA.
       reflexivity.
   Qed.
 
+  Theorem hitrace_incl_atomize_ysa_hicall :
+    forall T R HT (p : proc _ _ T) (rx : _ -> proc _ _ R)
+           (op : opHiT HT),
+      ysa_movers p ->
+      hitrace_incl op_step
+        (Bind (_ <- OpCallHi op; r <- p; OpRetHi r) rx)
+        (Bind (_ <- OpCallHi op; r <- Atomic p; OpRetHi r) rx).
+  Proof.
+    intros.
+
+    rewrite exec_equiv_bind_bind.
+    rewrite exec_equiv_bind_bind with (p1 := OpCallHi _).
+    eapply hitrace_incl_bind_a; intros.
+    repeat rewrite exec_equiv_bind_bind.
+
+    rewrite hitrace_incl_atomize_ysa; eauto.
+    reflexivity.
+  Qed.
+
 End YSA.
+
+Hint Constructors ysa_movers.
+Hint Constructors at_most_one_non_mover.
+Hint Constructors left_movers.
 
 
 Ltac destruct_ifs :=
