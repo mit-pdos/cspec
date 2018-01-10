@@ -5,7 +5,7 @@ Require Import Morphisms.
 
 Import ListNotations.
 Require Import String.
-Require Import Trees.
+Require Import FSAPI.
 
 Definition maildir := ["/tmp/"%string; "mail/"%string].
 Definition tmpdir := ["/tmp/"%string].
