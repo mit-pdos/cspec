@@ -7,15 +7,11 @@ Import ListNotations.
 Require Import String.
 Require Import Trees.
 
-
-Definition State := FS.
-
 Definition maildir := ["/tmp/"%string; "mail/"%string].
 Definition tmpdir := ["/tmp/"%string].
 
 Global Opaque maildir.
 Global Opaque tmpdir.
-
 
 Parameter tid_to_string : nat -> string.
 
