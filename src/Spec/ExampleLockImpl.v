@@ -92,6 +92,21 @@ Proof.
   compile_eq_step.
 Qed.
 
+(* General pattern for proving [Acquire]-like implementations:
+ *
+ * There's a loop, running some operation [op] and bailing out when
+ * [op] returns a flag.
+ *
+ * [op] has two modes of execution: either it has no effect and does
+ * not return the flag, or it has the effect matching the high-level
+ * operation (e.g., [Acquire] in this example) and returning the flag.
+ *
+ * The proof considers an iteration of the loop, and shows that either
+ * the flag was not returned, and nothing happened (the loop is back to
+ * where it was), or the flag was returned and the execution matched the
+ * high-level operation (e.g., [Acquire]).
+ *)
+
 Theorem traces_match_one_thread_acquire :
   forall R
          (p1rest : _ -> proc opLoT opMidT R)
