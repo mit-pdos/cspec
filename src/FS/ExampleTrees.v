@@ -7,7 +7,116 @@ Import ListNotations.
 Require Import String.
 Require Import Trees.
 
+(** Definition of concurrent tree modifications, to write specifications *)
+
+Definition tree_transform := Graph.t -> Graph.t.
+
+Definition transform_fs (fs : FS) (xform : tree_transform) :=
+  mkFS (FSRoot fs) (xform (FSLinks fs)) (FSFiles fs).
+
+Definition add_link (srcdir : nat) (dst : Node) (name : string) : tree_transform :=
+  fun links => Graph.add (mkLink srcdir dst name) links.
+
+Definition remove_link (srcdir : nat) (dst : Node) (name : string) : tree_transform :=
+  fun links => Graph.remove (mkLink srcdir dst name) links.
+
+Definition xform_both (x1 x2 : tree_transform) :=
+  fun t => x2 (x1 t).
+
+Definition xform_id : tree_transform :=
+  fun t => t.
+
+Notation "x1 ;; x2" := (xform_both x1 x2) (at level 50).
+
+(** This is what a specification looks like *)
+
+Record specification (R : Type) := mkSpec {
+  Result : forall (result : R) (fs : FS), Prop;
+  AddLinks : tree_transform;
+  RemoveLinks : tree_transform;
+}.
+
+Definition spec_start {R} (fs : FS) (spec : specification R) : FS :=
+  transform_fs fs (AddLinks spec).
+
+Definition spec_finish {R} (fs : FS) (spec : specification R) : FS :=
+  transform_fs fs (RemoveLinks spec ;; AddLinks spec).
+
+Definition spec_ok {R} (fs : FS) (spec : specification R) (r : R) : Prop :=
+  Result spec r fs.
+
+
+(** Concrete specifications *)
+
+Definition lookup_spec (pn : Pathname) : specification (option Node) := {|
+  Result := fun result fs =>
+    (exists node, result = Some node /\ path_eval_root fs pn node) \/
+    result = None /\ ~ exists node, path_eval_root fs pn node;
+  AddLinks := xform_id;
+  RemoveLinks := xform_id;
+|}.
+
+Definition rename_overwrite_spec srcdir srcname node dstdir dstname oldnode := {|
+  Result := fun r _ => r = tt;
+  AddLinks := add_link dstdir node dstname;
+  RemoveLinks := remove_link srcdir node srcname;;
+                 remove_link dstdir oldnode dstname
+|}.
+
+Definition rename_nonexist_spec srcdir srcname node dstdir dstname := {|
+  Result := fun r _ => r = tt;
+  AddLinks := add_link dstdir node dstname;
+  RemoveLinks := remove_link srcdir node srcname
+|}.
+
+(**
+  TODO: take just Pathname arguments, rather than relying on knowing
+  node (and oldnode, if exists) already.
+
+  tricky issues:
+  - moving a symlink: need to move the SymlinkNode, not the evaluated target.
+  - overwriting a symlink?
+  - what if there are multiple possibilities for a given name?
+    saying "~ exists .., path_eval_root" seems to imply NONE of
+    these concurrent syscalls can be running now.
+ *)
+
+(*
+Definition rename_spec srcdir srcname dstdir dstname := {|
+  Result := fun r _ =>
+    r = true <-> exists n, path_eval_root fs (srcdir ++ [srcname]) n /\
+      ~ exists d, path_eval_root fs (dstdir ++ [dstname]) (DirNode d);
+  AddLinks := add_link 
+|}.
+*)
+
+Definition names := list string.
+
+Definition dirents dirnum (g: Graph.t) :=
+  Graph.filter (fun (l: Link) => (beq_nat (LinkFrom l) dirnum)) g.
+
+Definition dirnames dirnum g : names :=
+  let dir := dirents dirnum g in
+  map (fun (l:Link) => (LinkName l)) (Graph.elements dir).
+
+Definition readdir_spec pn : specification (option names)  := {|
+  Result := fun result fs =>
+              (exists node dir n, dir = Some (DirNode n) /\ path_eval_root fs pn node /\
+                           result = Some (dirnames n (FSLinks fs))
+              ) \/
+              result = None /\  ~ exists node n, path_eval_root fs pn node /\ node = (DirNode n);
+  AddLinks := xform_id;
+  RemoveLinks := xform_id;
+|}.
+
 (** Example valid (and some invalid) lookups *)
+
+Hint Extern 1 False =>
+  match goal with
+  | H : {| LinkFrom := ?a; LinkTo := ?b; LinkName := ?c |} =
+        {| LinkFrom := ?d; LinkTo := ?e; LinkName := ?f |} |- _ =>
+    destruct (Graph.eq_dec (mkLink a b c) (mkLink d e f)); congruence
+  end.
 
 Definition example_fs := mkFS 1
  (Graph.add (mkLink 1 (DirNode 2) "etc")
