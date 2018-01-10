@@ -15,29 +15,6 @@ Global Generalizable All Variables.
 
 (** Matching traces *)
 
-Inductive traces_match {opLoT opMidT opHiT} :
-  forall (t1 : trace opLoT opMidT)
-         (t2 : trace opMidT opHiT), Prop :=
-
-| MatchLo : forall t1 t2 tid e,
-  traces_match t1 t2 ->
-  traces_match (TraceEvent tid (EvLow e) t1) t2
-
-| MatchInvokeMid : forall t1 t2 tid e,
-  traces_match t1 t2 ->
-  traces_match (TraceEvent tid (EvHigh e) t1)
-               (TraceEvent tid (EvLow e) t2)
-
-| MatchInvokeHi : forall t1 t2 tid e,
-  traces_match t1 t2 ->
-  traces_match t1 (TraceEvent tid (EvHigh e) t2)
-
-| MatchEmpty :
-  traces_match TraceEmpty TraceEmpty.
-
-Hint Constructors traces_match.
-
-
 Fixpoint trace_filter_hi {opLoT'} `(t : trace opLoT opHiT) : trace opLoT' opHiT :=
   match t with
   | TraceEmpty => TraceEmpty
@@ -51,7 +28,7 @@ Fixpoint trace_filter_hi {opLoT'} `(t : trace opLoT opHiT) : trace opLoT' opHiT 
 Definition trace_match_hi {opLoTL opLoTR opHiT}
                           (t1 : trace opLoTL opHiT)
                           (t2 : trace opLoTR opHiT) :=
-  @trace_filter_hi opLoTR _ _ t1 = trace_filter_hi t2.
+  @trace_filter_hi opHiT _ _ t1 = @trace_filter_hi opHiT _ _ t2.
 
 Instance trace_match_hi_equiv :
   Equivalence (@trace_match_hi opLoT opLoT opHiT).
@@ -77,29 +54,6 @@ Qed.
 Hint Resolve trace_match_hi_prepend.
 
 
-Lemma traces_match_prepend : forall `(tr1 : trace opLoT opMidT) `(tr2 : trace opMidT opHiT) evs evs' tid,
-  traces_match tr1 tr2 ->
-  traces_match (prepend tid evs TraceEmpty) (prepend tid evs' TraceEmpty) ->
-  traces_match (prepend tid evs tr1) (prepend tid evs' tr2).
-Proof.
-  intros.
-  remember (prepend tid evs TraceEmpty).
-  remember (prepend tid evs' TraceEmpty).
-  generalize dependent evs'.
-  generalize dependent evs.
-  induction H0; intros.
-  all: destruct evs; simpl in *.
-  all: try inversion Heqt; subst.
-  all: try constructor; eauto.
-
-  all: destruct evs'; simpl in *.
-  all: try inversion Heqt0; subst.
-  all: try constructor; eauto.
-
-  specialize (IHtraces_match nil); simpl in *; eauto.
-  specialize (IHtraces_match ([e0] ++ evs)); simpl in *; eauto.
-Qed.
-
 Lemma trace_match_hi_prepend_empty : forall tid `(evs : list (event opT opHiT)) tr,
   trace_match_hi (prepend tid evs tr) (@TraceEmpty opT _) ->
   trace_match_hi (prepend tid evs TraceEmpty) (@TraceEmpty opT _) /\
@@ -110,6 +64,25 @@ Proof.
   - destruct a.
     + specialize (IHevs tr). intuition.
     + inversion H.
+Qed.
+
+Lemma trace_match_hi_prepend' : forall `(tr1 : trace opLoT opHiT) `(tr2 : trace opMidT opHiT) evs evs' tid,
+  trace_match_hi tr1 tr2 ->
+  trace_match_hi (prepend tid evs TraceEmpty) (prepend tid evs' TraceEmpty) ->
+  trace_match_hi (prepend tid evs tr1) (prepend tid evs' tr2).
+Proof.
+  induction evs; simpl in *; intros.
+  - induction evs'; simpl in *; intros; eauto.
+    destruct a; inversion H0; eauto.
+  - destruct a.
+    + inversion H0.
+      unfold trace_match_hi; cbn.
+      rewrite IHevs; eauto.
+    + induction evs'; simpl in *; intros; eauto.
+      * inversion H0.
+      * destruct a; inversion H0; eauto.
+        unfold trace_match_hi. cbn. f_equal.
+        rewrite IHevs; eauto.
 Qed.
 
 
@@ -136,39 +109,6 @@ Qed.
 Hint Resolve trace_match_hi_drop_lo_l.
 Hint Resolve trace_match_hi_drop_lo_r.
 Hint Resolve trace_match_hi_refl.
-
-Instance traces_match_proper :
-  Proper (trace_match_hi ==> eq ==> iff) (@traces_match opLoT opMidT opHiT).
-Proof.
-  intros.
-  intros t1 t2 H12.
-  intros t3' t3 H; subst.
-  split; intros.
-  - generalize dependent t2.
-    induction H; simpl; intros; eauto.
-    + induction t0; simpl; intros.
-      * destruct ev.
-        constructor. eauto.
-        inversion H12; subst.
-        constructor. eauto.
-      * inversion H12.
-    + induction t2; simpl; intros; eauto.
-      destruct ev.
-      constructor. eauto.
-      inversion H12.
-  - generalize dependent t1.
-    induction H; simpl; intros; eauto.
-    + induction t0; simpl; intros.
-      * destruct ev.
-        constructor. eauto.
-        inversion H12; subst.
-        constructor. eauto.
-      * inversion H12.
-    + induction t1; simpl; intros; eauto.
-      destruct ev.
-      constructor. eauto.
-      inversion H12.
-Qed.
 
 
 (** A strong notion of execution equivalence, independent of semantics *)
@@ -1648,16 +1588,16 @@ Qed.
 (** Correspondence between different layers *)
 
 Definition traces_match_ts {opLoT opMidT opHiT State} lo_step hi_step
-                           (ts1 : @threads_state opLoT opMidT)
+                           (ts1 : @threads_state opLoT opHiT)
                            (ts2 : @threads_state opMidT opHiT) :=
   forall (s : State) tr1,
     exec_prefix lo_step s ts1 tr1 ->
     exists tr2,
       exec_prefix hi_step s ts2 tr2 /\
-      traces_match tr1 tr2.
+      trace_match_hi tr1 tr2.
 
 Instance traces_match_ts_proper :
-  Proper (@hitrace_incl_ts opLoT opMidT State lo_step ==>
+  Proper (@hitrace_incl_ts opLoT opHiT State lo_step ==>
           exec_equiv_ts ==>
           Basics.flip Basics.impl)
          (@traces_match_ts opLoT opMidT opHiT State lo_step hi_step).
@@ -1671,144 +1611,10 @@ Proof.
   apply H in H0. deex.
   apply H2 in H0.
   eexists; split. eauto.
-  rewrite H3. eauto.
-Qed.
-
-Definition traces_match_one_thread opLoT opMidT opHiT State T
-    (lo_step : OpSemantics opLoT State)
-    (hi_step : OpSemantics opMidT State)
-    (p1 : proc opLoT opMidT T)
-    (p2 : proc opMidT opHiT T) :=
-  traces_match_ts lo_step hi_step
-    (threads_empty [[ 1 := Proc p1 ]])
-    (threads_empty [[ 1 := Proc p2 ]]).
-
-Instance traces_match_one_thread_proper :
-  Proper (@hitrace_incl opLoT opMidT T State lo_step ==>
-          @exec_equiv opMidT opHiT T ==>
-          Basics.flip Basics.impl)
-         (@traces_match_one_thread opLoT opMidT opHiT State T lo_step hi_step).
-Proof.
-  intros.
-  intros p1 p1'; intros.
-  intros p2 p2'; intros.
-  unfold Basics.flip, Basics.impl; intros.
-  unfold traces_match_one_thread in *; intros.
-  rewrite H.
-  rewrite H0.
-  eauto.
-Qed.
-
-Instance traces_match_one_thread_proper_flip :
-  Proper (Basics.flip (@hitrace_incl opLoT opMidT T State lo_step) ==>
-          @exec_equiv opMidT opHiT T ==>
-          Basics.impl)
-         (@traces_match_one_thread opLoT opMidT opHiT State T lo_step hi_step).
-Proof.
-  intros.
-  intros p1 p1'; intros.
-  intros p2 p2'; intros.
-  unfold Basics.flip, Basics.impl; intros.
-  unfold traces_match_one_thread in *; intros.
-  rewrite <- H.
-  rewrite <- H0.
-  eauto.
-Qed.
-
-Instance traces_match_one_thread_proper_equiv :
-  Proper (@exec_equiv_rx opLoT opMidT T ==>
-          @exec_equiv_rx opMidT opHiT T ==>
-          iff)
-         (@traces_match_one_thread opLoT opMidT opHiT State T lo_step hi_step).
-Proof.
-  intros.
-  intros p1 p1'; intros.
-  intros p2 p2'; intros.
-  unfold traces_match_one_thread; split; intros.
-  - rewrite <- H.
-    rewrite <- H0.
-    eauto.
-  - rewrite H.
-    rewrite H0.
-    eauto.
-Qed.
-
-Theorem traces_match_one_thread_opcall :
-  forall opLoT opMidT opHiT State R T
-         (p1rest : _ -> proc opLoT opMidT R)
-         (p2rest : _ -> proc opMidT opHiT R)
-         (op : opMidT T)
-         (lo_step : OpSemantics opLoT State)
-         (mid_step : OpSemantics opMidT State),
-  (forall x, traces_match_one_thread lo_step mid_step (p1rest x) (p2rest x)) ->
-  traces_match_one_thread lo_step mid_step
-    (Bind (OpCallHi op) p1rest) (Bind (OpCall op) p2rest).
-Proof.
-  intros.
-  unfold traces_match_one_thread, traces_match_ts; intros.
-
-  match goal with
-  | H : exec_prefix _ _ (thread_upd ?ts ?tid (Proc ?p)) _ |- _ =>
-    remember (thread_upd ts tid (Proc p));
-    destruct H as [? H];
-    induction H; intros; subst; eauto
-  end.
-
-  destruct (tid == 1); subst; autorewrite with t in *.
-  * repeat maybe_proc_inv.
-    repeat exec_tid_inv.
-
-    edestruct H; eauto.
-    intuition idtac.
-
-    eexists; split.
-    eapply ExecPrefixOne with (tid := 1).
-      autorewrite with t; eauto.
-      eauto.
-      autorewrite with t; eauto.
-    simpl.
-    eauto.
-
-  * exfalso; eapply thread_empty_inv; eauto.
-Qed.
-
-Theorem traces_match_one_thread_opret :
-  forall opLoT opMidT opHiT State R T
-         (p1rest : _ -> proc opLoT opMidT R)
-         (p2rest : _ -> proc opMidT opHiT R)
-         (v : T)
-         (lo_step : OpSemantics opLoT State)
-         (mid_step : OpSemantics opMidT State),
-  (forall x, traces_match_one_thread lo_step mid_step (p1rest x) (p2rest x)) ->
-  traces_match_one_thread lo_step mid_step
-    (Bind (OpRetHi v) p1rest) (Bind (OpRet v) p2rest).
-Proof.
-  intros.
-  unfold traces_match_one_thread, traces_match_ts; intros.
-
-  match goal with
-  | H : exec_prefix _ _ (thread_upd ?ts ?tid (Proc ?p)) _ |- _ =>
-    remember (thread_upd ts tid (Proc p));
-    destruct H as [? H];
-    induction H; intros; subst; eauto
-  end.
-
-  destruct (tid == 1); subst; autorewrite with t in *.
-  * repeat maybe_proc_inv.
-    repeat exec_tid_inv.
-
-    edestruct H; eauto.
-    intuition idtac.
-
-    eexists; split.
-    eapply ExecPrefixOne with (tid := 1).
-      autorewrite with t; eauto.
-      eauto.
-      autorewrite with t; eauto.
-    simpl.
-    eauto.
-
-  * exfalso; eapply thread_empty_inv; eauto.
+  unfold trace_match_hi.
+  rewrite <- H4.
+  rewrite H3.
+  reflexivity.
 Qed.
 
 

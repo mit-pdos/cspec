@@ -17,69 +17,74 @@ Section Compiler.
   Variable opMidT : Type -> Type.
   Variable opHiT : Type -> Type.
 
-  Variable compile_op : forall T, opMidT T -> proc opLoT opMidT T.
+  Variable compile_op : forall T, opMidT T -> proc opLoT opHiT T.
 
-  Definition atomize T (op : opMidT T) : proc opLoT opMidT T :=
+  Definition atomize T (op : opMidT T) : proc opLoT opHiT T :=
     Atomic (compile_op op).
 
-  Definition hicall T (op : opMidT T) : proc opLoT opMidT T :=
-    _ <- OpCallHi op;
-    r <- compile_op op;
-    OpRetHi r.
-
-  Inductive compile_ok : forall T (p1 : proc opLoT opMidT T) (p2 : proc opMidT opHiT T), Prop :=
+  Inductive compile_ok : forall T (p1 : proc opLoT opHiT T) (p2 : proc opMidT opHiT T), Prop :=
   | CompileOpcode : forall `(op : opMidT T),
-    compile_ok (hicall op) (Op op)
+    compile_ok (compile_op op) (Op op)
   | CompileRet : forall `(x : T),
     compile_ok (Ret x) (Ret x)
-  | CompileBind : forall `(p1a : proc opLoT opMidT T1) (p2a : proc opMidT opHiT T1)
+  | CompileBind : forall `(p1a : proc opLoT opHiT T1) (p2a : proc opMidT opHiT T1)
                          `(p1b : T1 -> proc _ _ T2) (p2b : T1 -> proc _ _ T2),
     compile_ok p1a p2a ->
     (forall x, compile_ok (p1b x) (p2b x)) ->
     compile_ok (Bind p1a p1b) (Bind p2a p2b)
   | CompileOpCallHi : forall `(op : opHiT T),
-    compile_ok (Ret tt) (OpCallHi op)
+    compile_ok (OpCallHi op) (OpCallHi op)
   | CompileOpRetHi : forall `(v : T),
-    compile_ok (Ret v) (OpRetHi v).
+    compile_ok (OpRetHi v) (OpRetHi v).
 
   (* [atomic_compile_ok] is not quite [compile_ok] with [atomize]
-     added to [compile_op].  It also breaks out [OpCallHi] and [OpRetHi]
+     added to [compile_op].  It also breaks out [OpCall] and [OpRet]
      into separate matches, so that the [atomic_compile_ok] relation keeps
      holding across atomic steps taken by each thread.
 
      This means that [atomic_compile_ok] does not enforce the calling
-     convention in itself: a program might have way too many [OpCallHi]s
-     and not enough [OpRetHi]s, etc.
+     convention in itself: a program might have way too many [OpCall]s
+     and not enough [OpRet]s, etc.
    *)
-  Inductive atomic_compile_ok : forall T (p1 : proc opLoT opMidT T) (p2 : proc opMidT opHiT T), Prop :=
+  Inductive atomic_compile_ok : forall T (p1 : proc opLoT opHiT T) (p2 : proc opMidT opHiT T), Prop :=
   | ACompileOpCall : forall `(op : opMidT T),
-    atomic_compile_ok (OpCallHi op) (OpCall op)
+    atomic_compile_ok (Ret tt) (OpCall op)
   | ACompileOpExec : forall `(op : opMidT T),
     atomic_compile_ok (Atomic (compile_op op)) (OpExec op)
   | ACompileOpRet : forall `(v : T),
-    atomic_compile_ok (OpRetHi v) (OpRet v)
+    atomic_compile_ok (Ret v) (OpRet v)
   | ACompileRet : forall `(x : T),
     atomic_compile_ok (Ret x) (Ret x)
-  | ACompileBind : forall `(p1a : proc opLoT opMidT T1) (p2a : proc opMidT opHiT T1)
+  | ACompileBind : forall `(p1a : proc opLoT opHiT T1) (p2a : proc opMidT opHiT T1)
                          `(p1b : T1 -> proc _ _ T2) (p2b : T1 -> proc _ _ T2),
     atomic_compile_ok p1a p2a ->
     (forall x, atomic_compile_ok (p1b x) (p2b x)) ->
     atomic_compile_ok (Bind p1a p1b) (Bind p2a p2b)
   | ACompileOpCallHi : forall `(op : opHiT T),
-    atomic_compile_ok (Ret tt) (OpCallHi op)
+    atomic_compile_ok (OpCallHi op) (OpCallHi op)
   | ACompileOpRetHi : forall `(v : T),
-    atomic_compile_ok (Ret v) (OpRetHi v).
+    atomic_compile_ok (OpRetHi v) (OpRetHi v).
 
-  CoFixpoint compile T (p : proc opMidT opHiT T) : proc opLoT opMidT T :=
+  CoFixpoint compile T (p : proc opMidT opHiT T) : proc opLoT opHiT T :=
     match p with
     | Ret t => Ret t
-    | OpCall op => OpCallHi op
+    | OpCall op => Ret tt
     | OpExec op => compile_op op
-    | OpRet r => OpRetHi r
+    | OpRet r => Ret r
     | Bind p1 p2 => Bind (compile p1) (fun r => compile (p2 r))
-    | OpCallHi _ => Ret tt
-    | OpRetHi v => Ret v
+    | OpCallHi op => OpCallHi op
+    | OpRetHi v => OpRetHi v
     | Atomic p => Atomic (compile p)
+    end.
+
+  Fixpoint compile_ts (ts : threads_state) : threads_state :=
+    match ts with
+    | nil => nil
+    | t :: ts' =>
+      match t with
+      | NoProc => NoProc
+      | Proc p => Proc (compile p)
+      end :: compile_ts ts'
     end.
 
 
@@ -90,10 +95,11 @@ Section Compiler.
   Definition compile_correct :=
     forall `(op : opMidT T) tid s v s' evs,
       atomic_exec lo_step (compile_op op) tid s v s' evs ->
-      traces_match (prepend tid evs TraceEmpty) (@TraceEmpty opMidT opHiT) /\
+      trace_match_hi (prepend tid evs TraceEmpty) (@TraceEmpty opMidT opHiT) /\
       hi_step op tid s v s'.
 
   Variable compile_is_correct : compile_correct.
+
 
   Lemma atomic_compile_ok_exec_tid : forall T (p1 : proc _ _ T) p2,
     atomic_compile_ok p1 p2 ->
@@ -101,7 +107,7 @@ Section Compiler.
       exec_tid lo_step tid s p1 s' result evs ->
       exists result' evs',
         exec_tid hi_step tid s p2 s' result' evs' /\
-        traces_match (prepend tid evs TraceEmpty) (prepend tid evs' TraceEmpty) /\
+        trace_match_hi (prepend tid evs TraceEmpty) (prepend tid evs' TraceEmpty) /\
         match result with
         | inl v => match result' with
           | inl v' => v = v'
@@ -119,7 +125,7 @@ Section Compiler.
       do 2 eexists; split.
       constructor.
       split.
-      simpl; eauto.
+      compute; eauto.
       eauto.
 
     - exec_tid_inv.
@@ -130,14 +136,14 @@ Section Compiler.
       do 2 eexists; split.
       constructor.
       split.
-      simpl; eauto.
+      compute; eauto.
       eauto.
 
     - exec_tid_inv.
       do 2 eexists; split.
       constructor.
       split.
-      simpl; eauto.
+      compute; eauto.
       eauto.
 
     - exec_tid_inv.
@@ -164,14 +170,14 @@ Section Compiler.
       do 2 eexists; split.
       constructor.
       split.
-      simpl; eauto.
+      compute; eauto.
       eauto.
 
     - exec_tid_inv.
       do 2 eexists; split.
       constructor.
       split.
-      simpl; eauto.
+      compute; eauto.
       eauto.
   Qed.
 
@@ -185,39 +191,43 @@ Section Compiler.
     unfold exec_prefix in H0; repeat deex.
     induction H; intros; eauto.
 
-    eapply proc_match_pick with (tid := tid) in H2 as H'.
-    intuition try congruence.
-    repeat deex.
-    rewrite H3 in H; inversion H; clear H; subst.
-    repeat maybe_proc_inv.
+    - eapply proc_match_pick with (tid := tid) in H2 as H'.
+      intuition try congruence.
+      repeat deex.
+      rewrite H3 in H; inversion H; clear H; subst.
+      repeat maybe_proc_inv.
 
-    edestruct atomic_compile_ok_exec_tid; eauto.
-    repeat deex.
+      edestruct atomic_compile_ok_exec_tid; eauto.
+      repeat deex.
 
-    edestruct IHexec.
-    shelve.
-    intuition idtac.
+      edestruct IHexec.
+      shelve.
+      intuition idtac.
 
-    eexists; split.
-    eapply ExecPrefixOne with (tid := tid).
+      eexists; split.
+      eapply ExecPrefixOne with (tid := tid).
+        eauto.
+        eauto.
+        eauto.
+
+      eapply trace_match_hi_prepend'; eauto.
+      Unshelve.
+
+      destruct result, x; simpl in *; try solve [ exfalso; eauto ].
+      eapply proc_match_del; eauto.
+      eapply proc_match_upd; eauto.
+
+    - eexists; split.
       eauto.
-      eauto.
-      eauto.
-
-    eapply traces_match_prepend; eauto.
-    Unshelve.
-
-    destruct result, x; simpl in *; try solve [ exfalso; eauto ].
-    eapply proc_match_del; eauto.
-    eapply proc_match_upd; eauto.
+      reflexivity.
   Qed.
 
 End Compiler.
 
-Arguments hicall {opLoT opMidT} compile_op {T}.
-
 Hint Constructors compile_ok.
 Hint Constructors atomic_compile_ok.
+
+Arguments atomize {opLoT opMidT opHiT} compile_op [T] op.
 
 
 Section Atomization.
@@ -227,31 +237,36 @@ Section Atomization.
      versions in the right-side proc. *)
 
   Variable opLoT : Type -> Type.
+  Variable opMidT : Type -> Type.
   Variable opHiT : Type -> Type.
-  Variable compile_op : forall T, opHiT T -> proc opLoT opHiT T.
+  Variable compile_op : forall T, opMidT T -> proc opLoT opHiT T.
 
   Inductive atomize_ok : forall T (p1 p2 : proc opLoT opHiT T), Prop :=
-  | AtomizeOpcode : forall `(op : opHiT T),
-    atomize_ok (hicall compile_op op) (hicall (atomize compile_op) op)
+  | AtomizeOpcode : forall `(op : opMidT T),
+    atomize_ok (compile_op op) (_ <- Ret tt; r <- atomize compile_op op; Ret r)
   | AtomizeRet : forall `(x : T),
     atomize_ok (Ret x) (Ret x)
   | AtomizeBind : forall T1 T2 (p1a p2a : proc opLoT opHiT T1)
                                (p1b p2b : T1 -> proc opLoT opHiT T2),
     atomize_ok p1a p2a ->
     (forall x, atomize_ok (p1b x) (p2b x)) ->
-    atomize_ok (Bind p1a p1b) (Bind p2a p2b).
+    atomize_ok (Bind p1a p1b) (Bind p2a p2b)
+  | AtomizeOpCallHi : forall `(op : opHiT T),
+    atomize_ok (OpCallHi op) (OpCallHi op)
+  | AtomizeOpRetHi : forall `(v : T),
+    atomize_ok (OpRetHi v) (OpRetHi v).
 
 
   Variable State : Type.
   Variable op_step : OpSemantics opLoT State.
 
   Definition atomize_correct :=
-    forall T (op : opHiT T)
+    forall T (op : opMidT T)
            T' (p1rest p2rest : _ -> proc _ _ T'),
            (forall x, hitrace_incl op_step (p1rest x) (p2rest x)) ->
            hitrace_incl op_step
-             (Bind (hicall compile_op op) p1rest)
-             (Bind (hicall (atomize compile_op) op) p2rest).
+             (Bind (compile_op op) p1rest)
+             (Bind (atomize compile_op op) p2rest).
 
   Variable atomize_is_correct : atomize_correct.
 
@@ -265,12 +280,21 @@ Section Atomization.
   Proof.
     induction 1; intros.
     - eauto.
+      unfold atomize_correct in atomize_is_correct.
+      rewrite atomize_is_correct; eauto.
+      rewrite exec_equiv_bind_bind.
+      rewrite exec_equiv_ret_bind.
+      rewrite exec_equiv_bind_bind.
+      setoid_rewrite exec_equiv_ret_bind.
+      reflexivity.
     - eapply hitrace_incl_bind_a.
       eauto.
     - rewrite exec_equiv_bind_bind.
       rewrite exec_equiv_bind_bind.
       eapply IHatomize_ok.
       eauto.
+    - eapply hitrace_incl_bind_a; eauto.
+    - eapply hitrace_incl_bind_a; eauto.
   Qed.
 
   Theorem atomize_ok_hitrace_incl :
@@ -328,6 +352,9 @@ Section Atomization.
 
 End Atomization.
 
+Arguments atomize_ok {opLoT opMidT opHiT} compile_op [T].
+Arguments atomize_correct {opLoT opMidT opHiT} compile_op [State] op_step.
+
 
 Ltac compile_eq_step :=
   match goal with
@@ -340,7 +367,7 @@ Ltac compile_eq_step :=
 
 Theorem compile_op_eq : forall opLoT opMidT opHiT T (op : opMidT T) f,
   @compile opLoT opMidT opHiT f T (Op op) =
-    _ <- OpCallHi op; r <- f T op; OpRetHi r.
+    _ <- Ret tt; r <- f T op; Ret r.
 Proof.
   intros.
   compile_eq_step.
@@ -368,14 +395,14 @@ Proof.
 Qed.
 
 Theorem compile_callhi_eq : forall opLoT opMidT opHiT T (op : opHiT T) f,
-  @compile opLoT opMidT opHiT f _ (OpCallHi op) = Ret tt.
+  @compile opLoT opMidT opHiT f _ (OpCallHi op) = OpCallHi op.
 Proof.
   intros.
   compile_eq_step.
 Qed.
 
 Theorem compile_rethi_eq : forall opLoT opMidT opHiT T (v : T) f,
-  @compile opLoT opMidT opHiT f T (OpRetHi v) = Ret v.
+  @compile opLoT opMidT opHiT f T (OpRetHi v) = OpRetHi v.
 Proof.
   intros.
   compile_eq_step.
@@ -383,7 +410,7 @@ Qed.
 
 
 Theorem atomize_proc_match_helper :
-  forall T `(p1 : proc opLoT opMidT T) `(p2 : proc opMidT opHiT T)
+  forall T `(p1 : proc opLoT opHiT T) `(p2 : proc opMidT opHiT T)
          compile_op,
   compile_ok compile_op p1 p2 ->
     atomize_ok compile_op p1 (compile (atomize compile_op) p2) /\
@@ -410,7 +437,7 @@ Hint Resolve proc_match_cons_Proc.
 Hint Resolve proc_match_cons_NoProc.
 
 Theorem atomize_proc_match :
-  forall `(ts1 : @threads_state opLoT opMidT)
+  forall `(ts1 : @threads_state opLoT opHiT)
          `(ts2 : @threads_state opMidT opHiT)
          compile_op,
   proc_match (compile_ok compile_op) ts1 ts2 ->
@@ -436,10 +463,10 @@ Proof.
 Qed.
 
 Theorem compile_traces_match_ts :
-  forall `(ts1 : @threads_state opLoT opMidT)
+  forall `(ts1 : @threads_state opLoT opHiT)
          `(ts2 : @threads_state opMidT opHiT)
          `(lo_step : OpSemantics opLoT State) hi_step compile_op,
-  compile_correct opHiT compile_op lo_step hi_step ->
+  compile_correct compile_op lo_step hi_step ->
   atomize_correct compile_op lo_step ->
   proc_match (compile_ok compile_op) ts1 ts2 ->
   traces_match_ts lo_step hi_step ts1 ts2.
@@ -1014,25 +1041,6 @@ Section YSA.
       repeat rewrite exec_equiv_bind_bind.
       rewrite hitrace_incl_op.
       reflexivity.
-  Qed.
-
-  Theorem hitrace_incl_atomize_ysa_hicall :
-    forall T R HT (p : proc _ _ T) (rx : _ -> proc _ _ R)
-           (op : opHiT HT),
-      ysa_movers p ->
-      hitrace_incl op_step
-        (Bind (_ <- OpCallHi op; r <- p; OpRetHi r) rx)
-        (Bind (_ <- OpCallHi op; r <- Atomic p; OpRetHi r) rx).
-  Proof.
-    intros.
-
-    rewrite exec_equiv_bind_bind.
-    rewrite exec_equiv_bind_bind with (p1 := OpCallHi _).
-    eapply hitrace_incl_bind_a; intros.
-    repeat rewrite exec_equiv_bind_bind.
-
-    rewrite hitrace_incl_atomize_ysa; eauto.
-    reflexivity.
   Qed.
 
 End YSA.
