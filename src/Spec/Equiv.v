@@ -38,21 +38,23 @@ Inductive traces_match {opLoT opMidT opHiT} :
 Hint Constructors traces_match.
 
 
-Fixpoint trace_filter_hi `(t : trace opLoT opHiT) : trace opLoT opHiT :=
+Fixpoint trace_filter_hi {opLoT'} `(t : trace opLoT opHiT) : trace opLoT' opHiT :=
   match t with
   | TraceEmpty => TraceEmpty
   | TraceEvent tid e t' =>
     match e with
     | EvLow _ => trace_filter_hi t'
-    | EvHigh _ => TraceEvent tid e (trace_filter_hi t')
+    | EvHigh eh => TraceEvent tid (EvHigh eh) (trace_filter_hi t')
     end
   end.
 
-Definition trace_match_hi {opLoT opHiT} (t1 t2 : trace opLoT opHiT) :=
-  trace_filter_hi t1 = trace_filter_hi t2.
+Definition trace_match_hi {opLoTL opLoTR opHiT}
+                          (t1 : trace opLoTL opHiT)
+                          (t2 : trace opLoTR opHiT) :=
+  @trace_filter_hi opLoTR _ _ t1 = trace_filter_hi t2.
 
 Instance trace_match_hi_equiv :
-  Equivalence (@trace_match_hi opLoT opHiT).
+  Equivalence (@trace_match_hi opLoT opLoT opHiT).
 Proof.
   split.
   - firstorder.
@@ -99,9 +101,9 @@ Proof.
 Qed.
 
 Lemma trace_match_hi_prepend_empty : forall tid `(evs : list (event opT opHiT)) tr,
-  trace_match_hi (prepend tid evs tr) TraceEmpty ->
-  trace_match_hi (prepend tid evs TraceEmpty) TraceEmpty /\
-  trace_match_hi tr TraceEmpty.
+  trace_match_hi (prepend tid evs tr) (@TraceEmpty opT _) ->
+  trace_match_hi (prepend tid evs TraceEmpty) (@TraceEmpty opT _) /\
+  trace_match_hi tr (@TraceEmpty opT _).
 Proof.
   unfold trace_match_hi; induction evs; simpl in *; intros.
   - split; eauto.
