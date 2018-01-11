@@ -77,6 +77,11 @@ Section Compiler.
     | Atomic p => Atomic (compile p)
     end.
 
+  Theorem compile_ok_compile :
+    forall `(p : proc _ _ T), compile_ok (compile p) p.
+  Proof.
+  Admitted.
+
   Fixpoint compile_ts (ts : threads_state) : threads_state :=
     match ts with
     | nil => nil
@@ -86,6 +91,26 @@ Section Compiler.
       | Proc p => Proc (compile p)
       end :: compile_ts ts'
     end.
+
+  Theorem compile_ts_ok :
+    forall ts,
+      proc_match compile_ok (compile_ts ts) ts.
+  Proof.
+    induction ts; intros.
+    - unfold proc_match; simpl; intuition eauto.
+      left.
+      repeat rewrite thread_get_nil; eauto.
+    - unfold proc_match in *; cbn; intuition eauto.
+      destruct tid; subst.
+      + repeat rewrite thread_get_0.
+        destruct a.
+        * right.
+          do 3 eexists; intuition eauto.
+          eapply compile_ok_compile.
+        * left; eauto.
+      + repeat rewrite thread_get_S.
+        eapply H0.
+  Qed.
 
 
   Variable State : Type.

@@ -260,8 +260,17 @@ Module LockingCounter <: LayerImpl LockAPI LockedCounterAPI.
   Definition absR (s1 : LockAPI.State) (s2 : LockedCounterAPI.State) :=
     s1 = s2.
 
-  Definition compile_ts l3opT ts :=
-    compile_ts.
- opHiT l3opT ts.
+  Definition compile_ts l3opT :=
+    compile_ts (compile_op l3opT).
+
+  Theorem compile_traces_match :
+    forall `(ts2 : @threads_state _ l3opT),
+      traces_match_abs absR LockAPI.step LockedCounterAPI.step (compile_ts ts2) ts2.
+  Proof.
+    unfold traces_match_abs; intros.
+    rewrite H0 in *; clear H0.
+    eapply all_traces_match; eauto.
+    eapply compile_ts_ok.
+  Qed.
 
 End LockingCounter.
