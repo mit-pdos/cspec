@@ -23,8 +23,12 @@ Section Compiler.
     Atomic (compile_op op).
 
   Inductive compile_ok : forall T (p1 : proc opLoT opHiT T) (p2 : proc opMidT opHiT T), Prop :=
-  | CompileOpcode : forall `(op : opMidT T),
-    compile_ok (compile_op op) (Op op)
+  | CompileOpCall : forall `(op : opMidT T),
+    compile_ok (Ret tt) (OpCall op)
+  | CompileOpExec : forall `(op : opMidT T),
+    compile_ok (compile_op op) (OpExec op)
+  | CompileOpRet : forall `(v : T),
+    compile_ok (Ret v) (OpRet v)
   | CompileRet : forall `(x : T),
     compile_ok (Ret x) (Ret x)
   | CompileBind : forall `(p1a : proc opLoT opHiT T1) (p2a : proc opMidT opHiT T1)
@@ -37,15 +41,6 @@ Section Compiler.
   | CompileOpRetHi : forall `(v : T),
     compile_ok (OpRetHi v) (OpRetHi v).
 
-  (* [atomic_compile_ok] is not quite [compile_ok] with [atomize]
-     added to [compile_op].  It also breaks out [OpCall] and [OpRet]
-     into separate matches, so that the [atomic_compile_ok] relation keeps
-     holding across atomic steps taken by each thread.
-
-     This means that [atomic_compile_ok] does not enforce the calling
-     convention in itself: a program might have way too many [OpCall]s
-     and not enough [OpRet]s, etc.
-   *)
   Inductive atomic_compile_ok : forall T (p1 : proc opLoT opHiT T) (p2 : proc opMidT opHiT T), Prop :=
   | ACompileOpCall : forall `(op : opMidT T),
     atomic_compile_ok (Ret tt) (OpCall op)
@@ -268,7 +263,7 @@ Section Atomization.
 
   Inductive atomize_ok : forall T (p1 p2 : proc opLoT opHiT T), Prop :=
   | AtomizeOpcode : forall `(op : opMidT T),
-    atomize_ok (compile_op op) (_ <- Ret tt; r <- atomize compile_op op; Ret r)
+    atomize_ok (compile_op op) (atomize compile_op op)
   | AtomizeRet : forall `(x : T),
     atomize_ok (Ret x) (Ret x)
   | AtomizeBind : forall T1 T2 (p1a p2a : proc opLoT opHiT T1)
@@ -305,13 +300,6 @@ Section Atomization.
   Proof.
     induction 1; intros.
     - eauto.
-      unfold atomize_correct in atomize_is_correct.
-      rewrite atomize_is_correct; eauto.
-      rewrite exec_equiv_bind_bind.
-      rewrite exec_equiv_ret_bind.
-      rewrite exec_equiv_bind_bind.
-      setoid_rewrite exec_equiv_ret_bind.
-      reflexivity.
     - eapply hitrace_incl_bind_a.
       eauto.
     - rewrite exec_equiv_bind_bind.
@@ -390,18 +378,29 @@ Ltac compile_eq_step :=
     apply functional_extensionality; intros
   end.
 
-Theorem compile_op_eq : forall opLoT opMidT opHiT T (op : opMidT T) f,
-  @compile opLoT opMidT opHiT f T (Op op) =
-    _ <- Ret tt; r <- f T op; Ret r.
+Theorem compile_opcall_eq : forall opLoT opMidT opHiT T (op : opMidT T) f,
+  @compile opLoT opMidT opHiT f unit (OpCall op) =
+    Ret tt.
 Proof.
   intros.
   compile_eq_step.
+Qed.
+
+Theorem compile_opret_eq : forall opLoT opMidT opHiT T (v : T) f,
+  @compile opLoT opMidT opHiT f T (OpRet v) =
+    Ret v.
+Proof.
+  intros.
   compile_eq_step.
-  compile_eq_step.
-  compile_eq_step.
+Qed.
+
+Theorem compile_opexec_eq : forall opLoT opMidT opHiT T (op : opMidT T) f,
+  @compile opLoT opMidT opHiT f T (OpExec op) =
+    f T op.
+Proof.
+  intros.
   compile_eq_step.
   destruct (f T op); congruence.
-  repeat compile_eq_step.
 Qed.
 
 Theorem compile_ret_eq : forall opLoT opMidT opHiT T (v : T) f,
@@ -442,10 +441,12 @@ Theorem atomize_proc_match_helper :
     atomic_compile_ok compile_op (compile (atomize compile_op) p2) p2.
 Proof.
   induction 1; simpl; intros.
-  - rewrite compile_op_eq.
-    split.
-    constructor.
-    repeat constructor.
+  - rewrite compile_opcall_eq.
+    split; constructor.
+  - rewrite compile_opexec_eq.
+    split; constructor.
+  - rewrite compile_opret_eq.
+    split; constructor.
   - rewrite compile_ret_eq.
     split; constructor.
   - rewrite compile_bind_eq.
