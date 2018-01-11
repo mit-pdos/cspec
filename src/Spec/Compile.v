@@ -15,65 +15,49 @@ Section Compiler.
 
   Variable opLoT : Type -> Type.
   Variable opMidT : Type -> Type.
-  Variable opHiT : Type -> Type.
 
-  Variable compile_op : forall T, opMidT T -> proc opLoT opHiT T.
+  Variable compile_op : forall T, opMidT T -> proc opLoT T.
 
-  Definition atomize T (op : opMidT T) : proc opLoT opHiT T :=
+  Definition atomize T (op : opMidT T) : proc opLoT T :=
     Atomic (compile_op op).
 
-  Inductive compile_ok : forall T (p1 : proc opLoT opHiT T) (p2 : proc opMidT opHiT T), Prop :=
-  | CompileOpCall : forall `(op : opMidT T),
-    compile_ok (Ret tt) (OpCall op)
-  | CompileOpExec : forall `(op : opMidT T),
-    compile_ok (compile_op op) (OpExec op)
-  | CompileOpRet : forall `(v : T),
-    compile_ok (Ret v) (OpRet v)
+  Inductive compile_ok : forall T (p1 : proc opLoT T) (p2 : proc opMidT T), Prop :=
+  | CompileOp : forall `(op : opMidT T),
+    compile_ok (compile_op op) (Op op)
   | CompileRet : forall `(x : T),
     compile_ok (Ret x) (Ret x)
-  | CompileBind : forall `(p1a : proc opLoT opHiT T1) (p2a : proc opMidT opHiT T1)
-                         `(p1b : T1 -> proc _ _ T2) (p2b : T1 -> proc _ _ T2),
+  | CompileBind : forall `(p1a : proc opLoT T1) (p2a : proc opMidT T1)
+                         `(p1b : T1 -> proc _ T2) (p2b : T1 -> proc _ T2),
     compile_ok p1a p2a ->
     (forall x, compile_ok (p1b x) (p2b x)) ->
     compile_ok (Bind p1a p1b) (Bind p2a p2b)
-  | CompileOpCallHi : forall `(op : opHiT T),
-    compile_ok (OpCallHi op) (OpCallHi op)
-  | CompileOpRetHi : forall `(v : T),
-    compile_ok (OpRetHi v) (OpRetHi v).
+  | CompileLog : forall `(v : T),
+    compile_ok (Log v) (Log v).
 
-  Inductive atomic_compile_ok : forall T (p1 : proc opLoT opHiT T) (p2 : proc opMidT opHiT T), Prop :=
-  | ACompileOpCall : forall `(op : opMidT T),
-    atomic_compile_ok (Ret tt) (OpCall op)
-  | ACompileOpExec : forall `(op : opMidT T),
-    atomic_compile_ok (Atomic (compile_op op)) (OpExec op)
-  | ACompileOpRet : forall `(v : T),
-    atomic_compile_ok (Ret v) (OpRet v)
+  Inductive atomic_compile_ok : forall T (p1 : proc opLoT T) (p2 : proc opMidT T), Prop :=
+  | ACompileOp : forall `(op : opMidT T),
+    atomic_compile_ok (Atomic (compile_op op)) (Op op)
   | ACompileRet : forall `(x : T),
     atomic_compile_ok (Ret x) (Ret x)
-  | ACompileBind : forall `(p1a : proc opLoT opHiT T1) (p2a : proc opMidT opHiT T1)
-                         `(p1b : T1 -> proc _ _ T2) (p2b : T1 -> proc _ _ T2),
+  | ACompileBind : forall `(p1a : proc opLoT T1) (p2a : proc opMidT T1)
+                         `(p1b : T1 -> proc _ T2) (p2b : T1 -> proc _ T2),
     atomic_compile_ok p1a p2a ->
     (forall x, atomic_compile_ok (p1b x) (p2b x)) ->
     atomic_compile_ok (Bind p1a p1b) (Bind p2a p2b)
-  | ACompileOpCallHi : forall `(op : opHiT T),
-    atomic_compile_ok (OpCallHi op) (OpCallHi op)
-  | ACompileOpRetHi : forall `(v : T),
-    atomic_compile_ok (OpRetHi v) (OpRetHi v).
+  | ACompileLog : forall `(v : T),
+    atomic_compile_ok (Log v) (Log v).
 
-  CoFixpoint compile T (p : proc opMidT opHiT T) : proc opLoT opHiT T :=
+  CoFixpoint compile T (p : proc opMidT T) : proc opLoT T :=
     match p with
     | Ret t => Ret t
-    | OpCall op => Ret tt
-    | OpExec op => compile_op op
-    | OpRet r => Ret r
+    | Op op => compile_op op
     | Bind p1 p2 => Bind (compile p1) (fun r => compile (p2 r))
-    | OpCallHi op => OpCallHi op
-    | OpRetHi v => OpRetHi v
+    | Log v => Log v
     | Atomic p => Atomic (compile p)
     end.
 
   Theorem compile_ok_compile :
-    forall `(p : proc _ _ T), compile_ok (compile p) p.
+    forall `(p : proc _ T), compile_ok (compile p) p.
   Proof.
   Admitted.
 
@@ -115,19 +99,19 @@ Section Compiler.
   Definition compile_correct :=
     forall `(op : opMidT T) tid s v s' evs,
       atomic_exec lo_step (compile_op op) tid s v s' evs ->
-      trace_match_hi (prepend tid evs TraceEmpty) (@TraceEmpty opMidT opHiT) /\
+      trace_eq (prepend tid evs TraceEmpty) TraceEmpty /\
       hi_step op tid s v s'.
 
   Variable compile_is_correct : compile_correct.
 
 
-  Lemma atomic_compile_ok_exec_tid : forall T (p1 : proc _ _ T) p2,
+  Lemma atomic_compile_ok_exec_tid : forall T (p1 : proc _ T) p2,
     atomic_compile_ok p1 p2 ->
     forall tid s s' result evs,
       exec_tid lo_step tid s p1 s' result evs ->
       exists result' evs',
         exec_tid hi_step tid s p2 s' result' evs' /\
-        trace_match_hi (prepend tid evs TraceEmpty) (prepend tid evs' TraceEmpty) /\
+        trace_eq (prepend tid evs TraceEmpty) (prepend tid evs' TraceEmpty) /\
         match result with
         | inl v => match result' with
           | inl v' => v = v'
@@ -142,22 +126,8 @@ Section Compiler.
     induction 1; intros.
 
     - exec_tid_inv.
-      do 2 eexists; split.
-      constructor.
-      split.
-      compute; eauto.
-      eauto.
-
-    - exec_tid_inv.
       eapply compile_is_correct in H6.
       do 2 eexists; intuition eauto.
-
-    - exec_tid_inv.
-      do 2 eexists; split.
-      constructor.
-      split.
-      compute; eauto.
-      eauto.
 
     - exec_tid_inv.
       do 2 eexists; split.
@@ -185,13 +155,6 @@ Section Compiler.
         constructor.
         eauto.
         eauto.
-
-    - exec_tid_inv.
-      do 2 eexists; split.
-      constructor.
-      split.
-      compute; eauto.
-      eauto.
 
     - exec_tid_inv.
       do 2 eexists; split.
@@ -230,16 +193,12 @@ Section Compiler.
         eauto.
         eauto.
 
-      eapply trace_match_hi_prepend'; eauto.
+      eapply trace_eq_prepend'; eauto.
       Unshelve.
 
       destruct result, x; simpl in *; try solve [ exfalso; eauto ].
       eapply proc_match_del; eauto.
       eapply proc_match_upd; eauto.
-
-    - eexists; split.
-      eauto.
-      reflexivity.
   Qed.
 
 End Compiler.
@@ -247,7 +206,7 @@ End Compiler.
 Hint Constructors compile_ok.
 Hint Constructors atomic_compile_ok.
 
-Arguments atomize {opLoT opMidT opHiT} compile_op [T] op.
+Arguments atomize {opLoT opMidT} compile_op [T] op.
 
 
 Section Atomization.
@@ -258,23 +217,20 @@ Section Atomization.
 
   Variable opLoT : Type -> Type.
   Variable opMidT : Type -> Type.
-  Variable opHiT : Type -> Type.
-  Variable compile_op : forall T, opMidT T -> proc opLoT opHiT T.
+  Variable compile_op : forall T, opMidT T -> proc opLoT T.
 
-  Inductive atomize_ok : forall T (p1 p2 : proc opLoT opHiT T), Prop :=
-  | AtomizeOpcode : forall `(op : opMidT T),
+  Inductive atomize_ok : forall T (p1 p2 : proc opLoT T), Prop :=
+  | AtomizeOp : forall `(op : opMidT T),
     atomize_ok (compile_op op) (atomize compile_op op)
   | AtomizeRet : forall `(x : T),
     atomize_ok (Ret x) (Ret x)
-  | AtomizeBind : forall T1 T2 (p1a p2a : proc opLoT opHiT T1)
-                               (p1b p2b : T1 -> proc opLoT opHiT T2),
+  | AtomizeBind : forall T1 T2 (p1a p2a : proc opLoT T1)
+                               (p1b p2b : T1 -> proc opLoT T2),
     atomize_ok p1a p2a ->
     (forall x, atomize_ok (p1b x) (p2b x)) ->
     atomize_ok (Bind p1a p1b) (Bind p2a p2b)
-  | AtomizeOpCallHi : forall `(op : opHiT T),
-    atomize_ok (OpCallHi op) (OpCallHi op)
-  | AtomizeOpRetHi : forall `(v : T),
-    atomize_ok (OpRetHi v) (OpRetHi v).
+  | AtomizeLog : forall `(v : T),
+    atomize_ok (Log v) (Log v).
 
 
   Variable State : Type.
@@ -282,50 +238,49 @@ Section Atomization.
 
   Definition atomize_correct :=
     forall T (op : opMidT T)
-           T' (p1rest p2rest : _ -> proc _ _ T'),
-           (forall x, hitrace_incl op_step (p1rest x) (p2rest x)) ->
-           hitrace_incl op_step
+           T' (p1rest p2rest : _ -> proc _ T'),
+           (forall x, trace_incl op_step (p1rest x) (p2rest x)) ->
+           trace_incl op_step
              (Bind (compile_op op) p1rest)
              (Bind (atomize compile_op op) p2rest).
 
   Variable atomize_is_correct : atomize_correct.
 
 
-  Theorem atomize_ok_hitrace_incl_0 :
+  Theorem atomize_ok_trace_incl_0 :
     forall T p1 p2,
     atomize_ok p1 p2 ->
-    forall T' (p1rest p2rest : T -> proc _ _ T'),
-    (forall x, hitrace_incl op_step (p1rest x) (p2rest x)) ->
-    hitrace_incl op_step (Bind p1 p1rest) (Bind p2 p2rest).
+    forall T' (p1rest p2rest : T -> proc _ T'),
+    (forall x, trace_incl op_step (p1rest x) (p2rest x)) ->
+    trace_incl op_step (Bind p1 p1rest) (Bind p2 p2rest).
   Proof.
     induction 1; intros.
     - eauto.
-    - eapply hitrace_incl_bind_a.
+    - eapply trace_incl_bind_a.
       eauto.
     - rewrite exec_equiv_bind_bind.
       rewrite exec_equiv_bind_bind.
       eapply IHatomize_ok.
       eauto.
-    - eapply hitrace_incl_bind_a; eauto.
-    - eapply hitrace_incl_bind_a; eauto.
+    - eapply trace_incl_bind_a; eauto.
   Qed.
 
-  Theorem atomize_ok_hitrace_incl :
-    forall `(p1 : proc _ _ T) p2,
+  Theorem atomize_ok_trace_incl :
+    forall `(p1 : proc _ T) p2,
     atomize_ok p1 p2 ->
-    hitrace_incl op_step p1 p2.
+    trace_incl op_step p1 p2.
   Proof.
     intros.
     rewrite <- exec_equiv_bind_ret.
     rewrite <- exec_equiv_bind_ret with (p := p2).
-    eapply atomize_ok_hitrace_incl_0; eauto.
+    eapply atomize_ok_trace_incl_0; eauto.
     reflexivity.
   Qed.
 
-  Theorem atomize_ok_upto_hitrace_incl :
+  Theorem atomize_ok_upto_trace_incl :
     forall n ts1' ts1,
     proc_match_upto n atomize_ok ts1 ts1' ->
-      hitrace_incl_ts op_step ts1 ts1'.
+      trace_incl_ts op_step ts1 ts1'.
   Proof.
     induction n; intros.
     - apply proc_match_upto_0_eq in H; subst.
@@ -343,7 +298,7 @@ Section Atomization.
             reflexivity.
          -- repeat deex.
             rewrite H.
-            rewrite atomize_ok_hitrace_incl; eauto.
+            rewrite atomize_ok_trace_incl; eauto.
             rewrite thread_upd_same; eauto.
             reflexivity.
       + eapply IHn.
@@ -352,21 +307,21 @@ Section Atomization.
         eauto.
   Qed.
 
-  Theorem atomize_ok_hitrace_incl_ts :
+  Theorem atomize_ok_trace_incl_ts :
     forall ts1' ts1,
     proc_match atomize_ok ts1 ts1' ->
-      hitrace_incl_ts op_step ts1 ts1'.
+      trace_incl_ts op_step ts1 ts1'.
   Proof.
     intros.
-    eapply atomize_ok_upto_hitrace_incl.
+    eapply atomize_ok_upto_trace_incl.
     eapply proc_match_upto_all.
     eauto.
   Qed.
 
 End Atomization.
 
-Arguments atomize_ok {opLoT opMidT opHiT} compile_op [T].
-Arguments atomize_correct {opLoT opMidT opHiT} compile_op [State] op_step.
+Arguments atomize_ok {opLoT opMidT} compile_op [T].
+Arguments atomize_correct {opLoT opMidT} compile_op [State] op_step.
 
 
 Ltac compile_eq_step :=
@@ -378,24 +333,8 @@ Ltac compile_eq_step :=
     apply functional_extensionality; intros
   end.
 
-Theorem compile_opcall_eq : forall opLoT opMidT opHiT T (op : opMidT T) f,
-  @compile opLoT opMidT opHiT f unit (OpCall op) =
-    Ret tt.
-Proof.
-  intros.
-  compile_eq_step.
-Qed.
-
-Theorem compile_opret_eq : forall opLoT opMidT opHiT T (v : T) f,
-  @compile opLoT opMidT opHiT f T (OpRet v) =
-    Ret v.
-Proof.
-  intros.
-  compile_eq_step.
-Qed.
-
-Theorem compile_opexec_eq : forall opLoT opMidT opHiT T (op : opMidT T) f,
-  @compile opLoT opMidT opHiT f T (OpExec op) =
+Theorem compile_op_eq : forall opLoT opMidT T (op : opMidT T) f,
+  @compile opLoT opMidT f T (Op op) =
     f T op.
 Proof.
   intros.
@@ -403,30 +342,23 @@ Proof.
   destruct (f T op); congruence.
 Qed.
 
-Theorem compile_ret_eq : forall opLoT opMidT opHiT T (v : T) f,
-  @compile opLoT opMidT opHiT f T (Ret v) = Ret v.
+Theorem compile_ret_eq : forall opLoT opMidT T (v : T) f,
+  @compile opLoT opMidT f T (Ret v) = Ret v.
 Proof.
   intros.
   compile_eq_step.
 Qed.
 
-Theorem compile_bind_eq : forall opLoT opMidT opHiT T1 T2 (p1 : proc opMidT opHiT T1) (p2 : _ -> proc opMidT opHiT T2) f,
-  @compile opLoT opMidT opHiT f T2 (Bind p1 p2) =
+Theorem compile_bind_eq : forall opLoT opMidT T1 T2 (p1 : proc opMidT T1) (p2 : _ -> proc opMidT T2) f,
+  @compile opLoT opMidT f T2 (Bind p1 p2) =
     Bind (compile f p1) (fun x => compile f (p2 x)).
 Proof.
   intros.
   compile_eq_step.
 Qed.
 
-Theorem compile_callhi_eq : forall opLoT opMidT opHiT T (op : opHiT T) f,
-  @compile opLoT opMidT opHiT f _ (OpCallHi op) = OpCallHi op.
-Proof.
-  intros.
-  compile_eq_step.
-Qed.
-
-Theorem compile_rethi_eq : forall opLoT opMidT opHiT T (v : T) f,
-  @compile opLoT opMidT opHiT f T (OpRetHi v) = OpRetHi v.
+Theorem compile_log_eq : forall opLoT opMidT T (v : T) f,
+  @compile opLoT opMidT f T (Log v) = Log v.
 Proof.
   intros.
   compile_eq_step.
@@ -434,18 +366,14 @@ Qed.
 
 
 Theorem atomize_proc_match_helper :
-  forall T `(p1 : proc opLoT opHiT T) `(p2 : proc opMidT opHiT T)
+  forall T `(p1 : proc opLoT T) `(p2 : proc opMidT T)
          compile_op,
   compile_ok compile_op p1 p2 ->
     atomize_ok compile_op p1 (compile (atomize compile_op) p2) /\
     atomic_compile_ok compile_op (compile (atomize compile_op) p2) p2.
 Proof.
   induction 1; simpl; intros.
-  - rewrite compile_opcall_eq.
-    split; constructor.
-  - rewrite compile_opexec_eq.
-    split; constructor.
-  - rewrite compile_opret_eq.
+  - rewrite compile_op_eq.
     split; constructor.
   - rewrite compile_ret_eq.
     split; constructor.
@@ -453,9 +381,7 @@ Proof.
     intuition idtac.
     constructor. eauto. intros. specialize (H1 x). intuition eauto.
     constructor. eauto. intros. specialize (H1 x). intuition eauto.
-  - rewrite compile_callhi_eq.
-    split; constructor.
-  - rewrite compile_rethi_eq.
+  - rewrite compile_log_eq.
     split; constructor.
 Qed.
 
@@ -463,8 +389,8 @@ Hint Resolve proc_match_cons_Proc.
 Hint Resolve proc_match_cons_NoProc.
 
 Theorem atomize_proc_match :
-  forall `(ts1 : @threads_state opLoT opHiT)
-         `(ts2 : @threads_state opMidT opHiT)
+  forall `(ts1 : @threads_state opLoT)
+         `(ts2 : @threads_state opMidT)
          compile_op,
   proc_match (compile_ok compile_op) ts1 ts2 ->
   exists ts1',
@@ -489,8 +415,8 @@ Proof.
 Qed.
 
 Theorem compile_traces_match_ts :
-  forall `(ts1 : @threads_state opLoT opHiT)
-         `(ts2 : @threads_state opMidT opHiT)
+  forall `(ts1 : @threads_state opLoT)
+         `(ts2 : @threads_state opMidT)
          `(lo_step : OpSemantics opLoT State) hi_step compile_op,
   compile_correct compile_op lo_step hi_step ->
   atomize_correct compile_op lo_step ->
@@ -499,7 +425,7 @@ Theorem compile_traces_match_ts :
 Proof.
   intros.
   eapply atomize_proc_match in H1; deex.
-  rewrite atomize_ok_hitrace_incl_ts; eauto.
+  rewrite atomize_ok_trace_incl_ts; eauto.
   eapply atomic_compile_ok_traces_match_ts; eauto.
 Qed.
 
@@ -507,7 +433,6 @@ Qed.
 Section Movers.
 
   Variable opT : Type -> Type.
-  Variable opHiT : Type -> Type.
   Variable State : Type.
   Variable op_step : OpSemantics opT State.
 
@@ -547,7 +472,7 @@ Section Movers.
   Proof. unfold both_mover; intuition. Qed.
 
 
-  Lemma atomic_exec_right_mover : forall tid0 tid1 s s0 `(ap : proc opT opHiT T) s1 v1 evs v0,
+  Lemma atomic_exec_right_mover : forall tid0 tid1 s s0 `(ap : proc opT T) s1 v1 evs v0,
     right_mover ->
     tid0 <> tid1 ->
     op_step opMover tid0 s v0 s0 ->
@@ -565,7 +490,7 @@ Section Movers.
     - edestruct IHatomic_exec; intuition eauto.
   Qed.
 
-  Lemma atomic_exec_left_mover : forall tid0 tid1 s s0 `(ap : proc opT opHiT T) s1 v1 evs v0,
+  Lemma atomic_exec_left_mover : forall tid0 tid1 s s0 `(ap : proc opT T) s1 v1 evs v0,
     left_mover ->
     tid0 <> tid1 ->
     atomic_exec op_step ap tid1 s v1 s0 evs ->
@@ -588,7 +513,7 @@ Section Movers.
     - edestruct IHatomic_exec; intuition eauto.
   Qed.
 
-  Lemma exec_tid_right_mover : forall tid0 tid1 s s0 `(p : proc opT opHiT T) s1 result' evs v0,
+  Lemma exec_tid_right_mover : forall tid0 tid1 s s0 `(p : proc opT T) s1 result' evs v0,
     right_mover ->
     tid0 <> tid1 ->
     op_step opMover tid0 s v0 s0 ->
@@ -604,7 +529,7 @@ Section Movers.
     - edestruct IHexec_tid; intuition eauto.
   Qed.
 
-  Lemma exec_tid_left_mover : forall tid0 tid1 s s0 `(p : proc opT opHiT T) s1 result' evs v0,
+  Lemma exec_tid_left_mover : forall tid0 tid1 s s0 `(p : proc opT T) s1 result' evs v0,
     left_mover ->
     tid0 <> tid1 ->
     exec_tid op_step tid1 s p s0 result' evs ->
@@ -625,9 +550,9 @@ Section Movers.
     - edestruct IHexec_tid; intuition eauto.
   Qed.
 
-  Lemma exec_left_mover : forall s ts tid `(rx : _ -> proc opT opHiT T) tr,
+  Lemma exec_left_mover : forall s ts tid `(rx : _ -> proc opT T) tr,
     left_mover ->
-    exec_prefix op_step s ts [[ tid := Proc (x <- OpExec opMover; rx x) ]] tr ->
+    exec_prefix op_step s ts [[ tid := Proc (x <- Op opMover; rx x) ]] tr ->
     exists s' r,
       op_step opMover tid s r s' /\
       exec_prefix op_step s' ts [[ tid := Proc (rx r) ]] tr.
@@ -671,16 +596,16 @@ Section Movers.
       eauto.
   Qed.
 
-  Theorem hitrace_incl_atomize_opexec_right_mover :
+  Theorem trace_incl_atomize_op_right_mover :
     right_mover ->
-    forall `(p : _ -> proc opT opHiT TP)
-           `(rx : _ -> proc opT opHiT TF),
-    hitrace_incl op_step
-      (Bind (Bind (OpExec opMover) (fun r => (Atomic (p r)))) rx)
-      (Bind (Atomic (Bind (OpExec opMover) p)) rx).
+    forall `(p : _ -> proc opT TP)
+           `(rx : _ -> proc opT TF),
+    trace_incl op_step
+      (Bind (Bind (Op opMover) (fun r => (Atomic (p r)))) rx)
+      (Bind (Atomic (Bind (Op opMover) p)) rx).
   Proof.
     intros.
-    eapply hitrace_incl_proof_helper; intros.
+    eapply trace_incl_proof_helper; intros.
     repeat exec_tid_inv.
 
     match goal with
@@ -718,46 +643,16 @@ Section Movers.
       eauto.
   Qed.
 
-  Theorem hitrace_incl_atomize_op_right_mover :
-    right_mover ->
-    forall `(p : _ -> proc opT opHiT TP)
-           `(rx : _ -> proc opT opHiT TF),
-    hitrace_incl op_step
-      (Bind (Bind (Op opMover) (fun r => (Atomic (p r)))) rx)
-      (Bind (Atomic (Bind (Op opMover) p)) rx).
-  Proof.
-    unfold Op; intros.
-
-    repeat rewrite exec_equiv_bind_bind.
-    rewrite atomic_equiv_bind_bind with (p1 := OpCall _).
-    rewrite <- hitrace_incl_atomize_opcall.
-    rewrite exec_equiv_bind_bind with (p1 := OpCall _).
-    eapply hitrace_incl_bind_a; intros.
-
-    repeat rewrite exec_equiv_bind_bind.
-    rewrite atomic_equiv_bind_bind with (p1 := OpExec _).
-    rewrite <- hitrace_incl_atomize_opexec_right_mover by eauto.
-    rewrite exec_equiv_bind_bind with (p1 := OpExec _).
-    eapply hitrace_incl_bind_a; intros.
-
-    repeat rewrite exec_equiv_bind_bind.
-    rewrite <- hitrace_incl_atomize_opret.
-    rewrite exec_equiv_bind_bind with (p1 := OpRet _).
-    eapply hitrace_incl_bind_a; intros.
-
-    reflexivity.
-  Qed.
-
-  Theorem hitrace_incl_atomize_opexec_left_mover :
+  Theorem trace_incl_atomize_op_left_mover :
     left_mover ->
-    forall `(p : proc opT opHiT TP)
-           `(rx : _ -> proc opT opHiT TF),
-    hitrace_incl op_step
-      (Bind (Bind (Atomic p) (fun _ => OpExec opMover)) rx)
-      (Bind (Atomic (Bind p (fun _ => OpExec opMover))) rx).
+    forall `(p : proc opT TP)
+           `(rx : _ -> proc opT TF),
+    trace_incl op_step
+      (Bind (Bind (Atomic p) (fun _ => Op opMover)) rx)
+      (Bind (Atomic (Bind p (fun _ => Op opMover))) rx).
   Proof.
     intros.
-    eapply hitrace_incl_proof_helper; intros.
+    eapply trace_incl_proof_helper; intros.
     repeat exec_tid_inv.
     eapply exec_left_mover in H1; eauto.
     repeat deex.
@@ -770,23 +665,23 @@ Section Movers.
     rewrite app_nil_r; eauto.
   Qed.
 
-  Theorem hitrace_incl_atomize_opexec_ret_left_mover :
+  Theorem trace_incl_atomize_op_ret_left_mover :
     left_mover ->
-    forall `(p : proc opT opHiT TP)
+    forall `(p : proc opT TP)
            `(f : TP -> _ -> TR)
-           `(rx : _ -> proc opT opHiT TF),
-    hitrace_incl op_step
-      (Bind (Bind (Atomic p) (fun a => Bind (OpExec opMover) (fun b => Ret (f a b)))) rx)
-      (Bind (Atomic (Bind p (fun a => Bind (OpExec opMover) (fun b => Ret (f a b))))) rx).
+           `(rx : _ -> proc opT TF),
+    trace_incl op_step
+      (Bind (Bind (Atomic p) (fun a => Bind (Op opMover) (fun b => Ret (f a b)))) rx)
+      (Bind (Atomic (Bind p (fun a => Bind (Op opMover) (fun b => Ret (f a b))))) rx).
   Proof.
     intros.
-    eapply hitrace_incl_proof_helper; intros.
+    eapply trace_incl_proof_helper; intros.
     repeat exec_tid_inv.
     rewrite exec_equiv_bind_bind in H1.
     eapply exec_left_mover in H1; eauto.
     repeat deex.
 
-    eapply hitrace_incl_ts_proof_helper in H1.
+    eapply trace_incl_ts_proof_helper in H1.
     repeat deex.
 
     eexists; split.
@@ -799,52 +694,6 @@ Section Movers.
     intros.
     repeat exec_tid_inv.
     eauto.
-  Qed.
-
-  Theorem hitrace_incl_atomize_op_ret_left_mover :
-    left_mover ->
-    forall `(p : proc opT opHiT TP)
-           `(f : TP -> _ -> TR)
-           `(rx : _ -> proc opT opHiT TF),
-    hitrace_incl op_step
-      (Bind (Bind (Atomic p) (fun a => Bind (Op opMover) (fun b => Ret (f a b)))) rx)
-      (Bind (Atomic (Bind p (fun a => Bind (Op opMover) (fun b => Ret (f a b))))) rx).
-  Proof.
-    unfold Op; intros.
-
-    etransitivity.
-    2: setoid_rewrite atomic_equiv_bind_bind with (p1 := OpCall _).
-    2: setoid_rewrite atomic_equiv_bind_bind'.
-    2: setoid_rewrite atomic_equiv_bind_bind with (p1 := OpExec _).
-    2: setoid_rewrite atomic_equiv_bind_bind'.
-    reflexivity.
-
-    rewrite <- hitrace_incl_atomize_opret_ret_l.
-
-    repeat rewrite exec_equiv_bind_bind.
-    rewrite <- hitrace_incl_atomize_opexec_ret_left_mover by eauto.
-
-    repeat rewrite exec_equiv_bind_bind.
-    rewrite <- hitrace_incl_atomize_opcall_ret_l.
-
-    repeat rewrite exec_equiv_bind_bind.
-    eapply hitrace_incl_bind_a; intros.
-
-    repeat rewrite exec_equiv_bind_bind with (p1 := OpCall _).
-    eapply hitrace_incl_bind_a; intros.
-
-    rewrite exec_equiv_ret_bind.
-    repeat rewrite exec_equiv_bind_bind with (p1 := OpExec _).
-    eapply hitrace_incl_bind_a; intros.
-
-    rewrite exec_equiv_ret_bind.
-    repeat rewrite exec_equiv_bind_bind with (p1 := OpRet _).
-    eapply hitrace_incl_bind_a; intros.
-
-    rewrite exec_equiv_ret_bind.
-    rewrite exec_equiv_ret_bind.
-    simpl.
-    reflexivity.
   Qed.
 
 End Movers.
@@ -860,15 +709,14 @@ Arguments both_mover {opT State} op_step {moverT}.
 Section YSA.
 
   Variable opT : Type -> Type.
-  Variable opHiT : Type -> Type.
   Variable State : Type.
   Variable op_step : OpSemantics opT State.
 
   (** Something similar to the Yield Sufficiency Automaton from the GC paper *)
 
-  Inductive left_movers : forall T, proc opT opHiT T -> Prop :=
+  Inductive left_movers : forall T, proc opT T -> Prop :=
   | LeftMoversOne :
-    forall `(opMover : opT oT) `(rx : _ -> proc _ _ T),
+    forall `(opMover : opT oT) `(rx : _ -> proc _ T),
     left_mover op_step opMover ->
     (forall a, left_movers (rx a)) ->
     left_movers (Bind (Op opMover) rx)
@@ -876,120 +724,42 @@ Section YSA.
     forall `(v : T),
     left_movers (Ret v).
 
-  Inductive at_most_one_non_mover : forall T, proc opT opHiT T -> Prop :=
+  Inductive at_most_one_non_mover : forall T, proc opT T -> Prop :=
   | ZeroNonMovers :
-    forall `(p : proc _ _ T),
+    forall `(p : proc _ T),
     left_movers p ->
     at_most_one_non_mover p
   | OneNonMover :
-    forall `(op : opT T) `(rx : _ -> proc _ _ R),
+    forall `(op : opT T) `(rx : _ -> proc _ R),
     (forall a, left_movers (rx a)) ->
     at_most_one_non_mover (Bind (Op op) rx).
 
-  Inductive ysa_movers : forall T, proc opT opHiT T -> Prop :=
+  Inductive ysa_movers : forall T, proc opT T -> Prop :=
   | RightMoversOne :
-    forall `(opMover : opT oT) `(rx : _ -> proc _ _ T),
+    forall `(opMover : opT oT) `(rx : _ -> proc _ T),
     right_mover op_step opMover ->
     (forall a, ysa_movers (rx a)) ->
     ysa_movers (Bind (Op opMover) rx)
   | RightMoversDone :
-    forall `(p : proc _ _ T),
+    forall `(p : proc _ T),
     at_most_one_non_mover p ->
     ysa_movers p.
 
-  Lemma exec_OpCall : forall s ts tid `(opMover : opT oT) `(rx : _ -> proc opT opHiT T) tr,
-    exec_prefix op_step s ts [[ tid := Proc (x <- OpCall opMover; rx x) ]] tr ->
-    exists tr',
-      exec_prefix op_step s ts [[ tid := Proc (rx tt) ]] tr' /\
-      trace_match_hi tr tr'.
-  Proof.
-    intros.
-
-    match goal with
-    | H : exec_prefix _ _ (thread_upd ?ts ?tid ?p) ?t |- _ =>
-      remember (thread_upd ts tid p);
-      remember t;
-      generalize dependent ts;
-      generalize dependent tr;
-      destruct H as [? H];
-      induction H; intros; subst
-    end.
-
-    - destruct (tid == tid0); subst; autorewrite with t in *.
-      + repeat maybe_proc_inv.
-        repeat exec_tid_inv.
-        simpl; eauto.
-
-      + edestruct IHexec.
-          autorewrite with t; eauto.
-          rewrite thread_upd_upd_ne; eauto.
-        intuition idtac.
-
-        eexists; split.
-        eapply ExecPrefixOne with (tid := tid0).
-          autorewrite with t; eauto.
-          eauto.
-          rewrite thread_upd_upd_ne; eauto.
-
-        eauto.
-
-    - eauto.
-  Qed.
-
-  Lemma exec_OpRet : forall s ts tid `(v : oT) `(rx : _ -> proc opT opHiT T) tr,
-    exec_prefix op_step s ts [[ tid := Proc (x <- OpRet v; rx x) ]] tr ->
-    exists tr',
-      exec_prefix op_step s ts [[ tid := Proc (rx v) ]] tr' /\
-      trace_match_hi tr tr'.
-  Proof.
-    intros.
-
-    match goal with
-    | H : exec_prefix _ _ (thread_upd ?ts ?tid ?p) ?t |- _ =>
-      remember (thread_upd ts tid p);
-      remember t;
-      generalize dependent ts;
-      generalize dependent tr;
-      destruct H as [? H];
-      induction H; intros; subst
-    end.
-
-    - destruct (tid == tid0); subst; autorewrite with t in *.
-      + repeat maybe_proc_inv.
-        repeat exec_tid_inv.
-        simpl; eauto.
-
-      + edestruct IHexec.
-          autorewrite with t; eauto.
-          rewrite thread_upd_upd_ne; eauto.
-        intuition idtac.
-
-        eexists; split.
-        eapply ExecPrefixOne with (tid := tid0).
-          autorewrite with t; eauto.
-          eauto.
-          rewrite thread_upd_upd_ne; eauto.
-
-        eauto.
-
-    - eauto.
-  Qed.
-
-  Theorem hitrace_incl_atomize_ysa_left_movers :
-    forall T L R (p : proc _ _ T) (l : _ -> proc _ _ L) (rx : _ -> proc _ _ R),
+  Theorem trace_incl_atomize_ysa_left_movers :
+    forall T L R (p : proc _ T) (l : _ -> proc _ L) (rx : _ -> proc _ R),
       (forall a, left_movers (l a)) ->
-      hitrace_incl op_step
+      trace_incl op_step
         (Bind (Bind (Atomic p) l) rx)
         (Bind (Atomic (Bind p l)) rx).
   Proof.
     intros.
-    eapply hitrace_incl_proof_helper; intros.
+    eapply trace_incl_proof_helper; intros.
     repeat exec_tid_inv.
 
     cut (exists tr' v1 s1 evs1,
       atomic_exec op_step (l v) tid s' v1 s1 evs1 /\
       exec_prefix op_step s1 ts [[ tid := Proc (rx v1) ]] tr' /\
-      trace_match_hi tr (prepend tid evs1 tr')); intros.
+      trace_eq tr (prepend tid evs1 tr')); intros.
     {
       repeat deex.
       eexists; split.
@@ -1011,13 +781,8 @@ Section YSA.
     generalize dependent evs.
     induction H; intros.
 
-    - unfold Op in H2.
-      repeat rewrite exec_equiv_bind_bind in H2.
-      eapply exec_OpCall in H2; repeat deex.
-      repeat rewrite exec_equiv_bind_bind in H2.
+    - repeat rewrite exec_equiv_bind_bind in H2.
       eapply exec_left_mover in H2; eauto; repeat deex.
-      repeat rewrite exec_equiv_bind_bind in H4.
-      eapply exec_OpRet in H4; repeat deex.
 
       edestruct H1 with (p := Bind p (fun _ => Op opMover)).
       eassumption.
@@ -1030,9 +795,7 @@ Section YSA.
       eauto.
       eauto.
       rewrite app_nil_l in *.
-
-      unfold trace_match_hi; simpl.
-      congruence.
+      eauto.
 
     - rewrite exec_equiv_ret_bind in H1.
       do 4 eexists; intuition idtac.
@@ -1041,31 +804,31 @@ Section YSA.
       eauto.
   Qed.
 
-  Theorem hitrace_incl_atomize_ysa :
-    forall T R (p : proc _ _ T) (rx : _ -> proc _ _ R),
+  Theorem trace_incl_atomize_ysa :
+    forall T R (p : proc _ T) (rx : _ -> proc _ R),
       ysa_movers p ->
-      hitrace_incl op_step
+      trace_incl op_step
         (Bind p rx)
         (Bind (Atomic p) rx).
   Proof.
     intros.
     induction H.
     {
-      rewrite <- hitrace_incl_atomize_op_right_mover by eauto.
+      rewrite <- trace_incl_atomize_op_right_mover by eauto.
       repeat rewrite exec_equiv_bind_bind.
-      eapply hitrace_incl_bind_a; intros.
+      eapply trace_incl_bind_a; intros.
       eauto.
     }
 
     inversion H; clear H; repeat sigT_eq.
     - rewrite <- exec_equiv_ret_bind with (v := tt) (p0 := (fun _ => p)) at 1.
       rewrite <- atomic_equiv_ret_bind with (v := tt) (p0 := (fun _ => p)).
-      erewrite <- hitrace_incl_atomize_ysa_left_movers; eauto.
+      erewrite <- trace_incl_atomize_ysa_left_movers; eauto.
       rewrite exec_equiv_atomicret_ret.
       reflexivity.
-    - erewrite <- hitrace_incl_atomize_ysa_left_movers; eauto.
+    - erewrite <- trace_incl_atomize_ysa_left_movers; eauto.
       repeat rewrite exec_equiv_bind_bind.
-      rewrite hitrace_incl_op.
+      rewrite trace_incl_op.
       reflexivity.
   Qed.
 
@@ -1085,7 +848,6 @@ Ltac destruct_ifs :=
 Section PerThreadState.
 
   Variable opT : Type -> Type.
-  Variable opHiT : Type -> Type.
   Variable ThreadState : Type.
   Definition State := forall (tid : nat), ThreadState.
   Variable op_step : OpSemantics opT State.

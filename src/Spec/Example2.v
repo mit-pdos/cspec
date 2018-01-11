@@ -116,32 +116,26 @@ End CounterAPI.
 
 Module LockingCounter <: LayerImpl LockAPI LockedCounterAPI.
 
-  Section Impl.
+  Definition inc_core : proc LockAPI.opT _ :=
+    _ <- Op Acquire;
+    v <- Op Read;
+    _ <- Op (Write (v + 1));
+    _ <- Op Release;
+    Ret v.
 
-    Variable opHiT : Type -> Type.
+  Definition dec_core : proc LockAPI.opT _ :=
+    _ <- Op Acquire;
+    v <- Op Read;
+    _ <- Op (Write (v - 1));
+    _ <- Op Release;
+    Ret v.
 
-    Definition inc_core : proc LockAPI.opT opHiT _ :=
-      _ <- Op Acquire;
-      v <- Op Read;
-      _ <- Op (Write (v + 1));
-      _ <- Op Release;
-      Ret v.
-
-    Definition dec_core : proc LockAPI.opT opHiT _ :=
-      _ <- Op Acquire;
-      v <- Op Read;
-      _ <- Op (Write (v - 1));
-      _ <- Op Release;
-      Ret v.
-
-    Definition compile_op T (op : LockedCounterAPI.opT T)
-                          : proc LockAPI.opT opHiT T :=
-      match op with
-      | Inc => inc_core
-      | Dec => dec_core
-      end.
-
-  End Impl.
+  Definition compile_op T (op : LockedCounterAPI.opT T)
+                        : proc LockAPI.opT T :=
+    match op with
+    | Inc => inc_core
+    | Dec => dec_core
+    end.
 
   Ltac step_inv :=
     match goal with
@@ -192,30 +186,30 @@ Module LockingCounter <: LayerImpl LockAPI LockedCounterAPI.
   Hint Resolve write_right_mover.
 
 
-  Theorem inc_atomic : forall opHiT `(rx : _ -> proc _ _ T),
-    hitrace_incl LockAPI.step
-      (Bind (compile_op opHiT Inc) rx)
-      (Bind (atomize (compile_op opHiT) Inc) rx).
+  Theorem inc_atomic : forall `(rx : _ -> proc _ T),
+    trace_incl LockAPI.step
+      (Bind (compile_op Inc) rx)
+      (Bind (atomize compile_op Inc) rx).
   Proof.
     intros.
-    eapply hitrace_incl_atomize_ysa.
+    eapply trace_incl_atomize_ysa.
     simpl.
     unfold inc_core; eauto 20.
   Qed.
 
-  Theorem dec_atomic : forall opHiT `(rx : _ -> proc _ _ T),
-    hitrace_incl LockAPI.step
-      (Bind (compile_op opHiT Dec) rx)
-      (Bind (atomize (compile_op opHiT) Dec) rx).
+  Theorem dec_atomic : forall `(rx : _ -> proc _ T),
+    trace_incl LockAPI.step
+      (Bind (compile_op Dec) rx)
+      (Bind (atomize compile_op Dec) rx).
   Proof.
     intros.
-    eapply hitrace_incl_atomize_ysa.
+    eapply trace_incl_atomize_ysa.
     simpl.
     unfold dec_core; eauto 20.
   Qed.
 
-  Theorem my_compile_correct : forall opHiT,
-    compile_correct (compile_op opHiT) LockAPI.step LockedCounterAPI.step.
+  Theorem my_compile_correct :
+    compile_correct compile_op LockAPI.step LockedCounterAPI.step.
   Proof.
     unfold compile_correct; intros.
     destruct op.
@@ -231,16 +225,16 @@ Module LockingCounter <: LayerImpl LockAPI LockedCounterAPI.
       simpl; intuition eauto 20; compute; eauto.
   Qed.
 
-  Theorem my_atomize_correct : forall opHiT,
-    atomize_correct (compile_op opHiT) LockAPI.step.
+  Theorem my_atomize_correct :
+    atomize_correct compile_op LockAPI.step.
   Proof.
     unfold atomize_correct; intros.
     destruct op.
     + rewrite inc_atomic.
-      eapply hitrace_incl_bind_a.
+      eapply trace_incl_bind_a.
       eauto.
     + rewrite dec_atomic.
-      eapply hitrace_incl_bind_a.
+      eapply trace_incl_bind_a.
       eauto.
   Qed.
 
@@ -249,9 +243,9 @@ Module LockingCounter <: LayerImpl LockAPI LockedCounterAPI.
 
 
   Theorem all_traces_match :
-    forall opHiT ts1 (ts2 : @threads_state _ opHiT),
-    proc_match (compile_ok (compile_op opHiT)) ts1 ts2 ->
-    traces_match_ts LockAPI.step LockedCounterAPI.step ts1 ts2.
+    forall ts1 ts2,
+      proc_match (compile_ok compile_op) ts1 ts2 ->
+      traces_match_ts LockAPI.step LockedCounterAPI.step ts1 ts2.
   Proof.
     intros.
     eapply compile_traces_match_ts; eauto.
@@ -260,11 +254,10 @@ Module LockingCounter <: LayerImpl LockAPI LockedCounterAPI.
   Definition absR (s1 : LockAPI.State) (s2 : LockedCounterAPI.State) :=
     s1 = s2.
 
-  Definition compile_ts l3opT :=
-    compile_ts (compile_op l3opT).
+  Definition compile_ts := compile_ts compile_op.
 
   Theorem compile_traces_match :
-    forall `(ts2 : @threads_state _ l3opT),
+    forall ts2,
       traces_match_abs absR LockAPI.step LockedCounterAPI.step (compile_ts ts2) ts2.
   Proof.
     unfold traces_match_abs; intros.

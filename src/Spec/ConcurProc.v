@@ -13,28 +13,10 @@ Global Set Implicit Arguments.
 Global Generalizable All Variables.
 
 
-Section Event.
-
-  Variable opT : Type -> Type.
-
-  Inductive callret :=
-  | EvCall : forall T (op : opT T), callret
-  | EvRet : forall T (result : T), callret.
-
-End Event.
-
-Arguments EvCall {opT T}.
-Arguments EvRet {opT T}.
-
-
 Section Trace.
 
-  Variable opT : Type -> Type.
-  Variable opHiT : Type -> Type.
-
   Inductive event :=
-  | EvLow : callret opT -> event
-  | EvHigh : callret opHiT -> event.
+  | Event : forall T (v : T), event.
 
   Inductive trace :=
   | TraceEvent : forall (tid : nat) (ev : event), trace -> trace
@@ -50,37 +32,27 @@ Section Trace.
 
 End Trace.
 
-Arguments EvLow {opT opHiT}.
-Arguments EvHigh {opT opHiT}.
-Arguments TraceEvent {opT opHiT}.
-Arguments TraceEmpty {opT opHiT}.
+Arguments Event {T}.
 
 
 Section Proc.
 
   Variable opT : Type -> Type.
-  Variable opHiT : Type -> Type.
   Variable State : Type.
 
   CoInductive proc : Type -> Type :=
-  | OpCall : forall T (op : opT T), proc unit
-  | OpExec : forall T (op : opT T), proc T
-  | OpRet : forall T (v : T), proc T
+  | Op : forall T (op : opT T), proc T
   | Ret : forall T (v : T), proc T
   | Bind : forall T (T1 : Type) (p1 : proc T1) (p2 : T1 -> proc T), proc T
-  | OpCallHi : forall T' (op : opHiT T'), proc unit
-  | OpRetHi : forall T (result : T), proc T
+  | Log : forall T (v : T), proc T
   | Atomic : forall T (p : proc T), proc T.
 
   Definition frob_proc T (p : proc T) : proc T :=
     match p with
-    | OpCall op => OpCall op
-    | OpExec op => OpExec op
-    | OpRet v => OpRet v
+    | Op op => Op op
     | Bind p1 p2 => Bind p1 p2
     | Ret t => Ret t
-    | OpCallHi op => OpCallHi op
-    | OpRetHi v => OpRetHi v
+    | Log v => Log v
     | Atomic p => Atomic p
     end.
 
@@ -112,7 +84,7 @@ Section Proc.
 
 
   Inductive atomic_exec : forall T, proc T -> nat -> State ->
-                                    T -> State -> list (event opT opHiT) -> Prop :=
+                                    T -> State -> list event -> Prop :=
 
   | AtomicRet : forall T tid (v : T) s,
     atomic_exec (Ret v) tid s v s nil
@@ -123,25 +95,13 @@ Section Proc.
     atomic_exec (p2 v1) tid s1 v2 s2 ev2 ->
     atomic_exec (Bind p1 p2) tid s0 v2 s2 (ev1 ++ ev2)
 
-  | AtomicOpCall : forall T tid s (op : opT T),
-    atomic_exec (OpCall op) tid s tt s
-      [EvLow (EvCall op)]
-
-  | AtomicOpExec : forall T tid (v : T) s s' op,
+  | AtomicOp : forall T tid (v : T) s s' op,
     op_step op tid s v s' ->
-    atomic_exec (OpExec op) tid s v s' nil
+    atomic_exec (Op op) tid s v s' nil
 
-  | AtomicOpRet : forall T tid (v : T) s,
-    atomic_exec (OpRet v) tid s v s
-      [EvLow (EvRet v)]
-
-  | AtomicInvokeHi : forall T (op : opHiT T) tid s,
-    atomic_exec (OpCallHi op) tid s tt s
-      [EvHigh (EvCall op)]
-
-  | AtomicReturnHi : forall T (r : T) tid s,
-    atomic_exec (OpRetHi r) tid s r s
-      [EvHigh (EvRet r)]
+  | AtomicLog : forall T (r : T) tid s,
+    atomic_exec (Log r) tid s r s
+      [Event r]
 
   | AtomicAtomic : forall T (p : proc T) tid s r s' ev',
     atomic_exec p tid s r s' ev' ->
@@ -150,28 +110,18 @@ Section Proc.
 
   Inductive exec_tid : forall T (tid : nat),
     State -> proc T ->
-    State -> T + proc T -> list (event opT opHiT) -> Prop :=
+    State -> T + proc T -> list event -> Prop :=
 
   | ExecTidRet : forall tid T (v : T) s,
     exec_tid tid s (Ret v)
                  s (inl v)
                  nil
 
-  | ExecTidOpCall : forall tid T s (op : opT T),
-    exec_tid tid s (OpCall op)
-                 s (inl tt)
-                 [EvLow (EvCall op)]
-
-  | ExecTidOpRun : forall tid T (v : T) s s' op,
+  | ExecTidOp : forall tid T (v : T) s s' op,
     op_step op tid s v s' ->
-    exec_tid tid s (OpExec op)
+    exec_tid tid s (Op op)
                  s' (inl v)
                  nil
-
-  | ExecTidOpRet : forall tid T (v : T) s,
-    exec_tid tid s (OpRet v)
-                 s (inl v)
-                 [EvLow (EvRet v)]
 
   | ExecTidAtomic : forall tid T (v : T) ap s s' evs,
     atomic_exec ap tid s v s' evs ->
@@ -179,15 +129,10 @@ Section Proc.
                  s' (inl v)
                  evs
 
-  | ExecTidInvokeHi : forall tid s T' (op : opHiT T'),
-    exec_tid tid s (OpCallHi op)
-                 s (inl tt)
-                 [EvHigh (EvCall op)]
-
-  | ExecTidReturnHi : forall tid s T' (r : T'),
-    exec_tid tid s (OpRetHi r)
+  | ExecTidLog : forall tid s T' (r : T'),
+    exec_tid tid s (Log r)
                  s (inl r)
-                 [EvHigh (EvRet r)]
+                 [Event r]
 
   | ExecTidBind : forall tid T1 (p1 : proc T1) T2 (p2 : T1 -> proc T2) s s' result evs,
     exec_tid tid s p1
@@ -201,7 +146,7 @@ Section Proc.
                     ) evs.
 
 
-  Inductive exec : State -> threads_state -> trace opT opHiT -> nat -> Prop :=
+  Inductive exec : State -> threads_state -> trace -> nat -> Prop :=
 
   | ExecOne : forall T tid (ts : threads_state) trace p s s' evs result ctr,
     thread_get ts tid = @Proc T p ->
@@ -217,15 +162,15 @@ Section Proc.
     exec s ts TraceEmpty 0.
 
 
-  Definition exec_prefix (s : State) (ts : threads_state) (tr : trace opT opHiT) : Prop :=
+  Definition exec_prefix (s : State) (ts : threads_state) (tr : trace) : Prop :=
     exists n,
       exec s ts tr n.
 
   Theorem ExecPrefixOne
        : forall (T : Type) 
-           (tid : nat) (ts : threads_state) (trace : trace opT opHiT)
+           (tid : nat) (ts : threads_state) (tr : trace)
            (p : proc T) (s s' : State)
-           (evs : list (event opT opHiT)) (result : T + proc T),
+           (evs : list event) (result : T + proc T),
          thread_get ts tid = Proc p ->
          exec_tid tid s p s' result evs ->
          exec_prefix s'
@@ -233,8 +178,8 @@ Section Proc.
              (match result with
               | inl _ => NoProc
               | inr p' => Proc p'
-              end)) trace ->
-         exec_prefix s ts (prepend tid evs trace).
+              end)) tr ->
+         exec_prefix s ts (prepend tid evs tr).
   Proof.
     unfold exec_prefix; intros; deex.
     eexists; eapply ExecOne; eauto.
@@ -250,19 +195,16 @@ Section Proc.
 
 End Proc.
 
-Arguments OpCall {opT opHiT T}.
-Arguments OpExec {opT opHiT T}.
-Arguments OpRet {opT opHiT T}.
-Arguments Ret {opT opHiT T}.
-Arguments Bind {opT opHiT T T1}.
-Arguments OpCallHi {opT opHiT T'}.
-Arguments OpRetHi {opT opHiT T}.
-Arguments Atomic {opT opHiT T}.
+Arguments Op {opT T}.
+Arguments Ret {opT T}.
+Arguments Bind {opT T T1}.
+Arguments Log {opT T}.
+Arguments Atomic {opT T}.
 
-Arguments Proc {opT opHiT T}.
-Arguments NoProc {opT opHiT}.
+Arguments Proc {opT T}.
+Arguments NoProc {opT}.
 
-Arguments threads_state {opT opHiT}.
+Arguments threads_state {opT}.
 
 Hint Constructors exec.
 Hint Resolve exec_to_exec_prefix.
@@ -278,13 +220,7 @@ Notation "ts [[ tid := p ]]" := (thread_upd ts tid p)
   (at level 8, left associativity).
 
 
-Definition Op {opT opHiT T} (op : opT T) : proc opT opHiT T :=
-  _ <- OpCall op;
-  r <- OpExec op;
-  OpRet r.
-
-
-Definition threads_empty {opT opHiT} : @threads_state opT opHiT := nil.
+Definition threads_empty {opT} : @threads_state opT := nil.
 
 
 Lemma nth_error_nil : forall T x,
@@ -293,7 +229,7 @@ Proof.
   induction x; simpl; eauto.
 Qed.
 
-Lemma pad_eq : forall n `(ts : @threads_state opT opHiT) tid,
+Lemma pad_eq : forall n `(ts : @threads_state opT) tid,
   ts [[ tid ]] = (pad ts n NoProc) [[ tid ]].
 Proof.
   unfold thread_get.
@@ -346,7 +282,7 @@ Proof.
   omega.
 Qed.
 
-Lemma thread_get_Some_length : forall tid `(ts : @threads_state opT opHiT) `(p : proc _ _ T),
+Lemma thread_get_Some_length : forall tid `(ts : @threads_state opT) `(p : proc _ T),
   ts [[ tid ]] = Proc p ->
   tid < length ts.
 Proof.
@@ -354,7 +290,7 @@ Proof.
   induction tid; simpl; intros.
   - destruct ts; try congruence. simpl. omega.
   - destruct ts; try congruence. simpl.
-    specialize (IHtid _ _ _ _ _ H).
+    specialize (IHtid _ _ _ _ H).
     omega.
 Qed.
 
@@ -373,14 +309,14 @@ Hint Resolve thread_get_Some_length.
 Hint Resolve lt_le_S.
 
 
-Lemma prepend_app : forall `(evs1 : list (event opT opHiT)) evs2 tr tid,
+Lemma prepend_app : forall `(evs1 : list event) evs2 tr tid,
   prepend tid (evs1 ++ evs2) tr = prepend tid evs1 (prepend tid evs2 tr).
 Proof.
   induction evs1; simpl; intros; eauto.
   rewrite IHevs1; eauto.
 Qed.
 
-Lemma list_upd_eq : forall tid `(ts : @threads_state opT opHiT) p,
+Lemma list_upd_eq : forall tid `(ts : @threads_state opT) p,
   tid < length ts ->
   (list_upd ts tid p) [[ tid ]] = p.
 Proof.
@@ -391,7 +327,7 @@ Proof.
     eapply IHtid. omega.
 Qed.
 
-Lemma list_upd_ne : forall tid' tid `(ts : @threads_state opT opHiT) p,
+Lemma list_upd_ne : forall tid' tid `(ts : @threads_state opT) p,
   tid < length ts ->
   tid' <> tid ->
   (list_upd ts tid p) [[ tid' ]] = ts [[ tid' ]].
@@ -406,7 +342,7 @@ Proof.
     eapply IHtid'. omega. omega.
 Qed.
 
-Lemma list_upd_noop : forall tid `(ts : @threads_state opT opHiT) `(p : proc _ _ T),
+Lemma list_upd_noop : forall tid `(ts : @threads_state opT) `(p : proc _ T),
   ts [[ tid ]] = Proc p ->
   list_upd ts tid (Proc p) = ts.
 Proof.
@@ -416,7 +352,7 @@ Proof.
   - destruct ts; try congruence. simpl. f_equal. eauto.
 Qed.
 
-Lemma list_upd_noop_NoProc : forall tid `(ts : @threads_state opT opHiT),
+Lemma list_upd_noop_NoProc : forall tid `(ts : @threads_state opT),
   ts [[ tid ]] = NoProc ->
   tid < length ts ->
   list_upd ts tid NoProc = ts.
@@ -430,7 +366,7 @@ Proof.
     eauto.
 Qed.
 
-Lemma thread_upd_same : forall tid `(ts : @threads_state opT opHiT) `(p : proc _ _ T),
+Lemma thread_upd_same : forall tid `(ts : @threads_state opT) `(p : proc _ T),
   ts [[ tid ]] = Proc p ->
   ts [[ tid := Proc p ]] = ts.
 Proof.
@@ -439,7 +375,7 @@ Proof.
   rewrite list_upd_noop; eauto.
 Qed.
 
-Lemma thread_upd_same' : forall tid `(ts : @threads_state opT opHiT),
+Lemma thread_upd_same' : forall tid `(ts : @threads_state opT),
   tid < length ts ->
   ts [[ tid ]] = NoProc ->
   ts [[ tid := NoProc ]] = ts.
@@ -449,7 +385,7 @@ Proof.
   rewrite list_upd_noop_NoProc; eauto.
 Qed.
 
-Lemma thread_upd_eq : forall tid `(ts : @threads_state opT opHiT) p,
+Lemma thread_upd_eq : forall tid `(ts : @threads_state opT) p,
   ts [[ tid := p ]] [[ tid ]] = p.
 Proof.
   unfold thread_upd; intros.
@@ -458,7 +394,7 @@ Proof.
   omega.
 Qed.
 
-Lemma thread_get_pad : forall tid `(ts : @threads_state opT opHiT) n,
+Lemma thread_get_pad : forall tid `(ts : @threads_state opT) n,
   (pad ts n NoProc) [[ tid ]] = ts [[ tid ]].
 Proof.
   unfold thread_get.
@@ -471,7 +407,7 @@ Proof.
     + destruct n; simpl; eauto.
 Qed.
 
-Lemma thread_upd_ne : forall tid `(ts : @threads_state opT opHiT) p tid',
+Lemma thread_upd_ne : forall tid `(ts : @threads_state opT) p tid',
   tid <> tid' ->
   ts [[ tid := p ]] [[ tid' ]] = ts [[ tid' ]].
 Proof.
@@ -481,7 +417,7 @@ Proof.
   rewrite thread_get_pad. eauto.
 Qed.
 
-Lemma list_upd_pad : forall `(ts : @threads_state opT opHiT) tid n p,
+Lemma list_upd_pad : forall `(ts : @threads_state opT) tid n p,
   tid < length ts ->
   pad (list_upd ts tid p) n NoProc = list_upd (pad ts n NoProc) tid p.
 Proof.
@@ -495,7 +431,7 @@ Proof.
       omega.
 Qed.
 
-Lemma list_upd_comm : forall `(ts : @threads_state opT opHiT) tid1 p1 tid2 p2,
+Lemma list_upd_comm : forall `(ts : @threads_state opT) tid1 p1 tid2 p2,
   tid1 < length ts ->
   tid2 < length ts ->
   tid1 <> tid2 ->
@@ -506,7 +442,7 @@ Proof.
     f_equal. apply IHts; omega.
 Qed.
 
-Lemma list_upd_upd_eq : forall `(ts : @threads_state opT opHiT) tid p1 p2,
+Lemma list_upd_upd_eq : forall `(ts : @threads_state opT) tid p1 p2,
   tid < length ts ->
   list_upd (list_upd ts tid p1) tid p2 = list_upd ts tid p2.
 Proof.
@@ -535,7 +471,7 @@ Proof.
   - rewrite IHn. eauto.
 Qed.
 
-Lemma thread_upd_upd_ne : forall tid tid' `(ts : @threads_state opT opHiT) p p',
+Lemma thread_upd_upd_ne : forall tid tid' `(ts : @threads_state opT) p p',
   tid <> tid' ->
   ts [[ tid := p ]] [[ tid' := p' ]] =
   ts [[ tid' := p' ]] [[ tid := p ]].
@@ -549,7 +485,7 @@ Proof.
   apply pad_comm.
 Qed.
 
-Lemma thread_upd_upd_eq : forall tid `(ts : @threads_state opT opHiT) p1 p2,
+Lemma thread_upd_upd_eq : forall tid `(ts : @threads_state opT) p1 p2,
   ts [[ tid := p1 ]] [[ tid := p2 ]] =
   ts [[ tid := p2 ]].
 Proof.
@@ -560,7 +496,7 @@ Proof.
   reflexivity.
 Qed.
 
-Lemma thread_upd_inv : forall `(ts : @threads_state opT opHiT) tid1 `(p : proc _ _ T) tid2 `(p' : proc _ _ T'),
+Lemma thread_upd_inv : forall `(ts : @threads_state opT) tid1 `(p : proc _ T) tid2 `(p' : proc _ T'),
   ts [[ tid1 := Proc p ]] [[ tid2 ]] = Proc p' ->
   tid1 = tid2 /\ Proc p = Proc p' \/
   tid1 <> tid2 /\ ts [[ tid2 ]] = Proc p'.
@@ -573,53 +509,53 @@ Proof.
     rewrite thread_upd_ne in H; eauto.
 Qed.
 
-Lemma thread_empty_inv : forall opT opHiT tid `(p' : proc _ _ T),
-  (@threads_empty opT opHiT) [[ tid ]] = Proc p' ->
+Lemma thread_empty_inv : forall opT tid `(p' : proc _ T),
+  (@threads_empty opT) [[ tid ]] = Proc p' ->
   False.
 Proof.
   unfold threads_empty; intros.
   destruct tid; compute in H; congruence.
 Qed.
 
-Lemma thread_get_S : forall `(ts : @threads_state opT opHiT) tid a,
+Lemma thread_get_S : forall `(ts : @threads_state opT) tid a,
   (a :: ts) [[ S tid ]] = ts [[ tid ]].
 Proof.
   reflexivity.
 Qed.
 
-Lemma thread_get_0 : forall `(ts : @threads_state opT opHiT) a,
+Lemma thread_get_0 : forall `(ts : @threads_state opT) a,
   (a :: ts) [[ 0 ]] = a.
 Proof.
   reflexivity.
 Qed.
 
-Lemma thread_upd_S : forall `(ts : @threads_state opT opHiT) tid a p,
+Lemma thread_upd_S : forall `(ts : @threads_state opT) tid a p,
   (a :: ts) [[ S tid := p ]] = a :: (ts [[ tid := p ]]).
 Proof.
   reflexivity.
 Qed.
 
-Lemma thread_upd_0 : forall `(ts : @threads_state opT opHiT) a p,
+Lemma thread_upd_0 : forall `(ts : @threads_state opT) a p,
   (a :: ts) [[ 0 := p ]] = p :: ts.
 Proof.
   reflexivity.
 Qed.
 
-Lemma thread_get_nil : forall opT opHiT tid,
-  @thread_get opT opHiT nil tid = NoProc.
+Lemma thread_get_nil : forall opT tid,
+  @thread_get opT nil tid = NoProc.
 Proof.
   unfold thread_get; intros.
   rewrite nth_error_nil.
   reflexivity.
 Qed.
 
-Lemma thread_upd_nil_S : forall opT opHiT tid p,
-  @thread_upd opT opHiT nil (S tid) p = NoProc :: (nil [[ tid := p ]]).
+Lemma thread_upd_nil_S : forall opT tid p,
+  @thread_upd opT nil (S tid) p = NoProc :: (nil [[ tid := p ]]).
 Proof.
   reflexivity.
 Qed.
 
-Lemma length_thread_upd : forall tid `(ts : @threads_state opT opHiT) p,
+Lemma length_thread_upd : forall tid `(ts : @threads_state opT) p,
   length (ts [[ tid := p ]]) = Nat.max (S tid) (length ts).
 Proof.
   induction tid; simpl; intros.
@@ -633,8 +569,8 @@ Proof.
       simpl. omega.
 Qed.
 
-Lemma thread_get_repeat_NoProc : forall opT opHiT n tid,
-  (repeat (@NoProc opT opHiT) n) [[ tid ]] = NoProc.
+Lemma thread_get_repeat_NoProc : forall opT n tid,
+  (repeat (@NoProc opT) n) [[ tid ]] = NoProc.
 Proof.
   induction n; simpl; intros.
   - rewrite thread_get_nil. eauto.
@@ -643,7 +579,7 @@ Proof.
     + rewrite thread_get_S. eauto.
 Qed.
 
-Lemma thread_upd_same'' : forall tid `(ts : @threads_state opT opHiT),
+Lemma thread_upd_same'' : forall tid `(ts : @threads_state opT),
   tid >= length ts ->
   ts [[ tid := NoProc ]] = pad ts (S tid) NoProc.
 Proof.
@@ -660,7 +596,7 @@ Proof.
     + simpl app. rewrite thread_get_S. eapply IHts. simpl in *. omega.
 Qed.
 
-Lemma thread_get_oob : forall tid `(ts : @threads_state opT opHiT),
+Lemma thread_get_oob : forall tid `(ts : @threads_state opT),
   tid >= length ts ->
   ts [[ tid ]] = NoProc.
 Proof.
@@ -681,7 +617,7 @@ Hint Extern 1 (exec_tid _ _ _ _ _ _ _) => econstructor.
 Hint Extern 1 (atomic_exec _ _ _ _ _ _ _) => econstructor.
 
 
-Lemma thread_get_app_NoProc : forall `(ts : @threads_state opT opHiT) tid `(p : proc _ _ T),
+Lemma thread_get_app_NoProc : forall `(ts : @threads_state opT) tid `(p : proc _ T),
   ts [[ tid ]] = Proc p <->
   (ts ++ [NoProc]) [[ tid ]] = Proc p.
 Proof.
@@ -705,7 +641,7 @@ Proof.
     + destruct tid; cbn in *; eauto.
 Qed.
 
-Lemma thread_upd_app_NoProc : forall `(ts : @threads_state opT opHiT) tid p,
+Lemma thread_upd_app_NoProc : forall `(ts : @threads_state opT) tid p,
   tid < length ts ->
   ts [[ tid := p ]] ++ [NoProc] = (ts ++ [NoProc]) [[ tid := p ]].
 Proof.
