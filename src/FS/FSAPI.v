@@ -55,8 +55,6 @@ Module Link_as_UDT := Make_UDT(MDT_Link).
 
 Module Graph := MSetWeakList.Make Link_as_UDT.
 
-Definition t := Graph.singleton (mkLink 0 (FileNode 0) "x").
-
 Definition File := string.
 Definition Files := list File.
 
