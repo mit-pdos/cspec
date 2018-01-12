@@ -213,6 +213,7 @@ Definition create_file dir h name (fs : FS) :=
 Definition valid_dir dir (fs : FS) :=
   exists pn, path_eval_root fs pn (DirNode dir).
 
+(* If pn exists, then it is unique. *)
 Definition unique_pathname (fs : FS) pn :=
   exists node,
     path_eval_root fs pn node /\
@@ -228,7 +229,7 @@ Definition unique_dirents (fs : FS) :=
 (** This invariant isn't always true: a rename of a file in the same directory,
  will add the destination before deleting it, since we model rename as
  link+unlink. thus, a lookup may observe a duplicate entry after the link and
- before the unlink. *)
+ before the unlink. so, path_evaluates_unique isn't true either. *)
 Definition fs_invariant (fs : FS) :=
   unique_dirents fs.
 
@@ -494,14 +495,14 @@ Proof.
     eapply path_evaluates_addlink_does_not_exists; eauto.
 Qed.
 
-Lemma path_eval_root_addlink' : forall fs dirnum name dirpn h node',
+Lemma path_eval_root_addlink' : forall fs dirnum name dirpn h node,
     name <> "." ->
     name <> ".." ->
     fs_invariant fs ->
     does_not_exist fs dirnum name ->
     path_eval_root fs dirpn (DirNode dirnum) ->
-    path_eval_root (add_link dirnum (FileNode h) name fs) dirpn node' ->
-    path_eval_root fs dirpn node'.
+    path_eval_root (add_link dirnum (FileNode h) name fs) dirpn node ->
+    path_eval_root fs dirpn node.
 Proof.
   unfold path_eval_root.
   intros.
