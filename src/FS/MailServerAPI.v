@@ -120,6 +120,38 @@ Proof.
     eapply H2. rewrite <- H. eauto.
 Qed.
 
+Lemma path_eval_root_create: forall fs pn dirnum h name,
+    does_not_exist fs dirnum name ->
+    path_eval_root fs pn (DirNode dirnum) ->
+    path_eval_root (create_file dirnum h name fs) pn (DirNode dirnum ).
+Proof.
+  intros.
+  eapply path_eval_root_updfile in H0.
+  eapply path_eval_root_addlink in H0; eauto.
+Qed.
+
+Lemma path_eval_root_create': forall fs pn dirnum h name node',
+    name <> "." ->
+    name <> ".." ->
+    fs_invariant fs ->
+    does_not_exist fs dirnum name ->
+    file_handle_unused fs h ->
+    file_handle_valid fs h ->
+    path_eval_root fs pn (DirNode dirnum) ->
+    path_eval_root (create_file dirnum h name fs) pn node' ->
+    node' = (DirNode dirnum).
+Proof.
+  intros.
+  eapply path_eval_root_addlink' in H6 as H6x; eauto.
+  eapply path_eval_root_updfile' in H6x.
+  eapply path_eval_root_eq; eauto.
+
+  unfold fs_invariant, unique_dirents; intros.
+  apply valid_link_updfile' in H7.
+  apply valid_link_updfile' in H8.
+  eapply H1; eauto.
+  eapply path_eval_root_updfile; eauto.
+Qed.
 
 Lemma invariant_create : forall dirnum h name fs,
     name <> "." ->
@@ -133,29 +165,64 @@ Lemma invariant_create : forall dirnum h name fs,
 Proof.
   unfold invariant; intuition idtac.
   eapply fs_invariant_create; eauto.
-
   unfold unique_pathname in *; repeat deex.
   exists (DirNode dirnum); split.
-  eapply path_eval_root_updfile in H4 as Hx.
-  eapply path_eval_root_addlink in Hx.
-  apply Hx.
-  eapply does_not_exist_updfile'; eauto.
-
+  eapply path_eval_root_create in H4; eauto.
   intros.
-
-  eapply path_eval_root_addlink' in H8 as H8x; eauto.
-  
-  eapply path_eval_root_updfile' in H8x.
-  eapply path_eval_root_eq; eauto.
-
-  unfold fs_invariant, unique_dirents; intros.
-  apply valid_link_updfile' in H9.
-  apply valid_link_updfile' in H10.
-  eapply H6; eauto.
-
-  eapply path_eval_root_updfile; eauto.
+  eapply path_eval_root_create'; eauto.
 Qed.
 
+Lemma path_unique_create_inum_eq: forall fs pn dirnum dirnum0 h name,
+    invariant fs ->
+    does_not_exist fs dirnum0 name ->
+    file_handle_unused fs h ->
+    file_handle_valid fs h ->
+    invariant (create_file dirnum0 h name fs) ->
+    path_eval_root fs pn (DirNode dirnum0) ->
+    path_eval_root (create_file dirnum0 h name fs) pn (DirNode dirnum) ->
+    dirnum = dirnum0.
+Proof.
+  intros.
+  assert (DirNode dirnum = DirNode dirnum0) as Hinum.
+  destruct H; intuition idtac.
+  eapply path_eval_root_updfile in H4 as Hx.
+  eapply path_eval_root_addlink in Hx.
+  2: apply does_not_exist_updfile'; eauto.
+  eapply path_eval_root_eq.
+  3: apply Hx.
+  2: eauto.
+  unfold invariant in *; intuition idtac.
+  inversion Hinum; auto.
+Qed.
+
+Lemma create_file_comm: forall fs dirnum h0 h1 name1 name0,
+    file_handle_unused fs h0 ->
+    file_handle_unused (create_file dirnum h0 name0 fs) h1 ->
+    FSEquiv (create_file dirnum h1 name1 (create_file dirnum h0 name0 fs))
+            (create_file dirnum h0 name0 (create_file dirnum h1 name1 fs)).
+Proof.
+  intros.
+  unfold create_file, add_link, upd_file, FSEquiv; simpl.
+  destruct fs; simpl.
+  intuition eauto.
+  eapply list_upd_commutes.
+  eapply file_handle_unused_ne in H0 as Hx; eauto.
+  unfold Graph.Equal; split; intros.
+  {
+    eapply Graph.add_spec in H1; intuition idtac; subst.
+    eapply Graph.add_spec; right. eapply Graph.add_spec; eauto.
+    eapply Graph.add_spec in H2; intuition idtac; subst.
+    eapply Graph.add_spec; eauto.
+    eapply Graph.add_spec; right. eapply Graph.add_spec; eauto.
+  }
+  {
+    eapply Graph.add_spec in H1; intuition idtac; subst.
+    eapply Graph.add_spec; right. eapply Graph.add_spec; eauto.
+    eapply Graph.add_spec in H2; intuition idtac; subst.
+    eapply Graph.add_spec; eauto.
+    eapply Graph.add_spec; right. eapply Graph.add_spec; eauto.
+  }
+Qed.
 
 Theorem create_tmpdir_both_mover : forall dir name,
   both_mover mailfs_step (Create dir name).
@@ -166,77 +233,36 @@ Proof.
     repeat step_inv.
     repeat subst_fsequiv.
 
-    (* Use the fact that tmpdir is unique to show that dirnum=dirnum0 *)
-    assert (DirNode dirnum = DirNode dirnum0) as Hy.
-    destruct H18; intuition idtac.
-    eapply path_eval_root_updfile in H8 as Hx.
-    eapply path_eval_root_addlink in Hx.
-    2: apply does_not_exist_updfile'; eauto.
-    eapply path_eval_root_eq.
-    3: apply Hx.
-    2: eauto.
-    eapply fs_invariant_create; eauto.
-    unfold invariant in *; intuition idtac.
-    inversion Hy; clear Hy; subst.
+    replace dirnum with dirnum0 in *.
+    2: eapply path_unique_create_inum_eq in H7 as Hi; auto.
 
     eexists; split; subst_fsequiv.
     + intuition idtac.
-
-      econstructor.
-      2: reflexivity.
-
+      econstructor; eauto.
+      2: reflexivity; eauto.
       econstructor; eauto.
       eauto.
-
       eapply invariant_create; eauto.
 
+      (* some come from econstructor; others form invariant_create *)
+      Unshelve.
+      all: auto.
+
     + intuition idtac.
-
+      econstructor.
       econstructor.
 
-      econstructor.
-
-      eapply path_eval_root_updfile in H8 as H8x.
-      eapply path_eval_root_addlink in H8x.
+      eapply path_eval_root_create in H8 as H8x.
       apply H8x.
 
       eauto.
-      unfold create_file; eauto.
-      unfold create_file; eauto.
-      unfold create_file; eauto.
-      unfold create_file; eauto.
-      unfold create_file; eauto.
+      all: try unfold create_file; eauto.
 
-      {
-        destruct s.
-        unfold add_link, upd_file.
-        unfold FSEquiv.
-        simpl.
-        intuition eauto.
-        eapply list_upd_commutes.
-        eapply file_handle_unused_ne in H13 as Hx; eauto.
-
-
-        unfold Graph.Equal; split; intros.
-        {
-          eapply Graph.add_spec in H0; intuition idtac; subst.
-          eapply Graph.add_spec; right. eapply Graph.add_spec; eauto.
-          eapply Graph.add_spec in H3; intuition idtac; subst.
-          eapply Graph.add_spec; eauto.
-          eapply Graph.add_spec; right. eapply Graph.add_spec; eauto.
-        }
-        {
-          eapply Graph.add_spec in H0; intuition idtac; subst.
-          eapply Graph.add_spec; right. eapply Graph.add_spec; eauto.
-          eapply Graph.add_spec in H3; intuition idtac; subst.
-          eapply Graph.add_spec; eauto.
-          eapply Graph.add_spec; right. eapply Graph.add_spec; eauto.
-        }
-      }
-
-      eauto.
-
+      apply create_file_comm; auto.
       eapply invariant_create; eauto.
+
+      Unshelve.
+      all: auto.
 
   - admit.
 Admitted.

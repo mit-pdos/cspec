@@ -225,6 +225,10 @@ Definition unique_dirents (fs : FS) :=
     valid_link fs dir name target0 ->
     target0 = target.
 
+(** This invariant isn't always true: a rename of a file in the same directory,
+ will add the destination before deleting it, since we model rename as
+ link+unlink. thus, a lookup may observe a duplicate entry after the link and
+ before the unlink. *)
 Definition fs_invariant (fs : FS) :=
   unique_dirents fs.
 
@@ -815,7 +819,7 @@ Section StepXform.
 End StepXform.
 
 Inductive fs_step : forall T, fsOpT T -> nat -> State -> T -> State -> Prop :=
-| StepCreateAt : forall dir dirnum name tid s h s',
+| StepCreate : forall dir dirnum name tid s h s',
   path_eval_root s dir (DirNode dirnum) ->
   does_not_exist s dirnum name ->
   file_handle_unused s h ->
