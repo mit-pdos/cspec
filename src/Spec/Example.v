@@ -9,6 +9,7 @@ Require Import RelationClasses.
 Require Import Morphisms.
 Require Import List.
 Require Import Compile.
+Require Import PerThreadState.
 
 Import ListNotations.
 

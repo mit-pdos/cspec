@@ -10,6 +10,7 @@ Require Import Morphisms.
 Require Import List.
 Require Import Compile.
 Require Import Modules.
+Require Import Movers.
 
 Import ListNotations.
 
