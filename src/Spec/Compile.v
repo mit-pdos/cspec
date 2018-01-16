@@ -11,6 +11,79 @@ Global Set Implicit Arguments.
 Global Generalizable All Variables.
 
 
+Section NoAtomics.
+
+  Variable opT : Type -> Type.
+
+  Inductive no_atomics_n : forall T (p : proc opT T) (n : nat), Prop :=
+  | NoAtomicsOp : forall `(op : opT T) n,
+    no_atomics_n (Op op) (S n)
+  | NoAtomicsRet : forall `(x : T) n,
+    no_atomics_n (Ret x) (S n)
+  | NoAtomicsBind : forall `(pa : proc opT T1) `(pb : T1 -> proc _ T2) n,
+    no_atomics_n pa n ->
+    (forall x, no_atomics_n (pb x) n) ->
+    no_atomics_n (Bind pa pb) (S n)
+  | NoAtomicsLog : forall `(v : T) n,
+    no_atomics_n (Log v) (S n)
+  | NoAtomicsZero : forall `(p : proc _ T),
+    no_atomics_n p 0.
+
+  Definition no_atomics T (p : proc opT T) :=
+    forall n,
+      no_atomics_n p n.
+
+  Definition no_atomics_opt x :=
+    match x with
+    | NoProc => True
+    | Proc p => no_atomics p
+    end.
+
+  Definition no_atomics_ts (ts : threads_state) :=
+    Forall no_atomics_opt ts.
+
+
+  Theorem no_atomics_inv_bind_a : forall `(p1 : proc _ T1) `(p2 : T1 -> proc _ T2),
+    no_atomics (Bind p1 p2) ->
+    no_atomics p1.
+  Proof.
+    unfold no_atomics; intros.
+    specialize (H (S n)); inversion H; clear H; repeat sigT_eq.
+    eauto.
+  Qed.
+
+  Theorem no_atomics_inv_bind_b : forall `(p1 : proc _ T1) `(p2 : T1 -> proc _ T2),
+    no_atomics (Bind p1 p2) ->
+    forall x, no_atomics (p2 x).
+  Proof.
+    unfold no_atomics; intros.
+    specialize (H (S n)); inversion H; clear H; repeat sigT_eq.
+    eauto.
+  Qed.
+
+  Theorem no_atomics_inv_atomic : forall `(p : proc _ T),
+    no_atomics (Atomic p) ->
+    False.
+  Proof.
+    intros.
+    specialize (H 1); inversion H.
+  Qed.
+
+  Theorem no_atomics_ts_cons : forall p ts,
+    no_atomics_ts (p :: ts) ->
+    no_atomics_opt p /\ no_atomics_ts ts.
+  Proof.
+    intros.
+    inversion H; intuition.
+  Qed.
+
+End NoAtomics.
+
+Hint Resolve no_atomics_inv_bind_a.
+Hint Resolve no_atomics_inv_bind_b.
+Hint Resolve no_atomics_inv_atomic.
+
+
 Section Compiler.
 
   Variable opLoT : Type -> Type.
@@ -21,31 +94,116 @@ Section Compiler.
   Definition atomize T (op : opMidT T) : proc opLoT T :=
     Atomic (compile_op op).
 
-  Inductive compile_ok : forall T (p1 : proc opLoT T) (p2 : proc opMidT T), Prop :=
-  | CompileOp : forall `(op : opMidT T),
-    compile_ok (compile_op op) (Op op)
-  | CompileRet : forall `(x : T),
-    compile_ok (Ret x) (Ret x)
+  Inductive compile_ok_n : forall T (p1 : proc opLoT T) (p2 : proc opMidT T) (n : nat), Prop :=
+  | CompileOp : forall `(op : opMidT T) n,
+    compile_ok_n (compile_op op) (Op op) (S n)
+  | CompileRet : forall `(x : T) n,
+    compile_ok_n (Ret x) (Ret x) (S n)
   | CompileBind : forall `(p1a : proc opLoT T1) (p2a : proc opMidT T1)
-                         `(p1b : T1 -> proc _ T2) (p2b : T1 -> proc _ T2),
+                         `(p1b : T1 -> proc _ T2) (p2b : T1 -> proc _ T2) n,
+    compile_ok_n p1a p2a n ->
+    (forall x, compile_ok_n (p1b x) (p2b x) n) ->
+    compile_ok_n (Bind p1a p1b) (Bind p2a p2b) (S n)
+  | CompileLog : forall `(v : T) n,
+    compile_ok_n (Log v) (Log v) (S n)
+  | CompileZero : forall T (p1 : proc _ T) (p2 : proc _ T),
+    compile_ok_n p1 p2 0.
+
+  Definition compile_ok T (p1 : proc opLoT T) (p2 : proc opMidT T) :=
+    forall n,
+      compile_ok_n p1 p2 n.
+
+  Inductive atomic_compile_ok_n : forall T (p1 : proc opLoT T) (p2 : proc opMidT T) (n : nat), Prop :=
+  | ACompileOp : forall `(op : opMidT T) n,
+    atomic_compile_ok_n (Atomic (compile_op op)) (Op op) n
+  | ACompileRet : forall `(x : T) n,
+    atomic_compile_ok_n (Ret x) (Ret x) n
+  | ACompileBind : forall `(p1a : proc opLoT T1) (p2a : proc opMidT T1)
+                          `(p1b : T1 -> proc _ T2) (p2b : T1 -> proc _ T2) n,
+    atomic_compile_ok_n p1a p2a n ->
+    (forall x, atomic_compile_ok_n (p1b x) (p2b x) n) ->
+    atomic_compile_ok_n (Bind p1a p1b) (Bind p2a p2b) (S n)
+  | ACompileLog : forall `(v : T) n,
+    atomic_compile_ok_n (Log v) (Log v) n
+  | ACompileZero : forall T (p1 : proc _ T) (p2 : proc _ T),
+    atomic_compile_ok_n p1 p2 0.
+
+  Definition atomic_compile_ok T (p1 : proc opLoT T) (p2 : proc opMidT T) :=
+    forall n,
+      atomic_compile_ok_n p1 p2 n.
+
+
+  Hint Constructors compile_ok_n.
+  Hint Constructors atomic_compile_ok_n.
+
+
+  Theorem compile_ok_inv_bind : forall `(p1a : proc _ T1) `(p1b : _ -> proc _ T2) p2a p2b,
+    compile_ok (Bind p1a p1b) (Bind p2a p2b) ->
+      compile_ok p1a p2a /\
+      forall r, compile_ok (p1b r) (p2b r).
+  Proof.
+    split; intros.
+
+    intro.
+    specialize (H (S n)); inversion H; clear H; repeat sigT_eq.
+    eauto.
+
+    intro.
+    specialize (H (S n)); inversion H; clear H; repeat sigT_eq.
+    eauto.
+  Qed.
+
+  Theorem compile_ok_bind : forall `(p1a : proc opLoT T1) (p2a : proc opMidT T1)
+                                   `(p1b : T1 -> proc _ T2) (p2b : T1 -> proc _ T2),
     compile_ok p1a p2a ->
     (forall x, compile_ok (p1b x) (p2b x)) ->
-    compile_ok (Bind p1a p1b) (Bind p2a p2b)
-  | CompileLog : forall `(v : T),
-    compile_ok (Log v) (Log v).
+    compile_ok (Bind p1a p1b) (Bind p2a p2b).
+  Proof.
+    intros.
+    intro.
+    destruct n; eauto.
+    constructor; eauto.
+    intros.
+    eapply H0.
+  Qed.
 
-  Inductive atomic_compile_ok : forall T (p1 : proc opLoT T) (p2 : proc opMidT T), Prop :=
-  | ACompileOp : forall `(op : opMidT T),
-    atomic_compile_ok (Atomic (compile_op op)) (Op op)
-  | ACompileRet : forall `(x : T),
-    atomic_compile_ok (Ret x) (Ret x)
-  | ACompileBind : forall `(p1a : proc opLoT T1) (p2a : proc opMidT T1)
-                         `(p1b : T1 -> proc _ T2) (p2b : T1 -> proc _ T2),
+  Theorem atomic_compile_ok_inv_bind : forall `(p1a : proc _ T1) `(p1b : _ -> proc _ T2) p2,
+    atomic_compile_ok (Bind p1a p1b) p2 ->
+    exists p2a p2b,
+      p2 = Bind p2a p2b /\
+      atomic_compile_ok p1a p2a /\
+      forall r, atomic_compile_ok (p1b r) (p2b r).
+  Proof.
+    intros.
+    specialize (H 1) as H'.
+    inversion H'; clear H'; repeat sigT_eq.
+    do 2 eexists; intuition.
+
+    intro.
+    specialize (H (S n)); inversion H; clear H; repeat sigT_eq.
+    eauto.
+
+    intro.
+    specialize (H (S n)); inversion H; clear H; repeat sigT_eq.
+    eauto.
+  Qed.
+
+  Theorem atomic_compile_ok_bind : forall `(p1a : proc opLoT T1) (p2a : proc opMidT T1)
+                                          `(p1b : T1 -> proc _ T2) (p2b : T1 -> proc _ T2),
     atomic_compile_ok p1a p2a ->
     (forall x, atomic_compile_ok (p1b x) (p2b x)) ->
-    atomic_compile_ok (Bind p1a p1b) (Bind p2a p2b)
-  | ACompileLog : forall `(v : T),
-    atomic_compile_ok (Log v) (Log v).
+    atomic_compile_ok (Bind p1a p1b) (Bind p2a p2b).
+  Proof.
+    intros.
+    intro.
+    destruct n; eauto.
+    constructor; eauto.
+    intros.
+    eapply H0.
+  Qed.
+
+  Hint Resolve atomic_compile_ok_bind.
+
 
   CoFixpoint compile T (p : proc opMidT T) : proc opLoT T :=
     match p with
@@ -56,10 +214,70 @@ Section Compiler.
     | Atomic p => Atomic (compile p)
     end.
 
-  Theorem compile_ok_compile :
-    forall `(p : proc _ T), compile_ok (compile p) p.
+  Ltac compile_eq_step :=
+    match goal with
+    | |- ?x = _ =>
+      rewrite frob_proc_eq with (p := x) at 1; simpl;
+        try reflexivity; f_equal
+    | _ =>
+      apply functional_extensionality; intros
+    end.
+
+  Theorem compile_op_eq : forall T (op : _ T),
+    compile (Op op) =
+      compile_op op.
   Proof.
-  Admitted.
+    intros.
+    compile_eq_step.
+    destruct (compile_op op); congruence.
+  Qed.
+
+  Theorem compile_ret_eq : forall T (v : T),
+    compile (Ret v) = Ret v.
+  Proof.
+    intros.
+    compile_eq_step.
+  Qed.
+
+  Theorem compile_bind_eq : forall T1 T2 (p1 : proc _ T1) (p2 : _ -> proc _ T2),
+    compile (Bind p1 p2) =
+      Bind (compile p1) (fun x => compile (p2 x)).
+  Proof.
+    intros.
+    compile_eq_step.
+  Qed.
+
+  Theorem compile_log_eq : forall T (v : T),
+    compile (Log v) = Log v.
+  Proof.
+    intros.
+    compile_eq_step.
+  Qed.
+
+  Theorem compile_atomic_eq : forall T (p : proc _ T),
+    compile (Atomic p) = Atomic (compile p).
+  Proof.
+    intros.
+    compile_eq_step.
+  Qed.
+
+
+  Theorem compile_ok_compile :
+    forall `(p : proc _ T),
+      no_atomics p ->
+      compile_ok (compile p) p.
+  Proof.
+    unfold compile_ok; intros.
+    generalize dependent p.
+    generalize dependent T.
+    induction n; eauto; intros.
+    destruct p.
+    - rewrite compile_op_eq; eauto.
+    - rewrite compile_ret_eq; eauto.
+    - rewrite compile_bind_eq; eauto 20.
+    - rewrite compile_log_eq; eauto.
+    - exfalso; eauto.
+  Qed.
 
   Fixpoint compile_ts (ts : threads_state) : threads_state :=
     match ts with
@@ -73,22 +291,25 @@ Section Compiler.
 
   Theorem compile_ts_ok :
     forall ts,
+      no_atomics_ts ts ->
       proc_match compile_ok (compile_ts ts) ts.
   Proof.
     induction ts; intros.
     - unfold proc_match; simpl; intuition eauto.
       left.
       repeat rewrite thread_get_nil; eauto.
-    - unfold proc_match in *; cbn; intuition eauto.
+    - apply no_atomics_ts_cons in H; intuition idtac.
+      unfold proc_match in *; cbn; intuition eauto.
       destruct tid; subst.
       + repeat rewrite thread_get_0.
         destruct a.
-        * right.
+        * simpl in *.
+          right.
           do 3 eexists; intuition eauto.
-          eapply compile_ok_compile.
+          eapply compile_ok_compile; eauto.
         * left; eauto.
       + repeat rewrite thread_get_S.
-        eapply H0.
+        eapply H3.
   Qed.
 
 
@@ -123,45 +344,34 @@ Section Compiler.
           end
         end.
   Proof.
-    induction 1; intros.
+    intros.
+    induction H0.
 
-    - exec_tid_inv.
-      eapply compile_is_correct in H6.
+    - specialize (H 1).
+      inversion H; clear H; repeat sigT_eq.
+      eauto.
+
+    - specialize (H 1).
+      inversion H.
+
+    - specialize (H 1).
+      inversion H; clear H; repeat sigT_eq.
+      eapply compile_is_correct in H0.
       do 2 eexists; intuition eauto.
 
-    - exec_tid_inv.
-      do 2 eexists; split.
-      constructor.
-      split.
-      compute; eauto.
+    - specialize (H 1).
+      inversion H; clear H; repeat sigT_eq.
       eauto.
 
-    - exec_tid_inv.
-      eapply IHatomic_compile_ok in H12.
-      repeat deex.
+    - eapply atomic_compile_ok_inv_bind in H; repeat deex.
+      edestruct IHexec_tid; eauto; repeat deex.
+      do 2 eexists; intuition idtac.
 
-      destruct result0; destruct result'; try solve [ exfalso; eauto ].
+      constructor; eauto.
+      eauto.
 
-      + do 2 eexists; split.
-        eauto.
-        split.
-        eauto.
+      destruct result; destruct x; try solve [ exfalso; eauto ];
         subst; eauto.
-
-      + do 2 eexists; split.
-        eauto.
-        split.
-        eauto.
-        constructor.
-        eauto.
-        eauto.
-
-    - exec_tid_inv.
-      do 2 eexists; split.
-      constructor.
-      split.
-      compute; eauto.
-      eauto.
   Qed.
 
   Theorem atomic_compile_ok_traces_match_ts :
@@ -203,9 +413,6 @@ Section Compiler.
 
 End Compiler.
 
-Hint Constructors compile_ok.
-Hint Constructors atomic_compile_ok.
-
 Arguments atomize {opLoT opMidT} compile_op [T] op.
 
 
@@ -219,18 +426,24 @@ Section Atomization.
   Variable opMidT : Type -> Type.
   Variable compile_op : forall T, opMidT T -> proc opLoT T.
 
-  Inductive atomize_ok : forall T (p1 p2 : proc opLoT T), Prop :=
-  | AtomizeOp : forall `(op : opMidT T),
-    atomize_ok (compile_op op) (atomize compile_op op)
-  | AtomizeRet : forall `(x : T),
-    atomize_ok (Ret x) (Ret x)
+  Inductive atomize_ok_n : forall T (p1 p2 : proc opLoT T) (n : nat), Prop :=
+  | AtomizeOp : forall `(op : opMidT T) n,
+    atomize_ok_n (compile_op op) (atomize compile_op op) (S n)
+  | AtomizeRet : forall `(x : T) n,
+    atomize_ok_n (Ret x) (Ret x) (S n)
   | AtomizeBind : forall T1 T2 (p1a p2a : proc opLoT T1)
-                               (p1b p2b : T1 -> proc opLoT T2),
-    atomize_ok p1a p2a ->
-    (forall x, atomize_ok (p1b x) (p2b x)) ->
-    atomize_ok (Bind p1a p1b) (Bind p2a p2b)
-  | AtomizeLog : forall `(v : T),
-    atomize_ok (Log v) (Log v).
+                               (p1b p2b : T1 -> proc opLoT T2) n,
+    atomize_ok_n p1a p2a n ->
+    (forall x, atomize_ok_n (p1b x) (p2b x) n) ->
+    atomize_ok_n (Bind p1a p1b) (Bind p2a p2b) (S n)
+  | AtomizeLog : forall `(v : T) n,
+    atomize_ok_n (Log v) (Log v) (S n)
+  | AtomizeZero : forall `(p1 : proc _ T) p2,
+    atomize_ok_n p1 p2 0.
+
+  Definition atomize_ok T (p1 p2 : proc opLoT T) :=
+    forall n,
+      atomize_ok_n p1 p2 n.
 
 
   Variable State : Type.
@@ -254,6 +467,19 @@ Section Atomization.
     (forall x, trace_incl op_step (p1rest x) (p2rest x)) ->
     trace_incl op_step (Bind p1 p1rest) (Bind p2 p2rest).
   Proof.
+(*
+    intros.
+    eapply trace_incl_proof_helper; intros.
+    exec_tid_inv.
+
+    generalize dependent p2.
+    induction H12; intros.
+
+    - specialize (H 1).
+      inversion H; clear H; repeat sigT_eq.
+      eauto.
+
+
     induction 1; intros.
     - eauto.
     - eapply trace_incl_bind_a.
@@ -264,6 +490,8 @@ Section Atomization.
       eauto.
     - eapply trace_incl_bind_a; eauto.
   Qed.
+*)
+  Admitted.
 
   Theorem atomize_ok_trace_incl :
     forall `(p1 : proc _ T) p2,
@@ -324,46 +552,6 @@ Arguments atomize_ok {opLoT opMidT} compile_op [T].
 Arguments atomize_correct {opLoT opMidT} compile_op [State] op_step.
 
 
-Ltac compile_eq_step :=
-  match goal with
-  | |- ?x = _ =>
-    rewrite frob_proc_eq with (p := x) at 1; simpl;
-      try reflexivity; f_equal
-  | _ =>
-    apply functional_extensionality; intros
-  end.
-
-Theorem compile_op_eq : forall opLoT opMidT T (op : opMidT T) f,
-  @compile opLoT opMidT f T (Op op) =
-    f T op.
-Proof.
-  intros.
-  compile_eq_step.
-  destruct (f T op); congruence.
-Qed.
-
-Theorem compile_ret_eq : forall opLoT opMidT T (v : T) f,
-  @compile opLoT opMidT f T (Ret v) = Ret v.
-Proof.
-  intros.
-  compile_eq_step.
-Qed.
-
-Theorem compile_bind_eq : forall opLoT opMidT T1 T2 (p1 : proc opMidT T1) (p2 : _ -> proc opMidT T2) f,
-  @compile opLoT opMidT f T2 (Bind p1 p2) =
-    Bind (compile f p1) (fun x => compile f (p2 x)).
-Proof.
-  intros.
-  compile_eq_step.
-Qed.
-
-Theorem compile_log_eq : forall opLoT opMidT T (v : T) f,
-  @compile opLoT opMidT f T (Log v) = Log v.
-Proof.
-  intros.
-  compile_eq_step.
-Qed.
-
 
 Theorem atomize_proc_match_helper :
   forall T `(p1 : proc opLoT T) `(p2 : proc opMidT T)
@@ -372,17 +560,28 @@ Theorem atomize_proc_match_helper :
     atomize_ok compile_op p1 (compile (atomize compile_op) p2) /\
     atomic_compile_ok compile_op (compile (atomize compile_op) p2) p2.
 Proof.
-  induction 1; simpl; intros.
-  - rewrite compile_op_eq.
-    split; constructor.
-  - rewrite compile_ret_eq.
-    split; constructor.
-  - rewrite compile_bind_eq.
-    intuition idtac.
-    constructor. eauto. intros. specialize (H1 x). intuition eauto.
-    constructor. eauto. intros. specialize (H1 x). intuition eauto.
-  - rewrite compile_log_eq.
-    split; constructor.
+  split; intro n; generalize dependent T.
+  - induction n; intros; [ apply AtomizeZero | ].
+    specialize (H (S n)) as H'; inversion H'; clear H'; repeat sigT_eq.
+
+    + rewrite compile_op_eq. constructor.
+    + rewrite compile_ret_eq. constructor.
+    + rewrite compile_bind_eq. constructor.
+      * eapply IHn. eapply compile_ok_inv_bind in H. intuition eauto.
+      * intros.
+        eapply IHn. eapply compile_ok_inv_bind in H. intuition eauto.
+    + rewrite compile_log_eq. constructor.
+
+  - induction n; intros; [ apply ACompileZero | ].
+    specialize (H (S n)) as H'; inversion H'; clear H'; repeat sigT_eq.
+
+    + rewrite compile_op_eq. constructor.
+    + rewrite compile_ret_eq. constructor.
+    + rewrite compile_bind_eq. constructor.
+      * eapply IHn. eapply compile_ok_inv_bind in H. intuition eauto.
+      * intros.
+        eapply IHn. eapply compile_ok_inv_bind in H. intuition eauto.
+    + rewrite compile_log_eq. constructor.
 Qed.
 
 Hint Resolve proc_match_cons_Proc.
