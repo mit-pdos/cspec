@@ -477,8 +477,60 @@ Section Atomization.
 
     - specialize (H 1).
       inversion H; clear H; repeat sigT_eq.
+
+      {
+        edestruct atomize_is_correct.
+        eauto.
+        eapply ExecPrefixOne with (tid := tid).
+          rewrite thread_upd_eq; eauto.
+          rewrite H4. eauto.
+          autorewrite with t. eauto.
+        eauto.
+      }
+
+      edestruct H0; eauto.
+      intuition idtac.
+
+      do 2 eexists.
+      eapply ExecPrefixOne with (tid := tid).
+        rewrite thread_upd_eq; eauto.
+        eauto.
+        autorewrite with t. eauto.
       eauto.
 
+    - admit.
+
+    - admit.
+
+    - admit.
+
+    - specialize (H 1) as H'.
+      inversion H'; clear H'; repeat sigT_eq.
+
+      {
+        edestruct atomize_is_correct.
+        eauto.
+        eapply ExecPrefixOne with (tid := tid).
+          rewrite thread_upd_eq; eauto.
+          rewrite H4. eauto.
+          autorewrite with t. eauto.
+        eauto.
+      }
+
+      edestruct IHexec_tid.
+        eauto.
+        
+      edestruct H0; eauto.
+      intuition idtac.
+
+      do 2 eexists.
+      eapply ExecPrefixOne with (tid := tid).
+        rewrite thread_upd_eq; eauto.
+        eauto.
+        autorewrite with t. eauto.
+      eauto.
+
+      
 
     induction 1; intros.
     - eauto.
