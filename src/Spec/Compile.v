@@ -11,7 +11,7 @@ Global Set Implicit Arguments.
 Global Generalizable All Variables.
 
 
-Section NoAtomics.
+Section ProcStructure.
 
   Variable opT : Type -> Type.
 
@@ -77,11 +77,33 @@ Section NoAtomics.
     inversion H; intuition.
   Qed.
 
-End NoAtomics.
+
+  Inductive non_bind_n : forall T, proc opT T -> nat -> Prop :=
+  | NonBindOp : forall `(op : opT T) n,
+    non_bind_n (Op op) n
+  | NonBindRet : forall `(r : T) n,
+    non_bind_n (Ret r) n
+  | NonBindLog : forall `(r : T) n,
+    non_bind_n (Log r) n
+  | NonBindAtomic : forall `(p : proc _ T) n,
+    non_bind_n (Atomic p) n
+  | NonBindBind : forall `(p1 : proc _ T) `(p2 : _ -> proc _ T2) n,
+    non_bind_n p1 n ->
+    (forall x, non_bind_n (p2 x) (S n)) ->
+    non_bind_n (Bind p1 p2) (S n).
+
+  Hint Constructors non_bind_n.
+
+  Definition non_degenerate `(p : proc _ T) :=
+    exists n,
+      non_bind_n p n.
+
+End ProcStructure.
 
 Hint Resolve no_atomics_inv_bind_a.
 Hint Resolve no_atomics_inv_bind_b.
 Hint Resolve no_atomics_inv_atomic.
+Hint Constructors non_bind_n.
 
 
 Section Compiler.
@@ -313,6 +335,34 @@ Section Compiler.
   Qed.
 
 
+  Definition compile_non_degenerate :=
+    forall `(op : opMidT T),
+      non_degenerate (compile_op op).
+
+(*
+  Theorem non_degenerate_compile_ok : forall `(p1 : proc opLoT T) (p2 : proc opMidT T),
+    compile_non_degenerate ->
+    non_degenerate p2 ->
+    compile_ok p1 p2 ->
+    non_degenerate p1.
+  Proof.
+    unfold compile_non_degenerate, non_degenerate, compile_ok; intros.
+    repeat deex.
+    specialize (H1 (S n)).
+    remember (S n).
+    generalize dependent n.
+    induction H1; intros; eauto; try congruence.
+    inversion Heqn0; clear Heqn0; subst.
+    inversion H3; clear H3; repeat sigT_eq.
+
+    edestruct IHcompile_ok_n; eauto.
+    
+    induction H0; inversion H1; clear H1; repeat sigT_eq;
+      eauto.
+    
+*)
+
+
   Variable State : Type.
   Variable lo_step : OpSemantics opLoT State.
   Variable hi_step : OpSemantics opMidT State.
@@ -442,6 +492,7 @@ Section Atomization.
     atomize_ok_n p1 p2 0.
 
   Definition atomize_ok T (p1 p2 : proc opLoT T) :=
+    non_degenerate p1 /\
     forall n,
       atomize_ok_n p1 p2 n.
 
@@ -460,6 +511,32 @@ Section Atomization.
   Variable atomize_is_correct : atomize_correct.
 
 
+  Theorem non_degenerate_atomize_ok : forall `(p1 : proc opLoT T) (p2 : proc opLoT T),
+    atomize_ok p1 p2 ->
+    non_degenerate p2.
+  Proof.
+    unfold atomize_ok, non_degenerate.
+    intuition idtac.
+    repeat deex.
+    exists n.
+    generalize dependent T.
+    induction n; intros; eauto.
+    - inversion H; clear H; repeat sigT_eq;
+        specialize (H1 1) as H'; inversion H'; clear H'; repeat sigT_eq;
+        unfold atomize; eauto.
+    - inversion H; clear H; repeat sigT_eq;
+        specialize (H1 1) as H'; inversion H'; clear H'; repeat sigT_eq;
+        unfold atomize; eauto.
+      constructor; intros.
+      + eapply IHn. eapply H4.
+        intros. specialize (H1 (S n0)). inversion H1; clear H1; repeat sigT_eq.
+        eauto.
+      + eapply IHn. eapply (H5 x).
+        intros. specialize (H1 (S n0)). inversion H1; clear H1; repeat sigT_eq.
+        eauto.
+  Qed.
+
+
   Theorem atomize_ok_trace_incl_0 :
     forall T p1 p2,
     atomize_ok p1 p2 ->
@@ -467,83 +544,56 @@ Section Atomization.
     (forall x, trace_incl op_step (p1rest x) (p2rest x)) ->
     trace_incl op_step (Bind p1 p1rest) (Bind p2 p2rest).
   Proof.
-(*
-    intros.
-    eapply trace_incl_proof_helper; intros.
-    exec_tid_inv.
+    unfold atomize_ok.
+    do 4 intro.
+    destruct H.
+    destruct H.
+    specialize (H0 (S x)).
+    generalize dependent H0.
+    induction H.
 
-    generalize dependent p2.
-    induction H12; intros.
+    - intros.
+      inversion H0; clear H0; repeat sigT_eq.
+      rewrite <- H3.
+      eauto.
 
-    - specialize (H 1).
-      inversion H; clear H; repeat sigT_eq.
+    - intros.
+      inversion H0; clear H0; repeat sigT_eq.
 
       {
-        edestruct atomize_is_correct.
-        eauto.
-        eapply ExecPrefixOne with (tid := tid).
-          rewrite thread_upd_eq; eauto.
-          rewrite H4. eauto.
-          autorewrite with t. eauto.
+        rewrite <- H3.
         eauto.
       }
 
-      edestruct H0; eauto.
-      intuition idtac.
-
-      do 2 eexists.
-      eapply ExecPrefixOne with (tid := tid).
-        rewrite thread_upd_eq; eauto.
-        eauto.
-        autorewrite with t. eauto.
+      repeat rewrite exec_equiv_ret_bind.
       eauto.
 
-    - admit.
-
-    - admit.
-
-    - admit.
-
-    - specialize (H 1) as H'.
-      inversion H'; clear H'; repeat sigT_eq.
+    - intros.
+      inversion H0; clear H0; repeat sigT_eq.
 
       {
-        edestruct atomize_is_correct.
-        eauto.
-        eapply ExecPrefixOne with (tid := tid).
-          rewrite thread_upd_eq; eauto.
-          rewrite H4. eauto.
-          autorewrite with t. eauto.
+        rewrite <- H3.
         eauto.
       }
 
-      edestruct IHexec_tid.
+      eapply trace_incl_bind_a; eauto.
+
+    - intros.
+      inversion H0; clear H0; repeat sigT_eq.
+      rewrite <- H3.
+      eauto.
+
+    - intros.
+      inversion H2; clear H2; repeat sigT_eq.
+
+      {
+        rewrite <- H6.
         eauto.
-        
-      edestruct H0; eauto.
-      intuition idtac.
+      }
 
-      do 2 eexists.
-      eapply ExecPrefixOne with (tid := tid).
-        rewrite thread_upd_eq; eauto.
-        eauto.
-        autorewrite with t. eauto.
+      repeat rewrite exec_equiv_bind_bind.
       eauto.
-
-      
-
-    induction 1; intros.
-    - eauto.
-    - eapply trace_incl_bind_a.
-      eauto.
-    - rewrite exec_equiv_bind_bind.
-      rewrite exec_equiv_bind_bind.
-      eapply IHatomize_ok.
-      eauto.
-    - eapply trace_incl_bind_a; eauto.
   Qed.
-*)
-  Admitted.
 
   Theorem atomize_ok_trace_incl :
     forall `(p1 : proc _ T) p2,
@@ -608,12 +658,17 @@ Arguments atomize_correct {opLoT opMidT} compile_op [State] op_step.
 Theorem atomize_proc_match_helper :
   forall T `(p1 : proc opLoT T) `(p2 : proc opMidT T)
          compile_op,
+  non_degenerate p2 ->
   compile_ok compile_op p1 p2 ->
     atomize_ok compile_op p1 (compile (atomize compile_op) p2) /\
     atomic_compile_ok compile_op (compile (atomize compile_op) p2) p2.
 Proof.
-  split; intro n; generalize dependent T.
-  - induction n; intros; [ apply AtomizeZero | ].
+  split.
+  - split.
+
+; intro n; generalize dependent T.
+
+ induction n; intros; [ apply AtomizeZero | ].
     specialize (H (S n)) as H'; inversion H'; clear H'; repeat sigT_eq.
 
     + rewrite compile_op_eq. constructor.
