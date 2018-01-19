@@ -15,23 +15,20 @@ Section ProcStructure.
 
   Variable opT : Type -> Type.
 
-  Inductive no_atomics_n : forall T (p : proc opT T) (n : nat), Prop :=
-  | NoAtomicsOp : forall `(op : opT T) n,
-    no_atomics_n (Op op) (S n)
-  | NoAtomicsRet : forall `(x : T) n,
-    no_atomics_n (Ret x) (S n)
-  | NoAtomicsBind : forall `(pa : proc opT T1) `(pb : T1 -> proc _ T2) n,
-    no_atomics_n pa n ->
-    (forall x, no_atomics_n (pb x) n) ->
-    no_atomics_n (Bind pa pb) (S n)
-  | NoAtomicsLog : forall `(v : T) n,
-    no_atomics_n (Log v) (S n)
-  | NoAtomicsZero : forall `(p : proc _ T),
-    no_atomics_n p 0.
-
-  Definition no_atomics T (p : proc opT T) :=
-    forall n,
-      no_atomics_n p n.
+  Inductive no_atomics : forall T (p : proc opT T), Prop :=
+  | NoAtomicsOp : forall `(op : opT T),
+    no_atomics (Op op)
+  | NoAtomicsRet : forall `(x : T),
+    no_atomics (Ret x)
+  | NoAtomicsBind : forall `(pa : proc opT T1) `(pb : T1 -> proc _ T2),
+    no_atomics pa ->
+    (forall x, no_atomics (pb x)) ->
+    no_atomics (Bind pa pb)
+  | NoAtomicsUntil : forall `(p : proc opT T) (c : T -> bool),
+    no_atomics p ->
+    no_atomics (Until c p)
+  | NoAtomicsLog : forall `(v : T),
+    no_atomics (Log v).
 
   Definition no_atomics_opt x :=
     match x with
@@ -43,32 +40,6 @@ Section ProcStructure.
     Forall no_atomics_opt ts.
 
 
-  Theorem no_atomics_inv_bind_a : forall `(p1 : proc _ T1) `(p2 : T1 -> proc _ T2),
-    no_atomics (Bind p1 p2) ->
-    no_atomics p1.
-  Proof.
-    unfold no_atomics; intros.
-    specialize (H (S n)); inversion H; clear H; repeat sigT_eq.
-    eauto.
-  Qed.
-
-  Theorem no_atomics_inv_bind_b : forall `(p1 : proc _ T1) `(p2 : T1 -> proc _ T2),
-    no_atomics (Bind p1 p2) ->
-    forall x, no_atomics (p2 x).
-  Proof.
-    unfold no_atomics; intros.
-    specialize (H (S n)); inversion H; clear H; repeat sigT_eq.
-    eauto.
-  Qed.
-
-  Theorem no_atomics_inv_atomic : forall `(p : proc _ T),
-    no_atomics (Atomic p) ->
-    False.
-  Proof.
-    intros.
-    specialize (H 1); inversion H.
-  Qed.
-
   Theorem no_atomics_ts_cons : forall p ts,
     no_atomics_ts (p :: ts) ->
     no_atomics_opt p /\ no_atomics_ts ts.
@@ -77,33 +48,7 @@ Section ProcStructure.
     inversion H; intuition.
   Qed.
 
-
-  Inductive non_bind_n : forall T, proc opT T -> nat -> Prop :=
-  | NonBindOp : forall `(op : opT T) n,
-    non_bind_n (Op op) n
-  | NonBindRet : forall `(r : T) n,
-    non_bind_n (Ret r) n
-  | NonBindLog : forall `(r : T) n,
-    non_bind_n (Log r) n
-  | NonBindAtomic : forall `(p : proc _ T) n,
-    non_bind_n (Atomic p) n
-  | NonBindBind : forall `(p1 : proc _ T) `(p2 : _ -> proc _ T2) n,
-    non_bind_n p1 n ->
-    (forall x, non_bind_n (p2 x) (S n)) ->
-    non_bind_n (Bind p1 p2) (S n).
-
-  Hint Constructors non_bind_n.
-
-  Definition non_degenerate `(p : proc _ T) :=
-    exists n,
-      non_bind_n p n.
-
 End ProcStructure.
-
-Hint Resolve no_atomics_inv_bind_a.
-Hint Resolve no_atomics_inv_bind_b.
-Hint Resolve no_atomics_inv_atomic.
-Hint Constructors non_bind_n.
 
 
 Section Compiler.
@@ -116,172 +61,51 @@ Section Compiler.
   Definition atomize T (op : opMidT T) : proc opLoT T :=
     Atomic (compile_op op).
 
-  Inductive compile_ok_n : forall T (p1 : proc opLoT T) (p2 : proc opMidT T) (n : nat), Prop :=
-  | CompileOp : forall `(op : opMidT T) n,
-    compile_ok_n (compile_op op) (Op op) (S n)
-  | CompileRet : forall `(x : T) n,
-    compile_ok_n (Ret x) (Ret x) (S n)
+  Inductive compile_ok : forall T (p1 : proc opLoT T) (p2 : proc opMidT T), Prop :=
+  | CompileOp : forall `(op : opMidT T),
+    compile_ok (compile_op op) (Op op)
+  | CompileRet : forall `(x : T),
+    compile_ok (Ret x) (Ret x)
   | CompileBind : forall `(p1a : proc opLoT T1) (p2a : proc opMidT T1)
-                         `(p1b : T1 -> proc _ T2) (p2b : T1 -> proc _ T2) n,
-    compile_ok_n p1a p2a n ->
-    (forall x, compile_ok_n (p1b x) (p2b x) n) ->
-    compile_ok_n (Bind p1a p1b) (Bind p2a p2b) (S n)
-  | CompileLog : forall `(v : T) n,
-    compile_ok_n (Log v) (Log v) (S n)
-  | CompileZero : forall T (p1 : proc _ T) (p2 : proc _ T),
-    compile_ok_n p1 p2 0.
-
-  Definition compile_ok T (p1 : proc opLoT T) (p2 : proc opMidT T) :=
-    forall n,
-      compile_ok_n p1 p2 n.
-
-  Inductive atomic_compile_ok_n : forall T (p1 : proc opLoT T) (p2 : proc opMidT T) (n : nat), Prop :=
-  | ACompileOp : forall `(op : opMidT T) n,
-    atomic_compile_ok_n (Atomic (compile_op op)) (Op op) n
-  | ACompileRet : forall `(x : T) n,
-    atomic_compile_ok_n (Ret x) (Ret x) n
-  | ACompileBind : forall `(p1a : proc opLoT T1) (p2a : proc opMidT T1)
-                          `(p1b : T1 -> proc _ T2) (p2b : T1 -> proc _ T2) n,
-    atomic_compile_ok_n p1a p2a n ->
-    (forall x, atomic_compile_ok_n (p1b x) (p2b x) n) ->
-    atomic_compile_ok_n (Bind p1a p1b) (Bind p2a p2b) (S n)
-  | ACompileLog : forall `(v : T) n,
-    atomic_compile_ok_n (Log v) (Log v) n
-  | ACompileZero : forall T (p1 : proc _ T) (p2 : proc _ T),
-    atomic_compile_ok_n p1 p2 0.
-
-  Definition atomic_compile_ok T (p1 : proc opLoT T) (p2 : proc opMidT T) :=
-    forall n,
-      atomic_compile_ok_n p1 p2 n.
-
-
-  Hint Constructors compile_ok_n.
-  Hint Constructors atomic_compile_ok_n.
-
-
-  Theorem compile_ok_inv_bind : forall `(p1a : proc _ T1) `(p1b : _ -> proc _ T2) p2a p2b,
-    compile_ok (Bind p1a p1b) (Bind p2a p2b) ->
-      compile_ok p1a p2a /\
-      forall r, compile_ok (p1b r) (p2b r).
-  Proof.
-    split; intros.
-
-    intro.
-    specialize (H (S n)); inversion H; clear H; repeat sigT_eq.
-    eauto.
-
-    intro.
-    specialize (H (S n)); inversion H; clear H; repeat sigT_eq.
-    eauto.
-  Qed.
-
-  Theorem compile_ok_bind : forall `(p1a : proc opLoT T1) (p2a : proc opMidT T1)
-                                   `(p1b : T1 -> proc _ T2) (p2b : T1 -> proc _ T2),
+                         `(p1b : T1 -> proc _ T2) (p2b : T1 -> proc _ T2),
     compile_ok p1a p2a ->
     (forall x, compile_ok (p1b x) (p2b x)) ->
-    compile_ok (Bind p1a p1b) (Bind p2a p2b).
-  Proof.
-    intros.
-    intro.
-    destruct n; eauto.
-    constructor; eauto.
-    intros.
-    eapply H0.
-  Qed.
+    compile_ok (Bind p1a p1b) (Bind p2a p2b)
+  | CompileUntil : forall `(p1 : proc opLoT T) (p2 : proc opMidT T) (c : T -> bool),
+    compile_ok p1 p2 ->
+    compile_ok (Until c p1) (Until c p2)
+  | CompileLog : forall `(v : T),
+    compile_ok (Log v) (Log v).
 
-  Theorem atomic_compile_ok_inv_bind : forall `(p1a : proc _ T1) `(p1b : _ -> proc _ T2) p2,
-    atomic_compile_ok (Bind p1a p1b) p2 ->
-    exists p2a p2b,
-      p2 = Bind p2a p2b /\
-      atomic_compile_ok p1a p2a /\
-      forall r, atomic_compile_ok (p1b r) (p2b r).
-  Proof.
-    intros.
-    specialize (H 1) as H'.
-    inversion H'; clear H'; repeat sigT_eq.
-    do 2 eexists; intuition.
-
-    intro.
-    specialize (H (S n)); inversion H; clear H; repeat sigT_eq.
-    eauto.
-
-    intro.
-    specialize (H (S n)); inversion H; clear H; repeat sigT_eq.
-    eauto.
-  Qed.
-
-  Theorem atomic_compile_ok_bind : forall `(p1a : proc opLoT T1) (p2a : proc opMidT T1)
-                                          `(p1b : T1 -> proc _ T2) (p2b : T1 -> proc _ T2),
+  Inductive atomic_compile_ok : forall T (p1 : proc opLoT T) (p2 : proc opMidT T), Prop :=
+  | ACompileOp : forall `(op : opMidT T),
+    atomic_compile_ok (Atomic (compile_op op)) (Op op)
+  | ACompileRet : forall `(x : T),
+    atomic_compile_ok (Ret x) (Ret x)
+  | ACompileBind : forall `(p1a : proc opLoT T1) (p2a : proc opMidT T1)
+                          `(p1b : T1 -> proc _ T2) (p2b : T1 -> proc _ T2),
     atomic_compile_ok p1a p2a ->
     (forall x, atomic_compile_ok (p1b x) (p2b x)) ->
-    atomic_compile_ok (Bind p1a p1b) (Bind p2a p2b).
-  Proof.
-    intros.
-    intro.
-    destruct n; eauto.
-    constructor; eauto.
-    intros.
-    eapply H0.
-  Qed.
+    atomic_compile_ok (Bind p1a p1b) (Bind p2a p2b)
+  | ACompileUntil : forall `(p1 : proc opLoT T) (p2 : proc opMidT T) (c : T -> bool),
+    atomic_compile_ok p1 p2 ->
+    atomic_compile_ok (Until c p1) (Until c p2)
+  | ACompileLog : forall `(v : T),
+    atomic_compile_ok (Log v) (Log v).
 
-  Hint Resolve atomic_compile_ok_bind.
+  Hint Constructors compile_ok.
+  Hint Constructors atomic_compile_ok.
 
 
-  CoFixpoint compile T (p : proc opMidT T) : proc opLoT T :=
+  Fixpoint compile T (p : proc opMidT T) : proc opLoT T :=
     match p with
     | Ret t => Ret t
     | Op op => compile_op op
     | Bind p1 p2 => Bind (compile p1) (fun r => compile (p2 r))
     | Log v => Log v
     | Atomic p => Atomic (compile p)
+    | Until c p => Until c (compile p)
     end.
-
-  Ltac compile_eq_step :=
-    match goal with
-    | |- ?x = _ =>
-      rewrite frob_proc_eq with (p := x) at 1; simpl;
-        try reflexivity; f_equal
-    | _ =>
-      apply functional_extensionality; intros
-    end.
-
-  Theorem compile_op_eq : forall T (op : _ T),
-    compile (Op op) =
-      compile_op op.
-  Proof.
-    intros.
-    compile_eq_step.
-    destruct (compile_op op); congruence.
-  Qed.
-
-  Theorem compile_ret_eq : forall T (v : T),
-    compile (Ret v) = Ret v.
-  Proof.
-    intros.
-    compile_eq_step.
-  Qed.
-
-  Theorem compile_bind_eq : forall T1 T2 (p1 : proc _ T1) (p2 : _ -> proc _ T2),
-    compile (Bind p1 p2) =
-      Bind (compile p1) (fun x => compile (p2 x)).
-  Proof.
-    intros.
-    compile_eq_step.
-  Qed.
-
-  Theorem compile_log_eq : forall T (v : T),
-    compile (Log v) = Log v.
-  Proof.
-    intros.
-    compile_eq_step.
-  Qed.
-
-  Theorem compile_atomic_eq : forall T (p : proc _ T),
-    compile (Atomic p) = Atomic (compile p).
-  Proof.
-    intros.
-    compile_eq_step.
-  Qed.
 
 
   Theorem compile_ok_compile :
@@ -289,16 +113,12 @@ Section Compiler.
       no_atomics p ->
       compile_ok (compile p) p.
   Proof.
-    unfold compile_ok; intros.
-    generalize dependent p.
-    generalize dependent T.
-    induction n; eauto; intros.
-    destruct p.
-    - rewrite compile_op_eq; eauto.
-    - rewrite compile_ret_eq; eauto.
-    - rewrite compile_bind_eq; eauto 20.
-    - rewrite compile_log_eq; eauto.
-    - exfalso; eauto.
+    induction p; simpl; intros; eauto.
+    - inversion H0; clear H0; repeat sigT_eq.
+      eauto.
+    - inversion H; clear H; repeat sigT_eq.
+      eauto.
+    - inversion H.
   Qed.
 
   Fixpoint compile_ts (ts : threads_state) : threads_state :=
@@ -335,34 +155,6 @@ Section Compiler.
   Qed.
 
 
-  Definition compile_non_degenerate :=
-    forall `(op : opMidT T),
-      non_degenerate (compile_op op).
-
-(*
-  Theorem non_degenerate_compile_ok : forall `(p1 : proc opLoT T) (p2 : proc opMidT T),
-    compile_non_degenerate ->
-    non_degenerate p2 ->
-    compile_ok p1 p2 ->
-    non_degenerate p1.
-  Proof.
-    unfold compile_non_degenerate, non_degenerate, compile_ok; intros.
-    repeat deex.
-    specialize (H1 (S n)).
-    remember (S n).
-    generalize dependent n.
-    induction H1; intros; eauto; try congruence.
-    inversion Heqn0; clear Heqn0; subst.
-    inversion H3; clear H3; repeat sigT_eq.
-
-    edestruct IHcompile_ok_n; eauto.
-    
-    induction H0; inversion H1; clear H1; repeat sigT_eq;
-      eauto.
-    
-*)
-
-
   Variable State : Type.
   Variable lo_step : OpSemantics opLoT State.
   Variable hi_step : OpSemantics opMidT State.
@@ -396,25 +188,12 @@ Section Compiler.
   Proof.
     intros.
     induction H0.
+    all: inversion H; clear H; repeat sigT_eq; eauto.
 
-    - specialize (H 1).
-      inversion H; clear H; repeat sigT_eq.
-      eauto.
-
-    - specialize (H 1).
-      inversion H.
-
-    - specialize (H 1).
-      inversion H; clear H; repeat sigT_eq.
-      eapply compile_is_correct in H0.
+    - eapply compile_is_correct in H0.
       do 2 eexists; intuition eauto.
 
-    - specialize (H 1).
-      inversion H; clear H; repeat sigT_eq.
-      eauto.
-
-    - eapply atomic_compile_ok_inv_bind in H; repeat deex.
-      edestruct IHexec_tid; eauto; repeat deex.
+    - edestruct IHexec_tid; eauto; repeat deex.
       do 2 eexists; intuition idtac.
 
       constructor; eauto.
@@ -422,6 +201,14 @@ Section Compiler.
 
       destruct result; destruct x; try solve [ exfalso; eauto ];
         subst; eauto.
+
+    - do 2 eexists; intuition idtac.
+        eauto.
+        eauto.
+        simpl.
+
+      constructor; eauto; intros.
+      destruct (Bool.bool_dec (c x) true); eauto.
   Qed.
 
   Theorem atomic_compile_ok_traces_match_ts :
@@ -476,25 +263,21 @@ Section Atomization.
   Variable opMidT : Type -> Type.
   Variable compile_op : forall T, opMidT T -> proc opLoT T.
 
-  Inductive atomize_ok_n : forall T (p1 p2 : proc opLoT T) (n : nat), Prop :=
-  | AtomizeOp : forall `(op : opMidT T) n,
-    atomize_ok_n (compile_op op) (atomize compile_op op) (S n)
-  | AtomizeRet : forall `(x : T) n,
-    atomize_ok_n (Ret x) (Ret x) (S n)
+  Inductive atomize_ok : forall T (p1 p2 : proc opLoT T), Prop :=
+  | AtomizeOp : forall `(op : opMidT T),
+    atomize_ok (compile_op op) (atomize compile_op op)
+  | AtomizeRet : forall `(x : T),
+    atomize_ok (Ret x) (Ret x)
   | AtomizeBind : forall T1 T2 (p1a p2a : proc opLoT T1)
-                               (p1b p2b : T1 -> proc opLoT T2) n,
-    atomize_ok_n p1a p2a n ->
-    (forall x, atomize_ok_n (p1b x) (p2b x) n) ->
-    atomize_ok_n (Bind p1a p1b) (Bind p2a p2b) (S n)
-  | AtomizeLog : forall `(v : T) n,
-    atomize_ok_n (Log v) (Log v) (S n)
-  | AtomizeZero : forall `(p1 : proc _ T) p2,
-    atomize_ok_n p1 p2 0.
-
-  Definition atomize_ok T (p1 p2 : proc opLoT T) :=
-    non_degenerate p1 /\
-    forall n,
-      atomize_ok_n p1 p2 n.
+                               (p1b p2b : T1 -> proc opLoT T2),
+    atomize_ok p1a p2a ->
+    (forall x, atomize_ok (p1b x) (p2b x)) ->
+    atomize_ok (Bind p1a p1b) (Bind p2a p2b)
+  | AtomizeUntil : forall T (p1 p2 : proc opLoT T) (c : T -> bool),
+    atomize_ok p1 p2 ->
+    atomize_ok (Until c p1) (Until c p2)
+  | AtomizeLog : forall `(v : T),
+    atomize_ok (Log v) (Log v).
 
 
   Variable State : Type.
@@ -511,32 +294,6 @@ Section Atomization.
   Variable atomize_is_correct : atomize_correct.
 
 
-  Theorem non_degenerate_atomize_ok : forall `(p1 : proc opLoT T) (p2 : proc opLoT T),
-    atomize_ok p1 p2 ->
-    non_degenerate p2.
-  Proof.
-    unfold atomize_ok, non_degenerate.
-    intuition idtac.
-    repeat deex.
-    exists n.
-    generalize dependent T.
-    induction n; intros; eauto.
-    - inversion H; clear H; repeat sigT_eq;
-        specialize (H1 1) as H'; inversion H'; clear H'; repeat sigT_eq;
-        unfold atomize; eauto.
-    - inversion H; clear H; repeat sigT_eq;
-        specialize (H1 1) as H'; inversion H'; clear H'; repeat sigT_eq;
-        unfold atomize; eauto.
-      constructor; intros.
-      + eapply IHn. eapply H4.
-        intros. specialize (H1 (S n0)). inversion H1; clear H1; repeat sigT_eq.
-        eauto.
-      + eapply IHn. eapply (H5 x).
-        intros. specialize (H1 (S n0)). inversion H1; clear H1; repeat sigT_eq.
-        eauto.
-  Qed.
-
-
   Theorem atomize_ok_trace_incl_0 :
     forall T p1 p2,
     atomize_ok p1 p2 ->
@@ -544,7 +301,193 @@ Section Atomization.
     (forall x, trace_incl op_step (p1rest x) (p2rest x)) ->
     trace_incl op_step (Bind p1 p1rest) (Bind p2 p2rest).
   Proof.
-    unfold atomize_ok.
+    intros.
+    unfold trace_incl.
+    unfold trace_incl_opt.
+    unfold trace_incl_ts.
+    unfold trace_incl_ts_s.
+    intros.
+    destruct H1.
+
+    generalize dependent T.
+    generalize dependent ts.
+    generalize dependent s.
+    generalize dependent tr.
+
+    induction x; intros.
+
+    - inversion H1; clear H1; repeat sigT_eq; subst.
+      eauto.
+
+    - inversion H1; clear H1; repeat sigT_eq; subst.
+      destruct (tid0 == tid); subst; autorewrite with t in *.
+
+      + maybe_proc_inv; repeat sigT_eq.
+        exec_tid_inv.
+
+        induction H.
+        * admit.
+        * exec_tid_inv.
+          edestruct H0; eauto.
+          eexists; intuition idtac.
+          rewrite exec_equiv_ret_bind. eauto.
+          simpl. eauto.
+        * exec_tid_inv.
+          edestruct IHatomize_ok with (p1rest := fun x => Bind (p1b x) p1rest)
+                                      (p2rest := fun x => Bind (p2b x) p2rest).
+            3: eassumption.
+            2: destruct result; eauto.
+            2: admit.
+
+          
+            intros. intro. intros. intro. intro. intros.
+            unfold trace_incl; intros.
+
+          eexists; intuition idtac.
+          rewrite exec_equiv_bind_bind. eassumption.
+          eauto.
+        * exec_tid_inv.
+          edestruct IHx with (p2 := until1 c p2).
+            3: exact H8.
+            2: eauto.
+            constructor. eauto.
+            intros. destruct (Bool.bool_dec (c x0) true). constructor. constructor. eauto.
+
+          eexists. intuition idtac.
+          rewrite exec_equiv_until. eassumption.
+          eauto.
+        * admit.
+
+      + rewrite thread_upd_upd_ne in H8 by eauto.
+        edestruct IHx; eauto.
+        intuition idtac.
+
+        eexists; intuition idtac.
+        eapply ExecPrefixOne with (tid := tid0).
+          autorewrite with t; eauto.
+          eauto.
+          rewrite thread_upd_upd_ne; eauto.
+        eauto.
+  Admitted.
+  
+
+
+    intros.
+    eapply trace_incl_proof_helper; intros.
+    exec_tid_inv.
+
+    generalize dependent tr.
+    generalize dependent p2rest.
+    generalize dependent p1rest.
+    generalize dependent p2.
+    induction H12; intros.
+
+    - inversion H; clear H; repeat sigT_eq.
+
+      {
+        edestruct atomize_is_correct.
+        eauto.
+        eapply ExecPrefixOne with (tid := tid).
+          rewrite thread_upd_eq; eauto.
+          rewrite H4. eauto.
+          autorewrite with t. eauto.
+        eauto.
+      }
+
+      edestruct H0; eauto.
+      intuition idtac.
+
+      do 2 eexists.
+      eapply ExecPrefixOne with (tid := tid).
+        rewrite thread_upd_eq; eauto.
+        eauto.
+        autorewrite with t. eauto.
+      eauto.
+
+    - inversion H0; clear H0; repeat sigT_eq.
+      edestruct atomize_is_correct.
+      eauto.
+      eapply ExecPrefixOne with (tid := tid).
+        rewrite thread_upd_eq; eauto.
+        rewrite H5. eauto.
+        autorewrite with t. eauto.
+      eauto.
+
+    - inversion H0; clear H0; repeat sigT_eq.
+      edestruct atomize_is_correct.
+      eauto.
+      eapply ExecPrefixOne with (tid := tid).
+        rewrite thread_upd_eq; eauto.
+        rewrite H5. eauto.
+        autorewrite with t. eauto.
+      eauto.
+
+    - inversion H; clear H; repeat sigT_eq.
+
+      {
+        edestruct atomize_is_correct.
+        eauto.
+        eapply ExecPrefixOne with (tid := tid).
+          rewrite thread_upd_eq; eauto.
+          rewrite H4. eauto.
+          autorewrite with t. eauto.
+        eauto.
+      }
+
+      edestruct H0; eauto.
+      intuition idtac.
+
+      do 2 eexists.
+      eapply ExecPrefixOne with (tid := tid).
+        rewrite thread_upd_eq; eauto.
+        eauto.
+        autorewrite with t. eauto.
+      eauto.
+
+    - admit.
+
+    - inversion H; clear H; repeat sigT_eq.
+
+      {
+        edestruct atomize_is_correct.
+        eauto.
+        eapply ExecPrefixOne with (tid := tid).
+          rewrite thread_upd_eq; eauto.
+          rewrite H4. eauto.
+          autorewrite with t. eauto.
+        eauto.
+      }
+
+      
+
+      edestruct H0; eauto.
+      intuition idtac.
+
+      do 2 eexists.
+      eapply ExecPrefixOne with (tid := tid).
+        rewrite thread_upd_eq; eauto.
+        eauto.
+        autorewrite with t. eauto.
+      eauto.
+
+      
+
+    induction 1; intros; eauto.
+    - repeat rewrite exec_equiv_ret_bind.
+      eauto.
+    - repeat rewrite exec_equiv_bind_bind.
+      eauto.
+    - repeat rewrite exec_equiv_until.
+      unfold until1.
+      repeat rewrite exec_equiv_bind_bind.
+      eapply IHatomize_ok; intros.
+      destruct (Bool.bool_dec (c x) true).
+      + repeat rewrite exec_equiv_ret_bind.
+        eauto.
+      + 
+
+
+
     do 4 intro.
     destruct H.
     destruct H.

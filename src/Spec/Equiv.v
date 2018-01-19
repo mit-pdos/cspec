@@ -610,6 +610,26 @@ Proof.
   reflexivity.
 Qed.
 
+Theorem exec_equiv_until : forall `(p : proc opT T) (c : T -> bool),
+  exec_equiv_rx (Until c p) (until1 c p).
+Proof.
+  intros.
+  eapply exec_equiv_rx_proof_helper; intros.
+  - repeat exec_tid_inv.
+    simpl; eauto.
+  - rewrite <- app_nil_l with (l := evs).
+    rewrite prepend_app.
+    eapply ExecPrefixOne.
+      autorewrite with t; eauto.
+      eauto.
+      autorewrite with t.
+    eapply ExecPrefixOne.
+      autorewrite with t; eauto.
+      eauto.
+      autorewrite with t.
+    eauto.
+Qed.
+
 Instance Bind_exec_equiv_proper :
   Proper (exec_equiv_rx ==>
           pointwise_relation T exec_equiv_rx ==>
@@ -624,6 +644,16 @@ Proof.
   eapply exec_equiv_bind_a; intros.
   eapply H2.
 Qed.
+
+(*
+Instance Until_exec_equiv_proper :
+  Proper (eq ==> exec_equiv_rx ==> @exec_equiv_rx opT T) Until.
+Proof.
+  intros.
+  intros ? ? ?; subst.
+  intros p1a p1b H1; intros.
+Admitted.
+*)
 
 Theorem exec_equiv_ts_upd_same : forall `(ts : @threads_state opT) p tid,
   ts [[ tid ]] = p ->
@@ -1309,6 +1339,10 @@ Proof.
   rewrite prepend_app.
   apply exec_equiv_norx_bind_bind.
   eauto.
+
+  rewrite exec_equiv_until.
+  eauto.
+
   eauto.
 Qed.
 

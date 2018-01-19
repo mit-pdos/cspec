@@ -6,6 +6,7 @@ Require Import Omega.
 Require Import Helpers.Helpers.
 Require Import Helpers.ListStuff.
 Require Import List.
+Require Import Bool.
 
 Import ListNotations.
 
@@ -40,27 +41,13 @@ Section Proc.
   Variable opT : Type -> Type.
   Variable State : Type.
 
-  CoInductive proc : Type -> Type :=
+  Inductive proc : Type -> Type :=
   | Op : forall T (op : opT T), proc T
   | Ret : forall T (v : T), proc T
   | Bind : forall T (T1 : Type) (p1 : proc T1) (p2 : T1 -> proc T), proc T
+  | Until : forall T (c : T -> bool) (p : proc T), proc T
   | Log : forall T (v : T), proc T
   | Atomic : forall T (p : proc T), proc T.
-
-  Definition frob_proc T (p : proc T) : proc T :=
-    match p with
-    | Op op => Op op
-    | Bind p1 p2 => Bind p1 p2
-    | Ret t => Ret t
-    | Log v => Log v
-    | Atomic p => Atomic p
-    end.
-
-  Theorem frob_proc_eq : forall T (p : proc T),
-    p = frob_proc p.
-  Proof.
-    destruct p; reflexivity.
-  Qed.
 
 
   Definition OpSemantics := forall T, opT T -> nat -> State -> T -> State -> Prop.
@@ -83,6 +70,10 @@ Section Proc.
     list_upd (pad ts (S tid) NoProc) tid s.
 
 
+  Definition until1 T (c : T -> bool) (p : proc T) :=
+    Bind p (fun x => if bool_dec (c x) true then Ret x else Until c p).
+
+
   Inductive atomic_exec : forall T, proc T -> nat -> State ->
                                     T -> State -> list event -> Prop :=
 
@@ -102,6 +93,10 @@ Section Proc.
   | AtomicLog : forall T (r : T) tid s,
     atomic_exec (Log r) tid s r s
       [Event r]
+
+  | AtomicUntil : forall T (p : proc T) (c : T -> bool) tid s r s' ev',
+    atomic_exec (until1 c p) tid s r s' ev' ->
+    atomic_exec (Until c p) tid s r s' ev'
 
   | AtomicAtomic : forall T (p : proc T) tid s r s' ev',
     atomic_exec p tid s r s' ev' ->
@@ -143,7 +138,12 @@ Section Proc.
                      | inl r => p2 r
                      | inr p1' => Bind p1' p2
                      end
-                    ) evs.
+                    ) evs
+
+  | ExecTidUntil : forall tid T (p : proc T) (c : T -> bool) s,
+    exec_tid tid s (Until c p)
+                 s (inr (until1 c p))
+                 nil.
 
 
   Inductive exec : State -> threads_state -> trace -> nat -> Prop :=
@@ -198,6 +198,7 @@ End Proc.
 Arguments Op {opT T}.
 Arguments Ret {opT T}.
 Arguments Bind {opT T T1}.
+Arguments Until {opT T}.
 Arguments Log {opT T}.
 Arguments Atomic {opT T}.
 
