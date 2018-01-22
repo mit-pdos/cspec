@@ -18,13 +18,11 @@ Global Generalizable All Variables.
 
 (** Opcodes *)
 
-Inductive opLoT : Type -> Type :=
-| Acquire : opLoT unit
-| Release : opLoT unit
-| Read : opLoT nat
-| Write : nat -> opLoT unit.
-
-Variable opHiT : Type -> Type.
+Inductive opT : Type -> Type :=
+| Acquire : opT unit
+| Release : opT unit
+| Read : opT nat
+| Write : nat -> opT unit.
 
 
 (** State *)
@@ -37,7 +35,7 @@ Record State := mkState {
 
 (** Semantics *)
 
-Inductive raw_step : forall T, opLoT T -> nat -> State -> T -> State -> Prop :=
+Inductive raw_step : forall T, opT T -> nat -> State -> T -> State -> Prop :=
 | RawStepAcquire : forall tid v,
   raw_step Acquire tid (mkState v None) tt (mkState v (Some tid))
 | RawStepRelease : forall tid v l,
@@ -47,7 +45,7 @@ Inductive raw_step : forall T, opLoT T -> nat -> State -> T -> State -> Prop :=
 | RawStepWrite : forall tid v0 v l,
   raw_step (Write v) tid (mkState v0 l) tt (mkState v l).
 
-Inductive proto_step : forall T, opLoT T -> nat -> State -> T -> State -> Prop :=
+Inductive proto_step : forall T, opT T -> nat -> State -> T -> State -> Prop :=
 | ProtoStepAcquire : forall tid v,
   proto_step Acquire tid (mkState v None) tt (mkState v (Some tid))
 | ProtoStepRelease : forall tid v,
@@ -76,7 +74,7 @@ Ltac step_inv :=
 
 (** Rules for following the protocol *)
 
-Definition follows_protocol_op `(op : opLoT T) (tid : nat)
+Definition follows_protocol_op `(op : opT T) (tid : nat)
                                 (old_owner : bool) (new_owner : bool) :=
   match op with
   | Acquire => old_owner = false /\ new_owner = true
@@ -93,7 +91,7 @@ Definition lock_match s tid :=
   end.
 
 
-Theorem follows_protocol_step : forall `(op : opLoT T) tid s v s' b,
+Theorem follows_protocol_step : forall `(op : opT T) tid s v s' b,
   raw_step op tid s v s' ->
   follows_protocol_op op tid (lock_match s tid) b ->
   proto_step op tid s v s'.
@@ -113,51 +111,39 @@ Qed.
 Hint Resolve follows_protocol_step.
 
 
-(** XXX
-  This seems to restrict us to finite programs...
- *)
-
 Inductive follows_protocol_proc (tid : nat) (old_owner : bool) (new_owner : bool) :
-  forall T (p : proc opLoT opHiT T), Prop :=
-| FollowsProtocolProcOpExec :
-  forall T (op : opLoT T),
+  forall T (p : proc opT T), Prop :=
+| FollowsProtocolProcOp :
+  forall T (op : opT T),
   follows_protocol_op op tid old_owner new_owner ->
-  follows_protocol_proc tid old_owner new_owner (OpExec op)
+  follows_protocol_proc tid old_owner new_owner (Op op)
 | FollowsProtocolProcBind :
-  forall T1 T2 (p1 : proc opLoT opHiT T1) (p2 : T1 -> proc opLoT opHiT T2) mid_owner,
+  forall T1 T2 (p1 : proc opT T1) (p2 : T1 -> proc opT T2) mid_owner,
   follows_protocol_proc tid old_owner mid_owner p1 ->
   (forall x, follows_protocol_proc tid mid_owner new_owner (p2 x)) ->
   follows_protocol_proc tid old_owner new_owner (Bind p1 p2)
+| FollowsProtocolProcUntil :
+  forall T (p : proc opT T) c,
+  old_owner = new_owner ->
+  follows_protocol_proc tid old_owner new_owner p ->
+  follows_protocol_proc tid old_owner new_owner (Until c p)
 | FollowsProtocolProcAtomic :
-  forall T (p : proc opLoT opHiT T),
+  forall T (p : proc opT T),
   follows_protocol_proc tid old_owner new_owner p ->
   follows_protocol_proc tid old_owner new_owner (Atomic p)
-
-| FollowsProtocolProcOpCall :
-  forall T (op : opLoT T),
-  old_owner = new_owner ->
-  follows_protocol_proc tid old_owner new_owner (OpCall op)
-| FollowsProtocolProcOpRet :
+| FollowsProtocolProcLog :
   forall T (v : T),
   old_owner = new_owner ->
-  follows_protocol_proc tid old_owner new_owner (OpRet v)
+  follows_protocol_proc tid old_owner new_owner (Log v)
 | FollowsProtocolProcRet :
   forall T (v : T),
   old_owner = new_owner ->
-  follows_protocol_proc tid old_owner new_owner (Ret v)
-| FollowsProtocolProcOpCallHi :
-  forall T (op : opHiT T),
-  old_owner = new_owner ->
-  follows_protocol_proc tid old_owner new_owner (OpCallHi op)
-| FollowsProtocolProcOpRetHi :
-  forall T (v : T),
-  old_owner = new_owner ->
-  follows_protocol_proc tid old_owner new_owner (OpRetHi v).
+  follows_protocol_proc tid old_owner new_owner (Ret v).
 
 Hint Constructors follows_protocol_proc.
 
 
-Lemma follows_protocol_op_owner : forall `(op : opLoT T) tid s v s' b,
+Lemma follows_protocol_op_owner : forall `(op : opT T) tid s v s' b,
   raw_step op tid s v s' ->
   follows_protocol_op op tid (lock_match s tid) b ->
   b = lock_match s' tid.
@@ -168,7 +154,7 @@ Proof.
 Qed.
 
 Theorem follows_protocol_atomic_owner :
-  forall `(p : proc opLoT opHiT T) tid s0 r s1 evs b,
+  forall `(p : proc opT T) tid s0 r s1 evs b,
   atomic_exec raw_step p tid s0 r s1 evs ->
   follows_protocol_proc tid (lock_match s0 tid) b p ->
   b = lock_match s1 tid.
@@ -184,10 +170,15 @@ Proof.
     eapply IHatomic_exec1 in H5; subst.
     specialize (H7 v1); eauto.
   - eapply follows_protocol_op_owner; eauto.
+  - erewrite <- IHatomic_exec. reflexivity.
+    econstructor; eauto; intros.
+    destruct (Bool.bool_dec (c x)).
+    constructor; eauto.
+    constructor; eauto.
 Qed.
 
 
-Theorem follows_protocol_atomic : forall `(p : proc opLoT opHiT T) tid s v s' evs b,
+Theorem follows_protocol_atomic : forall `(p : proc opT T) tid s v s' evs b,
   atomic_exec raw_step p tid s v s' evs ->
   follows_protocol_proc tid (lock_match s tid) b p ->
   atomic_exec proto_step p tid s v s' evs.
@@ -202,19 +193,27 @@ Proof.
 
   eapply follows_protocol_atomic_owner in H5 as H5'; eauto; subst.
   eauto.
+
+  constructor.
+  eapply IHatomic_exec.
+  econstructor; eauto; intros.
+  destruct (Bool.bool_dec (c x)).
+  constructor; eauto.
+  constructor; eauto.
+  congruence.
 Qed.
 
 Hint Resolve follows_protocol_atomic.
 
 
-Definition follows_protocol (ts : @threads_state opLoT opHiT) (s : State) :=
-  forall tid T (p : proc _ _ T),
+Definition follows_protocol (ts : @threads_state opT) (s : State) :=
+  forall tid T (p : proc _ T),
     ts [[ tid ]] = Proc p ->
     exists b,
       follows_protocol_proc tid (lock_match s tid) b p.
 
 Lemma follows_protocol_exec_tid :
-  forall ts tid `(p : proc _ _ T) s s' result evs,
+  forall ts tid `(p : proc _ T) s s' result evs,
     follows_protocol ts s ->
     ts [[ tid ]] = Proc p ->
     exec_tid raw_step tid s p s' result evs ->
@@ -237,7 +236,7 @@ Proof.
 Qed.
 
 
-Lemma lock_match_op_ne : forall `(op : opLoT T) tid tid' s s' r b,
+Lemma lock_match_op_ne : forall `(op : opT T) tid tid' s s' r b,
   raw_step op tid s r s' ->
   follows_protocol_op op tid (lock_match s tid) b ->
   tid <> tid' ->
@@ -253,7 +252,7 @@ Qed.
 Hint Resolve lock_match_op_ne.
 
 
-Lemma lock_match_atomic_ne : forall `(p : proc opLoT opHiT T) tid tid' s s' r evs b,
+Lemma lock_match_atomic_ne : forall `(p : proc opT T) tid tid' s s' r evs b,
   atomic_exec raw_step p tid s r s' evs ->
   follows_protocol_proc tid (lock_match s tid) b p ->
   tid <> tid' ->
@@ -270,12 +269,19 @@ Proof.
   intuition idtac.
   eapply follows_protocol_atomic_owner in H6 as H6'; eauto; subst.
   erewrite H2; eauto.
+
+  intuition idtac.
+  eapply H0.
+  econstructor; eauto; intros.
+  destruct (Bool.bool_dec (c x)).
+  constructor; eauto.
+  constructor; eauto.
 Qed.
 
 Hint Resolve lock_match_atomic_ne.
 
 
-Lemma lock_match_exec_tid_ne : forall `(p : proc opLoT opHiT T) tid tid' s s' r evs b,
+Lemma lock_match_exec_tid_ne : forall `(p : proc opT T) tid tid' s s' r evs b,
   exec_tid raw_step tid s p s' r evs ->
   follows_protocol_proc tid (lock_match s tid) b p ->
   tid <> tid' ->
@@ -291,7 +297,7 @@ Proof.
 Qed.
 
 Lemma follows_protocol_proc_exec_tid :
-  forall `(p : proc opLoT opHiT T) tid s s' p' evs b,
+  forall `(p : proc opT T) tid s s' p' evs b,
   follows_protocol_proc tid (lock_match s tid) b p ->
   exec_tid raw_step tid s p s' (inr p') evs ->
   follows_protocol_proc tid (lock_match s' tid) b p'.
@@ -319,10 +325,16 @@ Proof.
     eapply follows_protocol_atomic_owner in H2; eauto; subst; eauto.
   - specialize (IHexec_tid _ H4 _ eq_refl).
     simpl. eauto.
+  - inversion Heqs0; clear Heqs0; subst.
+    inversion H; clear H; repeat sigT_eq; subst.
+    econstructor; eauto; intros.
+    destruct (Bool.bool_dec (c x)).
+    constructor; eauto.
+    constructor; eauto.
 Qed.
 
 Lemma follows_protocol_exec_tid_upd :
-  forall ts tid `(p : proc _ _ T) s s' result evs,
+  forall ts tid `(p : proc _ T) s s' result evs,
     follows_protocol ts s ->
     ts [[ tid ]] = Proc p ->
     exec_tid raw_step tid s p s' result evs ->
