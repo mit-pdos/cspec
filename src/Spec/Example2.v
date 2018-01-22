@@ -11,6 +11,7 @@ Require Import List.
 Require Import Compile.
 Require Import Modules.
 Require Import Movers.
+Require Import Abstraction.
 
 Import ListNotations.
 
@@ -278,3 +279,53 @@ Module LockingCounter <: LayerImpl LockAPI LockedCounterAPI.
   Qed.
 
 End LockingCounter.
+
+
+(** Abstracting away the lock details. *)
+
+Module AbsCounter <: LayerImpl LockedCounterAPI CounterAPI.
+
+  Definition absR (s1 : LockedCounterAPI.State) (s2 : CounterAPI.State) :=
+    Lock s1 = None /\
+    Value s1 = s2.
+
+  Definition compile_ts (ts : @threads_state CounterAPI.opT) := ts.
+
+  Theorem compile_ts_no_atomics :
+    forall (ts : @threads_state CounterAPI.opT),
+      no_atomics_ts ts ->
+      no_atomics_ts (compile_ts ts).
+  Proof.
+    unfold compile_ts; eauto.
+  Qed.
+
+  Theorem absR_ok :
+    op_abs absR LockedCounterAPI.step CounterAPI.step.
+  Proof.
+    unfold op_abs; intros.
+    destruct s1; inversion H; clear H.
+    simpl in *; subst.
+    unfold absR.
+    destruct op; inversion H0; clear H0; repeat sigT_eq.
+    all: eexists; intuition eauto; constructor.
+  Qed.
+
+  Hint Resolve absR_ok.
+
+  Theorem compile_traces_match :
+    forall ts,
+      no_atomics_ts ts ->
+      traces_match_abs absR LockedCounterAPI.step CounterAPI.step (compile_ts ts) ts.
+  Proof.
+    unfold compile_ts, traces_match_abs; intros.
+    eexists; intuition idtac.
+    eapply trace_incl_abs; eauto.
+    eauto.
+  Qed.
+
+End AbsCounter.
+
+
+(** Linking *)
+
+Module c := Link LockAPI LockedCounterAPI CounterAPI LockingCounter AbsCounter.

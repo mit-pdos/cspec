@@ -54,3 +54,42 @@ Module Type LayerImpl (l1 : Layer) (l2 : Layer).
       traces_match_abs absR l1.step l2.step (compile_ts ts) ts.
 
 End LayerImpl.
+
+
+(** General layer transformers. *)
+
+Module Link (a : Layer) (b : Layer) (c : Layer)
+            (x : LayerImpl a b) (y : LayerImpl b c) <: LayerImpl a c.
+
+  Definition absR (s1 : a.State) (s3 : c.State) :=
+    exists s2, x.absR s1 s2 /\ y.absR s2 s3.
+
+  Definition compile_ts ts :=
+    x.compile_ts (y.compile_ts ts).
+
+  Theorem compile_ts_no_atomics :
+    forall ts,
+      no_atomics_ts ts ->
+      no_atomics_ts (compile_ts ts).
+  Proof.
+    intros.
+    eapply x.compile_ts_no_atomics.
+    eapply y.compile_ts_no_atomics.
+    eauto.
+  Qed.
+
+  Theorem compile_traces_match :
+    forall ts,
+      no_atomics_ts ts ->
+      traces_match_abs absR a.step c.step (compile_ts ts) ts.
+  Proof.
+    unfold traces_match_abs; intros.
+    inversion H1; clear H1; intuition idtac.
+    edestruct x.compile_traces_match; intuition eauto.
+      eapply y.compile_ts_no_atomics; eauto.
+    edestruct y.compile_traces_match; intuition eauto.
+    eexists; intuition eauto.
+    etransitivity; eauto.
+  Qed.
+
+End Link.
