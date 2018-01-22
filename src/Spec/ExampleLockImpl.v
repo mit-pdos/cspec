@@ -23,10 +23,8 @@ Inductive opLoT : Type -> Type :=
 | Clear : opLoT unit.
 
 Inductive opMidT : Type -> Type :=
-| Acquire : opMidT unit
+| Acquire : opMidT bool
 | Release : opMidT unit.
-
-Variable opHiT : Type -> Type.
 
 
 (** State *)
@@ -43,8 +41,8 @@ Inductive lo_step : forall T, opLoT T -> nat -> State -> T -> State -> Prop :=
   lo_step Clear tid v tt false.
 
 Inductive mid_step : forall T, opMidT T -> nat -> State -> T -> State -> Prop :=
-| MidStepAcquire : forall tid,
-  mid_step Acquire tid false tt true
+| MidStepAcquire : forall tid r,
+  mid_step Acquire tid false r true
 | MidStepRelease : forall tid v,
   mid_step Release tid v tt false.
 
@@ -62,35 +60,64 @@ Ltac step_inv :=
 
 (** Implementations *)
 
-(* XXX being lazy and just calling [OpExec] instead of [Op],
-  to avoid shuffling the [OpCall] and [OpRet] symbols *)
+Definition acquire_cond (r : bool) :=
+  if r == false then true else false.
 
-CoFixpoint acquire_core : proc opLoT opMidT _ :=
-  r <- OpExec TestAndSet;
-  if (r == false) then
-    Ret tt
-  else
-    acquire_core.
+Definition acquire_core : proc opLoT _ :=
+  Until acquire_cond (Op TestAndSet).
 
-Definition release_core : proc opLoT opMidT _ :=
-  Op Clear.
+Definition release_cond (r : unit) :=
+  true.
 
-Definition compile_op T (op : opMidT T) : proc opLoT opMidT T :=
+Definition release_core : proc opLoT _ :=
+  Until release_cond (Op Clear).
+
+Definition compile_op T (op : opMidT T) : (opLoT T) * (T -> bool) :=
   match op with
-  | Acquire => acquire_core
-  | Release => release_core
+  | Acquire => (TestAndSet, acquire_cond)
+  | Release => (Clear, release_cond)
   end.
 
 
-(** Single-thread correctness, as an experiment *)
+(** Proofs *)
 
-Theorem acquire_core_eq :
-  acquire_core =
-    r <- OpExec TestAndSet;
-    if (r == false) then Ret tt else acquire_core.
+Theorem acquire_noop_or_success :
+  forall tid s r s',
+    lo_step TestAndSet tid s r s' ->
+    acquire_cond r = false /\ s = s' \/
+    acquire_cond r = true /\ mid_step Acquire tid s r s'.
 Proof.
-  compile_eq_step.
+  unfold acquire_cond; intros.
+  step_inv.
+  destruct (r == false); subst; eauto.
+  destruct r; try congruence; eauto.
 Qed.
+
+Theorem release_noop_or_success :
+  forall tid s r s',
+    lo_step Clear tid s r s' ->
+    release_cond r = false /\ s = s' \/
+    release_cond r = true /\ mid_step Release tid s r s'.
+Proof.
+  unfold release_cond; intros.
+  step_inv.
+  eauto.
+Qed.
+
+Theorem all_noop_or_success :
+  forall `(opM : opMidT T) opL cond tid s r s',
+    (opL, cond) = compile_op opM ->
+    lo_step opL tid s r s' ->
+    cond r = false /\ s = s' \/
+    cond r = true /\ mid_step opM tid s r s'.
+Proof.
+  destruct opM; simpl; intros.
+  - inversion H; clear H; subst.
+    eapply acquire_noop_or_success; eauto.
+  - inversion H; clear H; subst.
+    eapply release_noop_or_success; eauto.
+Qed.
+
 
 (* General pattern for proving [Acquire]-like implementations:
  *
@@ -109,8 +136,8 @@ Qed.
 
 Theorem traces_match_one_thread_acquire :
   forall R
-         (p1rest : _ -> proc opLoT opMidT R)
-         (p2rest : _ -> proc opMidT opHiT R),
+         (p1rest : _ -> proc opLoT R)
+         (p2rest : _ -> proc opMidT R),
   (forall x, traces_match_one_thread lo_step mid_step (p1rest x) (p2rest x)) ->
   traces_match_one_thread lo_step mid_step
     (Bind acquire_core p1rest) (Bind (OpExec Acquire) p2rest).
