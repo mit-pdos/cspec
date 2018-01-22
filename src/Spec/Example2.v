@@ -257,14 +257,24 @@ Module LockingCounter <: LayerImpl LockAPI LockedCounterAPI.
 
   Definition compile_ts := compile_ts compile_op.
 
+  Theorem compile_ts_no_atomics :
+    forall ts,
+      no_atomics_ts ts ->
+      no_atomics_ts (compile_ts ts).
+  Proof.
+    eapply compile_ts_no_atomics.
+    destruct op; compute; eauto.
+  Qed.
+
   Theorem compile_traces_match :
     forall ts2,
+      no_atomics_ts ts2 ->
       traces_match_abs absR LockAPI.step LockedCounterAPI.step (compile_ts ts2) ts2.
   Proof.
     unfold traces_match_abs; intros.
-    rewrite H0 in *; clear H0.
+    rewrite H1 in *; clear H1.
     eapply all_traces_match; eauto.
-    eapply compile_ts_ok.
+    eapply compile_ts_ok; eauto.
   Qed.
 
 End LockingCounter.

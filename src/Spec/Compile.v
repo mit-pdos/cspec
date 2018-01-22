@@ -50,6 +50,8 @@ Section ProcStructure.
 
 End ProcStructure.
 
+Hint Constructors no_atomics.
+
 
 Section Compiler.
 
@@ -57,6 +59,10 @@ Section Compiler.
   Variable opMidT : Type -> Type.
 
   Variable compile_op : forall T, opMidT T -> proc opLoT T.
+
+  Variable compile_op_no_atomics :
+    forall `(op : opMidT T),
+      no_atomics (compile_op op).
 
   Definition atomize T (op : opMidT T) : proc opLoT T :=
     Atomic (compile_op op).
@@ -121,6 +127,17 @@ Section Compiler.
     - inversion H.
   Qed.
 
+  Theorem compile_no_atomics :
+    forall `(p : proc _ T),
+      no_atomics p ->
+      no_atomics (compile p).
+  Proof.
+    induction p; simpl; intros; eauto.
+    - inversion H0; clear H0; repeat sigT_eq. eauto.
+    - inversion H; clear H; repeat sigT_eq. eauto.
+    - inversion H.
+  Qed.
+
   Fixpoint compile_ts (ts : threads_state) : threads_state :=
     match ts with
     | nil => nil
@@ -152,6 +169,21 @@ Section Compiler.
         * left; eauto.
       + repeat rewrite thread_get_S.
         eapply H3.
+  Qed.
+
+  Theorem compile_ts_no_atomics :
+    forall ts,
+      no_atomics_ts ts ->
+      no_atomics_ts (compile_ts ts).
+  Proof.
+    induction ts; intros.
+    - constructor.
+    - simpl.
+      apply no_atomics_ts_cons in H; intuition idtac.
+      constructor; [ | assumption ].
+      destruct a; eauto.
+      simpl.
+      eapply compile_no_atomics; eauto.
   Qed.
 
 

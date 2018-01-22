@@ -69,6 +69,7 @@ Section Movers.
       edestruct IHatomic_exec2; intuition eauto.
     - edestruct H; intuition eauto.
     - edestruct IHatomic_exec; intuition eauto.
+    - edestruct IHatomic_exec; intuition eauto.
   Qed.
 
   Lemma atomic_exec_left_mover : forall tid0 tid1 s s0 `(ap : proc opT T) s1 v1 evs v0,
@@ -91,6 +92,7 @@ Section Movers.
       2: eauto.
       eauto.
       intuition eauto.
+    - edestruct IHatomic_exec; intuition eauto.
     - edestruct IHatomic_exec; intuition eauto.
   Qed.
 

@@ -44,8 +44,13 @@ Module Type LayerImpl (l1 : Layer) (l2 : Layer).
 
   Axiom absR : l1.State -> l2.State -> Prop.
   Axiom compile_ts : @threads_state l2.opT -> @threads_state l1.opT.
+  Axiom compile_ts_no_atomics :
+    forall ts,
+      no_atomics_ts ts ->
+      no_atomics_ts (compile_ts ts).
   Axiom compile_traces_match :
     forall ts,
+      no_atomics_ts ts ->
       traces_match_abs absR l1.step l2.step (compile_ts ts) ts.
 
 End LayerImpl.
