@@ -301,241 +301,19 @@ Section Atomization.
     (forall x, trace_incl op_step (p1rest x) (p2rest x)) ->
     trace_incl op_step (Bind p1 p1rest) (Bind p2 p2rest).
   Proof.
-    intros.
-    unfold trace_incl.
-    unfold trace_incl_opt.
-    unfold trace_incl_ts.
-    unfold trace_incl_ts_s.
-    intros.
-    destruct H1.
-
-    generalize dependent T.
-    generalize dependent ts.
-    generalize dependent s.
-    generalize dependent tr.
-
-    induction x; intros.
-
-    - inversion H1; clear H1; repeat sigT_eq; subst.
-      eauto.
-
-    - inversion H1; clear H1; repeat sigT_eq; subst.
-      destruct (tid0 == tid); subst; autorewrite with t in *.
-
-      + maybe_proc_inv; repeat sigT_eq.
-        exec_tid_inv.
-
-        induction H.
-        * admit.
-        * exec_tid_inv.
-          edestruct H0; eauto.
-          eexists; intuition idtac.
-          rewrite exec_equiv_ret_bind. eauto.
-          simpl. eauto.
-        * exec_tid_inv.
-          edestruct IHatomize_ok with (p1rest := fun x => Bind (p1b x) p1rest)
-                                      (p2rest := fun x => Bind (p2b x) p2rest).
-            3: eassumption.
-            2: destruct result; eauto.
-            2: admit.
-
-          
-            intros. intro. intros. intro. intro. intros.
-            unfold trace_incl; intros.
-
-          eexists; intuition idtac.
-          rewrite exec_equiv_bind_bind. eassumption.
-          eauto.
-        * exec_tid_inv.
-          edestruct IHx with (p2 := until1 c p2).
-            3: exact H8.
-            2: eauto.
-            constructor. eauto.
-            intros. destruct (Bool.bool_dec (c x0) true). constructor. constructor. eauto.
-
-          eexists. intuition idtac.
-          rewrite exec_equiv_until. eassumption.
-          eauto.
-        * admit.
-
-      + rewrite thread_upd_upd_ne in H8 by eauto.
-        edestruct IHx; eauto.
-        intuition idtac.
-
-        eexists; intuition idtac.
-        eapply ExecPrefixOne with (tid := tid0).
-          autorewrite with t; eauto.
-          eauto.
-          rewrite thread_upd_upd_ne; eauto.
-        eauto.
-  Admitted.
-  
-
-
-    intros.
-    eapply trace_incl_proof_helper; intros.
-    exec_tid_inv.
-
-    generalize dependent tr.
-    generalize dependent p2rest.
-    generalize dependent p1rest.
-    generalize dependent p2.
-    induction H12; intros.
-
-    - inversion H; clear H; repeat sigT_eq.
-
-      {
-        edestruct atomize_is_correct.
-        eauto.
-        eapply ExecPrefixOne with (tid := tid).
-          rewrite thread_upd_eq; eauto.
-          rewrite H4. eauto.
-          autorewrite with t. eauto.
-        eauto.
-      }
-
-      edestruct H0; eauto.
-      intuition idtac.
-
-      do 2 eexists.
-      eapply ExecPrefixOne with (tid := tid).
-        rewrite thread_upd_eq; eauto.
-        eauto.
-        autorewrite with t. eauto.
-      eauto.
-
-    - inversion H0; clear H0; repeat sigT_eq.
-      edestruct atomize_is_correct.
-      eauto.
-      eapply ExecPrefixOne with (tid := tid).
-        rewrite thread_upd_eq; eauto.
-        rewrite H5. eauto.
-        autorewrite with t. eauto.
-      eauto.
-
-    - inversion H0; clear H0; repeat sigT_eq.
-      edestruct atomize_is_correct.
-      eauto.
-      eapply ExecPrefixOne with (tid := tid).
-        rewrite thread_upd_eq; eauto.
-        rewrite H5. eauto.
-        autorewrite with t. eauto.
-      eauto.
-
-    - inversion H; clear H; repeat sigT_eq.
-
-      {
-        edestruct atomize_is_correct.
-        eauto.
-        eapply ExecPrefixOne with (tid := tid).
-          rewrite thread_upd_eq; eauto.
-          rewrite H4. eauto.
-          autorewrite with t. eauto.
-        eauto.
-      }
-
-      edestruct H0; eauto.
-      intuition idtac.
-
-      do 2 eexists.
-      eapply ExecPrefixOne with (tid := tid).
-        rewrite thread_upd_eq; eauto.
-        eauto.
-        autorewrite with t. eauto.
-      eauto.
-
-    - admit.
-
-    - inversion H; clear H; repeat sigT_eq.
-
-      {
-        edestruct atomize_is_correct.
-        eauto.
-        eapply ExecPrefixOne with (tid := tid).
-          rewrite thread_upd_eq; eauto.
-          rewrite H4. eauto.
-          autorewrite with t. eauto.
-        eauto.
-      }
-
-      
-
-      edestruct H0; eauto.
-      intuition idtac.
-
-      do 2 eexists.
-      eapply ExecPrefixOne with (tid := tid).
-        rewrite thread_upd_eq; eauto.
-        eauto.
-        autorewrite with t. eauto.
-      eauto.
-
-      
-
     induction 1; intros; eauto.
-    - repeat rewrite exec_equiv_ret_bind.
-      eauto.
+    - eapply trace_incl_bind_a; eauto.
     - repeat rewrite exec_equiv_bind_bind.
       eauto.
-    - repeat rewrite exec_equiv_until.
-      unfold until1.
-      repeat rewrite exec_equiv_bind_bind.
+    - etransitivity.
+      eapply trace_incl_rx_to_trace_incl.
+      eapply trace_incl_rx_until.
+      eapply trace_incl_to_trace_incl_rx; intros.
       eapply IHatomize_ok; intros.
-      destruct (Bool.bool_dec (c x) true).
-      + repeat rewrite exec_equiv_ret_bind.
-        eauto.
-      + 
-
-
-
-    do 4 intro.
-    destruct H.
-    destruct H.
-    specialize (H0 (S x)).
-    generalize dependent H0.
-    induction H.
-
-    - intros.
-      inversion H0; clear H0; repeat sigT_eq.
-      rewrite <- H3.
+      reflexivity.
+      eapply trace_incl_bind_a; intros.
       eauto.
-
-    - intros.
-      inversion H0; clear H0; repeat sigT_eq.
-
-      {
-        rewrite <- H3.
-        eauto.
-      }
-
-      repeat rewrite exec_equiv_ret_bind.
-      eauto.
-
-    - intros.
-      inversion H0; clear H0; repeat sigT_eq.
-
-      {
-        rewrite <- H3.
-        eauto.
-      }
-
-      eapply trace_incl_bind_a; eauto.
-
-    - intros.
-      inversion H0; clear H0; repeat sigT_eq.
-      rewrite <- H3.
-      eauto.
-
-    - intros.
-      inversion H2; clear H2; repeat sigT_eq.
-
-      {
-        rewrite <- H6.
-        eauto.
-      }
-
-      repeat rewrite exec_equiv_bind_bind.
-      eauto.
+    - eapply trace_incl_bind_a; eauto.
   Qed.
 
   Theorem atomize_ok_trace_incl :
@@ -601,37 +379,18 @@ Arguments atomize_correct {opLoT opMidT} compile_op [State] op_step.
 Theorem atomize_proc_match_helper :
   forall T `(p1 : proc opLoT T) `(p2 : proc opMidT T)
          compile_op,
-  non_degenerate p2 ->
   compile_ok compile_op p1 p2 ->
     atomize_ok compile_op p1 (compile (atomize compile_op) p2) /\
     atomic_compile_ok compile_op (compile (atomize compile_op) p2) p2.
 Proof.
-  split.
-  - split.
-
-; intro n; generalize dependent T.
-
- induction n; intros; [ apply AtomizeZero | ].
-    specialize (H (S n)) as H'; inversion H'; clear H'; repeat sigT_eq.
-
-    + rewrite compile_op_eq. constructor.
-    + rewrite compile_ret_eq. constructor.
-    + rewrite compile_bind_eq. constructor.
-      * eapply IHn. eapply compile_ok_inv_bind in H. intuition eauto.
-      * intros.
-        eapply IHn. eapply compile_ok_inv_bind in H. intuition eauto.
-    + rewrite compile_log_eq. constructor.
-
-  - induction n; intros; [ apply ACompileZero | ].
-    specialize (H (S n)) as H'; inversion H'; clear H'; repeat sigT_eq.
-
-    + rewrite compile_op_eq. constructor.
-    + rewrite compile_ret_eq. constructor.
-    + rewrite compile_bind_eq. constructor.
-      * eapply IHn. eapply compile_ok_inv_bind in H. intuition eauto.
-      * intros.
-        eapply IHn. eapply compile_ok_inv_bind in H. intuition eauto.
-    + rewrite compile_log_eq. constructor.
+  induction 1; simpl; intros.
+  - split; constructor.
+  - split; constructor.
+  - intuition idtac.
+    constructor. eauto. intros. specialize (H1 x). intuition eauto.
+    constructor. eauto. intros. specialize (H1 x). intuition eauto.
+  - split; constructor; intuition eauto.
+  - split; constructor.
 Qed.
 
 Hint Resolve proc_match_cons_Proc.
