@@ -250,7 +250,17 @@ Section Compiler.
         eauto.
 
       + destruct result'; subst.
-        * 
+        * edestruct IHexec.
+            eapply proc_match_upd; eauto.
+          eexists; intuition idtac.
+
+          rewrite exec_equiv_ret_None in H7.
+
+          eapply ExecPrefixOne with (tid := tid).
+            eauto.
+            eauto.
+            eauto.
+          eauto.
 
         * edestruct IHexec.
             eapply proc_match_upd; eauto.
@@ -263,3 +273,5 @@ Section Compiler.
   Qed.
 
 End Compiler.
+
+Arguments compile_ts {opLoT opMidT}.
