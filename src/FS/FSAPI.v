@@ -23,7 +23,8 @@ Inductive linkOpT : Type -> Type :=
 | LinkList (dir : nat) : linkOpT (option (list string))
 | LinkGetRoot : linkOpT nat
 | FileRead (f : nat) : linkOpT string
-| FileWrite (f : nat) (data : string) : linkOpT unit.
+| FileWrite (f : nat) (data : string) : linkOpT unit
+| GetTID : linkOpT nat.
 
 
 Inductive stat_result :=
@@ -104,7 +105,12 @@ Module LinkAPI <: Layer.
     xstep (FileWrite f data) tid
       fs
       tt
-      (upd_file f data fs).
+      (upd_file f data fs)
+  | StepGetTID : forall tid fs,
+    xstep GetTID tid
+      fs
+      tid
+      fs.
 
   Definition step := xstep.
 

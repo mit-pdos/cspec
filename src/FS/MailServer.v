@@ -54,6 +54,7 @@ Definition pickup (cwd : nat) (user : string) :=
   names <?- readdir cwd (maildir ++ [user]);
   read_files cwd (maildir ++ [user]) names.
 
+
 (*
 Inductive mailfs_step_allowed : forall T, linkOpT T -> nat -> Prop :=
 | MailStepCreateTmp : forall dir name tid,
