@@ -9,6 +9,7 @@ Require Import RelationClasses.
 Require Import Morphisms.
 Require Import List.
 Require Import Compile.
+Require Import CompileLoop.
 Require Import Modules.
 Require Import Movers.
 Require Import Abstraction.
@@ -21,8 +22,14 @@ Global Generalizable All Variables.
 
 (** Opcodes and states *)
 
+Inductive TASOpT : Type -> Type :=
+| TestAndSet :TASOpT bool
+| Clear : TASOpT unit
+| ReadTAS : TASOpT nat
+| WriteTAS : nat -> TASOpT unit.
+
 Inductive LockOpT : Type -> Type :=
-| Acquire : LockOpT unit
+| Acquire : LockOpT bool
 | Release : LockOpT unit
 | Read : LockOpT nat
 | Write : nat -> LockOpT unit.
@@ -30,6 +37,11 @@ Inductive LockOpT : Type -> Type :=
 Inductive CounterOpT : Type -> Type :=
 | Inc : CounterOpT nat
 | Dec : CounterOpT nat.
+
+Record TASState := mkTASState {
+  TASValue : nat;
+  TASLock : bool;
+}.
 
 Record LockState := mkState {
   Value : nat;
@@ -40,6 +52,68 @@ Definition CounterState := nat.
 
 
 (** Layer definitions *)
+
+Module TASAPI <: Layer.
+
+  Definition opT := TASOpT.
+  Definition State := TASState.
+
+  Inductive xstep : forall T, opT T -> nat -> State -> T -> State -> Prop :=
+  | StepTAS : forall tid v l,
+    xstep TestAndSet tid (mkTASState v l) l (mkTASState v true)
+  | StepClear : forall tid v l,
+    xstep Clear tid (mkTASState v l) tt (mkTASState v false)
+  | StepRead : forall tid v l,
+    xstep ReadTAS tid (mkTASState v l) v (mkTASState v l)
+  | StepWrite : forall tid v0 v l,
+    xstep (WriteTAS v) tid (mkTASState v0 l) tt (mkTASState v l).
+
+  Definition step := xstep.
+
+End TASAPI.
+
+
+Module TASLockAPI <: Layer.
+
+  Definition opT := TASOpT.
+  Definition State := LockState.
+
+  Inductive xstep : forall T, opT T -> nat -> State -> T -> State -> Prop :=
+  | StepTAS0 : forall tid v,
+    xstep TestAndSet tid (mkState v None) false (mkState v (Some tid))
+  | StepTAS1 : forall tid tid' v,
+    xstep TestAndSet tid (mkState v (Some tid')) true (mkState v (Some tid'))
+  | StepClear : forall tid v l,
+    xstep Clear tid (mkState v l) tt (mkState v None)
+  | StepRead : forall tid v l,
+    xstep ReadTAS tid (mkState v l) v (mkState v l)
+  | StepWrite : forall tid v0 v l,
+    xstep (WriteTAS v) tid (mkState v0 l) tt (mkState v l).
+
+  Definition step := xstep.
+
+End TASLockAPI.
+
+
+Module RawLockAPI <: Layer.
+
+  Definition opT := LockOpT.
+  Definition State := LockState.
+
+  Inductive xstep : forall T, opT T -> nat -> State -> T -> State -> Prop :=
+  | StepAcquire : forall tid v r,
+    xstep Acquire tid (mkState v None) r (mkState v (Some tid))
+  | StepRelease : forall tid v l,
+    xstep Release tid (mkState v l) tt (mkState v None)
+  | StepRead : forall tid v l,
+    xstep Read tid (mkState v l) v (mkState v l)
+  | StepWrite : forall tid v0 v l,
+    xstep (Write v) tid (mkState v0 l) tt (mkState v l).
+
+  Definition step := xstep.
+
+End RawLockAPI.
+
 
 Module LockAPI <: Layer.
 
@@ -63,8 +137,8 @@ Module LockAPI <: Layer.
    *)
 
   Inductive xstep : forall T, opT T -> nat -> State -> T -> State -> Prop :=
-  | StepAcquire : forall tid v,
-    xstep Acquire tid (mkState v None) tt (mkState v (Some tid))
+  | StepAcquire : forall tid v r,
+    xstep Acquire tid (mkState v None) r (mkState v (Some tid))
   | StepRelease : forall tid v,
     xstep Release tid (mkState v (Some tid)) tt (mkState v None)
   | StepReleaseHack0 : forall tid v,
@@ -246,24 +320,24 @@ Module LockingCounter <: LayerImpl LockAPI LockedCounterAPI.
 
   Theorem all_traces_match :
     forall ts1 ts2,
-      proc_match (compile_ok compile_op) ts1 ts2 ->
+      proc_match (Compile.compile_ok compile_op) ts1 ts2 ->
       traces_match_ts LockAPI.step LockedCounterAPI.step ts1 ts2.
   Proof.
     intros.
-    eapply compile_traces_match_ts; eauto.
+    eapply Compile.compile_traces_match_ts; eauto.
   Qed.
 
   Definition absR (s1 : LockAPI.State) (s2 : LockedCounterAPI.State) :=
     s1 = s2.
 
-  Definition compile_ts := compile_ts compile_op.
+  Definition compile_ts := Compile.compile_ts compile_op.
 
   Theorem compile_ts_no_atomics :
     forall ts,
       no_atomics_ts ts ->
       no_atomics_ts (compile_ts ts).
   Proof.
-    eapply compile_ts_no_atomics.
+    eapply Compile.compile_ts_no_atomics.
     destruct op; compute; eauto.
   Qed.
 
@@ -275,7 +349,7 @@ Module LockingCounter <: LayerImpl LockAPI LockedCounterAPI.
     unfold traces_match_abs; intros.
     rewrite H1 in *; clear H1.
     eapply all_traces_match; eauto.
-    eapply compile_ts_ok; eauto.
+    eapply Compile.compile_ts_ok; eauto.
   Qed.
 
 End LockingCounter.
@@ -326,6 +400,157 @@ Module AbsCounter <: LayerImpl LockedCounterAPI CounterAPI.
 End AbsCounter.
 
 
+(** Adding ghost state to the test-and-set bit. *)
+
+Module AbsLock <: LayerImpl TASAPI TASLockAPI.
+
+  Definition absR (s1 : TASAPI.State) (s2 : TASLockAPI.State) :=
+    TASValue s1 = Value s2 /\
+    (TASLock s1 = false /\ Lock s2 = None \/
+     exists tid,
+     TASLock s1 = true /\ Lock s2 = Some tid).
+
+  Definition compile_ts (ts : @threads_state TASLockAPI.opT) := ts.
+
+  Theorem compile_ts_no_atomics :
+    forall (ts : @threads_state TASLockAPI.opT),
+      no_atomics_ts ts ->
+      no_atomics_ts (compile_ts ts).
+  Proof.
+    unfold compile_ts; eauto.
+  Qed.
+
+  Hint Constructors TASLockAPI.xstep.
+
+  Theorem absR_ok :
+    op_abs absR TASAPI.step TASLockAPI.step.
+  Proof.
+    unfold op_abs; intros.
+    destruct s1; destruct s2; unfold absR in *.
+    unfold TASLockAPI.step.
+    ( intuition idtac ); simpl in *; subst; repeat deex.
+    - inversion H0; clear H0; subst; repeat sigT_eq; simpl in *.
+      all: eexists; (intuition idtac); [ | | eauto ].
+      all: simpl; eauto.
+    - inversion H0; clear H0; subst; repeat sigT_eq; simpl in *.
+      all: eexists; (intuition idtac); [ | | eauto ].
+      all: simpl; eauto.
+  Qed.
+
+  Hint Resolve absR_ok.
+
+  Theorem compile_traces_match :
+    forall ts,
+      no_atomics_ts ts ->
+      traces_match_abs absR TASAPI.step TASLockAPI.step (compile_ts ts) ts.
+  Proof.
+    unfold compile_ts, traces_match_abs; intros.
+    eexists; intuition idtac.
+    eapply trace_incl_abs; eauto.
+    eauto.
+  Qed.
+
+End AbsLock.
+
+
+(** Implement [Acquire] on top of test-and-set *)
+
+Module LockImpl <: LayerImpl TASLockAPI RawLockAPI.
+
+  Definition acquire_cond (r : bool) :=
+    if r == false then true else false.
+
+  Definition acquire_core : proc TASLockAPI.opT _ :=
+    Until acquire_cond (Op TestAndSet).
+
+  Definition once_cond {T} (r : T) :=
+    true.
+
+  Definition release_core : proc TASLockAPI.opT _ :=
+    Until once_cond (Op Clear).
+
+  Definition read_core : proc TASLockAPI.opT _ :=
+    Until once_cond (Op ReadTAS).
+
+  Definition write_core v : proc TASLockAPI.opT _ :=
+    Until once_cond (Op (WriteTAS v)).
+
+  Definition compile_op T (op : RawLockAPI.opT T) : (TASLockAPI.opT T) * (T -> bool) :=
+    match op with
+    | Acquire => (TestAndSet, acquire_cond)
+    | Release => (Clear, once_cond)
+    | Read => (ReadTAS, once_cond)
+    | Write v => (WriteTAS v, once_cond)
+    end.
+
+  Definition compile_ts ts :=
+    CompileLoop.compile_ts compile_op ts.
+
+  Theorem compile_ts_no_atomics :
+    forall ts,
+      no_atomics_ts ts ->
+      no_atomics_ts (compile_ts ts).
+  Proof.
+    eapply CompileLoop.compile_ts_no_atomics.
+  Qed.
+
+  Definition absR (s1 : TASLockAPI.State) (s2 : RawLockAPI.State) :=
+    s1 = s2.
+
+  Ltac step_inv :=
+    match goal with
+    | H : TASLockAPI.step _ _ _ _ _ |- _ =>
+      inversion H; clear H; subst; repeat sigT_eq
+    | H : RawLockAPI.step _ _ _ _ _ |- _ =>
+      inversion H; clear H; subst; repeat sigT_eq
+    end.
+
+  Ltac pair_inv :=
+    match goal with
+    | H : (_, _) = (_, _) |- _ =>
+      inversion H; clear H; subst; repeat sigT_eq
+    end.
+
+  Hint Constructors RawLockAPI.xstep.
+
+  Theorem noop_or_success :
+    noop_or_success compile_op TASLockAPI.step RawLockAPI.step.
+  Proof.
+    unfold noop_or_success.
+    unfold RawLockAPI.step.
+    destruct opM; simpl; intros; pair_inv; step_inv; eauto.
+  Qed.
+
+  Theorem compile_traces_match :
+    forall ts,
+      no_atomics_ts ts ->
+      traces_match_abs absR TASLockAPI.step RawLockAPI.step (compile_ts ts) ts.
+  Proof.
+    unfold traces_match_abs, absR; intros; subst.
+    eapply CompileLoop.compile_traces_match_ts; eauto.
+    eapply noop_or_success.
+    eapply CompileLoop.compile_ts_ok; eauto.
+  Qed.
+
+End LockImpl.
+
+
 (** Linking *)
 
-Module c := Link LockAPI LockedCounterAPI CounterAPI LockingCounter AbsCounter.
+(* End-to-end stack:
+
+  TASAPI
+    [ AbsLock ]
+  TASLockAPI
+    [ LockImpl ]
+  RawLockAPI
+    [ ?? ]
+  LockAPI
+    [ LockingCounter ]
+  LockedCounterAPI
+    [ AbsCounter ]
+  CounterAPI
+ *)
+
+Module c1 := Link TASAPI TASLockAPI RawLockAPI AbsLock LockImpl.
+Module c2 := Link LockAPI LockedCounterAPI CounterAPI LockingCounter AbsCounter.
