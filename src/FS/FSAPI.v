@@ -70,7 +70,6 @@ Definition proper_nameb n : bool := negb (orb (eq_string n  ".") (eq_string n ".
 Definition proper_name n := n <> "." /\ n <> "..".
 Definition proper_link l := proper_name (LinkName l).
 Definition proper_links g := Graph.For_all proper_link g.
-
 Instance proper_proper_link:
   Proper (eq ==> eq) proper_link.
 Proof.
@@ -133,16 +132,20 @@ Ltac subst_fsequiv :=
 
 Inductive valid_link : forall (fs : FS) (dir : nat) (name : string) (target : Node), Prop :=
 | ValidLink : forall fs dir name target,
-  Graph.In (mkLink dir target name) (FSLinks fs) ->
-  valid_link fs dir name target
+    proper_name name ->
+    (exists parent name,
+        Graph.In (mkLink parent (DirNode dir) name) (FSLinks fs) ->
+        target <> DirNode parent) ->
+    Graph.In (mkLink dir target name) (FSLinks fs) ->
+    valid_link fs dir name target
 | ValidDot : forall fs dir,
-  valid_link fs dir "." (DirNode dir)
+    valid_link fs dir "." (DirNode dir)
 | ValidDotDot : forall fs dir name parent,
-  Graph.In (mkLink parent (DirNode dir) name) (FSLinks fs) ->
-  valid_link fs dir ".." (DirNode parent)
+    Graph.In (mkLink parent (DirNode dir) name) (FSLinks fs) ->
+    valid_link fs dir ".." (DirNode parent)
 | ValidDotDotRoot : forall fs dir,
-  dir = FSRoot fs ->
-  valid_link fs dir ".." (DirNode dir).
+    dir = FSRoot fs ->
+    valid_link fs dir ".." (DirNode dir).
 
 Instance valid_link_proper :
   Proper (FSEquiv ==> eq ==> eq ==> eq ==> iff) valid_link.
@@ -167,6 +170,10 @@ Proof.
       eapply H2; eauto.
     + eapply ValidDotDotRoot. congruence.
 Qed.
+
+Definition proper_link' fs l := proper_name (LinkName l) /\
+                             (exists parent, valid_link fs (LinkFrom l) ".." parent ->
+                                (LinkTo l) <> parent).
 
 Inductive path_evaluates : forall (fs : FS) (start : Node) (pn : Pathname) (target : Node), Prop :=
 | PathEvalEmpty : forall fs start,
@@ -402,7 +409,16 @@ Proof.
   edestruct H; eauto.
 Qed.
 
+(* . and .. are unique; which we get from definition.
+  no other name in directory refers to parent or cur directory *)
+
 Definition fs_invariant (fs : FS) := proper_links (FSLinks fs).
+
+Definition unique_dotdot (fs : FS) :=
+
+                  
+Definition fs_invariant1 (fs : FS) := proper_links (FSLinks fs) /\
+                                      unique_dotdot.
 
 Lemma fs_invariant_proper_name: forall fs startdir node name,
     fs_invariant fs ->
@@ -522,7 +538,6 @@ Proof.
 Qed. 
 
 Lemma valid_link_add_link'': forall fs startdir name name0 dirnum n node node',
-    dirnum <> startdir ->
     valid_link fs startdir name0 node ->
     proper_name name  ->
     does_not_exist fs dirnum name ->
@@ -530,21 +545,21 @@ Lemma valid_link_add_link'': forall fs startdir name name0 dirnum n node node',
     valid_link fs startdir name0 node'.
 Proof.
   intros.
-  inversion H3; subst; clear H3.
-  - apply Graph.add_spec in H4.
+  inversion H2; subst; clear H2.
+  - apply Graph.add_spec in H3.
     intuition idtac; auto.
-    inversion H3; subst; clear H3.
-    exfalso; eauto.
+    inversion H2; subst; clear H2.
+    exfalso; eapply valid_link_does_not_exist; eauto.
   - apply ValidDot.
   - eapply ValidDotDot.
-    apply Graph.add_spec in H4; auto.
+    apply Graph.add_spec in H3; auto.
     intuition idtac; eauto.
-    inversion H3; subst. clear H3.
-    XXX
+    inversion H2; subst. clear H2.
+    admit. 
   - eapply ValidDotDotRoot.
     simpl in *.
     reflexivity.
-Qed. 
+Admitted. 
 
 Lemma path_evaluates_add_link' : forall fs startdir dirnum name dirpn n node,
   fs_invariant fs ->
@@ -573,30 +588,24 @@ Proof.
   - inversion H1; subst; clear H1.
     {
       eapply PathEvalDirLink; eauto.
-      inversion H10; subst.
-      eapply fs_invariant_proper_name in H1 as Hx; eauto.
-      eapply valid_link_add_link' in H4; auto.
+      eapply valid_link_add_link'' in H4; auto.
       assert (DirNode inum0 = DirNode inum).
       {
         inversion H0; subst.
         eapply unique_pathname_valid_link_eq.
-        eapply H14.
+        eapply H13.
         eauto.
         eauto.
       }
-      inversion H6; subst; clear H6.
+      inversion H1; subst; clear H1.
       eapply IHpath_evaluates; eauto.
       admit.
       eauto.
-      Search inum.
-      admit.
-      admit.
-      admit.
     }
     {
       inversion H10; subst.
       eapply fs_invariant_proper_name in H1 as Hx; eauto.
-      eapply valid_link_add_link' in H4; eauto.
+      eapply valid_link_add_link'' in H4; eauto.
       exfalso. admit. (* H2 + H8 + H *)
     }
   + eapply PathEvalSymlink; eauto; subst.
