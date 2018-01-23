@@ -937,3 +937,13 @@ Module c3 := Link RawLockAPI LockedCounterAPI CounterAPI c2 AbsCounter.
 Module c := Link TASAPI RawLockAPI CounterAPI c1 c3.
 
 Print Assumptions c.compile_traces_match.
+
+
+Definition test_thread :=
+  Until (fun _ => false) (_ <- Op Inc; _ <- Op Dec; Ret tt).
+
+Definition test_threads :=
+  repeat (Proc test_thread) 16.
+
+Definition compiled_threads :=
+  c.compile_ts test_threads.

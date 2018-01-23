@@ -9,7 +9,7 @@ CODE += $(wildcard src/FS/*.v)
 
 COQRFLAGS := -R build POCS
 
-BINS	:= 
+BINS	:= concur-test
 
 .PHONY: default
 default: $(patsubst %,bin/%,$(BINS)) docs
@@ -44,10 +44,7 @@ docs: coq
 	coqtop $(COQRFLAGS) -batch -noglob -load-vernac-source $<
 	./scripts/add-preprocess.sh $@/*.hs
 
-statdb-cli/extract: build/Lab1/StatDbCli.vo
-remap-nbd/extract: build/Lab2/RemappedServer.vo
-replicate-nbd/extract: build/Lab4/ReplicatedServer.vo
-mail-cli/extract: build/FS/MailCli.vo mail-cli/lib/FS/Ops.hs
+concur-test/extract: build/Spec/Example2.vo
 
 bin/%: %/extract
 	mkdir -p $(@D)
@@ -60,8 +57,3 @@ clean:
 	rm -rf $(foreach d,$(BINS),$(d)/extract)
 	rm -rf $(foreach d,$(BINS),$(d)/.stack-work)
 	rm -f $(foreach b,$(BINS),bin/$(b))
-
-lab%-handin.tar.gz: clean
-	tar cf - `find . -type f | grep -v '^\.*$$' | grep -v '/\.git/' | grep -v 'lab[0-9].*\.tar\.gz'` | gzip > $@
-
-prepare-submit: lab1-handin.tar.gz
