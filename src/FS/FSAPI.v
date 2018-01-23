@@ -5,8 +5,7 @@ Require Import MSets.MSetWeakList.
 Require Import Relations.Relation_Operators.
 Require Import RelationClasses.
 Require Import Morphisms.
-Require Import Bool.
-Require Import Ascii.
+Require Import Sumbool.
 
 Import ListNotations.
 Open Scope string.
@@ -64,19 +63,8 @@ Module Link_as_UDT := Make_UDT(MDT_Link).
 
 Module Graph := MSetWeakList.Make Link_as_UDT.
 
-Definition eq_ascii (a1 a2 : ascii) :=
-  match a1, a2 with
-  | Ascii b1 b2 b3 b4 b5 b6 b7 b8, Ascii c1 c2 c3 c4 c5 c6 c7 c8 =>
-    (eqb b1 c1) && (eqb b2 c2) && (eqb b3 c3) && (eqb b4 c4) &&
-    (eqb b5 c5) && (eqb b6 c6) && (eqb b7 c7) && (eqb b8 c8)
-  end.
-
-Fixpoint eq_string (s1 s2 : string) :=
-  match s1, s2 with
-  | EmptyString,  EmptyString  => true
-  | String x1 s1, String x2 s2 => eq_ascii x1 x2 && eq_string s1 s2
-  | _, _                       => false
-  end.
+Definition eq_string (s1 s2 : string) :=
+  if string_dec s1 s2 then true else false.
 
 Definition proper_nameb n : bool := negb (orb (eq_string n  ".") (eq_string n "..")).
 Definition proper_name n := n <> "." /\ n <> "..".
