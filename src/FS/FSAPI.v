@@ -132,10 +132,12 @@ Ltac subst_fsequiv :=
 
 Inductive valid_link : forall (fs : FS) (dir : nat) (name : string) (target : Node), Prop :=
 | ValidLink : forall fs dir name target,
+(*
     proper_name name ->
     (exists parent name,
         Graph.In (mkLink parent (DirNode dir) name) (FSLinks fs) ->
         target <> DirNode parent) ->
+*)
     Graph.In (mkLink dir target name) (FSLinks fs) ->
     valid_link fs dir name target
 | ValidDot : forall fs dir,
@@ -414,11 +416,13 @@ Qed.
 
 Definition fs_invariant (fs : FS) := proper_links (FSLinks fs).
 
+(*
 Definition unique_dotdot (fs : FS) :=
 
                   
 Definition fs_invariant1 (fs : FS) := proper_links (FSLinks fs) /\
                                       unique_dotdot.
+*)
 
 Lemma fs_invariant_proper_name: forall fs startdir node name,
     fs_invariant fs ->
@@ -608,7 +612,7 @@ Proof.
       eapply valid_link_add_link'' in H4; eauto.
       exfalso. admit. (* H2 + H8 + H *)
     }
-  + eapply PathEvalSymlink; eauto; subst.
+  - eapply PathEvalSymlink; eauto; subst.
     inversion H0; subst.
     (*
     - constructor.
