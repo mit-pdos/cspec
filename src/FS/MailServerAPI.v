@@ -418,6 +418,7 @@ Proof.
   intros.
   eapply H1.
   eapply path_evaluates_add_link_upd_file' in H2.
+  simpl in *.
   apply path_evaluates_add_link' in H2; simpl in *; eauto.
   unfold unique_pathname.
   eexists.

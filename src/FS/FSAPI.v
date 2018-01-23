@@ -305,6 +305,28 @@ Proof.
   reflexivity.
 Qed.
 
+Lemma unique_pathname_valid_link_eq: forall fs dirnum name inum inum',
+    unique_pathname fs (DirNode dirnum) [name] ->
+    valid_link fs dirnum name (DirNode inum) ->
+    valid_link fs dirnum name (DirNode inum') ->
+    DirNode inum = DirNode inum'.
+Proof.
+  intros.
+  unfold unique_pathname in *.
+  deex.
+  specialize (H2 (DirNode inum)) as H2x; subst.
+  specialize (H2 (DirNode inum')) as H2y; subst.
+  destruct H2x.
+  econstructor.
+  eapply H0.
+  constructor.
+  destruct H2y.
+  econstructor.
+  eapply H1.
+  constructor.
+  reflexivity.
+Qed.
+
 Lemma unique_pathname_path_evaluates_cons_eq: forall fs startdir name pn' node node' node'',
     path_evaluates fs (DirNode startdir) [name] node' ->
     path_evaluates fs node' pn' node ->
@@ -499,6 +521,31 @@ Proof.
     reflexivity.
 Qed. 
 
+Lemma valid_link_add_link'': forall fs startdir name name0 dirnum n node node',
+    dirnum <> startdir ->
+    valid_link fs startdir name0 node ->
+    proper_name name  ->
+    does_not_exist fs dirnum name ->
+    valid_link (add_link dirnum n name fs) startdir name0 node' ->
+    valid_link fs startdir name0 node'.
+Proof.
+  intros.
+  inversion H3; subst; clear H3.
+  - apply Graph.add_spec in H4.
+    intuition idtac; auto.
+    inversion H3; subst; clear H3.
+    exfalso; eauto.
+  - apply ValidDot.
+  - eapply ValidDotDot.
+    apply Graph.add_spec in H4; auto.
+    intuition idtac; eauto.
+    inversion H3; subst. clear H3.
+    XXX
+  - eapply ValidDotDotRoot.
+    simpl in *.
+    reflexivity.
+Qed. 
+
 Lemma path_evaluates_add_link' : forall fs startdir dirnum name dirpn n node,
   fs_invariant fs ->
   stable_pathname fs startdir dirpn ->
@@ -511,7 +558,6 @@ Proof.
   intros.
   remember (add_link dirnum n name fs).
   generalize dependent fs; intros.
-  generalize dependent dirpn; intros.
   induction H4; subst.
   - constructor.
   - eapply PathEvalFileLink; subst; eauto.
@@ -524,46 +570,33 @@ Proof.
       exfalso; auto.
     + constructor; eauto.
     + apply fs_invariant_add_link; eauto.
-  - inversion H0; subst; clear H0.
+  - inversion H1; subst; clear H1.
     {
       eapply PathEvalDirLink; eauto.
-
-      (* maybe conclude from H9 that name0 doesn't start with .." *)
-      
-      eapply valid_link_add_link' in H3; eauto.
-
+      inversion H10; subst.
+      eapply fs_invariant_proper_name in H1 as Hx; eauto.
+      eapply valid_link_add_link' in H4; auto.
       assert (DirNode inum0 = DirNode inum).
       {
-        eapply unique_dirent_link_eq; eauto.
-
-        (* XXX this lemma isn't true *)
-        eapply unique_pathname_cons in H as Hx.
-        
-        intuition idtac.
-        specialize (H5 (DirNode inum0)).
-        destruct H5.
-        econstructor; eauto.
-        eapply unique_pathname_dirent in H0 as H0x.
-        deex.
-        inversion H6; subst.
-        assumption.
-        inversion H0; subst; clear H0.
-        
-        eapply IHpath_evaluates; eauto.
-        eapply unique_pathname_cons in H as Hx.
-        intuition idtac.
-        specialize (H5 (DirNode inum)).
-
-        assert(path_evaluates fs (DirNode startdir) [name0] (DirNode inum)).
-        destruct H5.
-        econstructor; eauto.
-        econstructor; auto.
-        auto.
-        auto.
+        inversion H0; subst.
+        eapply unique_pathname_valid_link_eq.
+        eapply H14.
+        eauto.
+        eauto.
       }
+      inversion H6; subst; clear H6.
+      eapply IHpath_evaluates; eauto.
+      admit.
+      eauto.
+      Search inum.
+      admit.
+      admit.
+      admit.
     }
     {
-      eapply valid_link_add_link' in H3; eauto.
+      inversion H10; subst.
+      eapply fs_invariant_proper_name in H1 as Hx; eauto.
+      eapply valid_link_add_link' in H4; eauto.
       exfalso. admit. (* H2 + H8 + H *)
     }
   + eapply PathEvalSymlink; eauto; subst.
