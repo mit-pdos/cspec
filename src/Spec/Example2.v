@@ -192,7 +192,7 @@ End CounterAPI.
 
 Module LockingRule <: ProcRule LockAPI.
 
-  Definition follows_protocol_op `(op : LockAPI.opT T) (tid : nat)
+  Definition follows_protocol_op `(op : LockAPI.opT T)
                                   (old_owner : bool) (new_owner : bool) :=
     match op with
     | Acquire => new_owner = true
@@ -208,40 +208,40 @@ Module LockingRule <: ProcRule LockAPI.
     | None => false
     end.
 
-  Inductive follows_protocol_proc (tid : nat) (old_owner : bool) (new_owner : bool) :
+  Inductive follows_protocol_proc (old_owner : bool) (new_owner : bool) :
     forall T (p : proc LockAPI.opT T), Prop :=
   | FollowsProtocolProcOp :
     forall T (op : LockAPI.opT T),
-    follows_protocol_op op tid old_owner new_owner ->
-    follows_protocol_proc tid old_owner new_owner (Op op)
+    follows_protocol_op op old_owner new_owner ->
+    follows_protocol_proc old_owner new_owner (Op op)
   | FollowsProtocolProcBind :
     forall T1 T2 (p1 : proc _ T1) (p2 : T1 -> proc _ T2) mid_owner,
-    follows_protocol_proc tid old_owner mid_owner p1 ->
-    (forall x, follows_protocol_proc tid mid_owner new_owner (p2 x)) ->
-    follows_protocol_proc tid old_owner new_owner (Bind p1 p2)
+    follows_protocol_proc old_owner mid_owner p1 ->
+    (forall x, follows_protocol_proc mid_owner new_owner (p2 x)) ->
+    follows_protocol_proc old_owner new_owner (Bind p1 p2)
   | FollowsProtocolProcUntil :
     forall T (p : proc _ T) c,
     old_owner = new_owner ->
-    follows_protocol_proc tid old_owner new_owner p ->
-    follows_protocol_proc tid old_owner new_owner (Until c p)
+    follows_protocol_proc old_owner new_owner p ->
+    follows_protocol_proc old_owner new_owner (Until c p)
   | FollowsProtocolProcAtomic :
     forall T (p : proc _ T),
-    follows_protocol_proc tid old_owner new_owner p ->
-    follows_protocol_proc tid old_owner new_owner (Atomic p)
+    follows_protocol_proc old_owner new_owner p ->
+    follows_protocol_proc old_owner new_owner (Atomic p)
   | FollowsProtocolProcLog :
     forall T (v : T),
     old_owner = new_owner ->
-    follows_protocol_proc tid old_owner new_owner (Log v)
+    follows_protocol_proc old_owner new_owner (Log v)
   | FollowsProtocolProcRet :
     forall T (v : T),
     old_owner = new_owner ->
-    follows_protocol_proc tid old_owner new_owner (Ret v).
+    follows_protocol_proc old_owner new_owner (Ret v).
 
   Definition follows_protocol_s (ts : @threads_state LockAPI.opT) (s : LockAPI.State) :=
     forall tid T (p : proc _ T),
       ts [[ tid ]] = Proc p ->
       exists b,
-        follows_protocol_proc tid (lock_match s tid) b p.
+        follows_protocol_proc (lock_match s tid) b p.
 
   Definition follows_protocol ts :=
     forall s, follows_protocol_s ts s.
@@ -647,7 +647,7 @@ Module LockProtocol <: LayerImplRequiresRule RawLockAPI LockAPI LockingRule.
 
   Theorem follows_protocol_step : forall `(op : LockAPI.opT T) tid s v s' b,
     RawLockAPI.step op tid s v s' ->
-    follows_protocol_op op tid (lock_match s tid) b ->
+    follows_protocol_op op (lock_match s tid) b ->
     LockAPI.step op tid s v s'.
   Proof.
     intros.
@@ -668,7 +668,7 @@ Module LockProtocol <: LayerImplRequiresRule RawLockAPI LockAPI LockingRule.
 
   Lemma follows_protocol_op_owner : forall `(op : RawLockAPI.opT T) tid s v s' b,
     RawLockAPI.step op tid s v s' ->
-    follows_protocol_op op tid (lock_match s tid) b ->
+    follows_protocol_op op (lock_match s tid) b ->
     b = lock_match s' tid.
   Proof.
     intros; step_inv; unfold lock_match in *; simpl in *;
@@ -679,14 +679,14 @@ Module LockProtocol <: LayerImplRequiresRule RawLockAPI LockAPI LockingRule.
   Theorem follows_protocol_atomic_owner :
     forall `(p : proc RawLockAPI.opT T) tid s0 r s1 evs b,
     atomic_exec RawLockAPI.step p tid s0 r s1 evs ->
-    follows_protocol_proc tid (lock_match s0 tid) b p ->
+    follows_protocol_proc (lock_match s0 tid) b p ->
     b = lock_match s1 tid.
   Proof.
     intros.
     generalize dependent b.
     induction H; simpl in *; intros; eauto;
       match goal with
-      | H : follows_protocol_proc _ _ _ _ |- _ =>
+      | H : follows_protocol_proc _ _ _ |- _ =>
         inversion H; clear H; repeat sigT_eq; subst
       end; eauto.
     - repeat deex.
@@ -702,14 +702,14 @@ Module LockProtocol <: LayerImplRequiresRule RawLockAPI LockAPI LockingRule.
 
   Theorem follows_protocol_atomic : forall `(p : proc RawLockAPI.opT T) tid s v s' evs b,
     atomic_exec RawLockAPI.step p tid s v s' evs ->
-    follows_protocol_proc tid (lock_match s tid) b p ->
+    follows_protocol_proc (lock_match s tid) b p ->
     atomic_exec LockAPI.step p tid s v s' evs.
   Proof.
     intros.
     erewrite follows_protocol_atomic_owner with (b0 := b) in H0; eauto.
     induction H; intros; eauto;
       match goal with
-      | H : follows_protocol_proc _ _ _ _ |- _ =>
+      | H : follows_protocol_proc _ _ _ |- _ =>
         inversion H; clear H; repeat sigT_eq; subst
       end; eauto.
 
@@ -741,7 +741,7 @@ Module LockProtocol <: LayerImplRequiresRule RawLockAPI LockAPI LockingRule.
     generalize dependent b.
     induction H1; simpl in *; intros; eauto;
       match goal with
-      | H : follows_protocol_proc _ _ _ _ |- _ =>
+      | H : follows_protocol_proc _ _ _ |- _ =>
         inversion H; clear H; repeat sigT_eq; subst
       end; eauto.
 
@@ -754,7 +754,7 @@ Module LockProtocol <: LayerImplRequiresRule RawLockAPI LockAPI LockingRule.
 
   Lemma lock_match_op_ne : forall `(op : RawLockAPI.opT T) tid tid' s s' r b,
     RawLockAPI.step op tid s r s' ->
-    follows_protocol_op op tid (lock_match s tid) b ->
+    follows_protocol_op op (lock_match s tid) b ->
     tid <> tid' ->
     lock_match s tid' = lock_match s' tid'.
   Proof.
@@ -770,7 +770,7 @@ Module LockProtocol <: LayerImplRequiresRule RawLockAPI LockAPI LockingRule.
 
   Lemma lock_match_atomic_ne : forall `(p : proc RawLockAPI.opT T) tid tid' s s' r evs b,
     atomic_exec RawLockAPI.step p tid s r s' evs ->
-    follows_protocol_proc tid (lock_match s tid) b p ->
+    follows_protocol_proc (lock_match s tid) b p ->
     tid <> tid' ->
     lock_match s tid' = lock_match s' tid'.
   Proof.
@@ -778,7 +778,7 @@ Module LockProtocol <: LayerImplRequiresRule RawLockAPI LockAPI LockingRule.
     generalize dependent b.
     induction H; simpl in *; intros; eauto;
       match goal with
-      | H : follows_protocol_proc _ _ _ _ |- _ =>
+      | H : follows_protocol_proc _ _ _ |- _ =>
         inversion H; clear H; repeat sigT_eq; subst
       end; eauto.
 
@@ -799,7 +799,7 @@ Module LockProtocol <: LayerImplRequiresRule RawLockAPI LockAPI LockingRule.
 
   Lemma lock_match_exec_tid_ne : forall `(p : proc RawLockAPI.opT T) tid tid' s s' r evs b,
     exec_tid RawLockAPI.step tid s p s' r evs ->
-    follows_protocol_proc tid (lock_match s tid) b p ->
+    follows_protocol_proc (lock_match s tid) b p ->
     tid <> tid' ->
     lock_match s tid' = lock_match s' tid'.
   Proof.
@@ -807,16 +807,16 @@ Module LockProtocol <: LayerImplRequiresRule RawLockAPI LockAPI LockingRule.
     generalize dependent b.
     induction H; simpl in *; intros; eauto;
       match goal with
-      | H : follows_protocol_proc _ _ _ _ |- _ =>
+      | H : follows_protocol_proc _ _ _ |- _ =>
         inversion H; clear H; repeat sigT_eq; subst
       end; eauto.
   Qed.
 
   Lemma follows_protocol_proc_exec_tid :
     forall `(p : proc RawLockAPI.opT T) tid s s' p' evs b,
-    follows_protocol_proc tid (lock_match s tid) b p ->
+    follows_protocol_proc (lock_match s tid) b p ->
     exec_tid RawLockAPI.step tid s p s' (inr p') evs ->
-    follows_protocol_proc tid (lock_match s' tid) b p'.
+    follows_protocol_proc (lock_match s' tid) b p'.
   Proof.
     intros.
     remember (inr p').
@@ -825,7 +825,7 @@ Module LockProtocol <: LayerImplRequiresRule RawLockAPI LockAPI LockingRule.
     induction H0; intros; simpl in *; try congruence.
 
     match goal with
-    | H : follows_protocol_proc _ _ _ _ |- _ =>
+    | H : follows_protocol_proc _ _ _ |- _ =>
       inversion H; clear H; repeat sigT_eq; subst
     end; eauto.
 
@@ -834,7 +834,7 @@ Module LockProtocol <: LayerImplRequiresRule RawLockAPI LockAPI LockingRule.
     - inversion H0; repeat sigT_eq; simpl in *; subst;
                     repeat sigT_eq; simpl in *; subst; eauto;
         match goal with
-        | H : follows_protocol_proc _ _ _ _ |- _ =>
+        | H : follows_protocol_proc _ _ _ |- _ =>
           inversion H; clear H; repeat sigT_eq; subst
         end; eauto.
       eapply follows_protocol_op_owner in H2; eauto; subst; eauto.
