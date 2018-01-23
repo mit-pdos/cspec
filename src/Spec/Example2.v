@@ -195,7 +195,7 @@ Module LockingRule <: ProcRule LockAPI.
   Definition follows_protocol_op `(op : LockAPI.opT T) (tid : nat)
                                   (old_owner : bool) (new_owner : bool) :=
     match op with
-    | Acquire => old_owner = false /\ new_owner = true
+    | Acquire => new_owner = true
     | Release => old_owner = true /\ new_owner = false
     | Read => old_owner = true /\ new_owner = true
     | Write _ => old_owner = true /\ new_owner = true
