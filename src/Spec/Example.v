@@ -9,6 +9,7 @@ Require Import RelationClasses.
 Require Import Morphisms.
 Require Import List.
 Require Import Compile.
+Require Import PerThreadState.
 
 Import ListNotations.
 
@@ -75,21 +76,23 @@ Hint Extern 1 (opHi_step _ _ _ _ _) => econstructor.
 
 (** Implementations *)
 
-Definition inc_twice_core : proc opT opHiT _ :=
+Definition inc_twice_core : proc opT _ :=
   _ <- Op Inc;
   Op Inc.
 
-Definition dec_thrice_core : proc opT opHiT _ :=
+Definition dec_thrice_core : proc opT _ :=
   _ <- Op Dec;
   _ <- Op Dec;
   Op Dec.
 
-Definition compile_op T (op : opHiT T) : proc opT opHiT T :=
+Definition compile_op T (op : opHiT T) : proc opT T :=
   match op with
   | IncTwice => inc_twice_core
   | DecThrice => dec_thrice_core
   | Noop2 => Ret tt
   end.
+
+(*
 
 Definition inc_twice_impl :=
   hicall compile_op IncTwice.
@@ -710,4 +713,6 @@ Proof.
   intros.
   eapply compile_traces_match_ts; eauto.
 Qed.
+*)
+
 *)
