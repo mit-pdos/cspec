@@ -57,6 +57,12 @@ be a state of the system that cleanly matches a high-level abstraction.
 
 ===
 
+Our framework does not support non-atomic operations.  Every API method
+is an opcode, and opcodes execute in a single atomic step.  This may be
+a problem for non-linearizable interfaces (like namei).
+
+===
+
 TODO for trace-based concurrency:
 
 - Left mover problem: how can we move it if it never executes?

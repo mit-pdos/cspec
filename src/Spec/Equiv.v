@@ -15,180 +15,88 @@ Global Generalizable All Variables.
 
 (** Matching traces *)
 
-Inductive traces_match {opLoT opMidT opHiT} :
-  forall (t1 : trace opLoT opMidT)
-         (t2 : trace opMidT opHiT), Prop :=
+Definition trace_eq (t1 t2 : trace) :=
+  t1 = t2.
 
-| MatchLo : forall t1 t2 tid e,
-  traces_match t1 t2 ->
-  traces_match (TraceEvent tid (EvLow e) t1) t2
-
-| MatchInvokeMid : forall t1 t2 tid e,
-  traces_match t1 t2 ->
-  traces_match (TraceEvent tid (EvHigh e) t1)
-               (TraceEvent tid (EvLow e) t2)
-
-| MatchInvokeHi : forall t1 t2 tid e,
-  traces_match t1 t2 ->
-  traces_match t1 (TraceEvent tid (EvHigh e) t2)
-
-| MatchEmpty :
-  traces_match TraceEmpty TraceEmpty.
-
-Hint Constructors traces_match.
-
-
-Fixpoint trace_filter_hi `(t : trace opLoT opHiT) : trace opLoT opHiT :=
-  match t with
-  | TraceEmpty => TraceEmpty
-  | TraceEvent tid e t' =>
-    match e with
-    | EvLow _ => trace_filter_hi t'
-    | EvHigh _ => TraceEvent tid e (trace_filter_hi t')
-    end
-  end.
-
-Definition trace_match_hi {opLoT opHiT} (t1 t2 : trace opLoT opHiT) :=
-  trace_filter_hi t1 = trace_filter_hi t2.
-
-Instance trace_match_hi_equiv :
-  Equivalence (@trace_match_hi opLoT opHiT).
+Instance trace_eq_equiv :
+  Equivalence trace_eq.
 Proof.
   split.
   - firstorder.
-  - unfold trace_match_hi, Symmetric; intros.
+  - unfold trace_eq, Symmetric; intros.
     symmetry; eauto.
-  - unfold trace_match_hi, Transitive; intros.
+  - unfold trace_eq, Transitive; intros.
     congruence.
 Qed.
 
-Lemma trace_match_hi_prepend : forall `(evs : list (event opT opHiT)) tr0 tr1 tid,
-  trace_match_hi tr0 tr1 ->
-  trace_match_hi (prepend tid evs tr0) (prepend tid evs tr1).
+Lemma trace_eq_prepend : forall `(evs : list event) tr0 tr1 tid,
+  trace_eq tr0 tr1 ->
+  trace_eq (prepend tid evs tr0) (prepend tid evs tr1).
 Proof.
-  unfold trace_match_hi.
+  unfold trace_eq.
   induction evs; simpl; intros; eauto.
   destruct a; eauto.
   erewrite IHevs; eauto.
 Qed.
 
-Hint Resolve trace_match_hi_prepend.
+Hint Resolve trace_eq_prepend.
 
 
-Lemma traces_match_prepend : forall `(tr1 : trace opLoT opMidT) `(tr2 : trace opMidT opHiT) evs evs' tid,
-  traces_match tr1 tr2 ->
-  traces_match (prepend tid evs TraceEmpty) (prepend tid evs' TraceEmpty) ->
-  traces_match (prepend tid evs tr1) (prepend tid evs' tr2).
+Lemma trace_eq_prepend_empty : forall tid `(evs : list event) tr,
+  trace_eq (prepend tid evs tr) TraceEmpty ->
+  trace_eq (prepend tid evs TraceEmpty) TraceEmpty /\
+  trace_eq tr TraceEmpty.
 Proof.
-  intros.
-  remember (prepend tid evs TraceEmpty).
-  remember (prepend tid evs' TraceEmpty).
-  generalize dependent evs'.
-  generalize dependent evs.
-  induction H0; intros.
-  all: destruct evs; simpl in *.
-  all: try inversion Heqt; subst.
-  all: try constructor; eauto.
-
-  all: destruct evs'; simpl in *.
-  all: try inversion Heqt0; subst.
-  all: try constructor; eauto.
-
-  specialize (IHtraces_match nil); simpl in *; eauto.
-  specialize (IHtraces_match ([e0] ++ evs)); simpl in *; eauto.
-Qed.
-
-Lemma trace_match_hi_prepend_empty : forall tid `(evs : list (event opT opHiT)) tr,
-  trace_match_hi (prepend tid evs tr) TraceEmpty ->
-  trace_match_hi (prepend tid evs TraceEmpty) TraceEmpty /\
-  trace_match_hi tr TraceEmpty.
-Proof.
-  unfold trace_match_hi; induction evs; simpl in *; intros.
+  unfold trace_eq; induction evs; simpl in *; intros.
   - split; eauto.
-  - destruct a.
-    + specialize (IHevs tr). intuition.
-    + inversion H.
+  - inversion H.
 Qed.
 
-
-Lemma trace_match_hi_drop_lo_l : forall opT opHiT e (tr1 tr2 : trace opT opHiT) tid,
-  trace_match_hi tr1 tr2 ->
-  trace_match_hi (TraceEvent tid (EvLow e) tr1) tr2.
+Lemma trace_eq_prepend' : forall tr1 tr2 evs evs' tid,
+  trace_eq tr1 tr2 ->
+  trace_eq (prepend tid evs TraceEmpty) (prepend tid evs' TraceEmpty) ->
+  trace_eq (prepend tid evs tr1) (prepend tid evs' tr2).
 Proof.
-  unfold trace_match_hi; simpl; eauto.
+  induction evs; simpl in *; intros.
+  - induction evs'; simpl in *; intros; eauto.
+    inversion H0.
+  - induction evs'; simpl in *; intros; eauto.
+    * inversion H0.
+    * inversion H0; subst; eauto.
+      unfold trace_eq. cbn. f_equal.
+      rewrite IHevs; eauto.
 Qed.
 
-Lemma trace_match_hi_drop_lo_r : forall opLoT opHiT e (tr1 tr2 : trace opLoT opHiT) tid,
-  trace_match_hi tr1 tr2 ->
-  trace_match_hi tr1 (TraceEvent tid (EvLow e) tr2).
-Proof.
-  unfold trace_match_hi; simpl; eauto.
-Qed.
 
-Lemma trace_match_hi_refl : forall `(tr : trace opT opHiT),
-  trace_match_hi tr tr.
+Lemma trace_eq_refl : forall tr,
+  trace_eq tr tr.
 Proof.
   reflexivity.
 Qed.
 
-Hint Resolve trace_match_hi_drop_lo_l.
-Hint Resolve trace_match_hi_drop_lo_r.
-Hint Resolve trace_match_hi_refl.
-
-Instance traces_match_proper :
-  Proper (trace_match_hi ==> eq ==> iff) (@traces_match opLoT opMidT opHiT).
-Proof.
-  intros.
-  intros t1 t2 H12.
-  intros t3' t3 H; subst.
-  split; intros.
-  - generalize dependent t2.
-    induction H; simpl; intros; eauto.
-    + induction t0; simpl; intros.
-      * destruct ev.
-        constructor. eauto.
-        inversion H12; subst.
-        constructor. eauto.
-      * inversion H12.
-    + induction t2; simpl; intros; eauto.
-      destruct ev.
-      constructor. eauto.
-      inversion H12.
-  - generalize dependent t1.
-    induction H; simpl; intros; eauto.
-    + induction t0; simpl; intros.
-      * destruct ev.
-        constructor. eauto.
-        inversion H12; subst.
-        constructor. eauto.
-      * inversion H12.
-    + induction t1; simpl; intros; eauto.
-      destruct ev.
-      constructor. eauto.
-      inversion H12.
-Qed.
+Hint Resolve trace_eq_refl.
 
 
 (** A strong notion of execution equivalence, independent of semantics *)
 
-Definition exec_equiv_ts {opT opHiT} (ts1 ts2 : @threads_state opT opHiT) :=
+Definition exec_equiv_ts {opT} (ts1 ts2 : @threads_state opT) :=
   forall State op_step (s : State) tr,
     exec_prefix op_step s ts1 tr <->
     exec_prefix op_step s ts2 tr.
 
-Definition exec_equiv_opt `(p1 : maybe_proc opT opHiT) p2 :=
+Definition exec_equiv_opt `(p1 : maybe_proc opT) p2 :=
   forall (ts : threads_state) tid,
     exec_equiv_ts (ts [[ tid := p1 ]]) (ts [[ tid := p2 ]]).
 
-Definition exec_equiv `(p1 : proc opT opHiT T) (p2 : proc _ _ T) :=
+Definition exec_equiv `(p1 : proc opT T) (p2 : proc _ T) :=
   exec_equiv_opt (Proc p1) (Proc p2).
 
-Definition exec_equiv_rx `(p1 : proc opT opHiT T) (p2 : proc _ _ T) :=
-  forall TR (rx : T -> proc _ _ TR),
+Definition exec_equiv_rx `(p1 : proc opT T) (p2 : proc _ T) :=
+  forall TR (rx : T -> proc _ TR),
     exec_equiv (Bind p1 rx) (Bind p2 rx).
 
 Instance exec_equiv_ts_equivalence :
-  Equivalence (@exec_equiv_ts opLoT opHiT).
+  Equivalence (@exec_equiv_ts opT).
 Proof.
   split.
   - firstorder.
@@ -200,7 +108,7 @@ Proof.
     + apply H. apply H0. eauto.
 Qed.
 
-Theorem exec_equiv_ts_app_None : forall `(ts : @threads_state opT opHiT),
+Theorem exec_equiv_ts_app_None : forall `(ts : @threads_state opT),
   exec_equiv_ts ts (ts ++ [NoProc]).
 Proof.
   split; intros;
@@ -220,7 +128,7 @@ Proof.
     + eapply ExecExpired.
 Qed.
 
-Theorem exec_equiv_ts_pad : forall n `(ts : @threads_state opT opHiT),
+Theorem exec_equiv_ts_pad : forall n `(ts : @threads_state opT),
   exec_equiv_ts ts (pad ts n NoProc).
 Proof.
   intros.
@@ -236,7 +144,7 @@ Proof.
 Qed.
 
 Instance exec_equiv_opt_equivalence :
-  Equivalence (@exec_equiv_opt opLoT opHiT).
+  Equivalence (@exec_equiv_opt opT).
 Proof.
   split.
   - unfold exec_equiv_opt, Reflexive; intros.
@@ -253,7 +161,7 @@ Proof.
 Qed.
 
 Instance exec_equiv_equivalence :
-  Equivalence (@exec_equiv opLoT opHiT T).
+  Equivalence (@exec_equiv opT T).
 Proof.
   unfold exec_equiv.
   split.
@@ -266,7 +174,7 @@ Proof.
 Qed.
 
 Instance exec_equiv_rx_equivalence :
-  Equivalence (@exec_equiv_rx opLoT opHiT T).
+  Equivalence (@exec_equiv_rx opT T).
 Proof.
   unfold exec_equiv_rx.
   split.
@@ -279,7 +187,7 @@ Proof.
 Qed.
 
 Instance thread_upd_exec_equiv_proper :
-  Proper (eq ==> eq ==> exec_equiv_opt ==> exec_equiv_ts) (@thread_upd opT opHiT).
+  Proper (eq ==> eq ==> exec_equiv_opt ==> exec_equiv_ts) (@thread_upd opT).
 Proof.
   intros.
   intros ts0 ts1 H; subst.
@@ -292,7 +200,7 @@ Proof.
 Qed.
 
 Instance Proc_exec_equiv_proper :
-  Proper (exec_equiv ==> exec_equiv_opt) (@Proc opT opHiT T).
+  Proper (exec_equiv ==> exec_equiv_opt) (@Proc opT T).
 Proof.
   intros.
   unfold exec_equiv.
@@ -300,8 +208,8 @@ Proof.
   eauto.
 Qed.
 
-Theorem exec_equiv_ret_None : forall opT opHiT `(v : T),
-  @exec_equiv_opt opT opHiT (Proc (Ret v)) NoProc.
+Theorem exec_equiv_ret_None : forall opT `(v : T),
+  @exec_equiv_opt opT (Proc (Ret v)) NoProc.
 Proof.
   split; intros;
     unfold exec_prefix in *; repeat deex.
@@ -337,7 +245,7 @@ Proof.
     eauto.
 Qed.
 
-Theorem exec_equiv_bind_ret : forall `(p : proc opT opHiT T),
+Theorem exec_equiv_bind_ret : forall `(p : proc opT T),
   exec_equiv (Bind p Ret) p.
 Proof.
   unfold exec_equiv; split; intros;
@@ -436,7 +344,7 @@ Proof.
 Qed.
 
 Instance exec_equiv_rx_to_exec_equiv :
-  subrelation (@exec_equiv_rx opT opHiT T) exec_equiv.
+  subrelation (@exec_equiv_rx opT T) exec_equiv.
 Proof.
   unfold subrelation, exec_equiv_rx; intros.
   rewrite <- exec_equiv_bind_ret with (p := x).
@@ -444,15 +352,15 @@ Proof.
   eauto.
 Qed.
 
-Theorem exec_equiv_rx_proof_helper : forall `(p1 : proc opT opHiT T) p2,
-  (forall tid `(s : State) s' op_step ts tr evs `(rx : _ -> proc _ _ TR) result,
+Theorem exec_equiv_rx_proof_helper : forall `(p1 : proc opT T) p2,
+  (forall tid `(s : State) s' op_step ts tr evs `(rx : _ -> proc _ TR) result,
     exec_tid op_step tid s (Bind p1 rx) s' result evs ->
     exec_prefix op_step s' (ts [[tid := match result with
                                  | inl _ => NoProc
                                  | inr p' => Proc p'
                                  end]]) tr ->
     exec_prefix op_step s (ts [[tid := Proc (Bind p2 rx)]]) (prepend tid evs tr)) ->
-  (forall tid `(s : State) s' op_step ts tr evs `(rx : _ -> proc _ _ TR) result,
+  (forall tid `(s : State) s' op_step ts tr evs `(rx : _ -> proc _ TR) result,
     exec_tid op_step tid s (Bind p2 rx) s' result evs ->
     exec_prefix op_step s' (ts [[tid := match result with
                                  | inl _ => NoProc
@@ -497,7 +405,7 @@ Proof.
       rewrite thread_upd_upd_ne; auto.
 Qed.
 
-Theorem exec_equiv_ret_bind : forall `(v : T) `(p : T -> proc opT opHiT T'),
+Theorem exec_equiv_ret_bind : forall `(v : T) `(p : T -> proc opT T'),
   exec_equiv_rx (Bind (Ret v) p) (p v).
 Proof.
   intros.
@@ -516,7 +424,7 @@ Proof.
     eauto.
 Qed.
 
-Theorem exec_equiv_atomicret_bind : forall `(v : T) `(p : T -> proc opT opHiT T'),
+Theorem exec_equiv_atomicret_bind : forall `(v : T) `(p : T -> proc opT T'),
   exec_equiv_rx (Bind (Atomic (Ret v)) p) (p v).
 Proof.
   intros.
@@ -537,8 +445,8 @@ Proof.
     eauto.
 Qed.
 
-Theorem exec_equiv_atomicret_ret : forall opLoT opHiT `(v : T),
-  @exec_equiv_rx opLoT opHiT _ (Atomic (Ret v)) (Ret v).
+Theorem exec_equiv_atomicret_ret : forall opT `(v : T),
+  @exec_equiv_rx opT _ (Atomic (Ret v)) (Ret v).
 Proof.
   intros.
   eapply exec_equiv_rx_proof_helper; intros.
@@ -555,7 +463,7 @@ Proof.
       autorewrite with t; eauto.
 Qed.
 
-Theorem exec_equiv_bind_bind : forall `(p1 : proc opT opHiT T1) `(p2 : T1 -> proc opT opHiT T2) `(p3 : T2 -> proc opT opHiT T3),
+Theorem exec_equiv_bind_bind : forall `(p1 : proc opT T1) `(p2 : T1 -> proc opT T2) `(p3 : T2 -> proc opT T3),
   exec_equiv_rx (Bind (Bind p1 p2) p3) (Bind p1 (fun v => Bind (p2 v) p3)).
 Proof.
   unfold exec_equiv; split; intros.
@@ -618,7 +526,7 @@ Proof.
       eauto.
 Qed.
 
-Theorem exec_equiv_norx_bind_bind : forall `(p1 : proc opT opHiT T1) `(p2 : T1 -> proc opT opHiT T2) `(p3 : T2 -> proc opT opHiT T3),
+Theorem exec_equiv_norx_bind_bind : forall `(p1 : proc opT T1) `(p2 : T1 -> proc opT T2) `(p3 : T2 -> proc opT T3),
   exec_equiv (Bind (Bind p1 p2) p3) (Bind p1 (fun v => Bind (p2 v) p3)).
 Proof.
   intros.
@@ -626,7 +534,7 @@ Proof.
   reflexivity.
 Qed.
 
-Theorem exec_equiv_bind_a : forall `(p : proc opT opHiT T) `(p1 : T -> proc _ _ T') p2,
+Theorem exec_equiv_bind_a : forall `(p : proc opT T) `(p1 : T -> proc _ T') p2,
   (forall x, exec_equiv (p1 x) (p2 x)) ->
   exec_equiv (Bind p p1) (Bind p p2).
 Proof.
@@ -688,7 +596,7 @@ Proof.
       rewrite thread_upd_upd_ne; eauto.
 Qed.
 
-Theorem exec_equiv_bind_bind' : forall `(p1 : proc opT opHiT T1) `(p2 : T1 -> proc _ _ T2) `(p3 : T1 -> T2 -> proc _ _ T3),
+Theorem exec_equiv_bind_bind' : forall `(p1 : proc opT T1) `(p2 : T1 -> proc _ T2) `(p3 : T1 -> T2 -> proc _ T3),
   exec_equiv_rx (Bind p1 (fun x => Bind (p2 x) (p3 x)))
              (Bind (Bind p1 (fun x => Bind (p2 x) (fun y => Ret (x, y))))
                    (fun p => p3 (fst p) (snd p))).
@@ -702,10 +610,30 @@ Proof.
   reflexivity.
 Qed.
 
+Theorem exec_equiv_until : forall `(p : proc opT T) (c : T -> bool),
+  exec_equiv_rx (Until c p) (until1 c p).
+Proof.
+  intros.
+  eapply exec_equiv_rx_proof_helper; intros.
+  - repeat exec_tid_inv.
+    simpl; eauto.
+  - rewrite <- app_nil_l with (l := evs).
+    rewrite prepend_app.
+    eapply ExecPrefixOne.
+      autorewrite with t; eauto.
+      eauto.
+      autorewrite with t.
+    eapply ExecPrefixOne.
+      autorewrite with t; eauto.
+      eauto.
+      autorewrite with t.
+    eauto.
+Qed.
+
 Instance Bind_exec_equiv_proper :
   Proper (exec_equiv_rx ==>
           pointwise_relation T exec_equiv_rx ==>
-          @exec_equiv_rx opT opHiT TR) Bind.
+          @exec_equiv_rx opT TR) Bind.
 Proof.
   unfold exec_equiv_rx; intros.
   intros p1a p1b H1; intros.
@@ -717,7 +645,7 @@ Proof.
   eapply H2.
 Qed.
 
-Theorem exec_equiv_ts_upd_same : forall `(ts : @threads_state opT opHiT) p tid,
+Theorem exec_equiv_ts_upd_same : forall `(ts : @threads_state opT) p tid,
   ts [[ tid ]] = p ->
   exec_equiv_ts ts (ts [[ tid := p ]]).
 Proof.
@@ -730,7 +658,7 @@ Proof.
 Qed.
 
 Instance exec_prefix_proper_exec_equiv :
-  Proper (eq ==> eq ==> exec_equiv_ts ==> eq ==> iff) (@exec_prefix opT opHiT State).
+  Proper (eq ==> eq ==> exec_equiv_ts ==> eq ==> iff) (@exec_prefix opT State).
 Proof.
   intros.
   intros ? ? ?; subst.
@@ -741,17 +669,212 @@ Proof.
 Qed.
 
 
+(** A version of [exec_equiv] for [exec] instead of [exec_prefix]. *)
+
+Definition exec_equiv_ts_N (n1 n2 : nat) {opT} (ts1 ts2 : @threads_state opT) :=
+  forall State op_step (s : State) tr,
+    exec op_step s ts1 tr n1 <->
+    exec op_step s ts2 tr n2.
+
+Definition exec_equiv_opt_N n1 n2 `(p1 : maybe_proc opT) p2 :=
+  forall (ts : threads_state) tid,
+    exec_equiv_ts_N n1 n2 (ts [[ tid := p1 ]]) (ts [[ tid := p2 ]]).
+
+Definition exec_equiv_N n1 n2 `(p1 : proc opT T) (p2 : proc _ T) :=
+  exec_equiv_opt_N n1 n2 (Proc p1) (Proc p2).
+
+Definition exec_equiv_rx_N n1 n2 `(p1 : proc opT T) (p2 : proc _ T) :=
+  forall TR (rx : T -> proc _ TR),
+    exec_equiv_N n1 n2 (Bind p1 rx) (Bind p2 rx).
+
+Instance exec_equiv_ts_N_equivalence :
+  Equivalence (@exec_equiv_ts_N n n opT).
+Proof.
+  split.
+  - firstorder.
+  - unfold Symmetric, exec_equiv_ts; intros.
+    split; intros; apply H; eauto.
+  - unfold Transitive, exec_equiv_ts; intros.
+    split; intros.
+    + apply H0. apply H. eauto.
+    + apply H. apply H0. eauto.
+Qed.
+
+Instance exec_equiv_opt_N_equivalence :
+  Equivalence (@exec_equiv_opt_N n n opT).
+Proof.
+  split.
+  - unfold exec_equiv_opt_N, Reflexive; intros.
+    reflexivity.
+  - unfold exec_equiv_opt_N, Symmetric; intros.
+    symmetry. eauto.
+  - intros t1 t2 t3.
+    unfold exec_equiv; split; intros.
+    + eapply H in H1; eauto.
+      eapply H0 in H1.
+      eauto.
+    + eapply H; eauto.
+      eapply H0; eauto.
+Qed.
+
+Instance exec_equiv_N_equivalence :
+  Equivalence (@exec_equiv_N n n opT T).
+Proof.
+  unfold exec_equiv_N.
+  split.
+  - intro t.
+    reflexivity.
+  - unfold Symmetric, exec_equiv_opt; intros.
+    symmetry. eauto.
+  - unfold Transitive; intros.
+    etransitivity; eauto.
+Qed.
+
+Instance exec_equiv_rx_N_equivalence :
+  Equivalence (@exec_equiv_rx_N n n opT T).
+Proof.
+  unfold exec_equiv_rx_N.
+  split.
+  - intro t.
+    reflexivity.
+  - unfold Symmetric, exec_equiv_opt_N; intros.
+    symmetry. eauto.
+  - unfold Transitive; intros.
+    etransitivity; eauto.
+Qed.
+
+Theorem exec_equiv_N_bind_bind : forall `(p1 : proc opT T1) `(p2 : T1 -> proc opT T2) `(p3 : T2 -> proc opT T3) n,
+  exec_equiv_N n n (Bind (Bind p1 p2) p3) (Bind p1 (fun v => Bind (p2 v) p3)).
+Proof.
+  split; intros.
+  - match goal with
+    | H : exec _ _ (thread_upd ?ts ?tid (Proc ?p)) _ _ |- _ =>
+      remember (thread_upd ts tid (Proc p));
+      generalize dependent ts;
+      generalize dependent p1;
+      induction H; intros; subst; eauto
+    end.
+
+    destruct (tid0 == tid); subst.
+    * autorewrite with t in *.
+      repeat maybe_proc_inv.
+      exec_tid_inv.
+      exec_tid_inv.
+      eapply ExecOne with (tid := tid).
+        rewrite thread_upd_eq. eauto.
+        eauto.
+      autorewrite with t.
+
+      destruct result; eauto.
+
+    * eapply ExecOne with (tid := tid0).
+        autorewrite with t in *; eauto.
+        eauto.
+      rewrite thread_upd_upd_ne by auto.
+      eapply IHexec.
+      rewrite thread_upd_upd_ne; eauto.
+
+  - match goal with
+    | H : exec _ _ (thread_upd ?ts ?tid (Proc ?p)) _ _ |- _ =>
+      remember (thread_upd ts tid (Proc p));
+      generalize dependent ts;
+      generalize dependent p1;
+      induction H; intros; subst; eauto
+    end.
+
+    destruct (tid0 == tid); subst.
+    * autorewrite with t in *.
+      repeat maybe_proc_inv.
+      exec_tid_inv.
+
+      eapply ExecOne with (tid := tid).
+        rewrite thread_upd_eq. eauto.
+        eauto.
+      autorewrite with t.
+
+      destruct result0; eauto.
+
+    * rewrite thread_upd_upd_ne in * by eauto.
+      eapply ExecOne with (tid := tid0).
+        rewrite thread_upd_ne in * by auto. eauto.
+        eauto.
+      rewrite thread_upd_upd_ne by auto.
+      eauto.
+Qed.
+
+Theorem exec_equiv_rx_N_bind_bind : forall `(p1 : proc opT T1) `(p2 : T1 -> proc opT T2) `(p3 : T2 -> proc opT T3) n,
+  exec_equiv_rx_N n n (Bind (Bind p1 p2) p3) (Bind p1 (fun v => Bind (p2 v) p3)).
+Proof.
+  split; intros.
+  - match goal with
+    | H : exec _ _ (thread_upd ?ts ?tid (Proc ?p)) _ _ |- _ =>
+      remember (thread_upd ts tid (Proc p));
+      generalize dependent ts;
+      generalize dependent p1;
+      induction H; intros; subst; eauto
+    end.
+
+    destruct (tid0 == tid); subst.
+    * autorewrite with t in *.
+      repeat maybe_proc_inv.
+      exec_tid_inv.
+      exec_tid_inv.
+      exec_tid_inv.
+      eapply ExecOne with (tid := tid).
+        rewrite thread_upd_eq. eauto.
+        eauto.
+      autorewrite with t.
+
+      destruct result0; eauto.
+
+    * eapply ExecOne with (tid := tid0).
+        autorewrite with t in *; eauto.
+        eauto.
+      rewrite thread_upd_upd_ne by auto.
+      eapply IHexec.
+      rewrite thread_upd_upd_ne; eauto.
+
+  - match goal with
+    | H : exec _ _ (thread_upd ?ts ?tid (Proc ?p)) _ _ |- _ =>
+      remember (thread_upd ts tid (Proc p));
+      generalize dependent ts;
+      generalize dependent p1;
+      induction H; intros; subst; eauto
+    end.
+
+    destruct (tid0 == tid); subst.
+    * autorewrite with t in *.
+      repeat maybe_proc_inv.
+      exec_tid_inv.
+      exec_tid_inv.
+
+      eapply ExecOne with (tid := tid).
+        rewrite thread_upd_eq. eauto.
+        eauto.
+      autorewrite with t.
+
+      destruct result; eauto.
+
+    * rewrite thread_upd_upd_ne in * by eauto.
+      eapply ExecOne with (tid := tid0).
+        rewrite thread_upd_ne in * by auto. eauto.
+        eauto.
+      rewrite thread_upd_upd_ne by auto.
+      eauto.
+Qed.
+
+
 (** A strong notion of equivalence for programs inside atomic sections.
     Basically the same as above, but defined as an underlying [atomic_exec]
     rather than [exec]. *)
 
-Definition atomic_equiv `(p1 : proc opT opHiT T) p2 :=
+Definition atomic_equiv `(p1 : proc opT T) p2 :=
   forall State op_step (s s' : State) r tid evs,
     atomic_exec op_step p1 tid s r s' evs <->
     atomic_exec op_step p2 tid s r s' evs.
 
 Instance atomic_equiv_equivalence :
-  Equivalence (@atomic_equiv opLoT opHiT T).
+  Equivalence (@atomic_equiv opT T).
 Proof.
   split.
   - firstorder.
@@ -764,7 +887,7 @@ Proof.
 Qed.
 
 Instance atomic_equiv_proper :
-  Proper (atomic_equiv ==> atomic_equiv ==> iff) (@atomic_equiv opT opHiT T).
+  Proper (atomic_equiv ==> atomic_equiv ==> iff) (@atomic_equiv opT T).
 Proof.
   intros.
   intros ? ? ?.
@@ -779,7 +902,7 @@ Proof.
     symmetry; eauto.
 Qed.
 
-Theorem atomic_equiv_ret_bind : forall `(v : T) `(p : T -> proc opT opHiT T'),
+Theorem atomic_equiv_ret_bind : forall `(v : T) `(p : T -> proc opT T'),
   atomic_equiv (Bind (Ret v) p) (p v).
 Proof.
   split; intros.
@@ -790,7 +913,7 @@ Proof.
     eauto.
 Qed.
 
-Theorem atomic_equiv_bind_ret : forall `(p : proc opT opHiT T),
+Theorem atomic_equiv_bind_ret : forall `(p : proc opT T),
   atomic_equiv (Bind p Ret) p.
 Proof.
   split; intros.
@@ -802,7 +925,7 @@ Proof.
     eauto.
 Qed.
 
-Theorem atomic_equiv_bind_bind : forall `(p1 : proc opT opHiT T1) `(p2 : T1 -> proc opT opHiT T2) `(p3 : T2 -> proc opT opHiT T3),
+Theorem atomic_equiv_bind_bind : forall `(p1 : proc opT T1) `(p2 : T1 -> proc opT T2) `(p3 : T2 -> proc opT T3),
   atomic_equiv (Bind (Bind p1 p2) p3) (Bind p1 (fun v => Bind (p2 v) p3)).
 Proof.
   split; intros.
@@ -816,7 +939,7 @@ Proof.
     eauto.
 Qed.
 
-Theorem atomic_equiv_bind_a : forall `(p : proc opT opHiT T) `(p1 : T -> proc _ _ T') p2,
+Theorem atomic_equiv_bind_a : forall `(p : proc opT T) `(p1 : T -> proc _ T') p2,
   (forall x, atomic_equiv (p1 x) (p2 x)) ->
   atomic_equiv (Bind p p1) (Bind p p2).
 Proof.
@@ -830,7 +953,7 @@ Proof.
     eapply H; eauto.
 Qed.
 
-Theorem atomic_equiv_bind_bind' : forall `(p1 : proc opT opHiT T1) `(p2 : T1 -> proc _ _ T2) `(p3 : T1 -> T2 -> proc _ _ T3),
+Theorem atomic_equiv_bind_bind' : forall `(p1 : proc opT T1) `(p2 : T1 -> proc _ T2) `(p3 : T1 -> T2 -> proc _ T3),
   atomic_equiv (Bind p1 (fun x => Bind (p2 x) (p3 x)))
                (Bind (Bind p1 (fun x => Bind (p2 x) (fun y => Ret (x, y))))
                      (fun p => p3 (fst p) (snd p))).
@@ -845,7 +968,7 @@ Proof.
 Qed.
 
 Instance Atomic_proper_atomic_equiv :
-  Proper (atomic_equiv ==> @exec_equiv_rx opT opHiT T) Atomic.
+  Proper (atomic_equiv ==> @exec_equiv_rx opT T) Atomic.
 Proof.
   intros.
   intros p1 p2 H.
@@ -866,7 +989,7 @@ Qed.
 Instance Bind_proper_atomic_equiv :
   Proper (atomic_equiv ==>
           pointwise_relation T atomic_equiv ==>
-          @atomic_equiv opT opHiT TR) Bind.
+          @atomic_equiv opT TR) Bind.
 Proof.
   intros.
   intros p1a p1b H1.
@@ -883,139 +1006,192 @@ Qed.
 
 (** Trace inclusion for an entire threads_state *)
 
-Definition hitrace_incl_ts_s {opLo opHi State} op_step (s s' : State) (ts1 ts2 : @threads_state opLo opHi) :=
+Definition trace_incl_ts_s {opT State} op_step (s s' : State) (ts1 ts2 : @threads_state opT) :=
   forall tr,
     exec_prefix op_step s ts1 tr ->
     exists tr', exec_prefix op_step s' ts2 tr' /\
-      trace_match_hi tr tr'.
+      trace_eq tr tr'.
 
-Definition hitrace_incl_ts {opLo opHi State} op_step (ts1 ts2 : @threads_state opLo opHi) :=
+Definition trace_incl_ts {opT State} op_step (ts1 ts2 : @threads_state opT) :=
   forall (s : State),
-    hitrace_incl_ts_s op_step s s ts1 ts2.
+    trace_incl_ts_s op_step s s ts1 ts2.
 
-Instance hitrace_incl_ts_s_preorder :
-  PreOrder (@hitrace_incl_ts_s opT opHiT State op_step s s).
+Definition trace_incl_ts_s_N n {opT State} op_step (s s' : State) (ts1 ts2 : @threads_state opT) :=
+  forall tr n',
+    n' <= n ->
+    exec op_step s ts1 tr n' ->
+    exists tr', exec_prefix op_step s' ts2 tr' /\
+      trace_eq tr tr'.
+
+Definition trace_incl_ts_N n {opT State} op_step (ts1 ts2 : @threads_state opT) :=
+  forall (s : State),
+    trace_incl_ts_s_N n op_step s s ts1 ts2.
+
+Instance trace_incl_ts_s_preorder :
+  PreOrder (@trace_incl_ts_s opT State op_step s s).
 Proof.
   split.
   - unfold Reflexive.
-    unfold hitrace_incl_ts_s; intros.
+    unfold trace_incl_ts_s; intros.
     eexists; intuition eauto.
   - unfold Transitive.
-    unfold hitrace_incl_ts_s; intros.
+    unfold trace_incl_ts_s; intros.
     eapply H in H1. deex.
     eapply H0 in H1. deex.
     eexists; intuition eauto.
     etransitivity; eauto.
 Qed.
 
-Instance hitrace_incl_ts_preorder :
-  PreOrder (@hitrace_incl_ts opT opHiT State op_step).
+Instance trace_incl_ts_preorder :
+  PreOrder (@trace_incl_ts opT State op_step).
 Proof.
   split.
-  - unfold Reflexive, hitrace_incl_ts; intros.
+  - unfold Reflexive, trace_incl_ts; intros.
     reflexivity.
-  - unfold Transitive, hitrace_incl_ts; intros.
+  - unfold Transitive, trace_incl_ts; intros.
     etransitivity; eauto.
 Qed.
 
-Instance exec_equiv_ts_to_hitrace_incl_ts :
-  subrelation (@exec_equiv_ts opT opHiT) (@hitrace_incl_ts opT opHiT State op_step).
+Instance exec_equiv_ts_to_trace_incl_ts :
+  subrelation (@exec_equiv_ts opT) (@trace_incl_ts opT State op_step).
 Proof.
   unfold subrelation; intros.
-  unfold hitrace_incl_ts, hitrace_incl_ts_s; intros.
+  unfold trace_incl_ts, trace_incl_ts_s; intros.
   apply H in H0.
   eauto.
 Qed.
 
-Theorem hitrace_incl_ts_s_trans : forall `(s0 : State) s1 s2 `(op_step : OpSemantics opT State) `(ts1 : @threads_state opT opHiT) ts2 ts3,
-  hitrace_incl_ts_s op_step s0 s1 ts1 ts2 ->
-  hitrace_incl_ts_s op_step s1 s2 ts2 ts3 ->
-  hitrace_incl_ts_s op_step s0 s2 ts1 ts3.
+Theorem trace_incl_ts_s_trans : forall `(s0 : State) s1 s2 `(op_step : OpSemantics opT State) `(ts1 : @threads_state opT) ts2 ts3,
+  trace_incl_ts_s op_step s0 s1 ts1 ts2 ->
+  trace_incl_ts_s op_step s1 s2 ts2 ts3 ->
+  trace_incl_ts_s op_step s0 s2 ts1 ts3.
 Proof.
-  unfold hitrace_incl_ts_s; intros.
+  unfold trace_incl_ts_s; intros.
   apply H in H1. deex.
   apply H0 in H1. deex.
   eexists; intuition eauto.
   etransitivity; eauto.
 Qed.
 
+Instance trace_incl_ts_s_N_refl :
+  Reflexive (@trace_incl_ts_s_N n opT State op_step s s).
+Proof.
+  unfold Reflexive.
+  unfold trace_incl_ts_s_N; intros.
+  eexists; intuition eauto.
+Qed.
+
+Instance trace_incl_ts_N_refl :
+  Reflexive (@trace_incl_ts_N n opT State op_step).
+Proof.
+  unfold Reflexive, trace_incl_ts_N; intros.
+  reflexivity.
+Qed.
+
 
 (** Trace inclusion for a single thread *)
 
-Definition hitrace_incl_s `(s : State) s' tid `(op_step : OpSemantics opT State) `(p1 : proc opT opHiT T) (p2 : proc _ _ T) :=
+Definition trace_incl_s `(s : State) s' tid `(op_step : OpSemantics opT State) `(p1 : proc opT T) (p2 : proc _ T) :=
   forall ts,
-    hitrace_incl_ts_s op_step s s'
+    trace_incl_ts_s op_step s s'
       (ts [[ tid := Proc p1 ]])
       (ts [[ tid := Proc p2 ]]).
 
-Definition hitrace_incl_opt {opT opHiT} `(op_step : OpSemantics opT State) p1 p2 :=
-  forall (ts : @threads_state opT opHiT) tid,
-    hitrace_incl_ts op_step
+Definition trace_incl_opt {opT} `(op_step : OpSemantics opT State) p1 p2 :=
+  forall (ts : @threads_state opT) tid,
+    trace_incl_ts op_step
       (ts [[ tid := p1 ]])
       (ts [[ tid := p2 ]]).
 
-Definition hitrace_incl {opT opHiT T} `(op_step : OpSemantics opT State) (p1 p2 : proc opT opHiT T) :=
-  hitrace_incl_opt op_step (Proc p1) (Proc p2).
+Definition trace_incl {opT T} `(op_step : OpSemantics opT State) (p1 p2 : proc opT T) :=
+  trace_incl_opt op_step (Proc p1) (Proc p2).
 
 
-Instance hitrace_incl_opt_preorder :
-  PreOrder (@hitrace_incl_opt opT opHiT State op_step).
+Definition trace_incl_s_N n `(s : State) s' tid `(op_step : OpSemantics opT State) `(p1 : proc opT T) (p2 : proc _ T) :=
+  forall ts,
+    trace_incl_ts_s_N n op_step s s'
+      (ts [[ tid := Proc p1 ]])
+      (ts [[ tid := Proc p2 ]]).
+
+Definition trace_incl_opt_N n {opT} `(op_step : OpSemantics opT State) p1 p2 :=
+  forall (ts : @threads_state opT) tid,
+    trace_incl_ts_N n op_step
+      (ts [[ tid := p1 ]])
+      (ts [[ tid := p2 ]]).
+
+Definition trace_incl_N n {opT T} `(op_step : OpSemantics opT State) (p1 p2 : proc opT T) :=
+  trace_incl_opt_N n op_step (Proc p1) (Proc p2).
+
+
+Definition trace_incl_rx_N n {opT T} `(op_step : OpSemantics opT State) (p1 p2 : proc opT T) :=
+  forall TF (rx1 rx2 : _ -> proc _ TF) n0,
+    n0 <= n ->
+    (forall a, trace_incl_N (n0-1) op_step (rx1 a) (rx2 a)) ->
+    trace_incl_N n0 op_step (Bind p1 rx1) (Bind p2 rx2).
+
+Definition trace_incl_rx {opT T} `(op_step : OpSemantics opT State) (p1 p2 : proc opT T) :=
+  forall n,
+    trace_incl_rx_N n op_step p1 p2.
+
+
+Instance trace_incl_opt_preorder :
+  PreOrder (@trace_incl_opt opT State op_step).
 Proof.
   split.
   - unfold Reflexive; intros.
-    unfold hitrace_incl_opt; intros.
+    unfold trace_incl_opt; intros.
     reflexivity.
   - unfold Transitive; intros.
-    unfold hitrace_incl_opt; intros.
+    unfold trace_incl_opt; intros.
     etransitivity; eauto.
 Qed.
 
-Instance hitrace_incl_s_preorder :
-  PreOrder (@hitrace_incl_s State s s tid opT op_step opHiT T).
+Instance trace_incl_s_preorder :
+  PreOrder (@trace_incl_s State s s tid opT op_step T).
 Proof.
   split.
   - unfold Reflexive; intros.
-    unfold hitrace_incl_s; intros.
+    unfold trace_incl_s; intros.
     reflexivity.
   - unfold Transitive; intros.
-    unfold hitrace_incl_s; intros.
+    unfold trace_incl_s; intros.
     etransitivity; eauto.
 Qed.
 
-Instance hitrace_incl_preorder :
-  PreOrder (@hitrace_incl opT opHiT T State op_step).
+Instance trace_incl_preorder :
+  PreOrder (@trace_incl opT T State op_step).
 Proof.
   split.
   - unfold Reflexive; intros.
-    unfold hitrace_incl; intros.
+    unfold trace_incl; intros.
     reflexivity.
   - unfold Transitive; intros.
-    unfold hitrace_incl; intros.
+    unfold trace_incl; intros.
     etransitivity; eauto.
 Qed.
 
-Instance exec_equiv_opt_to_hitrace_incl_opt :
-  subrelation (@exec_equiv_opt opT opHiT) (@hitrace_incl_opt opT opHiT State op_step).
+Instance exec_equiv_opt_to_trace_incl_opt :
+  subrelation (@exec_equiv_opt opT) (@trace_incl_opt opT State op_step).
 Proof.
   unfold subrelation; intros.
-  unfold hitrace_incl_opt, hitrace_incl_ts, hitrace_incl_ts_s; intros.
+  unfold trace_incl_opt, trace_incl_ts, trace_incl_ts_s; intros.
   apply H in H0.
   eauto.
 Qed.
 
-Instance exec_equiv_to_hitrace_incl :
-  subrelation (@exec_equiv opT opHiT T) (@hitrace_incl opT opHiT T State op_step).
+Instance exec_equiv_to_trace_incl :
+  subrelation (@exec_equiv opT T) (@trace_incl opT T State op_step).
 Proof.
   unfold subrelation; intros.
-  unfold hitrace_incl, hitrace_incl_opt, hitrace_incl_ts, hitrace_incl_ts_s; intros.
+  unfold trace_incl, trace_incl_opt, trace_incl_ts, trace_incl_ts_s; intros.
   apply H in H0.
   eauto.
 Qed.
 
-Instance hitrace_incl_proper :
-  Proper (Basics.flip (@hitrace_incl opT opHiT T State op_step) ==>
-          @hitrace_incl opT opHiT T State op_step ==>
-          Basics.impl) (@hitrace_incl opT opHiT T State op_step).
+Instance trace_incl_proper :
+  Proper (Basics.flip (@trace_incl opT T State op_step) ==>
+          @trace_incl opT T State op_step ==>
+          Basics.impl) (@trace_incl opT T State op_step).
 Proof.
   intros.
   intros p1 p2 H21 p3 p4 H34 H; subst.
@@ -1023,10 +1199,10 @@ Proof.
   repeat (etransitivity; eauto).
 Qed.
 
-Instance hitrace_incl_proper_flip :
-  Proper (@hitrace_incl opT opHiT T State op_step ==>
-          Basics.flip (@hitrace_incl opT opHiT T State op_step) ==>
-          Basics.flip Basics.impl) (@hitrace_incl opT opHiT T State op_step).
+Instance trace_incl_proper_flip :
+  Proper (@trace_incl opT T State op_step ==>
+          Basics.flip (@trace_incl opT T State op_step) ==>
+          Basics.flip Basics.impl) (@trace_incl opT T State op_step).
 Proof.
   intros.
   intros p1 p2 H21 p3 p4 H34 H; subst.
@@ -1034,14 +1210,14 @@ Proof.
   repeat (etransitivity; eauto).
 Qed.
 
-Instance hitrace_incl_s_proper :
-  Proper (Basics.flip (@hitrace_incl opT opHiT T State op_step) ==>
-          @hitrace_incl opT opHiT T State op_step ==>
-          Basics.impl) (@hitrace_incl_s State s s' tid opT op_step opHiT T).
+Instance trace_incl_s_proper :
+  Proper (Basics.flip (@trace_incl opT T State op_step) ==>
+          @trace_incl opT T State op_step ==>
+          Basics.impl) (@trace_incl_s State s s' tid opT op_step T).
 Proof.
   intros.
   intros p1 p2 H12 p3 p4 H34 H; subst.
-  unfold hitrace_incl_s, hitrace_incl_ts_s; intros.
+  unfold trace_incl_s, trace_incl_ts_s; intros.
   apply H12 in H0. deex.
   apply H in H0. deex.
   apply H34 in H0. deex.
@@ -1050,14 +1226,14 @@ Proof.
   repeat ( etransitivity; eauto ).
 Qed.
 
-Instance hitrace_incl_s_proper_flip :
-  Proper (@hitrace_incl opT opHiT T State op_step ==>
-          Basics.flip (@hitrace_incl opT opHiT T State op_step) ==>
-          Basics.flip Basics.impl) (@hitrace_incl_s State s s' tid opT op_step opHiT T).
+Instance trace_incl_s_proper_flip :
+  Proper (@trace_incl opT T State op_step ==>
+          Basics.flip (@trace_incl opT T State op_step) ==>
+          Basics.flip Basics.impl) (@trace_incl_s State s s' tid opT op_step T).
 Proof.
   intros.
   intros p1 p2 H12 p3 p4 H34 H; subst.
-  unfold hitrace_incl_s, hitrace_incl_ts_s; intros.
+  unfold trace_incl_s, trace_incl_ts_s; intros.
   apply H12 in H0. deex.
   apply H in H0. deex.
   apply H34 in H0. deex.
@@ -1066,22 +1242,22 @@ Proof.
   repeat ( etransitivity; eauto ).
 Qed.
 
-Instance hitrace_incl_exec_equiv_proper :
+Instance trace_incl_exec_equiv_proper :
   Proper (exec_equiv ==> exec_equiv ==> iff)
-         (@hitrace_incl opT opHiT T State op_step).
+         (@trace_incl opT T State op_step).
 Proof.
   intros p1 p1' ?.
   intros p2 p2' ?.
   split; intros.
-  - unfold hitrace_incl, hitrace_incl_opt,
-           hitrace_incl_ts, hitrace_incl_ts_s; intros.
+  - unfold trace_incl, trace_incl_opt,
+           trace_incl_ts, trace_incl_ts_s; intros.
     apply H in H2.
     apply H1 in H2.
     deex.
     apply H0 in H2.
     eauto.
-  - unfold hitrace_incl, hitrace_incl_opt,
-           hitrace_incl_ts, hitrace_incl_ts_s; intros.
+  - unfold trace_incl, trace_incl_opt,
+           trace_incl_ts, trace_incl_ts_s; intros.
     apply H in H2.
     apply H1 in H2.
     deex.
@@ -1089,21 +1265,21 @@ Proof.
     eauto.
 Qed.
 
-Instance hitrace_incl_s_exec_equiv_proper :
+Instance trace_incl_s_exec_equiv_proper :
   Proper (exec_equiv ==> exec_equiv ==> iff)
-         (@hitrace_incl_s State s s' tid opT op_step opHiT T).
+         (@trace_incl_s State s s' tid opT op_step T).
 Proof.
   intros.
   intros p1 p1' ?.
   intros p2 p2' ?.
   split; intros.
-  - unfold hitrace_incl_s, hitrace_incl_ts_s; intros.
+  - unfold trace_incl_s, trace_incl_ts_s; intros.
     apply H in H2.
     apply H1 in H2.
     deex.
     apply H0 in H2.
     eauto.
-  - unfold hitrace_incl_s, hitrace_incl_ts_s; intros.
+  - unfold trace_incl_s, trace_incl_ts_s; intros.
     apply H in H2.
     apply H1 in H2.
     deex.
@@ -1111,9 +1287,9 @@ Proof.
     eauto.
 Qed.
 
-Instance Proc_hitrace_incl_proper :
-  Proper (@hitrace_incl opT opHiT T State op_step ==>
-          @hitrace_incl_opt opT opHiT State op_step) (@Proc opT opHiT T).
+Instance Proc_trace_incl_proper :
+  Proper (@trace_incl opT T State op_step ==>
+          @trace_incl_opt opT State op_step) (@Proc opT T).
 Proof.
   intros.
   unfold exec_equiv.
@@ -1121,31 +1297,31 @@ Proof.
   eauto.
 Qed.
 
-Instance thread_upd_hitrace_incl_proper :
+Instance thread_upd_trace_incl_proper :
   Proper (eq ==> eq ==>
-          @hitrace_incl_opt opT opHiT State op_step ==>
-          hitrace_incl_ts op_step) (@thread_upd opT opHiT).
+          @trace_incl_opt opT State op_step ==>
+          trace_incl_ts op_step) (@thread_upd opT).
 Proof.
   intros.
   intros ts0 ts1 H; subst.
   intros tid tid' H; subst.
   intros p1 p2 H.
 
-  unfold hitrace_incl_opt in H.
+  unfold trace_incl_opt in H.
   eauto.
 Qed.
 
-Theorem hitrace_incl_s_trans : forall `(s0 : State) s1 s2 tid `(op_step : OpSemantics opT State) `(p1 : proc opT opHiT T) p2 p3,
-  hitrace_incl_s s0 s1 tid op_step p1 p2 ->
-  hitrace_incl_s s1 s2 tid op_step p2 p3 ->
-  hitrace_incl_s s0 s2 tid op_step p1 p3.
+Theorem trace_incl_s_trans : forall `(s0 : State) s1 s2 tid `(op_step : OpSemantics opT State) `(p1 : proc opT T) p2 p3,
+  trace_incl_s s0 s1 tid op_step p1 p2 ->
+  trace_incl_s s1 s2 tid op_step p2 p3 ->
+  trace_incl_s s0 s2 tid op_step p1 p3.
 Proof.
-  unfold hitrace_incl_s; intros.
-  eapply hitrace_incl_ts_s_trans; eauto.
+  unfold trace_incl_s; intros.
+  eapply trace_incl_ts_s_trans; eauto.
 Qed.
 
-Lemma hitrace_incl_ts_proof_helper :
-  forall `(p1 : proc opT opHiT T) (p2 : proc _ _ T) ts tid `(op_step : OpSemantics opT State),
+Lemma trace_incl_ts_proof_helper :
+  forall `(p1 : proc opT T) (p2 : proc _ T) ts tid `(op_step : OpSemantics opT State),
   (forall ts s s' result tr evs,
     exec_tid op_step tid s p1 s' result evs ->
     exec_prefix op_step s' (ts [[tid := match result with
@@ -1154,12 +1330,12 @@ Lemma hitrace_incl_ts_proof_helper :
                                  end]]) tr ->
     exists tr',
       exec_prefix op_step s ts [[tid := Proc p2]] tr' /\
-      trace_match_hi (prepend tid evs tr) tr') ->
-  hitrace_incl_ts op_step
+      trace_eq (prepend tid evs tr) tr') ->
+  trace_incl_ts op_step
     (ts [[ tid := Proc p1 ]])
     (ts [[ tid := Proc p2 ]]).
 Proof.
-  unfold hitrace_incl_ts, hitrace_incl_ts_s.
+  unfold trace_incl_ts, trace_incl_ts_s.
   intros.
 
   match goal with
@@ -1188,8 +1364,8 @@ Proof.
     eauto.
 Qed.
 
-Lemma hitrace_incl_proof_helper :
-  forall `(p1 : proc opT opHiT T) p2 `(op_step : OpSemantics opT State),
+Lemma trace_incl_proof_helper :
+  forall `(p1 : proc opT T) p2 `(op_step : OpSemantics opT State),
   (forall tid ts s s' result tr evs,
     exec_tid op_step tid s p1 s' result evs ->
     exec_prefix op_step s' (ts [[tid := match result with
@@ -1198,54 +1374,25 @@ Lemma hitrace_incl_proof_helper :
                                  end]]) tr ->
     exists tr',
       exec_prefix op_step s ts [[tid := Proc p2]] tr' /\
-      trace_match_hi (prepend tid evs tr) tr') ->
-  hitrace_incl op_step
+      trace_eq (prepend tid evs tr) tr') ->
+  trace_incl op_step
     p1 p2.
 Proof.
-  unfold hitrace_incl, hitrace_incl_opt.
+  unfold trace_incl, trace_incl_opt.
   intros.
 
-  eapply hitrace_incl_ts_proof_helper.
+  eapply trace_incl_ts_proof_helper.
   eauto.
 Qed.
 
-Lemma hitrace_incl_opret :
-  forall `(p : T -> proc opT opHiT T') (v : T) `(op_step : OpSemantics opT State),
-  hitrace_incl op_step
-    (Bind (OpRet v) p)
-    (p v).
-Proof.
-  intros.
-  eapply hitrace_incl_proof_helper; intros.
-  repeat exec_tid_inv.
-
-  eexists; split.
-  eauto.
-  constructor.
-Qed.
-
-Lemma hitrace_incl_opcall :
-  forall `(p : unit -> proc opT opHiT T') `(op : opT T) `(op_step : OpSemantics opT State),
-  hitrace_incl op_step
-    (Bind (OpCall op) p)
-    (p tt).
-Proof.
-  intros.
-  eapply hitrace_incl_proof_helper; intros.
-  repeat exec_tid_inv.
-
-  eexists; intuition eauto.
-  constructor.
-Qed.
-
-Theorem hitrace_incl_opexec :
-  forall `(p : T -> proc opT opHiT T') op `(op_step : OpSemantics opT State),
-  hitrace_incl op_step
-    (Bind (OpExec op) p)
+Theorem trace_incl_op :
+  forall `(p : T -> proc opT T') op `(op_step : OpSemantics opT State),
+  trace_incl op_step
+    (Bind (Op op) p)
     (Bind (Atomic (Op op)) p).
 Proof.
   intros.
-  eapply hitrace_incl_proof_helper; intros.
+  eapply trace_incl_proof_helper; intros.
   repeat exec_tid_inv.
 
   eexists; split.
@@ -1258,80 +1405,20 @@ Proof.
   simpl; eauto.
 Qed.
 
-Theorem hitrace_incl_atomize_opcall :
-  forall `(op : opT T)
-         `(p : _ -> proc opT opHiT TP)
-         `(rx : _ -> proc opT opHiT TF)
-         `(op_step : OpSemantics opT State),
-  hitrace_incl op_step
-    (Bind (Bind (OpCall op) (fun r => (Atomic (p r)))) rx)
-    (Bind (Atomic (Bind (OpCall op) p)) rx).
-Proof.
-  intros.
-  eapply hitrace_incl_proof_helper; intros.
-  repeat exec_tid_inv.
-
-  eapply hitrace_incl_ts_proof_helper in H0.
-  deex.
-  eexists; split.
-  eassumption.
-  eauto.
-
-  intros.
-  repeat exec_tid_inv.
-
-  eexists; split.
-  eapply ExecPrefixOne with (tid := tid).
-    autorewrite with t; eauto.
-    eauto.
-    simpl. autorewrite with t. eauto.
-  simpl; eauto.
-Qed.
-
-Theorem hitrace_incl_atomize_opret :
-  forall `(v : T)
-         `(p : _ -> proc opT opHiT TP)
-         `(rx : _ -> proc opT opHiT TF)
-         `(op_step : OpSemantics opT State),
-  hitrace_incl op_step
-    (Bind (Bind (OpRet v) (fun r => (Atomic (p r)))) rx)
-    (Bind (Atomic (Bind (OpRet v) p)) rx).
-Proof.
-  intros.
-  eapply hitrace_incl_proof_helper; intros.
-  repeat exec_tid_inv.
-
-  eapply hitrace_incl_ts_proof_helper in H0.
-  deex.
-  eexists; split.
-  eassumption.
-  eauto.
-
-  intros.
-  repeat exec_tid_inv.
-
-  eexists; split.
-  eapply ExecPrefixOne with (tid := tid).
-    autorewrite with t; eauto.
-    eauto.
-    simpl. autorewrite with t. eauto.
-  simpl; eauto.
-Qed.
-
-Theorem hitrace_incl_atomize_ret_l :
+Theorem trace_incl_atomize_ret_l :
   forall `(f : T1 -> T2)
-         `(p : proc opT opHiT T1)
-         `(rx : _ -> proc opT opHiT TF)
+         `(p : proc opT T1)
+         `(rx : _ -> proc opT TF)
          `(op_step : OpSemantics opT State),
-  hitrace_incl op_step
+  trace_incl op_step
     (Bind (Bind (Atomic p) (fun r => Ret (f r))) rx)
     (Bind (Atomic (Bind p (fun r => Ret (f r)))) rx).
 Proof.
   intros.
-  eapply hitrace_incl_proof_helper; intros.
+  eapply trace_incl_proof_helper; intros.
   repeat exec_tid_inv.
 
-  eapply hitrace_incl_ts_proof_helper in H0.
+  eapply trace_incl_ts_proof_helper in H0.
   deex.
   eexists; split.
   eapply ExecPrefixOne with (tid := tid).
@@ -1345,144 +1432,12 @@ Proof.
   eauto.
 Qed.
 
-Theorem hitrace_incl_atomize_opret_l :
-  forall `(f : T1 -> T2)
-         `(p : proc opT opHiT T1)
-         `(rx : _ -> proc opT opHiT TF)
-         `(op_step : OpSemantics opT State),
-  hitrace_incl op_step
-    (Bind (Bind (Atomic p) (fun r => OpRet (f r))) rx)
-    (Bind (Atomic (Bind p (fun r => OpRet (f r)))) rx).
+Theorem trace_incl_bind_a : forall `(p : proc opT T) `(p2 : T -> proc _ T') p2' `(op_step : OpSemantics opT State),
+  (forall x, trace_incl op_step (p2 x) (p2' x)) ->
+  trace_incl op_step (Bind p p2) (Bind p p2').
 Proof.
-  intros.
-  eapply hitrace_incl_proof_helper; intros.
-  repeat exec_tid_inv.
-
-  eapply hitrace_incl_ts_proof_helper in H0.
-  deex.
-  eexists; split.
-  eapply ExecPrefixOne with (tid := tid).
-    autorewrite with t; eauto.
-    eauto.
-    simpl. autorewrite with t. eauto.
-  rewrite prepend_app. eauto.
-
-  intros.
-  repeat exec_tid_inv.
-  eexists; split; eauto.
-  simpl; eauto.
-Qed.
-
-Theorem hitrace_incl_atomize_opret_ret_l :
-  forall `(f : T1 -> T2)
-         `(f2 : T1 -> T2 -> T3)
-         `(p : proc opT opHiT T1)
-         `(rx : _ -> proc opT opHiT TF)
-         `(op_step : OpSemantics opT State),
-  hitrace_incl op_step
-    (Bind (Bind (Atomic p) (fun r => Bind (OpRet (f r)) (fun a => Ret (f2 r a)))) rx)
-    (Bind (Atomic (Bind p (fun r => Bind (OpRet (f r)) (fun a => Ret (f2 r a))))) rx).
-Proof.
-  intros.
-  eapply hitrace_incl_proof_helper; intros.
-  repeat exec_tid_inv.
-
-  eapply hitrace_incl_ts_proof_helper in H0.
-  deex.
-  eexists; split.
-  eapply ExecPrefixOne with (tid := tid).
-    autorewrite with t; eauto.
-    eauto.
-    simpl. autorewrite with t. eauto.
-  rewrite prepend_app. rewrite app_nil_r. eauto.
-
-  intros.
-  repeat exec_tid_inv.
-
-  eapply hitrace_incl_ts_proof_helper in H1.
-  deex.
-  eexists; split.
-  eauto.
-  eauto.
-
-  intros.
-  repeat exec_tid_inv.
-  eexists; split; eauto.
-Qed.
-
-Theorem hitrace_incl_atomize_opcall_l :
-  forall `(p : proc opT opHiT T1)
-         `(fT : T1 -> Type)
-         `(f : forall (a : T1), opT (fT a))
-         `(rx : unit -> proc opT opHiT TF)
-         `(op_step : OpSemantics opT State),
-  hitrace_incl op_step
-    (Bind (Bind (Atomic p) (fun r => @OpCall opT opHiT (fT r) (f r))) rx)
-    (Bind (Atomic (Bind p (fun r => @OpCall opT opHiT (fT r) (f r)))) rx).
-Proof.
-  intros.
-  eapply hitrace_incl_proof_helper; intros.
-  repeat exec_tid_inv.
-
-  eapply hitrace_incl_ts_proof_helper in H0.
-  deex.
-  eexists; split.
-  eapply ExecPrefixOne with (tid := tid).
-    autorewrite with t; eauto.
-    eauto.
-    simpl. autorewrite with t. eauto.
-  rewrite prepend_app. eauto.
-
-  intros.
-  repeat exec_tid_inv.
-  eexists; split; eauto.
-  simpl; eauto.
-Qed.
-
-Theorem hitrace_incl_atomize_opcall_ret_l :
-  forall `(fT : T1 -> Type)
-         `(f : forall (a : T1), opT (fT a))
-         `(f2 : T1 -> unit -> T3)
-         `(p : proc opT opHiT T1)
-         `(rx : _ -> proc opT opHiT TF)
-         `(op_step : OpSemantics opT State),
-  hitrace_incl op_step
-    (Bind (Bind (Atomic p) (fun r => Bind (@OpCall opT opHiT (fT r) (f r)) (fun a => Ret (f2 r a)))) rx)
-    (Bind (Atomic (Bind p (fun r => Bind (@OpCall opT opHiT (fT r) (f r)) (fun a => Ret (f2 r a))))) rx).
-Proof.
-  intros.
-  eapply hitrace_incl_proof_helper; intros.
-  repeat exec_tid_inv.
-
-  eapply hitrace_incl_ts_proof_helper in H0.
-  deex.
-  eexists; split.
-  eapply ExecPrefixOne with (tid := tid).
-    autorewrite with t; eauto.
-    eauto.
-    simpl. autorewrite with t. eauto.
-  rewrite prepend_app. rewrite app_nil_r. eauto.
-
-  intros.
-  repeat exec_tid_inv.
-
-  eapply hitrace_incl_ts_proof_helper in H1.
-  deex.
-  eexists; split.
-  eauto.
-  eauto.
-
-  intros.
-  repeat exec_tid_inv.
-  eexists; split; eauto.
-Qed.
-
-Theorem hitrace_incl_bind_a : forall `(p : proc opT opHiT T) `(p2 : T -> proc _ _ T') p2' `(op_step : OpSemantics opT State),
-  (forall x, hitrace_incl op_step (p2 x) (p2' x)) ->
-  hitrace_incl op_step (Bind p p2) (Bind p p2').
-Proof.
-  unfold hitrace_incl, hitrace_incl_opt,
-         hitrace_incl_ts, hitrace_incl_ts_s.
+  unfold trace_incl, trace_incl_opt,
+         trace_incl_ts, trace_incl_ts_s.
   intros.
 
   match goal with
@@ -1534,61 +1489,164 @@ Proof.
     eauto.
 Qed.
 
-Theorem hitrace_incl_bind : forall `(p1 : proc opT opHiT T1) p1' `(p2 : T1 -> proc _ _ T2) p2' `(op_step : OpSemantics opT State),
-  (forall `(rx : _ -> proc _ _ T),
-    hitrace_incl op_step (Bind p1 rx) (Bind p1' rx)) ->
-  (forall `(rx : _ -> proc _ _ T) x,
-    hitrace_incl op_step (Bind (p2 x) rx) (Bind (p2' x) rx)) ->
-  forall `(rx : _ -> proc _ _ T),
-    hitrace_incl op_step (Bind (Bind p1 p2) rx) (Bind (Bind p1' p2') rx).
+Theorem trace_incl_N_bind_a : forall `(p : proc opT T) `(p2 : T -> proc _ T') p2' `(op_step : OpSemantics opT State) n,
+  (forall x, trace_incl_N (n-1) op_step (p2 x) (p2' x)) ->
+  trace_incl_N n op_step (Bind p p2) (Bind p p2').
 Proof.
+  unfold trace_incl_N, trace_incl_opt_N,
+         trace_incl_ts_N, trace_incl_ts_s_N.
   intros.
-  repeat rewrite exec_equiv_bind_bind.
-  rewrite H.
-  eapply hitrace_incl_bind_a.
+
+  match goal with
+  | H : exec _ _ (thread_upd ?ts ?tid ?pp) _ _ |- _ =>
+    remember (thread_upd ts tid pp);
+    generalize dependent ts;
+    generalize dependent p;
+    induction H; intros; subst; eauto
+  end.
+
+  destruct (tid0 == tid); subst.
+  + autorewrite with t in *.
+    repeat maybe_proc_inv.
+    exec_tid_inv.
+    destruct result0.
+
+    * edestruct H.
+      2: eassumption.
+      omega.
+      intuition idtac.
+
+      eexists; split.
+      eapply ExecPrefixOne with (tid := tid).
+        autorewrite with t; eauto.
+        eauto.
+        autorewrite with t; eauto.
+      eauto.
+
+    * edestruct IHexec.
+      2: eauto.
+      omega.
+      intuition idtac.
+
+      eexists; split.
+      eapply ExecPrefixOne with (tid := tid).
+        autorewrite with t; eauto.
+        eauto.
+        autorewrite with t; eauto.
+      eauto.
+
+  + edestruct IHexec.
+    omega.
+    rewrite thread_upd_upd_ne; eauto.
+    intuition idtac.
+
+    autorewrite with t in *.
+    eexists; split.
+    eapply ExecPrefixOne with (tid := tid0).
+      autorewrite with t; eauto.
+      eauto.
+      rewrite thread_upd_upd_ne; eauto.
+    eauto.
+Qed.
+
+Instance trace_incl_opt_N_refl :
+  Reflexive (@trace_incl_opt_N n opT State op_step).
+Proof.
+  unfold Reflexive; intros.
+  unfold trace_incl_opt_N; intros.
+  reflexivity.
+Qed.
+
+Instance trace_incl_N_refl :
+  Reflexive (@trace_incl_N n opT T State op_step).
+Proof.
+  unfold Reflexive; intros.
+  unfold trace_incl_N; intros.
+  reflexivity.
+Qed.
+
+Instance trace_incl_rx_N_refl :
+  Reflexive (@trace_incl_rx_N n opT T State op_step).
+Proof.
+  unfold Reflexive; intros.
+  unfold trace_incl_rx_N; intros.
+  eapply trace_incl_N_bind_a.
   eauto.
 Qed.
 
-Instance Bind_hitrace_incl_proper_2 :
+Theorem trace_incl_N_le :
+  forall `(op_step : OpSemantics opT State) T (p1 p2 : proc _ T) n1 n2,
+    trace_incl_N n2 op_step p1 p2 ->
+    n1 <= n2 ->
+    trace_incl_N n1 op_step p1 p2.
+Proof.
+  repeat ( intro; intros ).
+  eapply H in H2; try omega.
+  eauto.
+Qed.
+
+Theorem trace_incl_rx_N_le :
+  forall `(op_step : OpSemantics opT State) T (p1 p2 : proc _ T) n1 n2,
+    trace_incl_rx_N n2 op_step p1 p2 ->
+    n1 <= n2 ->
+    trace_incl_rx_N n1 op_step p1 p2.
+Proof.
+  repeat ( intro; intros ).
+  eapply H in H4.
+  eassumption.
+  3: reflexivity.
+  omega.
+  intros.
+  eapply trace_incl_N_le; eauto.
+  omega.
+Qed.
+
+Instance trace_incl_rx_preorder :
+  PreOrder (@trace_incl_rx opT T State op_step).
+Proof.
+  split.
+  - unfold Reflexive; intros.
+    unfold trace_incl_rx; intros.
+    unfold trace_incl_rx_N; intros.
+    eapply trace_incl_N_bind_a.
+    eauto.
+  - unfold Transitive; intros.
+    unfold trace_incl_rx in *; intros.
+    repeat ( intro; intros ).
+    eapply H with (n := n') in H4; try omega. repeat deex.
+    destruct H4.
+    eapply H0 with (n := x0) in H4; try omega. repeat deex.
+    eexists; intuition eauto. etransitivity; eauto.
+    2: intros; reflexivity.
+    reflexivity. reflexivity.
+    reflexivity. 2: reflexivity.
+    intros; eapply trace_incl_N_le; eauto.
+    omega.
+Qed.
+
+Instance Bind_trace_incl_proper_2 :
   Proper (eq ==>
-          pointwise_relation T0 (@hitrace_incl opT opHiT T State op_step) ==>
-          @hitrace_incl opT opHiT T State op_step) Bind.
+          pointwise_relation T0 (@trace_incl opT T State op_step) ==>
+          @trace_incl opT T State op_step) Bind.
 Proof.
   intros.
   intros p1a p1b H1; subst.
   intros p2a p2b H2.
-  eapply hitrace_incl_bind_a; intros.
+  eapply trace_incl_bind_a; intros.
   eapply H2.
 Qed.
 
-Theorem hitrace_incl_op :
-  forall `(p : T -> proc opT opHiT T') op `(op_step : OpSemantics opT State),
-  hitrace_incl op_step
-    (Bind (Op op) p)
-    (Bind (Atomic (Op op)) p).
-Proof.
-  intros.
-  unfold Op at 1.
-  rewrite exec_equiv_bind_bind.
-  rewrite hitrace_incl_opcall.
-  rewrite exec_equiv_bind_bind.
-  rewrite hitrace_incl_opexec.
-  eapply hitrace_incl_bind_a; intros.
-  rewrite hitrace_incl_opret.
-  reflexivity.
-Qed.
-
-Lemma hitrace_incl_atomic_bind :
-  forall `(p1 : proc opT opHiT T)
-         `(p2 : T -> proc opT opHiT T2)
-         `(p3 : T2 -> proc opT opHiT T3)
+Lemma trace_incl_atomic_bind :
+  forall `(p1 : proc opT T)
+         `(p2 : T -> proc opT T2)
+         `(p3 : T2 -> proc opT T3)
          `(op_step : OpSemantics opT State),
-  hitrace_incl op_step
+  trace_incl op_step
     (Bind (Atomic (Bind p1 p2)) p3)
     (Bind (Bind (Atomic p1) (fun r => Atomic (p2 r))) p3).
 Proof.
   intros.
-  eapply hitrace_incl_proof_helper; intros.
+  eapply trace_incl_proof_helper; intros.
   repeat exec_tid_inv.
   atomic_exec_inv.
 
@@ -1609,16 +1667,16 @@ Proof.
   rewrite prepend_app. eauto.
 Qed.
 
-Lemma hitrace_incl_atomic :
-  forall `(p1 : proc opT opHiT T)
-         `(p2 : T -> proc opT opHiT T2)
+Lemma trace_incl_atomic :
+  forall `(p1 : proc opT T)
+         `(p2 : T -> proc opT T2)
          `(op_step : OpSemantics opT State),
-  hitrace_incl op_step
+  trace_incl op_step
     (Bind (Atomic p1) p2)
     (Bind p1 p2).
 Proof.
   intros.
-  eapply hitrace_incl_proof_helper; intros.
+  eapply trace_incl_proof_helper; intros.
   repeat exec_tid_inv.
 
   eexists; intuition idtac.
@@ -1639,26 +1697,216 @@ Proof.
   rewrite prepend_app.
   apply exec_equiv_norx_bind_bind.
   eauto.
+
+  rewrite exec_equiv_until.
   eauto.
+
+  eauto.
+Qed.
+
+Instance trace_incl_to_trace_incl_N :
+  subrelation (@trace_incl opT T State op_step) (trace_incl_N n op_step).
+Proof.
+  unfold subrelation; intros.
+  intro; intros.
+  intro; intros.
+  intro; intros.
+  eapply exec_to_exec_prefix in H1.
+  eapply H in H1.
+  eauto.
+Qed.
+
+Theorem trace_incl_N_ret_bind :
+  forall `(op_step : OpSemantics opT State) `(v : T) TF (rx1 rx2 : _ -> proc _ TF) n,
+    (forall a, trace_incl_N (n - 1) op_step (rx1 a) (rx2 a)) ->
+    trace_incl_N n op_step (Bind (Ret v) rx1) (Bind (Ret v) rx2).
+Proof.
+  repeat ( intro; intros ).
+  match goal with
+  | H : exec _ _ (thread_upd ?ts ?tid (Proc ?p)) _ _ |- _ =>
+    remember (thread_upd ts tid (Proc p));
+    generalize dependent ts;
+    induction H; intros; subst; eauto
+  end.
+
+  destruct (tid0 == tid); subst; autorewrite with t in *.
+  * repeat maybe_proc_inv.
+    repeat exec_tid_inv.
+    eapply H in H3; try omega.
+    deex.
+    eexists; intuition idtac.
+    eapply ExecPrefixOne with (tid := tid).
+      autorewrite with t; eauto.
+      eauto.
+      autorewrite with t; eauto.
+    eauto.
+
+  * edestruct IHexec.
+      omega.
+      rewrite thread_upd_upd_ne; eauto.
+
+    eexists; intuition idtac.
+    eapply ExecPrefixOne with (tid := tid0).
+      rewrite thread_upd_ne in * by auto. eauto.
+      eauto.
+    rewrite thread_upd_upd_ne by eauto.
+    eassumption.
+    eauto.
+Qed.
+
+Theorem trace_incl_rx_until_helper :
+  forall T opT (p1 p2 : proc opT T)
+         `(op_step : OpSemantics opT State)
+         (c : T -> bool) n,
+    trace_incl_rx_N (n-1) op_step p1 p2 ->
+    trace_incl_rx_N n op_step (Until c p1) (Until c p2).
+Proof.
+  induction n; intros.
+
+  - intro; intros.
+    intro; intros.
+    intro; intros.
+    intro; intros.
+    match goal with
+    | H : exec _ _ _ _ _ |- _ =>
+      inversion H; clear H; repeat sigT_eq; subst; eauto
+    end.
+    omega.
+
+  - intro; intros.
+    intro; intros.
+    intro; intros.
+    intro; intros.
+    match goal with
+    | H : exec _ _ _ _ _ |- _ =>
+      inversion H; clear H; repeat sigT_eq; subst; eauto
+    end.
+
+    destruct (tid0 == tid); subst; autorewrite with t in *.
+
+    + repeat maybe_proc_inv.
+      repeat exec_tid_inv.
+
+      unfold until1 in *.
+      match goal with
+      | H : exec _ _ _ _ _ |- _ =>
+        eapply exec_equiv_N_bind_bind in H
+      end.
+
+      replace (S n - 1) with (n) in * by omega.
+
+      match goal with
+      | H : exec _ _ _ _ _,
+        H' : trace_incl_rx_N _ _ _ _ |- _ =>
+        eapply H' in H; try omega
+      end.
+      deex.
+
+      eexists; intuition idtac.
+      eapply ExecPrefixOne with (tid := tid).
+        autorewrite with t; eauto.
+        eauto.
+        autorewrite with t.
+        unfold until1.
+        rewrite exec_equiv_bind_bind.
+        eassumption.
+      eauto.
+
+      3: reflexivity.
+      omega.
+
+      simpl; intros.
+      destruct (Bool.bool_dec (c a)).
+      * eapply trace_incl_N_ret_bind; intros.
+        eapply trace_incl_N_le; eauto. omega.
+
+      * repeat ( intro; intros ).
+        eapply IHn.
+        eapply trace_incl_rx_N_le; eauto; omega.
+        4: eassumption.
+        3: reflexivity.
+        omega.
+        intros; eapply trace_incl_N_le; eauto; omega.
+
+    + edestruct IHn.
+        eapply trace_incl_rx_N_le; eauto; omega.
+        4: rewrite thread_upd_upd_ne in H6 by eauto; eassumption.
+        3: reflexivity. omega.
+        intros. eapply trace_incl_N_le; eauto; omega.
+
+      eexists; intuition idtac.
+
+      eapply ExecPrefixOne with (tid := tid0).
+        autorewrite with t; eauto.
+        eassumption.
+        rewrite thread_upd_upd_ne by eauto; eassumption.
+      eauto.
+Qed.
+
+Theorem trace_incl_rx_until :
+  forall T opT (p1 p2 : proc opT T)
+         `(op_step : OpSemantics opT State)
+         (c : T -> bool),
+    trace_incl_rx op_step p1 p2 ->
+    trace_incl_rx op_step (Until c p1) (Until c p2).
+Proof.
+  repeat ( intro; intros ).
+  eapply trace_incl_rx_until_helper in H3.
+  5: reflexivity.
+  eassumption.
+  eapply H.
+  reflexivity.
+  intros; eapply trace_incl_N_le; eauto; omega.
+Qed.
+
+Theorem trace_incl_rx_to_trace_incl :
+  forall `(op_step : OpSemantics opT State) T (p1 p2 : proc opT T),
+    trace_incl_rx op_step p1 p2 ->
+    forall `(rx : _ -> proc _ TF),
+      trace_incl op_step (Bind p1 rx) (Bind p2 rx).
+Proof.
+  repeat ( intro; intros ).
+  unfold exec_prefix in H0; deex.
+  eapply H.
+  3: reflexivity.
+  3: eassumption.
+  reflexivity.
+  reflexivity.
+Qed.
+
+Theorem trace_incl_to_trace_incl_rx :
+  forall `(op_step : OpSemantics opT State) T (p1 p2 : proc opT T),
+    (forall `(rx : _ -> proc _ TF),
+      trace_incl op_step (Bind p1 rx) (Bind p2 rx)) ->
+    trace_incl_rx op_step p1 p2.
+Proof.
+  repeat ( intro; intros ).
+  assert (trace_incl_rx op_step p1 p1) by reflexivity.
+  eapply H4 in H3; [ | reflexivity | eassumption | omega ].
+  deex.
+  edestruct H; try eassumption.
+  eexists; intuition idtac.
+  eassumption.
+  etransitivity; eauto.
 Qed.
 
 
 (** Correspondence between different layers *)
 
-Definition traces_match_ts {opLoT opMidT opHiT State} lo_step hi_step
-                           (ts1 : @threads_state opLoT opMidT)
-                           (ts2 : @threads_state opMidT opHiT) :=
+Definition traces_match_ts {opLoT opMidT State} lo_step hi_step
+                           (ts1 : @threads_state opLoT)
+                           (ts2 : @threads_state opMidT) :=
   forall (s : State) tr1,
     exec_prefix lo_step s ts1 tr1 ->
     exists tr2,
       exec_prefix hi_step s ts2 tr2 /\
-      traces_match tr1 tr2.
+      trace_eq tr1 tr2.
 
 Instance traces_match_ts_proper :
-  Proper (@hitrace_incl_ts opLoT opMidT State lo_step ==>
+  Proper (@trace_incl_ts opLoT State lo_step ==>
           exec_equiv_ts ==>
           Basics.flip Basics.impl)
-         (@traces_match_ts opLoT opMidT opHiT State lo_step hi_step).
+         (@traces_match_ts opLoT opMidT State lo_step hi_step).
 Proof.
   intros.
   intros ts1 ts1' H1.
@@ -1669,160 +1917,26 @@ Proof.
   apply H in H0. deex.
   apply H2 in H0.
   eexists; split. eauto.
-  rewrite H3. eauto.
-Qed.
-
-Definition traces_match_one_thread opLoT opMidT opHiT State T
-    (lo_step : OpSemantics opLoT State)
-    (hi_step : OpSemantics opMidT State)
-    (p1 : proc opLoT opMidT T)
-    (p2 : proc opMidT opHiT T) :=
-  traces_match_ts lo_step hi_step
-    (threads_empty [[ 1 := Proc p1 ]])
-    (threads_empty [[ 1 := Proc p2 ]]).
-
-Instance traces_match_one_thread_proper :
-  Proper (@hitrace_incl opLoT opMidT T State lo_step ==>
-          @exec_equiv opMidT opHiT T ==>
-          Basics.flip Basics.impl)
-         (@traces_match_one_thread opLoT opMidT opHiT State T lo_step hi_step).
-Proof.
-  intros.
-  intros p1 p1'; intros.
-  intros p2 p2'; intros.
-  unfold Basics.flip, Basics.impl; intros.
-  unfold traces_match_one_thread in *; intros.
-  rewrite H.
-  rewrite H0.
-  eauto.
-Qed.
-
-Instance traces_match_one_thread_proper_flip :
-  Proper (Basics.flip (@hitrace_incl opLoT opMidT T State lo_step) ==>
-          @exec_equiv opMidT opHiT T ==>
-          Basics.impl)
-         (@traces_match_one_thread opLoT opMidT opHiT State T lo_step hi_step).
-Proof.
-  intros.
-  intros p1 p1'; intros.
-  intros p2 p2'; intros.
-  unfold Basics.flip, Basics.impl; intros.
-  unfold traces_match_one_thread in *; intros.
-  rewrite <- H.
-  rewrite <- H0.
-  eauto.
-Qed.
-
-Instance traces_match_one_thread_proper_equiv :
-  Proper (@exec_equiv_rx opLoT opMidT T ==>
-          @exec_equiv_rx opMidT opHiT T ==>
-          iff)
-         (@traces_match_one_thread opLoT opMidT opHiT State T lo_step hi_step).
-Proof.
-  intros.
-  intros p1 p1'; intros.
-  intros p2 p2'; intros.
-  unfold traces_match_one_thread; split; intros.
-  - rewrite <- H.
-    rewrite <- H0.
-    eauto.
-  - rewrite H.
-    rewrite H0.
-    eauto.
-Qed.
-
-Theorem traces_match_one_thread_opcall :
-  forall opLoT opMidT opHiT State R T
-         (p1rest : _ -> proc opLoT opMidT R)
-         (p2rest : _ -> proc opMidT opHiT R)
-         (op : opMidT T)
-         (lo_step : OpSemantics opLoT State)
-         (mid_step : OpSemantics opMidT State),
-  (forall x, traces_match_one_thread lo_step mid_step (p1rest x) (p2rest x)) ->
-  traces_match_one_thread lo_step mid_step
-    (Bind (OpCallHi op) p1rest) (Bind (OpCall op) p2rest).
-Proof.
-  intros.
-  unfold traces_match_one_thread, traces_match_ts; intros.
-
-  match goal with
-  | H : exec_prefix _ _ (thread_upd ?ts ?tid (Proc ?p)) _ |- _ =>
-    remember (thread_upd ts tid (Proc p));
-    destruct H as [? H];
-    induction H; intros; subst; eauto
-  end.
-
-  destruct (tid == 1); subst; autorewrite with t in *.
-  * repeat maybe_proc_inv.
-    repeat exec_tid_inv.
-
-    edestruct H; eauto.
-    intuition idtac.
-
-    eexists; split.
-    eapply ExecPrefixOne with (tid := 1).
-      autorewrite with t; eauto.
-      eauto.
-      autorewrite with t; eauto.
-    simpl.
-    eauto.
-
-  * exfalso; eapply thread_empty_inv; eauto.
-Qed.
-
-Theorem traces_match_one_thread_opret :
-  forall opLoT opMidT opHiT State R T
-         (p1rest : _ -> proc opLoT opMidT R)
-         (p2rest : _ -> proc opMidT opHiT R)
-         (v : T)
-         (lo_step : OpSemantics opLoT State)
-         (mid_step : OpSemantics opMidT State),
-  (forall x, traces_match_one_thread lo_step mid_step (p1rest x) (p2rest x)) ->
-  traces_match_one_thread lo_step mid_step
-    (Bind (OpRetHi v) p1rest) (Bind (OpRet v) p2rest).
-Proof.
-  intros.
-  unfold traces_match_one_thread, traces_match_ts; intros.
-
-  match goal with
-  | H : exec_prefix _ _ (thread_upd ?ts ?tid (Proc ?p)) _ |- _ =>
-    remember (thread_upd ts tid (Proc p));
-    destruct H as [? H];
-    induction H; intros; subst; eauto
-  end.
-
-  destruct (tid == 1); subst; autorewrite with t in *.
-  * repeat maybe_proc_inv.
-    repeat exec_tid_inv.
-
-    edestruct H; eauto.
-    intuition idtac.
-
-    eexists; split.
-    eapply ExecPrefixOne with (tid := 1).
-      autorewrite with t; eauto.
-      eauto.
-      autorewrite with t; eauto.
-    simpl.
-    eauto.
-
-  * exfalso; eapply thread_empty_inv; eauto.
+  unfold trace_eq.
+  rewrite <- H4.
+  rewrite H3.
+  reflexivity.
 Qed.
 
 
 (** Helpers for connecting different [threads_state]s *)
 
-Definition proc_match `(R : forall T, proc opT opHiT T -> proc opT' opHiT' T -> Prop)
-                      `(ts1 : @threads_state opT opHiT)
-                      `(ts2 : @threads_state opT' opHiT') :=
+Definition proc_match `(R : forall T, proc opT T -> proc opT' T -> Prop)
+                      `(ts1 : @threads_state opT)
+                      `(ts2 : @threads_state opT') :=
   length ts1 = length ts2 /\
   forall tid,
     (ts1 [[ tid ]] = NoProc /\ ts2 [[ tid ]] = NoProc) \/
-    exists T (p1 : proc _ _ T) p2,
+    exists T (p1 : proc _ T) p2,
     ts1 [[ tid ]] = Proc p1 /\ ts2 [[ tid ]] = Proc p2 /\ R T p1 p2.
 
-Lemma proc_match_del : forall `(ts1 : @threads_state opT opHiT)
-                              `(ts2 : @threads_state opT' opHiT') R tid,
+Lemma proc_match_del : forall `(ts1 : @threads_state opT)
+                              `(ts2 : @threads_state opT') R tid,
   proc_match R ts1 ts2 ->
   proc_match R (ts1 [[ tid := NoProc ]]) (ts2 [[ tid := NoProc ]]).
 Proof.
@@ -1836,9 +1950,9 @@ Proof.
     + repeat rewrite thread_upd_ne by auto. intuition eauto.
 Qed.
 
-Lemma proc_match_upd : forall `(ts1 : @threads_state opT opHiT)
-                              `(ts2 : @threads_state opT' opHiT') R tid
-                              T (p1 : proc _ _ T) p2,
+Lemma proc_match_upd : forall `(ts1 : @threads_state opT)
+                              `(ts2 : @threads_state opT') R tid
+                              T (p1 : proc _ T) p2,
   proc_match R ts1 ts2 ->
   R _ p1 p2 ->
   proc_match R (ts1 [[ tid := Proc p1 ]]) (ts2 [[ tid := Proc p2 ]]).
@@ -1856,7 +1970,7 @@ Proof.
     + repeat rewrite thread_upd_ne by auto. intuition eauto.
 Qed.
 
-Lemma proc_match_nil : forall `(R : forall T, proc opT opHiT T -> proc opT' opHiT' T -> Prop),
+Lemma proc_match_nil : forall `(R : forall T, proc opT T -> proc opT' T -> Prop),
   proc_match R nil nil.
 Proof.
   unfold proc_match; intros.
@@ -1865,9 +1979,9 @@ Proof.
   repeat rewrite thread_get_nil; eauto.
 Qed.
 
-Lemma proc_match_cons_Proc : forall `(ts1 : @threads_state opT opHiT)
-                                    `(ts2 : @threads_state opT' opHiT') R
-                                    T (p1 : proc _ _ T) p2,
+Lemma proc_match_cons_Proc : forall `(ts1 : @threads_state opT)
+                                    `(ts2 : @threads_state opT') R
+                                    T (p1 : proc _ T) p2,
   proc_match R ts1 ts2 ->
   R _ p1 p2 ->
   proc_match R (Proc p1 :: ts1) (Proc p2 :: ts2).
@@ -1880,8 +1994,8 @@ Proof.
     + repeat rewrite thread_get_S. eauto.
 Qed.
 
-Lemma proc_match_cons_NoProc : forall `(ts1 : @threads_state opT opHiT)
-                                      `(ts2 : @threads_state opT' opHiT') R,
+Lemma proc_match_cons_NoProc : forall `(ts1 : @threads_state opT)
+                                      `(ts2 : @threads_state opT') R,
   proc_match R ts1 ts2 ->
   proc_match R (NoProc :: ts1) (NoProc :: ts2).
 Proof.
@@ -1893,13 +2007,13 @@ Proof.
     + repeat rewrite thread_get_S. eauto.
 Qed.
 
-Lemma proc_match_cons_inv : forall `(ts1 : @threads_state opT opHiT)
-                                   `(ts2 : @threads_state opT' opHiT') R
+Lemma proc_match_cons_inv : forall `(ts1 : @threads_state opT)
+                                   `(ts2 : @threads_state opT') R
                                    v1 v2,
   proc_match R (v1 :: ts1) (v2 :: ts2) ->
   proc_match R ts1 ts2 /\
   (v1 = NoProc /\ v2 = NoProc \/
-   exists T (p1 : proc _ _ T) p2,
+   exists T (p1 : proc _ T) p2,
    v1 = Proc p1 /\ v2 = Proc p2 /\ R T p1 p2).
 Proof.
   unfold proc_match; simpl; intros.
@@ -1912,18 +2026,18 @@ Proof.
     eauto.
 Qed.
 
-Definition proc_match_upto n `(R : forall T, proc opT opHiT T -> proc opT opHiT T -> Prop)
-                             (ts1 ts2 : @threads_state opT opHiT) :=
+Definition proc_match_upto n `(R : forall T, proc opT T -> proc opT T -> Prop)
+                             (ts1 ts2 : @threads_state opT) :=
   length ts1 = length ts2 /\
   forall tid,
     (tid < n ->
      (ts1 [[ tid ]] = NoProc /\ ts2 [[ tid ]] = NoProc) \/
-     exists T (p1 : proc _ _ T) p2,
+     exists T (p1 : proc _ T) p2,
      ts1 [[ tid ]] = Proc p1 /\ ts2 [[ tid ]] = Proc p2 /\ R T p1 p2) /\
     (tid >= n ->
      ts1 [[ tid ]] = ts2 [[ tid ]]).
 
-Theorem proc_match_upto_0_eq : forall `(ts1 : @threads_state opT opHiT) ts2 R,
+Theorem proc_match_upto_0_eq : forall `(ts1 : @threads_state opT) ts2 R,
   proc_match_upto 0 R ts1 ts2 ->
   ts1 = ts2.
 Proof.
@@ -1941,7 +2055,7 @@ Proof.
       apply H3. eauto.
 Qed.
 
-Theorem proc_match_upto_0 : forall `(ts : @threads_state opT opHiT) R,
+Theorem proc_match_upto_0 : forall `(ts : @threads_state opT) R,
   proc_match_upto 0 R ts ts.
 Proof.
   unfold proc_match_upto; intros.
@@ -1949,7 +2063,7 @@ Proof.
   omega.
 Qed.
 
-Theorem proc_match_upto_all : forall `(ts : @threads_state opT opHiT) ts' R,
+Theorem proc_match_upto_all : forall `(ts : @threads_state opT) ts' R,
   proc_match_upto (length ts) R ts ts' <->
   proc_match R ts ts'.
 Proof.
@@ -1966,7 +2080,7 @@ Proof.
     eauto.
 Qed.
 
-Lemma proc_match_upto_Sn : forall `(ts : @threads_state opT opHiT) ts' R n,
+Lemma proc_match_upto_Sn : forall `(ts : @threads_state opT) ts' R n,
   n < length ts ->
   proc_match_upto (S n) R ts ts' ->
   proc_match_upto n R ts (ts' [[ n := ts [[ n ]] ]]).
@@ -1984,7 +2098,7 @@ Proof.
     eapply H4. omega.
 Qed.
 
-Lemma proc_match_upto_Sn' : forall `(ts : @threads_state opT opHiT) ts' R n,
+Lemma proc_match_upto_Sn' : forall `(ts : @threads_state opT) ts' R n,
   n >= length ts ->
   proc_match_upto (S n) R ts ts' ->
   proc_match_upto n R ts ts'.
@@ -1996,22 +2110,22 @@ Proof.
     eauto.
 Qed.
 
-Theorem proc_match_pick : forall tid `(ts1 : @threads_state opT opHiT)
-                                     `(ts2 : @threads_state opT' opHiT') R,
+Theorem proc_match_pick : forall tid `(ts1 : @threads_state opT)
+                                     `(ts2 : @threads_state opT') R,
   proc_match R ts1 ts2 ->
     (ts1 [[ tid ]] = NoProc /\ ts2 [[ tid ]] = NoProc) \/
-    exists T (p1 : proc _ _ T) p2,
+    exists T (p1 : proc _ T) p2,
     ts1 [[ tid ]] = Proc p1 /\ ts2 [[ tid ]] = Proc p2 /\ R T p1 p2.
 Proof.
   unfold proc_match; intuition eauto.
 Qed.
 
 Theorem proc_match_upto_pick : forall tid n
-                                     `(ts1 : @threads_state opT opHiT) ts2 R,
+                                     `(ts1 : @threads_state opT) ts2 R,
   proc_match_upto n R ts1 ts2 ->
     (tid < n ->
      (ts1 [[ tid ]] = NoProc /\ ts2 [[ tid ]] = NoProc) \/
-     exists T (p1 : proc _ _ T) p2,
+     exists T (p1 : proc _ T) p2,
      ts1 [[ tid ]] = Proc p1 /\ ts2 [[ tid ]] = Proc p2 /\ R T p1 p2) /\
     (tid >= n ->
      ts1 [[ tid ]] = ts2 [[ tid ]]).
@@ -2021,8 +2135,8 @@ Proof.
   - specialize (H1 tid). intuition eauto.
 Qed.
 
-Theorem proc_match_len : forall `(ts1 : @threads_state opT opHiT)
-                                `(ts2 : @threads_state opT' opHiT') R,
+Theorem proc_match_len : forall `(ts1 : @threads_state opT)
+                                `(ts2 : @threads_state opT') R,
   proc_match R ts1 ts2 ->
   length ts1 = length ts2.
 Proof.
