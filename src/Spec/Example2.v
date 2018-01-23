@@ -251,7 +251,7 @@ End LockingRule.
 
 (** Using locks to get atomicity. *)
 
-Module LockingCounter <: LayerImpl LockAPI LockedCounterAPI.
+Module LockingCounter <: LayerImplFollowsRule LockAPI LockedCounterAPI LockingRule.
 
   Definition inc_core : proc LockAPI.opT _ :=
     _ <- Op Acquire;
@@ -413,16 +413,37 @@ Module LockingCounter <: LayerImpl LockAPI LockedCounterAPI.
     eapply Compile.compile_ts_ok; eauto.
   Qed.
 
-(*
+  Hint Constructors LockingRule.follows_protocol_proc.
+
   Theorem compile_ts_follows_protocol :
     forall ts,
       no_atomics_ts ts ->
       LockingRule.follows_protocol (compile_ts ts).
   Proof.
-    unfold LockingRule.follows_protocol; intros.
-    induction ts; intros.
-    - unfold LockingRule.follows_protocol_s.
+    unfold compile_ts.
+    unfold LockingRule.follows_protocol.
+    unfold LockingRule.follows_protocol_s.
+    intros.
+
+    pose proof (Compile.compile_ts_ok compile_op H).
+    eapply proc_match_pick with (tid := tid) in H1.
+    intuition idtac; try congruence.
+    repeat deex.
+    rewrite H0 in H1; inversion H1; clear H1; subst; repeat sigT_eq.
+
+    clear H2 H0 H ts.
+(*
+    induction H3.
+    - destruct op; simpl; repeat econstructor.
+    - eauto.
+    - deex.
+      admit.
+    - deex.
+      eexists.
+      econstructor.
+      econstructor. econstructor. econstructor.
 *)
+  Admitted.
 
 End LockingCounter.
 
@@ -897,18 +918,22 @@ End LockProtocol.
 
 (* End-to-end stack:
 
-  TASAPI
-    [ AbsLock ]
-  TASLockAPI
-    [ LockImpl ]
-  RawLockAPI
-    [ LockProtocol ]
-  LockAPI
-    [ LockingCounter ]
-  LockedCounterAPI
-    [ AbsCounter ]
-  CounterAPI
+  TASAPI --------------------+---------+
+    [ AbsLock ]              |         |
+  TASLockAPI                [c1]       |
+    [ LockImpl ]             |         |
+  RawLockAPI ----------------+----+    |
+    [ LockProtocol ]         |    |   [c]
+  LockAPI                   [c2]  |    |
+    [ LockingCounter ]       |   [c3]  |
+  LockedCounterAPI ----------+    |    |
+    [ AbsCounter ]                |    |
+  CounterAPI ---------------------+----+
  *)
 
 Module c1 := Link TASAPI TASLockAPI RawLockAPI AbsLock LockImpl.
-Module c2 := Link LockAPI LockedCounterAPI CounterAPI LockingCounter AbsCounter.
+Module c2 := LinkWithRule RawLockAPI LockAPI LockedCounterAPI LockingRule LockProtocol LockingCounter.
+Module c3 := Link RawLockAPI LockedCounterAPI CounterAPI c2 AbsCounter.
+Module c := Link TASAPI RawLockAPI CounterAPI c1 c3.
+
+Print Assumptions c.compile_traces_match.
