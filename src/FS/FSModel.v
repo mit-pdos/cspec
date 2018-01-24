@@ -15,8 +15,8 @@ Open Scope string.
  for concurrent operations a directory may contain a link with the same name
  twice, but for different nodes.  For example, we model a rename as a link
  followed by an unlink.  Thus, a lookup after link and before unlink may observe
- a duplicate name, but each name has a different node. *)
-
+ a duplicate name, but each name has a different node. Similarly, there may be
+ several ".." entries pointing to different parents. *)
 
 (** Data types *)
 
@@ -61,7 +61,7 @@ End MDT_Link.
 
 Module Link_as_UDT := Make_UDT(MDT_Link).
 
-Module Graph := MSetWeakList.Make Link_as_UDT.
+Module LinkSet := MSetWeakList.Make Link_as_UDT.
 
 Definition eq_string (s1 s2 : string) :=
   if string_dec s1 s2 then true else false.
@@ -69,7 +69,7 @@ Definition eq_string (s1 s2 : string) :=
 Definition proper_nameb n : bool := negb (orb (eq_string n  ".") (eq_string n "..")).
 Definition proper_name n := n <> "." /\ n <> "..".
 Definition proper_link l := proper_name (LinkName l).
-Definition proper_links g := Graph.For_all proper_link g.
+Definition proper_links g := LinkSet.For_all proper_link g.
 Instance proper_proper_link:
   Proper (eq ==> eq) proper_link.
 Proof.
@@ -78,15 +78,15 @@ Proof.
 Qed.
 
 Lemma In_add_add_comm: forall a l1 l2 g,
-    Graph.In a (Graph.add l1 (Graph.add l2 g)) ->
-    Graph.In a (Graph.add l2 (Graph.add l1 g)).
+    LinkSet.In a (LinkSet.add l1 (LinkSet.add l2 g)) ->
+    LinkSet.In a (LinkSet.add l2 (LinkSet.add l1 g)).
 Proof.
   intros.
-  eapply Graph.add_spec in H; intuition idtac; subst.
-  eapply Graph.add_spec; right. eapply Graph.add_spec; eauto.
-  eapply Graph.add_spec in H0; intuition idtac; subst.
-  eapply Graph.add_spec; eauto.
-  eapply Graph.add_spec; right. eapply Graph.add_spec; eauto.
+  eapply LinkSet.add_spec in H; intuition idtac; subst.
+  eapply LinkSet.add_spec; right. eapply LinkSet.add_spec; eauto.
+  eapply LinkSet.add_spec in H0; intuition idtac; subst.
+  eapply LinkSet.add_spec; eauto.
+  eapply LinkSet.add_spec; right. eapply LinkSet.add_spec; eauto.
 Qed.
 
 Definition File := string.
@@ -94,7 +94,7 @@ Definition Files := list File.
 
 Record FS := mkFS {
   FSRoot : nat;     (* root DirNode *)
-  FSLinks : Graph.t;
+  FSLinks : LinkSet.t;
   FSFiles : Files;  (* [filenum]s point into this list *)
 }.
 
@@ -103,7 +103,7 @@ Definition Pathname := list string.
 Definition FSEquiv (fs1 fs2 : FS) : Prop :=
   FSRoot fs1 = FSRoot fs2 /\
   FSFiles fs1 = FSFiles fs2 /\
-  Graph.Equal (FSLinks fs1) (FSLinks fs2).
+  LinkSet.Equal (FSLinks fs1) (FSLinks fs2).
 
 Instance FSEquiv_Equiv : Equivalence FSEquiv.
 Proof.
@@ -132,18 +132,12 @@ Ltac subst_fsequiv :=
 
 Inductive valid_link : forall (fs : FS) (dir : nat) (name : string) (target : Node), Prop :=
 | ValidLink : forall fs dir name target,
-(*
-    proper_name name ->
-    (exists parent name,
-        Graph.In (mkLink parent (DirNode dir) name) (FSLinks fs) ->
-        target <> DirNode parent) ->
-*)
-    Graph.In (mkLink dir target name) (FSLinks fs) ->
+    LinkSet.In (mkLink dir target name) (FSLinks fs) ->
     valid_link fs dir name target
 | ValidDot : forall fs dir,
     valid_link fs dir "." (DirNode dir)
 | ValidDotDot : forall fs dir name parent,
-    Graph.In (mkLink parent (DirNode dir) name) (FSLinks fs) ->
+    LinkSet.In (mkLink parent (DirNode dir) name) (FSLinks fs) ->
     valid_link fs dir ".." (DirNode parent)
 | ValidDotDotRoot : forall fs dir,
     dir = FSRoot fs ->
@@ -157,25 +151,21 @@ Proof.
   intros ? ? ?; subst.
   intros ? ? ?; subst.
   unfold FSEquiv in H; intuition idtac.
-  - inversion H1.
-    + eapply ValidLink.
+  - inversion H1; subst.
+    + eapply ValidLink; eauto.
       eapply H2; eauto.
     + eapply ValidDot.
-    + eapply ValidDotDot.
+    + eapply ValidDotDot; eauto.
       eapply H2; eauto.
     + eapply ValidDotDotRoot. congruence.
   - inversion H1.
-    + eapply ValidLink.
+    + eapply ValidLink; auto.
       eapply H2; eauto.
     + eapply ValidDot.
-    + eapply ValidDotDot.
+    + eapply ValidDotDot; eauto.
       eapply H2; eauto.
     + eapply ValidDotDotRoot. congruence.
 Qed.
-
-Definition proper_link' fs l := proper_name (LinkName l) /\
-                             (exists parent, valid_link fs (LinkFrom l) ".." parent ->
-                                (LinkTo l) <> parent).
 
 Inductive path_evaluates : forall (fs : FS) (start : Node) (pn : Pathname) (target : Node), Prop :=
 | PathEvalEmpty : forall fs start,
@@ -267,10 +257,10 @@ Proof.
 Qed.
 
 Definition does_not_exist (fs : FS) dirnum name :=
-  ~ exists n, Graph.In (mkLink dirnum n name) (FSLinks fs).
+  ~ exists n, LinkSet.In (mkLink dirnum n name) (FSLinks fs).
 
 Definition file_handle_unused (fs : FS) h :=
-  ~ exists d name, Graph.In (mkLink d (FileNode h) name) (FSLinks fs).
+  ~ exists d name, LinkSet.In (mkLink d (FileNode h) name) (FSLinks fs).
 
 Definition file_handle_valid (fs : FS) h :=
   h < Datatypes.length (FSFiles fs).
@@ -279,10 +269,10 @@ Definition upd_file h data (fs : FS) :=
   mkFS (FSRoot fs) (FSLinks fs) (list_upd (FSFiles fs) h data).
 
 Definition add_link dir node name (fs : FS) :=
-  mkFS (FSRoot fs) (Graph.add (mkLink dir node name) (FSLinks fs)) (FSFiles fs).
+  mkFS (FSRoot fs) (LinkSet.add (mkLink dir node name) (FSLinks fs)) (FSFiles fs).
 
 Definition del_link dir node name (fs : FS) :=
-  mkFS (FSRoot fs) (Graph.remove (mkLink dir node name) (FSLinks fs)) (FSFiles fs).
+  mkFS (FSRoot fs) (LinkSet.remove (mkLink dir node name) (FSLinks fs)) (FSFiles fs).
 
 Definition create_file dir h name (fs : FS) :=
   add_link dir (FileNode h) name (upd_file h "" fs).
@@ -294,10 +284,10 @@ Definition match_readdir from l :=
   beq_nat from (LinkFrom l).
 
 Definition readdir fs dir :=
-  Graph.filter (match_readdir dir) (FSLinks fs).
+  LinkSet.filter (match_readdir dir) (FSLinks fs).
 
 Definition readdir_names fs dir :=
-  map LinkName (Graph.elements (readdir fs dir)).
+  map LinkName (LinkSet.elements (readdir fs dir)).
 
 (* If pn exists, then it is unique. *)
 Definition unique_pathname (fs : FS) startdir pn :=
@@ -423,28 +413,17 @@ Proof.
   edestruct H; eauto.
 Qed.
 
-(* . and .. are unique; which we get from definition.
-  no other name in directory refers to parent or cur directory *)
-
 Definition fs_invariant (fs : FS) := proper_links (FSLinks fs).
 
-(*
-Definition unique_dotdot (fs : FS) :=
-
-                  
-Definition fs_invariant1 (fs : FS) := proper_links (FSLinks fs) /\
-                                      unique_dotdot.
-*)
-
-Lemma fs_invariant_proper_name: forall fs startdir node name,
+Lemma fs_proper_name: forall fs startdir node name,
     fs_invariant fs ->
-    Graph.In (mkLink startdir node name) (FSLinks fs) ->
+    LinkSet.In (mkLink startdir node name) (FSLinks fs) ->
     proper_name name.
 Proof.
   intros.
   unfold fs_invariant in *.
   unfold proper_links in *.
-  unfold Graph.For_all in *.
+  unfold LinkSet.For_all in *.
   specialize (H (mkLink startdir node name) H0); eauto.
 Qed.
 
@@ -458,9 +437,9 @@ Proof.
   unfold fs_invariant in *.
   unfold proper_links in *.
   unfold proper_link in *.
-  unfold Graph.For_all in *.
+  unfold LinkSet.For_all in *.
   intros; simpl in *.
-  eapply Graph.add_spec in H2; eauto.
+  eapply LinkSet.add_spec in H2; eauto.
   intuition idtac; subst; simpl in *; eauto.
 Qed.
 
@@ -475,26 +454,26 @@ Proof.
   + constructor.
   + eapply PathEvalFileLink; eauto.
     edestruct H.
-    - constructor; simpl.
-      apply Graph.add_spec; auto.
+    - constructor; simpl; auto.
+      apply LinkSet.add_spec; auto.
     - apply ValidDot.
     - eapply ValidDotDot.
-      apply Graph.add_spec; auto.
+      apply LinkSet.add_spec; auto.
       right; eauto.
     - apply ValidDotDotRoot; auto.
   + eapply PathEvalDirLink; eauto.
     edestruct H.
     - constructor; simpl.
-      apply Graph.add_spec; auto.
+      apply LinkSet.add_spec; auto.
     - apply ValidDot.
     - eapply ValidDotDot.
-      apply Graph.add_spec; auto.
+      apply LinkSet.add_spec; auto.
       right; eauto.
     - apply ValidDotDotRoot; auto.
   + inversion H; subst.
     eapply PathEvalSymlink; simpl.
     - constructor.
-      apply Graph.add_spec.
+      apply LinkSet.add_spec.
       eauto.
     - apply IHpath_evaluates1; eauto.
     - apply IHpath_evaluates2; eauto.
@@ -528,73 +507,47 @@ Proof.
   eapply valid_link_does_not_exist; eauto.
 Qed.
 
-Lemma valid_link_add_link': forall fs startdir name name0 dirnum n node node',
-    proper_name name0 ->
+Lemma valid_link_add_file_link': forall fs startdir name name0 dirnum node node' inum,
     valid_link fs startdir name0 node ->
     proper_name name  ->
     does_not_exist fs dirnum name ->
-    valid_link (add_link dirnum n name fs) startdir name0 node' ->
-    valid_link fs startdir name0 node'.
-Proof.
-  intros.
-  inversion H3; subst; clear H3.
-  - apply Graph.add_spec in H4.
-    intuition idtac; auto.
-    inversion H3; subst; clear H3.
-    exfalso; eapply valid_link_does_not_exist; eauto.
-  - apply ValidDot.
-  - eapply ValidDotDot.
-    apply Graph.add_spec in H4; auto.
-    intuition idtac; eauto.
-    inversion H3; subst. clear H3.
-    inversion H; congruence.
-  - eapply ValidDotDotRoot.
-    simpl in *.
-    reflexivity.
-Qed. 
-
-Lemma valid_link_add_link'': forall fs startdir name name0 dirnum n node node',
-    valid_link fs startdir name0 node ->
-    proper_name name  ->
-    does_not_exist fs dirnum name ->
-    valid_link (add_link dirnum n name fs) startdir name0 node' ->
+    valid_link (add_link dirnum (FileNode inum) name fs) startdir name0 node' ->
     valid_link fs startdir name0 node'.
 Proof.
   intros.
   inversion H2; subst; clear H2.
-  - apply Graph.add_spec in H3.
+  - apply LinkSet.add_spec in H3.
     intuition idtac; auto.
     inversion H2; subst; clear H2.
     exfalso; eapply valid_link_does_not_exist; eauto.
   - apply ValidDot.
   - eapply ValidDotDot.
-    apply Graph.add_spec in H3; auto.
+    apply LinkSet.add_spec in H3; auto.
     intuition idtac; eauto.
-    inversion H2; subst. clear H2.
-    admit. 
+    inversion H2; subst.
   - eapply ValidDotDotRoot.
     simpl in *.
     reflexivity.
-Admitted. 
+Qed.
 
-Lemma path_evaluates_add_link' : forall fs startdir dirnum name dirpn n node,
+Lemma path_evaluates_add_link' : forall fs startdir dirnum name dirpn finum node,
   fs_invariant fs ->
   stable_pathname fs startdir dirpn ->
   path_evaluates fs startdir dirpn (DirNode dirnum) ->
   does_not_exist fs dirnum name  ->
   proper_name name ->
-  path_evaluates (add_link dirnum n name fs) startdir dirpn node ->
+  path_evaluates (add_link dirnum (FileNode finum) name fs) startdir dirpn node ->
   path_evaluates fs startdir dirpn node.
 Proof.
   intros.
-  remember (add_link dirnum n name fs).
+  remember (add_link dirnum (FileNode finum) name fs).
   generalize dependent fs; intros.
   induction H4; subst.
   - constructor.
   - eapply PathEvalFileLink; subst; eauto.
     inversion H4; subst.
-    eapply fs_invariant_proper_name in H5 as H5x.
-    eapply Graph.add_spec in H5.
+    eapply fs_proper_name in H5 as H5x.
+    eapply LinkSet.add_spec in H5.
     intuition idtac.
     + inversion H6; subst; clear H6.
       eapply path_evaluates_does_not_exist in H2; eauto.
@@ -604,7 +557,7 @@ Proof.
   - inversion H1; subst; clear H1.
     {
       eapply PathEvalDirLink; eauto.
-      eapply valid_link_add_link'' in H4; auto.
+      eapply valid_link_add_file_link' in H4; auto.
       assert (DirNode inum0 = DirNode inum).
       {
         inversion H0; subst.
@@ -620,15 +573,16 @@ Proof.
     }
     {
       inversion H10; subst.
-      eapply fs_invariant_proper_name in H1 as Hx; eauto.
-      eapply valid_link_add_link'' in H4; eauto.
+      eapply fs_proper_name in H1 as Hx; eauto.
+      (* stronger property on dirpn  *)
+      (* xxx eapply valid_link_add_link'' in H4; eauto. *)
       exfalso. admit. (* H2 + H8 + H *)
     }
   - eapply PathEvalSymlink; eauto; subst.
     inversion H0; subst.
     (*
     - constructor.
-      apply Graph.add_spec.
+      apply LinkSet.add_spec.
       eauto.
     - apply IHpath_evaluates1; eauto.
     - apply IHpath_evaluates2; eauto.
@@ -725,7 +679,7 @@ Proof.
   destruct H.
   deex.
   eexists.
-  apply Graph.add_spec. right.
+  apply LinkSet.add_spec. right.
   apply H.
 Qed.
   
@@ -739,7 +693,7 @@ Proof.
   simpl in *.
   intro.
   deex.
-  apply Graph.add_spec in H1.
+  apply LinkSet.add_spec in H1.
   intuition idtac.
   inversion H2; congruence.
   destruct H.
@@ -790,7 +744,7 @@ Proof.
   repeat deex.
   destruct H.
   repeat eexists.
-  apply Graph.add_spec.
+  apply LinkSet.add_spec.
   right. apply H0.
 Qed.
   
@@ -813,7 +767,7 @@ Proof.
   simpl in *.
   intro.
   repeat deex.
-  apply Graph.add_spec in H1.
+  apply LinkSet.add_spec in H1.
   intuition idtac.
   inversion H2; congruence.
   destruct H.
@@ -831,7 +785,7 @@ Proof.
   intro.
   destruct H.
   repeat eexists.
-  apply Graph.add_spec.
+  apply LinkSet.add_spec.
   left. rewrite H0; eauto.
 Qed.
 
@@ -959,10 +913,10 @@ Proof.
   unfold FSEquiv in *.
   intuition; simpl.
 
-  unfold Graph.Equal; split; intros; apply Graph.add_spec.
-  - apply Graph.add_spec in H1; intuition; subst.
+  unfold LinkSet.Equal; split; intros; apply LinkSet.add_spec.
+  - apply LinkSet.add_spec in H1; intuition; subst.
     apply H2 in H3. eauto.
-  - apply Graph.add_spec in H1; intuition; subst.
+  - apply LinkSet.add_spec in H1; intuition; subst.
     apply H2 in H3. eauto.
 Qed.
 
