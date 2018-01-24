@@ -55,7 +55,7 @@ run_proc s (Until c p) = do
     run_proc s (Until c p)
 run_proc (S lck val) (Op ReadTAS) = do
   v <- readIORef val
-  debugmsg $ "ReadTAS " ++ (show v)
+  -- debugmsg $ "ReadTAS " ++ (show v)
   return $ unsafeCoerce v
 run_proc (S lck val) (Op (WriteTAS v)) = do
   debugmsg $ "WriteTAS " ++ (show v)
@@ -66,9 +66,10 @@ run_proc (S lck val) (Op TestAndSet) = do
   -- debugmsg $ "TestAndSet " ++ (show ok)
   if isJust ok then
     return $ unsafeCoerce False
-  else
+  else do
+    yield
     return $ unsafeCoerce True
 run_proc (S lck val) (Op Clear) = do
-  debugmsg $ "Clear"
+  -- debugmsg $ "Clear"
   tryPutMVar lck ()
   return $ unsafeCoerce ()

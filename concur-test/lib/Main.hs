@@ -23,7 +23,7 @@ run_thread s (Proc p) = do
 spawn_thread :: State -> Coq_maybe_proc (TASOpT a) -> IO ()
 spawn_thread s p = do
   putStrLn $ "Spawning.."
-  tid <- forkOS (run_thread s p)
+  tid <- forkIO (run_thread s p)
   putStrLn $ "Spawned " ++ (show tid)
   return ()
 
