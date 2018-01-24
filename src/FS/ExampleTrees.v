@@ -5,7 +5,7 @@ Require Import Morphisms.
 
 Import ListNotations.
 Require Import String.
-Require Import FSAPI.
+Require Import FSModel.
 
 (** Definition of concurrent tree modifications, to write specifications *)
 
