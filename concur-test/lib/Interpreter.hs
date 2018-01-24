@@ -1,8 +1,10 @@
 module Interpreter where
 
 -- Haskell libraries
+import Control.Concurrent
 import Data.Atomics
 import Data.IORef
+import Data.Maybe
 import GHC.Prim
 
 -- Extracted code
@@ -10,12 +12,12 @@ import ConcurProc
 import Example2
 
 data State =
-  S !(IORef Bool) !(IORef Integer)
+  S !(MVar ()) !(IORef Integer)
 
 mkState :: IO State
 mkState = do
-  lck <- newIORef $ False
-  val <- newIORef $ 0
+  lck <- newMVar ()
+  val <- newIORef 0
   return $ S lck val
 
 verbose :: Bool
@@ -23,8 +25,9 @@ verbose = True
 
 debugmsg :: String -> IO ()
 debugmsg s =
-  if verbose then
-    putStrLn s
+  if verbose then do
+    tid <- myThreadId
+    putStrLn $ "[" ++ (show tid) ++ "] " ++ s
   else
     return ()
 
@@ -59,17 +62,13 @@ run_proc (S lck val) (Op (WriteTAS v)) = do
   writeIORef val v
   return $ unsafeCoerce ()
 run_proc (S lck val) (Op TestAndSet) = do
-  tkt <- readForCAS lck
-  debugmsg $ "TestAndSet " ++ (show $ peekTicket tkt)
-  if peekTicket tkt == False then do
-    (ok, _) <- casIORef lck tkt True
-    if ok then
-      return $ unsafeCoerce False
-    else
-      return $ unsafeCoerce True
+  ok <- tryTakeMVar lck
+  -- debugmsg $ "TestAndSet " ++ (show ok)
+  if isJust ok then
+    return $ unsafeCoerce False
   else
     return $ unsafeCoerce True
 run_proc (S lck val) (Op Clear) = do
   debugmsg $ "Clear"
-  writeIORef lck False
+  tryPutMVar lck ()
   return $ unsafeCoerce ()

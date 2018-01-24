@@ -15,13 +15,16 @@ import Example2
 run_thread :: State -> Coq_maybe_proc (TASOpT a) -> IO ()
 run_thread _ NoProc = return ()
 run_thread s (Proc p) = do
+  tid <- myThreadId
+  putStrLn $ "Running " ++ (show tid)
   run_proc s p
   return ()
 
 spawn_thread :: State -> Coq_maybe_proc (TASOpT a) -> IO ()
 spawn_thread s p = do
-  putStrLn "Spawning.."
-  forkIO (run_thread s p)
+  putStrLn $ "Spawning.."
+  tid <- forkOS (run_thread s p)
+  putStrLn $ "Spawned " ++ (show tid)
   return ()
 
 main :: IO ()
