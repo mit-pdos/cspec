@@ -71,6 +71,9 @@ Module TASAPI <: Layer.
 
   Definition step := xstep.
 
+  Definition initP s :=
+    TASLock s = false.
+
 End TASAPI.
 
 
@@ -93,6 +96,9 @@ Module TASLockAPI <: Layer.
 
   Definition step := xstep.
 
+  Definition initP s :=
+    Lock s = None.
+
 End TASLockAPI.
 
 
@@ -112,6 +118,9 @@ Module RawLockAPI <: Layer.
     xstep (Write v) tid (mkState v0 l) tt (mkState v l).
 
   Definition step := xstep.
+
+  Definition initP s :=
+    Lock s = None.
 
 End RawLockAPI.
 
@@ -154,6 +163,9 @@ Module LockAPI <: Layer.
 
   Definition step := xstep.
 
+  Definition initP s :=
+    Lock s = None.
+
 End LockAPI.
 
 
@@ -170,6 +182,9 @@ Module LockedCounterAPI <: Layer.
 
   Definition step := xstep.
 
+  Definition initP s :=
+    Lock s = None.
+
 End LockedCounterAPI.
 
 
@@ -185,6 +200,9 @@ Module CounterAPI <: Layer.
     xstep Dec tid v v (v - 1).
 
   Definition step := xstep.
+
+  Definition initP (s : State) :=
+    True.
 
 End CounterAPI.
 
@@ -372,10 +390,10 @@ Module LockingCounter <: LayerImplFollowsRule LockAPI LockedCounterAPI LockingRu
   Theorem compile_traces_match :
     forall ts2,
       no_atomics_ts ts2 ->
-      traces_match_abs absR LockAPI.step LockedCounterAPI.step (compile_ts ts2) ts2.
+      traces_match_abs absR LockAPI.initP LockAPI.step LockedCounterAPI.step (compile_ts ts2) ts2.
   Proof.
     unfold traces_match_abs; intros.
-    rewrite H1 in *; clear H1.
+    rewrite H2 in *; clear H2.
     eapply all_traces_match; eauto.
     eapply Compile.compile_ts_ok; eauto.
   Qed.
@@ -411,6 +429,15 @@ Module LockingCounter <: LayerImplFollowsRule LockAPI LockedCounterAPI LockingRu
       econstructor. econstructor. econstructor.
 *)
   Admitted.
+
+  Theorem absInitP :
+    forall s1 s2,
+      LockAPI.initP s1 ->
+      absR s1 s2 ->
+      LockedCounterAPI.initP s2.
+  Proof.
+    congruence.
+  Qed.
 
 End LockingCounter.
 
@@ -449,12 +476,21 @@ Module AbsCounter <: LayerImpl LockedCounterAPI CounterAPI.
   Theorem compile_traces_match :
     forall ts,
       no_atomics_ts ts ->
-      traces_match_abs absR LockedCounterAPI.step CounterAPI.step (compile_ts ts) ts.
+      traces_match_abs absR LockedCounterAPI.initP LockedCounterAPI.step CounterAPI.step (compile_ts ts) ts.
   Proof.
     unfold compile_ts, traces_match_abs; intros.
     eexists; intuition idtac.
     eapply trace_incl_abs; eauto.
     eauto.
+  Qed.
+
+  Theorem absInitP :
+    forall s1 s2,
+      LockedCounterAPI.initP s1 ->
+      absR s1 s2 ->
+      CounterAPI.initP s2.
+  Proof.
+    firstorder.
   Qed.
 
 End AbsCounter.
@@ -502,12 +538,23 @@ Module AbsLock <: LayerImpl TASAPI TASLockAPI.
   Theorem compile_traces_match :
     forall ts,
       no_atomics_ts ts ->
-      traces_match_abs absR TASAPI.step TASLockAPI.step (compile_ts ts) ts.
+      traces_match_abs absR TASAPI.initP TASAPI.step TASLockAPI.step (compile_ts ts) ts.
   Proof.
     unfold compile_ts, traces_match_abs; intros.
     eexists; intuition idtac.
     eapply trace_incl_abs; eauto.
     eauto.
+  Qed.
+
+  Theorem absInitP :
+    forall s1 s2,
+      TASAPI.initP s1 ->
+      absR s1 s2 ->
+      TASLockAPI.initP s2.
+  Proof.
+    unfold absR, TASAPI.initP, TASLockAPI.initP.
+    intuition eauto.
+    deex; congruence.
   Qed.
 
 End AbsLock.
@@ -584,12 +631,21 @@ Module LockImpl <: LayerImpl TASLockAPI RawLockAPI.
   Theorem compile_traces_match :
     forall ts,
       no_atomics_ts ts ->
-      traces_match_abs absR TASLockAPI.step RawLockAPI.step (compile_ts ts) ts.
+      traces_match_abs absR TASLockAPI.initP TASLockAPI.step RawLockAPI.step (compile_ts ts) ts.
   Proof.
     unfold traces_match_abs, absR; intros; subst.
     eapply CompileLoop.compile_traces_match_ts; eauto.
     eapply noop_or_success.
     eapply CompileLoop.compile_ts_ok; eauto.
+  Qed.
+
+  Theorem absInitP :
+    forall s1 s2,
+      TASLockAPI.initP s1 ->
+      absR s1 s2 ->
+      RawLockAPI.initP s2.
+  Proof.
+    congruence.
   Qed.
 
 End LockImpl.
@@ -671,12 +727,12 @@ Module LockProtocol <: LayerImplRequiresRule RawLockAPI LockAPI LockingRule.
     forall ts,
       follows_protocol ts ->
       no_atomics_ts ts ->
-      traces_match_abs absR RawLockAPI.step LockAPI.step (compile_ts ts) ts.
+      traces_match_abs absR RawLockAPI.initP RawLockAPI.step LockAPI.step (compile_ts ts) ts.
   Proof.
     unfold compile_ts, follows_protocol, absR.
     unfold traces_match_abs; intros; subst.
-    clear H0.
-    destruct H1.
+    clear H0 H1.
+    destruct H2.
     specialize (H sm).
     induction H0; eauto.
     specialize (H tid _ p) as Htid.
@@ -691,6 +747,15 @@ Module LockProtocol <: LayerImplRequiresRule RawLockAPI LockAPI LockingRule.
       eapply follows_protocol_exec_tid; eauto.
       eauto.
     eauto.
+  Qed.
+
+  Theorem absInitP :
+    forall s1 s2,
+      RawLockAPI.initP s1 ->
+      absR s1 s2 ->
+      LockAPI.initP s2.
+  Proof.
+    congruence.
   Qed.
 
 End LockProtocol.
