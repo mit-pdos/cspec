@@ -214,7 +214,7 @@ Module LockingRule <: ProcRule LockAPI.
   Definition locked_protocol_op T (op : LockAPI.opT T)
                                 (old_owner : bool) (new_owner : bool) :=
     match op with
-    | Acquire => new_owner = true
+    | Acquire => old_owner = false /\ new_owner = true
     | Release => old_owner = true /\ new_owner = false
     | Read => old_owner = true /\ new_owner = true
     | Write _ => old_owner = true /\ new_owner = true
@@ -229,6 +229,7 @@ Module LockingRule <: ProcRule LockAPI.
 
   Definition follows_protocol ts :=
     forall s,
+      LockAPI.initP s ->
       follows_protocol_s lock_match locked_protocol_op ts s.
 
 End LockingRule.
@@ -411,24 +412,20 @@ Module LockingCounter <: LayerImplFollowsRule LockAPI LockedCounterAPI LockingRu
     intros.
 
     pose proof (Compile.compile_ts_ok compile_op H).
-    eapply proc_match_pick with (tid := tid) in H1.
+    eapply proc_match_pick with (tid := tid) in H2.
     intuition idtac; try congruence.
     repeat deex.
-    rewrite H0 in H1; inversion H1; clear H1; subst; repeat sigT_eq.
+    rewrite H1 in H2; inversion H2; clear H2; subst; repeat sigT_eq.
 
-    clear H2 H0 H ts.
-(*
-    induction H3.
-    - destruct op; simpl; repeat econstructor.
-    - eauto.
-    - deex.
-      admit.
-    - deex.
-      eexists.
-      econstructor.
-      econstructor. econstructor. econstructor.
-*)
-  Admitted.
+    clear H3 H1 H ts.
+    unfold LockAPI.initP in H0.
+    unfold LockingRule.lock_match.
+    rewrite H0; clear H0.
+    exists false.
+
+    induction H4; eauto.
+    destruct op; simpl; repeat econstructor.
+  Qed.
 
   Theorem absInitP :
     forall s1 s2,
@@ -731,9 +728,9 @@ Module LockProtocol <: LayerImplRequiresRule RawLockAPI LockAPI LockingRule.
   Proof.
     unfold compile_ts, follows_protocol, absR.
     unfold traces_match_abs; intros; subst.
+    specialize (H sm H1).
     clear H0 H1.
     destruct H2.
-    specialize (H sm).
     induction H0; eauto.
     specialize (H tid _ p) as Htid.
     intuition idtac; repeat deex.
