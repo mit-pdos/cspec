@@ -380,7 +380,7 @@ Module LockingCounter <: LayerImplFollowsRule LockAPI LockedCounterAPI LockingRu
     eapply Compile.compile_ts_ok; eauto.
   Qed.
 
-  Hint Constructors LockingRule.follows_protocol_proc.
+  Hint Constructors follows_protocol_proc.
 
   Theorem compile_ts_follows_protocol :
     forall ts,
@@ -389,7 +389,7 @@ Module LockingCounter <: LayerImplFollowsRule LockAPI LockedCounterAPI LockingRu
   Proof.
     unfold compile_ts.
     unfold LockingRule.follows_protocol.
-    unfold LockingRule.follows_protocol_s.
+    unfold follows_protocol_s.
     intros.
 
     pose proof (Compile.compile_ts_ok compile_op H).
