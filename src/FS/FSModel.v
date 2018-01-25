@@ -34,26 +34,22 @@ Record Link := mkLink {
 }.
 
 Instance Node_equal_dec : EqualDec Node.
-  unfold EqualDec; intros.
-  destruct x, y; try (right; congruence).
-  destruct (eq_nat_dec dirnum dirnum0); subst; eauto.
-    right; congruence.
-  destruct (eq_nat_dec filenum filenum0); subst; eauto.
-    right; congruence.
-  destruct (list_eq_dec string_dec target target0); subst; eauto.
-    right; congruence.
+Proof.
+  unfold EqualDec.
+  decide equality;
+    match goal with
+    | [ |- {?x = ?y} + {_} ] =>
+      destruct (x == y); eauto
+    end.
 Defined.
 
 Lemma Link_equal_dec : EqualDec Link.
-  unfold EqualDec; intros.
-  destruct x, y.
-  destruct (eq_nat_dec LinkFrom0 LinkFrom1); subst.
-  destruct (Node_equal_dec LinkTo0 LinkTo1); subst.
-  destruct (string_dec LinkName0 LinkName1); subst.
-  eauto.
-  right; congruence.
-  right; congruence.
-  right; congruence.
+  unfold EqualDec.
+  decide equality;
+    match goal with
+    | [ |- {?x = ?y} + {_} ] =>
+      destruct (x == y); eauto
+    end.
 Defined.
 
 Module MDT_Link.
