@@ -3,21 +3,6 @@ Require Import ProofIrrelevance.
 
 Set Implicit Arguments.
 
-Record injection A B :=
-  { inject: A -> B;
-    inject_ok : forall x y, inject x = inject y -> x = y; }.
-
-Theorem injection_Ordering A {B} : forall (ordA:Ordering A) (inj:injection B A), Ordering B.
-Proof.
-  intros.
-  refine {| cmp := fun x y =>
-                     cmp (inject inj x) (inject inj y) |}; intuition eauto.
-  eapply inject_ok; eauto.
-  subst; rewrite cmp_refl; auto.
-Defined.
-
-Arguments injection_Ordering A {B} ordA inj.
-
 Inductive Forall A (P: A -> Prop) : list A -> Prop :=
 | Forall_nil : Forall P nil
 | Forall_cons : forall x l,

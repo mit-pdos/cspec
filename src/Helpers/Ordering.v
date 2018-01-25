@@ -1,5 +1,6 @@
 Require Import Arith.
 Require Import Omega.
+Require Import String.
 Require List.
 
 Import List.ListNotations.
@@ -99,9 +100,8 @@ Proof.
       try omega.
 Defined.
 
-Instance prod_Ordering A B : Ordering A -> Ordering B -> Ordering (A*B).
+Instance prod_Ordering A B {ordA:Ordering A} {ordB: Ordering B} : Ordering (A*B).
 Proof.
-  intros ordA ordB.
   refine {| cmp := fun '(x1, x2) '(y1, y2) =>
                      match cmp x1 y1 with
                      | Lt => Lt
@@ -164,6 +164,21 @@ Proof.
   - destruct x, y, z; (intuition eauto);
       try congruence.
 Defined.
+
+Record injection A B :=
+  { inject: A -> B;
+    inject_ok : forall x y, inject x = inject y -> x = y; }.
+
+Theorem injection_Ordering A {B} : forall (ordA:Ordering A) (inj:injection B A), Ordering B.
+Proof.
+  intros.
+  refine {| cmp := fun x y =>
+                     cmp (inject inj x) (inject inj y) |}; intuition eauto.
+  eapply inject_ok; eauto.
+  subst; rewrite cmp_refl; auto.
+Defined.
+
+Arguments injection_Ordering A {B} ordA inj.
 
 Fixpoint cmp_list A (ord:Ordering A) (l1 l2:list A) : comparison :=
   match l1, l2 with
@@ -246,3 +261,56 @@ Proof.
     rewrite H1; eauto.
   - (* TODO: probably requires a three-list induction pattern *)
 Admitted.
+
+Instance bool_Ordering : Ordering bool.
+Proof.
+  refine {| cmp := fun x y =>
+                     match x, y with
+                     | false, false => Eq
+                     | true, true => Eq
+                     | false, true => Lt
+                     | true, false => Gt
+                     end |}; intros.
+  destruct x, y; simpl; (intuition idtac); congruence.
+  destruct x, y; simpl; (intuition idtac); congruence.
+  destruct x, y, z; simpl; (intuition idtac); congruence.
+Defined.
+
+Instance ascii_Ordering : Ordering Ascii.ascii.
+Proof.
+  apply (injection_Ordering (bool*bool*bool*bool*bool*bool*bool*bool)%type).
+  typeclasses eauto.
+
+  unshelve econstructor; intros.
+  destruct H.
+  exact (b, b0, b1, b2, b3, b4, b5, b6).
+  destruct x, y.
+  congruence.
+Defined.
+
+Fixpoint string_to_list (s:string) : list Ascii.ascii :=
+  match s with
+  | EmptyString => []
+  | String c s => c :: string_to_list s
+  end.
+
+Instance string_Ordering : Ordering string.
+Proof.
+  apply (injection_Ordering (list Ascii.ascii)).
+  typeclasses eauto.
+  refine {| inject := string_to_list |}; intros.
+  remember (string_to_list x).
+  remember (string_to_list y).
+  generalize dependent x.
+  generalize dependent y.
+  generalize dependent H.
+  eapply two_list_induction with (l1 := l) (l2 := l0); intros;
+    try congruence.
+  destruct x, y; simpl in *; try congruence.
+  inversion H0; subst; clear H0; intuition.
+  destruct x0, y0; simpl in *; try congruence.
+  inversion Heql0; subst; clear Heql0.
+  inversion Heql; subst; clear Heql.
+  f_equal.
+  eapply H0; eauto.
+Defined.
