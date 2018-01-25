@@ -194,7 +194,11 @@ Fixpoint cmp_list A (ord:Ordering A) (l1 l2:list A) : comparison :=
 
 Section TwoListInduction.
 
-  Fixpoint zip A (l1 l2:list A) : list (A*A) :=
+  Variable A:Type.
+  Variable B:Type.
+  Variable P: list A -> list B -> Prop.
+
+  Fixpoint zip (l1: list A) (l2:list B) : list (A*B) :=
     match l1 with
     | nil => nil
     | x::xs => match l2 with
@@ -203,9 +207,6 @@ Section TwoListInduction.
               end
     end.
 
-
-  Variable A:Type.
-  Variable P: list A -> list A -> Prop.
 
   Hypothesis Pnil_nil : P [] [].
   Hypothesis Pnil_cons : forall y ys, P [] (y::ys).
@@ -240,6 +241,52 @@ Section TwoListInduction.
 
 End TwoListInduction.
 
+Section ThreeListInduction.
+
+  Variable A:Type.
+  Variable B:Type.
+  Variable C:Type.
+
+  Fixpoint zip3 (l1: list A) (l2:list B) (l3:list C) : list (A*B*C) :=
+    zip (zip l1 l2) l3.
+
+  Variable P: list A -> list B -> list C -> Prop.
+
+  Hypothesis Psome_nil : forall xs ys zs,
+      xs = [] \/ ys = [] \/ zs = [] -> P xs ys zs.
+
+  Hypothesis Pind : forall x y z xs ys zs,
+      P xs ys zs ->
+      P (x::xs) (y::ys) (z::zs).
+
+  Theorem three_list_induction : forall l1 l2 l3,
+      P l1 l2 l3.
+  Proof.
+    intros.
+    remember (zip l1 l2).
+    generalize dependent l2.
+    generalize dependent l1.
+    eapply two_list_induction with (l1 := l) (l2 := l3);
+      intros; eauto.
+    destruct l1, l2; eauto.
+    simpl in *; congruence.
+
+    generalize dependent H.
+    generalize dependent Heql.
+    generalize dependent ys.
+    generalize dependent xs.
+    generalize dependent x.
+    generalize dependent y.
+    clear l.
+    clear l3.
+    eapply two_list_induction with (l1:=l1) (l2:=l2); simpl; intros; eauto.
+
+    inversion Heql; subst; clear Heql.
+    eauto.
+  Qed.
+
+End ThreeListInduction.
+
 Instance list_Ordering A {ord:Ordering A} : Ordering (list A).
 Proof.
   refine {| cmp := cmp_list ord |}; intros.
@@ -259,8 +306,31 @@ Proof.
     rewrite cmp_refl in *; eauto.
     rewrite H2 in *; congruence.
     rewrite H1; eauto.
-  - (* TODO: probably requires a three-list induction pattern *)
-Admitted.
+  - generalize dependent H.
+    generalize dependent H0.
+    eapply three_list_induction with (l1:=x) (l2:=y) (l3:=z); intros; simpl.
+    intuition subst.
+    destruct ys, zs; simpl in *; try congruence.
+    destruct xs, zs; simpl in *; try congruence.
+    destruct xs, ys; simpl in *; try congruence.
+    simpl in *.
+    destruct (ord_spec y0 z0), (ord_spec x0 y0); subst; eauto;
+      intuition eauto;
+      repeat match goal with
+             | [ H: context[cmp ?x ?x] |- _ ] =>
+               rewrite cmp_refl in H
+             | [ |- context[cmp ?x ?x] ] =>
+               rewrite cmp_refl
+             | [ H: context[cmp ?x ?y], Heq: cmp ?x ?y = _ |- _ ] =>
+               rewrite Heq in H
+             | [ Heq: cmp ?x ?y = _ |- context[cmp ?x ?y] ] =>
+               rewrite Heq
+             | _ =>
+               try erewrite cmp_trans by eauto
+             end;
+      eauto;
+      try congruence.
+Defined.
 
 Instance bool_Ordering : Ordering bool.
 Proof.
