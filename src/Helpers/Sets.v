@@ -70,11 +70,27 @@ Module FSet.
       { elements: list A;
         elem_sorted: sorted cmp_lt elements }.
 
+    Definition empty : t :=
+      {| elements := [];
+         elem_sorted := sorted_nil cmp_lt |}.
+
     Definition In x (s:t) :=
       List.In x (elements s).
 
+    Theorem empty_in : forall x,
+        ~In x empty.
+    Proof.
+      unfold In, empty; simpl; eauto.
+    Qed.
+
     Definition For_all (P:A -> Prop) (s:t) :=
       Forall P (elements s).
+
+    Theorem empty_Forall : forall P,
+        For_all P empty.
+    Proof.
+      unfold For_all; simpl; eauto.
+    Qed.
 
     Theorem For_all_in (P:A -> Prop) (s:t) :
       For_all P s ->
@@ -327,6 +343,34 @@ Module FSet.
       auto using _remove_in.
     Qed.
 
+    Theorem remove_in' : forall x s y,
+        In x (remove y s) ->
+        In x s /\ x <> y.
+    Proof.
+      destruct s as [s H].
+      unfold In, remove; simpl; intros.
+      induction s; simpl in *; eauto.
+      destruct (ord_spec y a); subst.
+      - rewrite cmp_refl in *.
+        inversion H; subst; clear H; intuition (subst; auto).
+        eapply Forall_in in H3; eauto.
+        unfold cmp_lt in *; rewrite cmp_refl in *; congruence.
+      - destruct H1.
+        rewrite H1 in *.
+        simpl in *.
+        intuition (subst; eauto).
+        rewrite cmp_refl in *; congruence.
+        inversion H; subst; clear H; intuition eauto.
+        eapply Forall_in in H3; eauto.
+        congruence.
+      - destruct H1.
+        rewrite H2 in *.
+        simpl in *; intuition (subst; eauto).
+        rewrite cmp_refl in *; congruence.
+        inversion H; subst; clear H; intuition eauto.
+        inversion H; subst; clear H; intuition eauto.
+    Qed.
+
     Lemma cmp_lt_antisym : forall x y,
         cmp_lt x y ->
         cmp_lt y x ->
@@ -446,5 +490,6 @@ Module FSet.
   End Sets.
 
   Arguments t A {Acmp}.
+  Arguments empty {A} {Acmp}.
 
 End FSet.

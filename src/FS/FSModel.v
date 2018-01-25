@@ -1,8 +1,6 @@
 Require Import POCS.
 Require Import String.
 Require Import Equalities.
-Require Import Sets.
-Require Import Ordering.
 Require Import Relations.Relation_Operators.
 Require Import RelationClasses.
 Require Import Morphisms.
@@ -93,27 +91,22 @@ Qed.
 Definition File := string.
 Definition Files := list File.
 
-Record preFS := mkpreFS {
+Record FS := mkFS {
   FSRoot : nat;     (* root DirNode *)
   FSLinks : FSet.t Link;
   FSFiles : Files;  (* [filenum]s point into this list *)
 }.
 
-Record FS := mkFS {
-  PreFS: preFS;
-  LinksProper: PFSet PreFS.(FSLinks);
-}.
-
 Definition Pathname := list string.
 
-Definition preFSEquiv (fs1 fs2 : preFS) : Prop :=
+Definition FSEquiv (fs1 fs2 : FS) : Prop :=
   FSRoot fs1 = FSRoot fs2 /\
   FSFiles fs1 = FSFiles fs2 /\
   FSLinks fs1 = FSLinks fs2.
 
-Instance preFSEquiv_Equiv : Equivalence preFSEquiv.
+Instance FSEquiv_Equiv : Equivalence FSEquiv.
 Proof.
-  split; unfold preFSEquiv.
+  split; unfold FSEquiv.
   - intros f; intuition eauto.
   - intros f1 f2; intuition eauto.
   - intros f1 f2 f3; intuition eauto.
@@ -124,17 +117,17 @@ Qed.
 
 Ltac subst_fsequiv :=
   match goal with
-  | H : preFSEquiv ?s1 ?s2 |- _ =>
+  | H : FSEquiv ?s1 ?s2 |- _ =>
     idtac "substituting" s1 "using" H; rewrite H in *; clear H; clear s1;
     idtac "cleared" s1
-  | H : preFSEquiv ?s1 ?s2 |- _ =>
+  | H : FSEquiv ?s1 ?s2 |- _ =>
     idtac "substituting" s2 "using" H; rewrite <- H in *; clear H; clear s2;
     idtac "cleared" s2
   end.
 
 (** [path_evaluates] is used to specify lookup *)
 
-Inductive valid_link : forall (fs : preFS) (dir : nat) (name : string) (target : Node), Prop :=
+Inductive valid_link : forall (fs : FS) (dir : nat) (name : string) (target : Node), Prop :=
 | ValidLink : forall fs dir name target,
     FSet.In (mkLink dir target name) (FSLinks fs) ->
     valid_link fs dir name target
@@ -148,13 +141,13 @@ Inductive valid_link : forall (fs : preFS) (dir : nat) (name : string) (target :
     valid_link fs dir ".." (DirNode dir).
 
 Instance valid_link_proper :
-  Proper (preFSEquiv ==> eq ==> eq ==> eq ==> iff) valid_link.
+  Proper (FSEquiv ==> eq ==> eq ==> eq ==> iff) valid_link.
 Proof.
   intros fs1 fs2 H.
   intros ? ? ?; subst.
   intros ? ? ?; subst.
   intros ? ? ?; subst.
-  unfold preFSEquiv in H; intuition idtac.
+  unfold FSEquiv in H; intuition idtac.
   assert (fs1 = fs2).
   destruct fs1, fs2.
   simpl in *; subst.
@@ -167,7 +160,7 @@ Proof.
   congruence.
 Qed.
 
-Inductive path_evaluates : forall (fs : preFS) (start : Node) (pn : Pathname) (target : Node), Prop :=
+Inductive path_evaluates : forall (fs : FS) (start : Node) (pn : Pathname) (target : Node), Prop :=
 | PathEvalEmpty : forall fs start,
   path_evaluates fs start nil start
 | PathEvalFileLink : forall fs startdir name inum,
@@ -184,7 +177,7 @@ Inductive path_evaluates : forall (fs : preFS) (start : Node) (pn : Pathname) (t
   path_evaluates fs (DirNode startdir) (name :: pn) target.
 
 Instance path_evaluates_proper :
-  Proper (preFSEquiv ==> eq ==> eq ==> eq ==> iff) path_evaluates.
+  Proper (FSEquiv ==> eq ==> eq ==> eq ==> iff) path_evaluates.
 Proof.
   intros fs1 fs2 H.
   intros ? ? ?; subst.
@@ -209,18 +202,18 @@ Proof.
       rewrite <- H in H0; eauto.
 Qed.
 
-Definition path_eval_root (fs : preFS) (pn : Pathname) (target : Node) : Prop :=
+Definition path_eval_root (fs : FS) (pn : Pathname) (target : Node) : Prop :=
   path_evaluates fs (DirNode (FSRoot fs)) pn target.
 
 Instance path_eval_root_proper :
-  Proper (preFSEquiv ==> eq ==> eq ==> iff) path_eval_root.
+  Proper (FSEquiv ==> eq ==> eq ==> iff) path_eval_root.
 Proof.
   intros fs1 fs2 H.
   intros ? ? ?; subst.
   intros ? ? ?; subst.
   unfold path_eval_root.
   eapply path_evaluates_proper; eauto.
-  unfold preFSEquiv in *; intuition.
+  unfold FSEquiv in *; intuition.
 Qed.
 
 Hint Constructors valid_link.
@@ -256,28 +249,28 @@ Proof.
     eapply PathEvalSymlink; eauto.
 Qed.
 
-Definition does_not_exist (fs : preFS) dirnum name :=
+Definition does_not_exist (fs : FS) dirnum name :=
   ~ exists n, FSet.In (mkLink dirnum n name) (FSLinks fs).
 
-Definition file_handle_unused (fs : preFS) h :=
+Definition file_handle_unused (fs : FS) h :=
   ~ exists d name, FSet.In (mkLink d (FileNode h) name) (FSLinks fs).
 
-Definition file_handle_valid (fs : preFS) h :=
+Definition file_handle_valid (fs : FS) h :=
   h < Datatypes.length (FSFiles fs).
 
-Definition upd_file h data (fs : preFS) :=
-  mkpreFS (FSRoot fs) (FSLinks fs) (list_upd (FSFiles fs) h data).
+Definition upd_file h data (fs : FS) :=
+  mkFS (FSRoot fs) (FSLinks fs) (list_upd (FSFiles fs) h data).
 
-Definition add_link dir node name (fs : preFS) :=
-  mkpreFS (FSRoot fs) (FSet.add (mkLink dir node name) (FSLinks fs)) (FSFiles fs).
+Definition add_link dir node name (fs : FS) :=
+  mkFS (FSRoot fs) (FSet.add (mkLink dir node name) (FSLinks fs)) (FSFiles fs).
 
-Definition del_link dir node name (fs : preFS) :=
-  mkpreFS (FSRoot fs) (FSet.remove (mkLink dir node name) (FSLinks fs)) (FSFiles fs).
+Definition del_link dir node name (fs : FS) :=
+  mkFS (FSRoot fs) (FSet.remove (mkLink dir node name) (FSLinks fs)) (FSFiles fs).
 
-Definition create_file dir h name (fs : preFS) :=
+Definition create_file dir h name (fs : FS) :=
   add_link dir (FileNode h) name (upd_file h "" fs).
 
-Definition valid_dir dir (fs : preFS) :=
+Definition valid_dir dir (fs : FS) :=
   exists pn, path_eval_root fs pn (DirNode dir).
 
 Definition match_readdir from l :=
@@ -290,13 +283,13 @@ Definition readdir_names fs dir :=
   map LinkName (FSet.elements (readdir fs dir)).
 
 (* If pn exists, then it is unique. *)
-Definition unique_pathname (fs : preFS) startdir pn :=
+Definition unique_pathname (fs : FS) startdir pn :=
   exists node,
     path_evaluates fs startdir pn node /\
     forall node',
       path_evaluates fs startdir pn node' -> node' = node.
 
-Definition unique_pathname_root (fs : preFS) pn :=
+Definition unique_pathname_root (fs : FS) pn :=
   exists node,
     path_eval_root fs pn node /\
     forall node',
@@ -359,7 +352,7 @@ Proof.
 Qed.
 
 (* A stronger version of unique_pathname, requiring all intermediate nodes match *)
-Inductive stable_pathname : forall (fs: preFS) (startdir: Node) (pn: Pathname), Prop :=
+Inductive stable_pathname : forall (fs: FS) (startdir: Node) (pn: Pathname), Prop :=
 | StablePathNil: forall fs startdir, stable_pathname fs (DirNode startdir) []
 | StablePathCons: forall fs startdir name pn' node node',
     path_evaluates fs (DirNode startdir) [name] node' ->
@@ -391,13 +384,13 @@ Proof.
     eapply unique_pathname_path_evaluates_cons_eq in H4 as Hx; eauto.
 Qed.
                                
-Definition unique_dirent (fs : preFS) dir name :=
+Definition unique_dirent (fs : FS) dir name :=
   forall target target0,
     valid_link fs dir name target ->
     valid_link fs dir name target0 ->
     target0 = target.
 
-Definition unique_dirents (fs : preFS) :=
+Definition unique_dirents (fs : FS) :=
   forall dir name target target0,
     valid_link fs dir name target ->
     valid_link fs dir name target0 ->
@@ -413,7 +406,7 @@ Proof.
   edestruct H; eauto.
 Qed.
 
-Definition fs_invariant (fs : preFS) := proper_links (FSLinks fs).
+Definition fs_invariant (fs : FS) := proper_links (FSLinks fs).
 
 Lemma fs_proper_name: forall fs startdir node name,
     fs_invariant fs ->
@@ -820,11 +813,11 @@ Proof.
 Qed.
 
 Instance file_handle_unused_proper :
-  Proper (preFSEquiv ==> eq ==> iff) file_handle_unused.
+  Proper (FSEquiv ==> eq ==> iff) file_handle_unused.
 Proof.
   intros ? ? ?; subst.
   intros ? ? ?; subst.
-  unfold preFSEquiv in H.
+  unfold FSEquiv in H.
   unfold file_handle_unused; intuition; repeat deex.
   - apply H1.
     rewrite  H2; eauto.
@@ -833,28 +826,28 @@ Proof.
 Qed.
 
 Instance file_handle_valid_proper :
-  Proper (preFSEquiv ==> eq ==> iff) file_handle_valid.
+  Proper (FSEquiv ==> eq ==> iff) file_handle_valid.
 Proof.
   intros ? ? ?; subst.
   intros ? ? ?; subst.
-  unfold preFSEquiv in H.
+  unfold FSEquiv in H.
   unfold file_handle_valid; intuition; congruence.
 Qed.
 
 Instance does_not_exist_proper :
-  Proper (preFSEquiv ==> eq ==> eq ==> iff) does_not_exist.
+  Proper (FSEquiv ==> eq ==> eq ==> iff) does_not_exist.
 Proof.
   intros ? ? ?; subst.
   intros ? ? ?; subst.
   intros ? ? ?; subst.
-  unfold preFSEquiv in H.
+  unfold FSEquiv in H.
   unfold does_not_exist; intuition; repeat deex.
   - rewrite H2 in *. eauto.
   - rewrite H2 in *. eauto.
 Qed.
 
-Instance preFSEquiv_proper :
-  Proper (preFSEquiv ==> preFSEquiv ==> iff) preFSEquiv.
+Instance FSEquiv_proper :
+  Proper (FSEquiv ==> FSEquiv ==> iff) FSEquiv.
 Proof.
   intros ? ? ?; subst.
   intros ? ? ?; subst.
@@ -862,32 +855,32 @@ Proof.
 Qed.
 
 Instance upd_file_proper :
-  Proper (eq ==> eq ==> preFSEquiv ==> preFSEquiv) upd_file.
+  Proper (eq ==> eq ==> FSEquiv ==> FSEquiv) upd_file.
 Proof.
   intros ? ? ?; subst.
   intros ? ? ?; subst.
   intros ? ? ?; subst.
   unfold upd_file.
-  unfold preFSEquiv in *.
+  unfold FSEquiv in *.
   intuition; simpl.
   rewrite H; eauto.
 Qed.
 
 Instance add_link_proper :
-  Proper (eq ==> eq ==> eq ==> preFSEquiv ==> preFSEquiv) add_link.
+  Proper (eq ==> eq ==> eq ==> FSEquiv ==> FSEquiv) add_link.
 Proof.
   intros ? ? ?; subst.
   intros ? ? ?; subst.
   intros ? ? ?; subst.
   intros ? ? ?; subst.
   unfold add_link.
-  unfold preFSEquiv in *.
+  unfold FSEquiv in *.
   intuition; simpl.
   rewrite H2 in *. eauto.
 Qed.
 
 Instance create_file_proper :
-  Proper (eq ==> eq ==> eq ==> preFSEquiv ==> preFSEquiv) create_file.
+  Proper (eq ==> eq ==> eq ==> FSEquiv ==> FSEquiv) create_file.
 Proof.
   intros ? ? ?; subst.
   intros ? ? ?; subst.
