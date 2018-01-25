@@ -1,13 +1,13 @@
 Require Import POCS.
 Require Import String.
 Require Import Equalities.
-Require Import MSets.MSetWeakList.
+Require Import Sets.
+Require Import Ordering.
 Require Import Relations.Relation_Operators.
 Require Import RelationClasses.
 Require Import Morphisms.
 Require Import Sumbool.
 Require Import ProofIrrelevance.
-
 
 Import ListNotations.
 Open Scope string.
@@ -52,26 +52,36 @@ Lemma Link_equal_dec : EqualDec Link.
     end.
 Defined.
 
-Module MDT_Link.
-  Definition t := Link.
-  Definition eq_dec := Link_equal_dec.
-End MDT_Link.
+Instance Node_Ordering : Ordering Node.
+Proof.
+  eapply (injection_Ordering (nat + nat + list string)).
+  typeclasses eauto.
+  unshelve econstructor; intros.
+  destruct H; [ left; left | left; right | right ]; eauto.
+  destruct x, y; simpl in *; congruence.
+Defined.
 
-Module Link_as_UDT := Make_UDT(MDT_Link).
+Instance Link_Ordering : Ordering Link.
+Proof.
+  eapply (injection_Ordering (nat * Node * string)%type).
+  typeclasses eauto.
 
-Module LinkSet := MSetWeakList.Make Link_as_UDT.
+  unshelve econstructor; intros.
+  exact (H.(LinkFrom), H.(LinkTo), H.(LinkName)).
+  destruct x, y; simpl in *; congruence.
+Defined.
 
 Definition eq_string (s1 s2 : string) :=
   if string_dec s1 s2 then true else false.
 
 Definition proper_name n := n <> "." /\ n <> "..".
 Definition proper_link l := proper_name (LinkName l).
-Definition proper_links g := LinkSet.For_all proper_link g.
+Definition proper_links g := FSet.For_all proper_link g.
 
-Inductive PLinkSet: forall ls, Prop :=
+Inductive PFSet: forall ls, Prop :=
 | LSProperNames: forall ls,
     proper_links ls ->
-    PLinkSet ls.
+    PFSet ls.
 
 Instance proper_proper_link:
   Proper (eq ==> eq) proper_link.
@@ -80,30 +90,18 @@ Proof.
   intros; subst; reflexivity.
 Qed.
 
-Lemma In_add_add_comm: forall a l1 l2 g,
-    LinkSet.In a (LinkSet.add l1 (LinkSet.add l2 g)) ->
-    LinkSet.In a (LinkSet.add l2 (LinkSet.add l1 g)).
-Proof.
-  intros.
-  eapply LinkSet.add_spec in H; intuition idtac; subst.
-  eapply LinkSet.add_spec; right. eapply LinkSet.add_spec; eauto.
-  eapply LinkSet.add_spec in H0; intuition idtac; subst.
-  eapply LinkSet.add_spec; eauto.
-  eapply LinkSet.add_spec; right. eapply LinkSet.add_spec; eauto.
-Qed.
-
 Definition File := string.
 Definition Files := list File.
 
 Record preFS := mkpreFS {
   FSRoot : nat;     (* root DirNode *)
-  FSLinks : LinkSet.t;
+  FSLinks : FSet.t Link;
   FSFiles : Files;  (* [filenum]s point into this list *)
 }.
 
 Record FS := mkFS {
   PreFS: preFS;
-  LinksProper: PLinkSet PreFS.(FSLinks);
+  LinksProper: PFSet PreFS.(FSLinks);
 }.
 
 Definition Pathname := list string.
@@ -138,12 +136,12 @@ Ltac subst_fsequiv :=
 
 Inductive valid_link : forall (fs : preFS) (dir : nat) (name : string) (target : Node), Prop :=
 | ValidLink : forall fs dir name target,
-    LinkSet.In (mkLink dir target name) (FSLinks fs) ->
+    FSet.In (mkLink dir target name) (FSLinks fs) ->
     valid_link fs dir name target
 | ValidDot : forall fs dir,
     valid_link fs dir "." (DirNode dir)
 | ValidDotDot : forall fs dir name parent,
-    LinkSet.In (mkLink parent (DirNode dir) name) (FSLinks fs) ->
+    FSet.In (mkLink parent (DirNode dir) name) (FSLinks fs) ->
     valid_link fs dir ".." (DirNode parent)
 | ValidDotDotRoot : forall fs dir,
     dir = FSRoot fs ->
@@ -259,10 +257,10 @@ Proof.
 Qed.
 
 Definition does_not_exist (fs : preFS) dirnum name :=
-  ~ exists n, LinkSet.In (mkLink dirnum n name) (FSLinks fs).
+  ~ exists n, FSet.In (mkLink dirnum n name) (FSLinks fs).
 
 Definition file_handle_unused (fs : preFS) h :=
-  ~ exists d name, LinkSet.In (mkLink d (FileNode h) name) (FSLinks fs).
+  ~ exists d name, FSet.In (mkLink d (FileNode h) name) (FSLinks fs).
 
 Definition file_handle_valid (fs : preFS) h :=
   h < Datatypes.length (FSFiles fs).
@@ -271,10 +269,10 @@ Definition upd_file h data (fs : preFS) :=
   mkpreFS (FSRoot fs) (FSLinks fs) (list_upd (FSFiles fs) h data).
 
 Definition add_link dir node name (fs : preFS) :=
-  mkpreFS (FSRoot fs) (LinkSet.add (mkLink dir node name) (FSLinks fs)) (FSFiles fs).
+  mkpreFS (FSRoot fs) (FSet.add (mkLink dir node name) (FSLinks fs)) (FSFiles fs).
 
 Definition del_link dir node name (fs : preFS) :=
-  mkpreFS (FSRoot fs) (LinkSet.remove (mkLink dir node name) (FSLinks fs)) (FSFiles fs).
+  mkpreFS (FSRoot fs) (FSet.remove (mkLink dir node name) (FSLinks fs)) (FSFiles fs).
 
 Definition create_file dir h name (fs : preFS) :=
   add_link dir (FileNode h) name (upd_file h "" fs).
@@ -286,10 +284,10 @@ Definition match_readdir from l :=
   beq_nat from (LinkFrom l).
 
 Definition readdir fs dir :=
-  LinkSet.filter (match_readdir dir) (FSLinks fs).
+  FSet.filter (match_readdir dir) (FSLinks fs).
 
 Definition readdir_names fs dir :=
-  map LinkName (LinkSet.elements (readdir fs dir)).
+  map LinkName (FSet.elements (readdir fs dir)).
 
 (* If pn exists, then it is unique. *)
 Definition unique_pathname (fs : preFS) startdir pn :=
@@ -419,14 +417,14 @@ Definition fs_invariant (fs : preFS) := proper_links (FSLinks fs).
 
 Lemma fs_proper_name: forall fs startdir node name,
     fs_invariant fs ->
-    LinkSet.In (mkLink startdir node name) (FSLinks fs) ->
+    FSet.In (mkLink startdir node name) (FSLinks fs) ->
     proper_name name.
 Proof.
   intros.
   unfold fs_invariant in *.
   unfold proper_links in *.
-  unfold LinkSet.For_all in *.
-  specialize (H (mkLink startdir node name) H0); eauto.
+  eapply FSet.For_all_in in H; eauto.
+  auto.
 Qed.
 
 Lemma fs_invariant_add_link: forall fs dirnum name node,
@@ -439,11 +437,11 @@ Proof.
   unfold fs_invariant in *.
   unfold proper_links in *.
   unfold proper_link in *.
-  unfold LinkSet.For_all in *.
-  intros; simpl in *.
-  eapply LinkSet.add_spec in H2; eauto.
-  intuition idtac; subst; simpl in *; eauto.
+  eapply FSet.add_forall; eauto.
 Qed.
+
+Hint Resolve FSet.add_incr.
+Hint Constructors valid_link.
 
 Lemma path_evaluates_add_link : forall fs startdir dirnum name dirpn n node,
   path_evaluates fs startdir dirpn node ->
@@ -455,30 +453,19 @@ Proof.
   induction H.
   + constructor.
   + eapply PathEvalFileLink; eauto.
-    edestruct H.
+    edestruct H; eauto.
     - constructor; simpl; auto.
-      apply LinkSet.add_spec; auto.
-    - apply ValidDot.
     - eapply ValidDotDot.
-      apply LinkSet.add_spec; auto.
-      right; eauto.
-    - apply ValidDotDotRoot; auto.
+      eapply FSet.add_incr; eauto.
   + eapply PathEvalDirLink; eauto.
-    edestruct H.
-    - constructor; simpl.
-      apply LinkSet.add_spec; auto.
-    - apply ValidDot.
+    edestruct H; eauto.
+    - constructor; simpl; eauto.
     - eapply ValidDotDot.
-      apply LinkSet.add_spec; auto.
-      right; eauto.
-    - apply ValidDotDotRoot; auto.
+      apply FSet.add_incr; eauto.
   + inversion H; subst.
-    eapply PathEvalSymlink; simpl.
-    - constructor.
-      apply LinkSet.add_spec.
-      eauto.
-    - apply IHpath_evaluates1; eauto.
-    - apply IHpath_evaluates2; eauto.
+    eapply PathEvalSymlink; simpl; eauto.
+    constructor.
+    apply FSet.add_incr; eauto.
 Qed.
 
 Lemma valid_link_does_not_exist: forall fs dirnum name node,
@@ -517,19 +504,14 @@ Lemma valid_link_add_file_link': forall fs startdir name name0 dirnum node node'
     valid_link fs startdir name0 node'.
 Proof.
   intros.
-  inversion H2; subst; clear H2.
-  - apply LinkSet.add_spec in H3.
-    intuition idtac; auto.
+  inversion H2; subst; clear H2; eauto.
+  - apply FSet.add_in' in H3; intuition eauto.
     inversion H2; subst; clear H2.
     exfalso; eapply valid_link_does_not_exist; eauto.
-  - apply ValidDot.
   - eapply ValidDotDot.
-    apply LinkSet.add_spec in H3; auto.
+    apply FSet.add_in' in H3; auto.
     intuition idtac; eauto.
-    inversion H2; subst.
-  - eapply ValidDotDotRoot.
-    simpl in *.
-    reflexivity.
+    inversion H2.
 Qed.
 
 Lemma path_evaluates_add_link' : forall fs startdir dirnum name dirpn finum node,
@@ -549,11 +531,10 @@ Proof.
   - eapply PathEvalFileLink; subst; eauto.
     inversion H4; subst.
     eapply fs_proper_name in H5 as H5x.
-    eapply LinkSet.add_spec in H5.
+    eapply FSet.add_in' in H5.
     intuition idtac.
     + inversion H6; subst; clear H6.
-      eapply path_evaluates_does_not_exist in H2; eauto.
-      exfalso; auto.
+      exfalso; eauto using path_evaluates_does_not_exist.
     + constructor; eauto.
     + apply fs_invariant_add_link; eauto.
   - inversion H1; subst; clear H1.
@@ -563,10 +544,7 @@ Proof.
       assert (DirNode inum0 = DirNode inum).
       {
         inversion H0; subst.
-        eapply unique_pathname_valid_link_eq.
-        eapply H13.
-        eauto.
-        eauto.
+        eauto using unique_pathname_valid_link_eq.
       }
       inversion H1; subst; clear H1.
       eapply IHpath_evaluates; eauto.
@@ -584,7 +562,7 @@ Proof.
     inversion H0; subst.
     (*
     - constructor.
-      apply LinkSet.add_spec.
+      apply FSet.add_spec.
       eauto.
     - apply IHpath_evaluates1; eauto.
     - apply IHpath_evaluates2; eauto.
@@ -600,30 +578,21 @@ Proof.
   eapply path_evaluates_add_link in H; eauto.
 Qed.
 
+Hint Constructors path_evaluates.
+
 Lemma path_evaluates_upd_file : forall fs startdir dirnum h data dirpn,
   path_evaluates fs startdir dirpn (DirNode dirnum) ->
   path_evaluates (upd_file h data fs) startdir dirpn (DirNode dirnum).
 Proof.
   intros.
   unfold upd_file; simpl.
-  induction H.
-  + constructor.
-  + eapply PathEvalFileLink; eauto.
-    edestruct H.
-    - constructor; simpl; auto.
-    - apply ValidDot.
-    - eapply ValidDotDot; simpl; eauto.
-    - apply ValidDotDotRoot; auto.
+  induction H; eauto.
+  + eapply PathEvalFileLink.
+    edestruct H; eauto.
   + eapply PathEvalDirLink; eauto.
-    edestruct H.
-    - constructor; simpl; auto.
-    - apply ValidDot.
-    - eapply ValidDotDot; simpl; eauto.
-    - apply ValidDotDotRoot; auto.
-  + eapply PathEvalSymlink; simpl.
-    inversion H. constructor. eauto.
-    apply IHpath_evaluates1; eauto.
-    apply IHpath_evaluates2; eauto.
+    destruct H; eauto.
+  + eapply PathEvalSymlink; simpl; eauto.
+    destruct H; eauto.
 Qed.
 
 Lemma path_eval_root_upd_file : forall fs dirnum h data dirpn,
@@ -681,8 +650,7 @@ Proof.
   destruct H.
   deex.
   eexists.
-  apply LinkSet.add_spec. right.
-  apply H.
+  apply FSet.add_incr; eauto.
 Qed.
   
 Lemma does_not_exist_add_link_same_dirnum : forall fs dirnum name n0 name0,
@@ -695,7 +663,7 @@ Proof.
   simpl in *.
   intro.
   deex.
-  apply LinkSet.add_spec in H1.
+  apply FSet.add_in' in H1.
   intuition idtac.
   inversion H2; congruence.
   destruct H.
@@ -746,8 +714,7 @@ Proof.
   repeat deex.
   destruct H.
   repeat eexists.
-  apply LinkSet.add_spec.
-  right. apply H0.
+  apply FSet.add_incr; eauto.
 Qed.
   
 Lemma file_handle_unused_upd_file' : forall fs h0 data0 h,
@@ -769,7 +736,7 @@ Proof.
   simpl in *.
   intro.
   repeat deex.
-  apply LinkSet.add_spec in H1.
+  apply FSet.add_in' in H1.
   intuition idtac.
   inversion H2; congruence.
   destruct H.
@@ -787,8 +754,8 @@ Proof.
   intro.
   destruct H.
   repeat eexists.
-  apply LinkSet.add_spec.
-  left. rewrite H0; eauto.
+  rewrite H0 in *.
+  apply FSet.add_in.
 Qed.
 
 Hint Resolve file_handle_unused_upd_file.

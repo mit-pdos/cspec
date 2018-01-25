@@ -66,15 +66,23 @@ Module FSet.
     Variable A:Type.
     Context {Acmp: Ordering A}.
 
-    Record OrdSet :=
+    Record t :=
       { elements: list A;
         elem_sorted: sorted cmp_lt elements }.
 
-    Definition In x (s:OrdSet) :=
+    Definition In x (s:t) :=
       List.In x (elements s).
 
-    Definition For_all (P:A -> Prop) (s:OrdSet) :=
+    Definition For_all (P:A -> Prop) (s:t) :=
       Forall P (elements s).
+
+    Theorem For_all_in (P:A -> Prop) (s:t) :
+      For_all P s ->
+      forall x, In x s -> P x.
+    Proof.
+      unfold For_all, In; simpl; intros.
+      eapply Forall_in; eauto.
+    Qed.
 
     Theorem not_in_forall : forall x s,
         ~In x s ->
@@ -146,9 +154,26 @@ Module FSet.
       - constructor; eauto.
     Qed.
 
-    Definition add (x:A) (s:OrdSet) : OrdSet :=
+    Definition add (x:A) (s:t) : t :=
       {| elements := _add x (elements s);
          elem_sorted := _add_respectful x (elem_sorted s); |}.
+
+    Theorem add_forall : forall x P s,
+        For_all P s ->
+        P x ->
+        For_all P (add x s).
+    Proof.
+      unfold For_all, add; simpl; intros.
+      eapply _add_forall; eauto.
+    Qed.
+
+    Theorem add_forall' : forall x P s,
+        For_all P (add x s) ->
+        For_all P s.
+    Proof.
+      unfold For_all, add; simpl; intros.
+      eapply _add_forall'; eauto.
+    Qed.
 
     Theorem _add_in : forall x l,
         List.In x (_add x l).
@@ -162,6 +187,23 @@ Module FSet.
     Proof.
       unfold add, In; simpl.
       eauto using _add_in.
+    Qed.
+
+    Theorem add_in' : forall x s y,
+        In x (add y s) ->
+        x = y \/ In x s.
+    Proof.
+      destruct s as [s H].
+      unfold In, add; simpl; intros.
+      induction s; simpl in *; intuition eauto.
+      inversion H; subst; clear H; intuition auto.
+      destruct (ord_spec y a); subst; intuition.
+      - rewrite cmp_refl in *.
+        simpl in *; intuition auto.
+      - rewrite H2 in *.
+        simpl in *; intuition auto.
+      - rewrite H5 in *.
+        simpl in *; intuition auto.
     Qed.
 
     Theorem _add_incr : forall x l y,
@@ -212,7 +254,7 @@ Module FSet.
         eauto.
     Qed.
 
-    Definition remove x (s:OrdSet) : OrdSet :=
+    Definition remove x (s:t) : t :=
       {| elements := _remove x (elements s);
          elem_sorted := _remove_respectful x (elem_sorted s); |}.
 
@@ -361,7 +403,7 @@ Module FSet.
       eapply Forall_subset; eauto.
     Qed.
 
-    Definition filter (P: A -> bool) (s:OrdSet) : OrdSet.
+    Definition filter (P: A -> bool) (s:t) : t.
       refine {| elements := _filter P (elements s) |}.
       apply _filter_respectful.
       apply (elem_sorted s).
@@ -402,5 +444,7 @@ Module FSet.
     Qed.
 
   End Sets.
+
+  Arguments t A {Acmp}.
 
 End FSet.
