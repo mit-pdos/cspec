@@ -81,13 +81,6 @@ Inductive PFSet: forall ls, Prop :=
     proper_links ls ->
     PFSet ls.
 
-Instance proper_proper_link:
-  Proper (eq ==> eq) proper_link.
-Proof.
-  intros ? ?.
-  intros; subst; reflexivity.
-Qed.
-
 Definition File := string.
 Definition Files := list File.
 
@@ -98,32 +91,6 @@ Record FS := mkFS {
 }.
 
 Definition Pathname := list string.
-
-Definition FSEquiv (fs1 fs2 : FS) : Prop :=
-  FSRoot fs1 = FSRoot fs2 /\
-  FSFiles fs1 = FSFiles fs2 /\
-  FSLinks fs1 = FSLinks fs2.
-
-Instance FSEquiv_Equiv : Equivalence FSEquiv.
-Proof.
-  split; unfold FSEquiv.
-  - intros f; intuition eauto.
-  - intros f1 f2; intuition eauto.
-  - intros f1 f2 f3; intuition eauto.
-    congruence.
-    congruence.
-    etransitivity; eauto.
-Qed.
-
-Ltac subst_fsequiv :=
-  match goal with
-  | H : FSEquiv ?s1 ?s2 |- _ =>
-    idtac "substituting" s1 "using" H; rewrite H in *; clear H; clear s1;
-    idtac "cleared" s1
-  | H : FSEquiv ?s1 ?s2 |- _ =>
-    idtac "substituting" s2 "using" H; rewrite <- H in *; clear H; clear s2;
-    idtac "cleared" s2
-  end.
 
 (** [path_evaluates] is used to specify lookup *)
 
@@ -139,26 +106,6 @@ Inductive valid_link : forall (fs : FS) (dir : nat) (name : string) (target : No
 | ValidDotDotRoot : forall fs dir,
     dir = FSRoot fs ->
     valid_link fs dir ".." (DirNode dir).
-
-Instance valid_link_proper :
-  Proper (FSEquiv ==> eq ==> eq ==> eq ==> iff) valid_link.
-Proof.
-  intros fs1 fs2 H.
-  intros ? ? ?; subst.
-  intros ? ? ?; subst.
-  intros ? ? ?; subst.
-  unfold FSEquiv in H; intuition idtac.
-  assert (fs1 = fs2).
-  destruct fs1, fs2.
-  simpl in *; subst.
-  auto.
-  congruence.
-  assert (fs1 = fs2).
-  destruct fs1, fs2.
-  simpl in *; subst.
-  auto.
-  congruence.
-Qed.
 
 Inductive path_evaluates : forall (fs : FS) (start : Node) (pn : Pathname) (target : Node), Prop :=
 | PathEvalEmpty : forall fs start,
@@ -176,45 +123,8 @@ Inductive path_evaluates : forall (fs : FS) (start : Node) (pn : Pathname) (targ
   path_evaluates fs symtarget pn target ->
   path_evaluates fs (DirNode startdir) (name :: pn) target.
 
-Instance path_evaluates_proper :
-  Proper (FSEquiv ==> eq ==> eq ==> eq ==> iff) path_evaluates.
-Proof.
-  intros fs1 fs2 H.
-  intros ? ? ?; subst.
-  intros ? ? ?; subst.
-  intros ? ? ?; subst.
-  intuition.
-  - induction H0.
-    + eapply PathEvalEmpty.
-    + eapply PathEvalFileLink; eauto.
-      rewrite H in H0. eauto.
-    + eapply PathEvalDirLink; eauto.
-      rewrite H in H0. eauto.
-    + eapply PathEvalSymlink; eauto.
-      rewrite H in H0; eauto.
-  - induction H0.
-    + eapply PathEvalEmpty.
-    + eapply PathEvalFileLink; eauto.
-      rewrite <- H in H0. eauto.
-    + eapply PathEvalDirLink; eauto.
-      rewrite <- H in H0. eauto.
-    + eapply PathEvalSymlink; eauto.
-      rewrite <- H in H0; eauto.
-Qed.
-
 Definition path_eval_root (fs : FS) (pn : Pathname) (target : Node) : Prop :=
   path_evaluates fs (DirNode (FSRoot fs)) pn target.
-
-Instance path_eval_root_proper :
-  Proper (FSEquiv ==> eq ==> eq ==> iff) path_eval_root.
-Proof.
-  intros fs1 fs2 H.
-  intros ? ? ?; subst.
-  intros ? ? ?; subst.
-  unfold path_eval_root.
-  eapply path_evaluates_proper; eauto.
-  unfold FSEquiv in *; intuition.
-Qed.
 
 Hint Constructors valid_link.
 Hint Constructors path_evaluates.
@@ -810,84 +720,5 @@ Proof.
   - eapply ValidDot.
   - eapply ValidDotDot. eauto.
   - eapply ValidDotDotRoot. eauto.
-Qed.
-
-Instance file_handle_unused_proper :
-  Proper (FSEquiv ==> eq ==> iff) file_handle_unused.
-Proof.
-  intros ? ? ?; subst.
-  intros ? ? ?; subst.
-  unfold FSEquiv in H.
-  unfold file_handle_unused; intuition; repeat deex.
-  - apply H1.
-    rewrite  H2; eauto.
-  - apply H1.
-    rewrite  <- H2; eauto.
-Qed.
-
-Instance file_handle_valid_proper :
-  Proper (FSEquiv ==> eq ==> iff) file_handle_valid.
-Proof.
-  intros ? ? ?; subst.
-  intros ? ? ?; subst.
-  unfold FSEquiv in H.
-  unfold file_handle_valid; intuition; congruence.
-Qed.
-
-Instance does_not_exist_proper :
-  Proper (FSEquiv ==> eq ==> eq ==> iff) does_not_exist.
-Proof.
-  intros ? ? ?; subst.
-  intros ? ? ?; subst.
-  intros ? ? ?; subst.
-  unfold FSEquiv in H.
-  unfold does_not_exist; intuition; repeat deex.
-  - rewrite H2 in *. eauto.
-  - rewrite H2 in *. eauto.
-Qed.
-
-Instance FSEquiv_proper :
-  Proper (FSEquiv ==> FSEquiv ==> iff) FSEquiv.
-Proof.
-  intros ? ? ?; subst.
-  intros ? ? ?; subst.
-  rewrite H. rewrite H0. reflexivity.
-Qed.
-
-Instance upd_file_proper :
-  Proper (eq ==> eq ==> FSEquiv ==> FSEquiv) upd_file.
-Proof.
-  intros ? ? ?; subst.
-  intros ? ? ?; subst.
-  intros ? ? ?; subst.
-  unfold upd_file.
-  unfold FSEquiv in *.
-  intuition; simpl.
-  rewrite H; eauto.
-Qed.
-
-Instance add_link_proper :
-  Proper (eq ==> eq ==> eq ==> FSEquiv ==> FSEquiv) add_link.
-Proof.
-  intros ? ? ?; subst.
-  intros ? ? ?; subst.
-  intros ? ? ?; subst.
-  intros ? ? ?; subst.
-  unfold add_link.
-  unfold FSEquiv in *.
-  intuition; simpl.
-  rewrite H2 in *. eauto.
-Qed.
-
-Instance create_file_proper :
-  Proper (eq ==> eq ==> eq ==> FSEquiv ==> FSEquiv) create_file.
-Proof.
-  intros ? ? ?; subst.
-  intros ? ? ?; subst.
-  intros ? ? ?; subst.
-  intros ? ? ?; subst.
-  unfold create_file.
-  rewrite H.
-  reflexivity.
 Qed.
 
