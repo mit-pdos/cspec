@@ -668,6 +668,17 @@ Proof.
   apply H.
 Qed.
 
+Theorem exec_equiv_rx_bind_ret : forall `(p : proc opT T),
+  exec_equiv_rx (Bind p Ret) p.
+Proof.
+  unfold exec_equiv_rx; intros.
+  rewrite exec_equiv_bind_bind.
+  eapply exec_equiv_bind_a; intros.
+  rewrite exec_equiv_ret_bind.
+  reflexivity.
+Qed.
+
+
 
 (** A version of [exec_equiv] for [exec] instead of [exec_prefix]. *)
 
