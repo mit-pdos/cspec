@@ -1,15 +1,14 @@
 Require Import POCS.
-Require Import Relations.Relation_Operators.
-Require Import RelationClasses.
-Require Import Morphisms.
+Require Import FSModel.
+Require Import FSAPI.
 
 Import ListNotations.
 Require Import String.
-Require Import FSAPI.
+Open Scope string.
+Open Scope list.
 
-
-Definition maildir := ["/tmp/"%string; "mail/"%string].
-Definition tmpdir := ["/tmp/"%string].
+Definition maildir := ["tmp"; "mail"].
+Definition tmpdir := ["tmp"].
 
 Global Opaque maildir.
 Global Opaque tmpdir.
@@ -28,6 +27,43 @@ Axiom starts_with_tid_not_dotdot : forall tid name,
 
 Hint Resolve starts_with_tid_not_dot.
 Hint Resolve starts_with_tid_not_dotdot.
+
+Definition message := string.
+
+
+Axiom find_available_name : nat -> Pathname -> proc linkOpT (option string).
+
+Definition deliver (cwd : nat) (user : string) (m : message) : proc _ _ :=
+  tmpname <?- find_available_name cwd tmpdir;
+  f <?- create cwd tmpdir tmpname;
+  _ <?- write cwd (tmpdir ++ [tmpname]) m;
+  msgname <?- find_available_name cwd (maildir ++ [user]);
+  _ <?- rename cwd tmpdir tmpname (maildir ++ [user]) msgname;
+  Ret (Some tt).
+
+Fixpoint read_files (cwd : nat) (dirpn : Pathname) (names : list string) :=
+  match names with
+  | nil => Ret (Some nil)
+  | name :: names' =>
+    data <?- read cwd (dirpn ++ [name]);
+    rest <?- read_files cwd dirpn names';
+    Ret (Some (data :: rest))
+  end.
+
+Definition pickup (cwd : nat) (user : string) :=
+  names <?- readdir cwd (maildir ++ [user]);
+  read_files cwd (maildir ++ [user]) names.
+
+
+(*
+Inductive mailfs_step_allowed : forall T, linkOpT T -> nat -> Prop :=
+| MailStepCreateTmp : forall dir name tid,
+  dir = tmpdir ->
+  starts_with_tid tid name ->
+  mailfs_step_allowed (Create dir name) tid.
+*)
+
+(*
 
 Inductive mailfs_step_allowed : forall T, fsOpT T -> nat -> Prop :=
 | MailStepCreateTmp : forall dir name tid,
@@ -67,19 +103,10 @@ Definition mailfs_step T (op : fsOpT T) tid s r s' :=
   invariant s /\
   invariant s'.
 
-Definition message := string.
 
 Inductive mailT : Type -> Type :=
 | Deliver (user : string) (m : message) : mailT unit.
 
-
-Definition deliver_core (user : string) (m : message) : proc fsOpT mailT unit :=
-  tmpname <- Op (FindAvailableName tmpdir);
-  _ <- Op (Create tmpdir tmpname);
-  _ <- Op (Write (tmpdir ++ [tmpname])%list m);
-  fn <- Op (FindAvailableName (maildir ++ [user])%list);
-  _ <- Op (Rename (tmpdir ++ [tmpname])%list (maildir ++ [user])%list fn);
-  Ret tt.
 
 Ltac step_inv :=
   match goal with
@@ -501,3 +528,5 @@ Proof.
 
   - admit.
 Admitted.
+
+*)

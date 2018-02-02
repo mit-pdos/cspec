@@ -2062,6 +2062,7 @@ Proof.
       rewrite thread_get_0 in H2.
       eauto.
     + apply IHts1 with (R := R); intuition.
+      omega.
       specialize (H1 (S tid)); intuition idtac.
       apply H3. eauto.
 Qed.

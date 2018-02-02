@@ -1,7 +1,8 @@
 Require Import Arith.
 Require Import Bool.
 Require Import List.
-Require Import EquivDec.
+Require Import String.
+Require Import Eqdep.
 
 Set Implicit Arguments.
 
@@ -33,6 +34,8 @@ Notation " x == y " := (equal_dec (x :>) (y :>)) (no associativity, at level 70)
 Instance nat_equal_dec : EqualDec nat := eq_nat_dec.
 Instance bool_equal_dec : EqualDec bool := bool_dec.
 
+Instance string_equal_dec : EqualDec string := string_dec.
+Instance list_equal_dec A `{dec:EqualDec A} : EqualDec (list A) := list_eq_dec dec.
 
 (** * [maybe_holds] predicate.
 

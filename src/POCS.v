@@ -26,8 +26,11 @@ infrastructure. *)
 
 Require Export Helpers.Helpers.
 Require Export Helpers.ListStuff.
+Require Export Helpers.Sets.
+Require Export Helpers.Ordering.
 
 Require Export Spec.ConcurProc.
 Require Export Spec.Equiv.
 Require Export Spec.Compile.
 Require Export Spec.Abstraction.
+Require Export Spec.Modules.
