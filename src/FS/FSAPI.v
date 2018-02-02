@@ -114,6 +114,8 @@ Module LinkAPI <: Layer.
 
   Definition step := xstep.
 
+  Definition initP (_ : State) := True.
+
 End LinkAPI.
 
 
