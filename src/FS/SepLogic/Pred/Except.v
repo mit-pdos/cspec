@@ -18,6 +18,7 @@ Definition mem_except `(m: mem A V) {AEQ: EqDec A eq} a : mem A V :=
 Theorem pred_except_ptsto : forall `(F: pred A V) {AEQ: EqDec A eq} a v,
     pred_except F a v * a |-> v ===> F.
 Proof.
+(*
   intros.
   rewrite star_comm.
   unfold pimpl, pred_except; simpl; intros.
@@ -26,7 +27,6 @@ Proof.
   extensionality a'.
   unfold mem_union, upd.
   admit.
-(*
   destruct (m2 a') eqn:?; try solve_false.
   simpl_match; eauto.
   rewrite H3; auto.
