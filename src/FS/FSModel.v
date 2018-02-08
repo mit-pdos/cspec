@@ -192,7 +192,20 @@ Definition readdir fs dir :=
 Definition readdir_names fs dir :=
   map LinkName (FSet.elements (readdir fs dir)).
 
-(* If pn exists, then it is unique. *)
+(* if pn exists, then it is unique *)
+Definition maybe_unique_pathname (fs : FS) startdir pn :=
+  forall node node',
+    path_evaluates fs startdir pn node ->
+    path_evaluates fs startdir pn node' ->
+    node' = node.
+
+Definition maybe_unique_pathname_root (fs : FS) pn :=
+  forall node node',
+    path_eval_root fs pn node ->
+    path_eval_root fs pn node' ->
+    node' = node.
+
+(* pn exists and it is unique. *)
 Definition unique_pathname (fs : FS) startdir pn :=
   exists node,
     path_evaluates fs startdir pn node /\

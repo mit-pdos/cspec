@@ -1,14 +1,15 @@
 Require Import POCS.
 Require Import FSModel.
 Require Import FSAPI.
+Require Import MailServerAPI.
 
 Import ListNotations.
 Require Import String.
 Open Scope string.
 Open Scope list.
 
-Definition maildir := ["tmp"; "mail"].
-Definition tmpdir := ["tmp"].
+Definition maildir := "mail".
+Definition tmpdir := "tmp".
 
 Global Opaque maildir.
 Global Opaque tmpdir.
@@ -28,97 +29,110 @@ Axiom starts_with_tid_not_dotdot : forall tid name,
 Hint Resolve starts_with_tid_not_dot.
 Hint Resolve starts_with_tid_not_dotdot.
 
-Definition message := string.
-
 
 Axiom find_available_name : nat -> Pathname -> proc linkOpT (option string).
 
 Definition deliver (cwd : nat) (user : string) (m : message) : proc _ _ :=
-  tmpname <?- find_available_name cwd tmpdir;
-  f <?- create cwd tmpdir tmpname;
-  _ <?- write cwd (tmpdir ++ [tmpname]) m;
-  msgname <?- find_available_name cwd (maildir ++ [user]);
-  _ <?- rename cwd tmpdir tmpname (maildir ++ [user]) msgname;
+  tmpname <?- find_available_name cwd [tmpdir];
+  f <?- create cwd [tmpdir] tmpname;
+  _ <?- write cwd ([tmpdir; tmpname]) m;
+  msgname <?- find_available_name cwd ([maildir; user]);
+  _ <?- rename cwd [tmpdir] tmpname ([maildir; user]) msgname;
   Ret (Some tt).
 
-Fixpoint read_files (cwd : nat) (dirpn : Pathname) (names : list string) :=
-  match names with
+Fixpoint read_files (cwd : nat) (dir : Pathname) (files : list string) : proc _ (option (list message)) :=
+  match files with
   | nil => Ret (Some nil)
-  | name :: names' =>
-    data <?- read cwd (dirpn ++ [name]);
-    rest <?- read_files cwd dirpn names';
-    Ret (Some (data :: rest))
+  | fn :: files' =>
+    msg <?- read cwd (dir ++ [fn]);
+    others <?- read_files cwd dir files';
+    Ret (Some (msg :: others))
   end.
 
-Definition pickup (cwd : nat) (user : string) :=
-  names <?- readdir cwd (maildir ++ [user]);
-  read_files cwd (maildir ++ [user]) names.
+Definition read (cwd : nat) (user : string) : proc _ _ :=
+  filenames <?- readdir cwd ([maildir; user]);
+  read_files cwd ([maildir; user]) filenames.
 
-
-(*
-Inductive mailfs_step_allowed : forall T, linkOpT T -> nat -> Prop :=
-| MailStepCreateTmp : forall dir name tid,
-  dir = tmpdir ->
+Inductive mailfs_step_allowed : forall T, linkOpT T -> nat -> LinkAPI.State -> Prop :=
+| MailAllowLinkAllocFile : forall dirnum name tid fs_state,
   starts_with_tid tid name ->
-  mailfs_step_allowed (Create dir name) tid.
-*)
+  path_eval_root fs_state [tmpdir] (DirNode dirnum) ->
+  mailfs_step_allowed (LinkAllocFile dirnum name) tid fs_state
 
-(*
+| MailAllowLinkLookupRoot : forall dirnum name tid fs_state,
+  dirnum = FSRoot fs_state ->
+  mailfs_step_allowed (LinkLookup dirnum name) tid fs_state
 
-Inductive mailfs_step_allowed : forall T, fsOpT T -> nat -> Prop :=
-| MailStepCreateTmp : forall dir name tid,
-  dir = tmpdir ->
+| MailAllowLinkLookupTmp : forall dirnum name tid fs_state,
   starts_with_tid tid name ->
-  mailfs_step_allowed (Create dir name) tid.
+  path_eval_root fs_state [tmpdir] (DirNode dirnum) ->
+  mailfs_step_allowed (LinkLookup dirnum name) tid fs_state
 
-(*
-| MailStepFindAvailableNameTmp : forall tid,
-  mailfs_step_allowed (FindAvailableName tmpdir) tid
+| MailAllowLinkLookupMail : forall dirnum name tid fs_state,
+  path_eval_root fs_state [maildir] (DirNode dirnum) ->
+  mailfs_step_allowed (LinkLookup dirnum name) tid fs_state
 
-| MailStepFindAvailableNameUser : forall user dir tid,
-  dir = (maildir ++ [user])%list ->
-  mailfs_step_allowed (FindAvailableName dir) tid
+| MailAllowLinkLookupUser : forall dirnum name tid fs_state user,
+  path_eval_root fs_state [maildir; user] (DirNode dirnum) ->
+  mailfs_step_allowed (LinkLookup dirnum name) tid fs_state
 
-| MailStepWriteTmp : forall pn dir name tid data,
-  dir = tmpdir ->
+| MailAllowFileWrite : forall name tid fs_state f data,
   starts_with_tid tid name ->
-  pn = (dir ++ [name])%list ->
-  mailfs_step_allowed (Write pn data) tid
+  path_eval_root fs_state [tmpdir; name] (FileNode f) ->
+  mailfs_step_allowed (FileWrite f data) tid fs_state
 
-| MailStepRenameTmpToMailbox : forall src srcname dstdir user dstname tid,
-  src = (tmpdir ++ [srcname])%list ->
-  starts_with_tid tid srcname ->
-  dstdir = (maildir ++ [user])%list ->
-  starts_with_tid tid dstname ->
-  mailfs_step_allowed (Rename src dstdir dstname) tid
-.
-*)
+| MailAllowFileRead : forall user name tid fs_state f,
+  path_eval_root fs_state [maildir; user; name] (FileNode f) ->
+  mailfs_step_allowed (FileRead f) tid fs_state
+
+| MailAllowRenameAdd : forall dirnum name node tid fs_state user,
+  starts_with_tid tid name ->
+  path_eval_root fs_state [maildir; user] (DirNode dirnum) ->
+  mailfs_step_allowed (LinkAdd dirnum name node) tid fs_state
+
+| MailAllowRenameDel : forall dirnum name node tid fs_state,
+  starts_with_tid tid name ->
+  path_eval_root fs_state [tmpdir] (DirNode dirnum) ->
+  mailfs_step_allowed (LinkDel dirnum name node) tid fs_state
+
+| MailAllowReaddir : forall dirnum tid fs_state user,
+  path_eval_root fs_state [maildir; user] (DirNode dirnum) ->
+  mailfs_step_allowed (LinkList dirnum) tid fs_state
+
+| MailAllowFindUser : forall dirnum tid fs_state user pfx,
+  starts_with_tid tid pfx ->
+  path_eval_root fs_state [maildir; user] (DirNode dirnum) ->
+  mailfs_step_allowed (LinkFindUnusedName dirnum pfx) tid fs_state
+
+| MailAllowFindTmp : forall dirnum tid fs_state pfx,
+  starts_with_tid tid pfx ->
+  path_eval_root fs_state [tmpdir] (DirNode dirnum) ->
+  mailfs_step_allowed (LinkFindUnusedName dirnum pfx) tid fs_state.
+
 
 Definition invariant (fs : FS) :=
-  unique_pathname_root fs tmpdir.
-
-Definition mailfs_step T (op : fsOpT T) tid s r s' :=
-  fs_step_equiv op tid s r s' /\
-  mailfs_step_allowed op tid /\
-  invariant s /\
-  invariant s'.
+  unique_pathname_root fs [tmpdir] /\
+  unique_pathname_root fs [maildir] /\
+  forall user,
+    maybe_unique_pathname_root fs [maildir; user].
 
 
-Inductive mailT : Type -> Type :=
-| Deliver (user : string) (m : message) : mailT unit.
+Module MailLinkAPI <: Layer.
+
+  Definition opT := linkOpT.
+  Definition State := FS.
+
+  Definition step T (op : linkOpT T) tid s r s' :=
+    LinkAPI.step op tid s r s' /\
+    mailfs_step_allowed op tid s /\
+    invariant s /\
+    invariant s'.
+
+  Definition initP (fs : State) := invariant fs.
+
+End MailLinkAPI.
 
 
-Ltac step_inv :=
-  match goal with
-  | H : fs_step _ _ _ _ _ |- _ =>
-    inversion H; clear H; subst; repeat sigT_eq
-  | H : fs_step_equiv _ _ _ _ _ |- _ =>
-    inversion H; clear H; subst; repeat sigT_eq
-  | H : mailfs_step _ _ _ _ _ |- _ =>
-    inversion H; clear H; subst; repeat sigT_eq
-  | H : mailfs_step_allowed _ _ |- _ =>
-    inversion H; clear H; subst; repeat sigT_eq
-  end.
 
 Hint Constructors mailfs_step_allowed.
 

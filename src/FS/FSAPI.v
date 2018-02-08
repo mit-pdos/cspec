@@ -22,6 +22,7 @@ Inductive linkOpT : Type -> Type :=
 | LinkLookup (dir : nat) (name : string) : linkOpT (option Node)
 | LinkList (dir : nat) : linkOpT (option (list string))
 | LinkGetRoot : linkOpT nat
+| LinkFindUnusedName (dir : nat) (prefix : string) : linkOpT string
 | FileRead (f : nat) : linkOpT string
 | FileWrite (f : nat) (data : string) : linkOpT unit
 | GetTID : linkOpT nat.
@@ -31,6 +32,7 @@ Inductive stat_result :=
 | StatFile
 | StatDir.
 
+(*
 Inductive fsOpT : Type -> Type :=
 | Create (cwd : nat) (dir : Pathname) (name : string) : fsOpT nat
 | Mkdir (cwd : nat) (dir : Pathname) (name : string) : fsOpT nat
@@ -42,6 +44,7 @@ Inductive fsOpT : Type -> Type :=
 | Write (cwd : nat) (pn : Pathname) (data : string) : fsOpT unit
 | FindAvailableName (cwd : nat) (dir : Pathname) : fsOpT string
 | Debug (s : string) : fsOpT unit.
+*)
 
 
 Module LinkAPI <: Layer.
@@ -94,6 +97,13 @@ Module LinkAPI <: Layer.
     xstep LinkGetRoot tid
       fs
       (FSRoot fs)
+      fs
+  | StepFindUnusedName : forall tid fs dir pfx name,
+    prefix pfx name = true ->
+    (~ exists target, valid_link fs dir name target) ->
+    xstep (LinkFindUnusedName dir pfx) tid
+      fs
+      name
       fs
   | StepRead : forall f data tid fs,
     nth_error (FSFiles fs) f = Some data ->
@@ -218,6 +228,11 @@ Definition rename (cwd : nat) (srcdir : Pathname) (srcname : string)
     end
   | _ => Ret None
   end.
+
+Definition find_available_name (cwd : nat) (pn : Pathname) (pfx : string) :=
+  dirnum <?- namei_cwd_dir cwd pn;
+  name <- Op (LinkFindUnusedName dirnum pfx);
+  Ret (Some name).
 
 Definition read (cwd : nat) (pn : Pathname) :=
   f <?- namei_cwd_file cwd pn;
