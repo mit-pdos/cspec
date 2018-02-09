@@ -126,8 +126,8 @@ Inductive path_evaluates : forall (fs : FS) (start : Node) (pn : Pathname) (targ
 Definition path_eval_root (fs : FS) (pn : Pathname) (target : Node) : Prop :=
   path_evaluates fs (DirNode (FSRoot fs)) pn target.
 
-Hint Constructors valid_link.
-Hint Constructors path_evaluates.
+Hint Constructors valid_link : model.
+Hint Constructors path_evaluates : model.
 
 Lemma path_evaluates_cons': forall fs startdir name pn node,
     path_evaluates fs startdir (name::pn) node ->
@@ -136,7 +136,7 @@ Lemma path_evaluates_cons': forall fs startdir name pn node,
       path_evaluates fs node' pn node.
 Proof.
   intros.
-  inversion H; subst; eexists; eauto.
+  inversion H; subst; eexists; eauto with model.
 Qed.
 
 Lemma path_evaluates_cons: forall fs startdir name pn node node',
@@ -179,6 +179,9 @@ Definition del_link dir node name (fs : FS) :=
 
 Definition create_file dir h name (fs : FS) :=
   add_link dir (FileNode h) name (upd_file h "" fs).
+
+Definition create_file_write dir h name data (fs : FS) :=
+  add_link dir (FileNode h) name (upd_file h data fs).
 
 Definition valid_dir dir (fs : FS) :=
   exists pn, path_eval_root fs pn (DirNode dir).
@@ -274,6 +277,24 @@ Proof.
   reflexivity.
 Qed.
 
+(* Proper pathname: no symlinks, no dots, no dot-dots *)
+Inductive proper_pathname : forall (fs : FS) (startdir : nat) (pn : Pathname), Prop :=
+| ProperPathNil : forall fs startdir,
+  proper_pathname fs startdir []
+| ProperPathCons : forall fs startdir name namedir pn,
+  proper_name name ->
+  valid_link fs startdir name (DirNode namedir) ->
+  proper_pathname fs namedir pn ->
+  proper_pathname fs startdir (name :: pn)
+| ProperPathConsMissing : forall fs startdir name pn,
+  proper_name name ->
+  (~ exists target, valid_link fs startdir name target) ->
+  proper_pathname fs startdir (name :: pn).
+
+Definition proper_pathname_root fs pn :=
+  proper_pathname fs (FSRoot fs) pn.
+
+
 (* A stronger version of unique_pathname, requiring all intermediate nodes match *)
 Inductive stable_pathname : forall (fs: FS) (startdir: Node) (pn: Pathname), Prop :=
 | StablePathNil: forall fs startdir, stable_pathname fs (DirNode startdir) []
@@ -357,7 +378,7 @@ Proof.
 Qed.
 
 Hint Resolve FSet.add_incr.
-Hint Constructors valid_link.
+
 
 Lemma path_evaluates_add_link : forall fs startdir dirnum name dirpn n node,
   path_evaluates fs startdir dirpn node ->
@@ -369,12 +390,12 @@ Proof.
   induction H.
   + constructor.
   + eapply PathEvalFileLink; eauto.
-    edestruct H; eauto.
+    edestruct H; eauto with model.
     - constructor; simpl; auto.
     - eapply ValidDotDot.
       eapply FSet.add_incr; eauto.
   + eapply PathEvalDirLink; eauto.
-    edestruct H; eauto.
+    edestruct H; eauto with model.
     - constructor; simpl; eauto.
     - eapply ValidDotDot.
       apply FSet.add_incr; eauto.
@@ -420,8 +441,8 @@ Lemma valid_link_add_file_link': forall fs startdir name name0 dirnum node node'
     valid_link fs startdir name0 node'.
 Proof.
   intros.
-  inversion H2; subst; clear H2; eauto.
-  - apply FSet.add_in' in H3; intuition eauto.
+  inversion H2; subst; clear H2; eauto with model.
+  - apply FSet.add_in' in H3; intuition eauto with model.
     inversion H2; subst; clear H2.
     exfalso; eapply valid_link_does_not_exist; eauto.
   - eapply ValidDotDot.
@@ -502,13 +523,13 @@ Lemma path_evaluates_upd_file : forall fs startdir dirnum h data dirpn,
 Proof.
   intros.
   unfold upd_file; simpl.
-  induction H; eauto.
+  induction H; eauto with model.
   + eapply PathEvalFileLink.
-    edestruct H; eauto.
+    edestruct H; eauto with model.
   + eapply PathEvalDirLink; eauto.
-    destruct H; eauto.
+    destruct H; eauto with model.
   + eapply PathEvalSymlink; simpl; eauto.
-    destruct H; eauto.
+    destruct H; eauto with model.
 Qed.
 
 Lemma path_eval_root_upd_file : forall fs dirnum h data dirpn,

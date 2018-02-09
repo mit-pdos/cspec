@@ -10,8 +10,8 @@ Require Import FSAPI.
 Definition message := string.
 
 Inductive mailOpT : Type -> Type :=
-| Deliver (user : string) (m : message) : mailOpT unit
-| Read (user : string) : mailOpT (list message).
+| Deliver (user : string) (m : message) : mailOpT (option unit)
+| Read (user : string) : mailOpT (option (list message)).
 
 Definition mailState := forall (user : string), FSet.t message.
 
@@ -30,13 +30,18 @@ Module MailServerAPI <: Layer.
     state user = msgs ->
     xstep (Deliver user msg) tid
       state
-      tt
+      (Some tt)
       (upd state user (FSet.add msg msgs))
   | StepRead : forall user msgs state tid,
     state user = msgs ->
     xstep (Read user) tid
       state
-      (FSet.elements msgs)
+      (Some (FSet.elements msgs))
+      state
+  | StepFail : forall T (op : opT (option T)) state tid,
+    xstep op tid
+      state
+      None
       state.
 
   Definition step := xstep.
