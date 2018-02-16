@@ -30,6 +30,8 @@ Section ProcStructure.
   | NoAtomicsLog : forall `(v : T),
     no_atomics (Log v).
 
+  Hint Constructors no_atomics.
+
   Definition no_atomics_opt x :=
     match x with
     | NoProc => True
@@ -39,6 +41,20 @@ Section ProcStructure.
   Definition no_atomics_ts (ts : threads_state) :=
     Forall no_atomics_opt ts.
 
+
+  Theorem no_atomics_ts_equiv : forall ts,
+    no_atomics_ts ts <->
+    (forall tid, no_atomics_opt ts [[ tid ]]).
+  Proof.
+    unfold no_atomics_ts, thread_get; split; intros.
+    - destruct (nth_error ts tid) eqn:He; simpl; eauto.
+      eapply Forall_forall in H; eauto.
+      eapply nth_error_In; eauto.
+    - eapply Forall_forall; intros.
+      eapply In_nth_error in H0; deex.
+      specialize (H n).
+      rewrite H0 in *; eauto.
+  Qed.
 
   Theorem no_atomics_ts_cons : forall p ts,
     no_atomics_ts (p :: ts) ->
@@ -60,10 +76,52 @@ Section ProcStructure.
     subst; eauto.
   Qed.
 
+  Theorem no_atomics_thread_upd_NoProc : forall ts tid,
+    no_atomics_ts ts ->
+    no_atomics_ts ts [[ tid := NoProc ]].
+  Proof.
+    intros.
+    eapply no_atomics_ts_equiv; intros.
+    destruct (tid0 == tid); subst; autorewrite with t.
+    simpl; eauto.
+    eapply no_atomics_ts_equiv in H; eauto.
+  Qed.
+
+  Theorem no_atomics_thread_upd_Proc : forall ts tid `(p : proc _ T),
+    no_atomics_ts ts ->
+    no_atomics p ->
+    no_atomics_ts ts [[ tid := Proc p ]].
+  Proof.
+    intros.
+    eapply no_atomics_ts_equiv; intros.
+    destruct (tid0 == tid); subst; autorewrite with t.
+    simpl; eauto.
+    eapply no_atomics_ts_equiv in H; eauto.
+  Qed.
+
+  Theorem no_atomics_exec_tid : forall `(step : OpSemantics opT State) tid s `(p : proc _ T) s' p' evs,
+    no_atomics p ->
+    exec_tid step tid s p s' (inr p') evs ->
+    no_atomics p'.
+  Proof.
+    intros.
+    remember (inr p').
+    induction H0; try congruence;
+      inversion Heqs0; clear Heqs0; subst.
+    - inversion H; clear H; subst; repeat sigT_eq.
+      destruct result; eauto.
+    - inversion H; clear H; subst; repeat sigT_eq.
+      constructor; eauto; intros.
+      destruct (Bool.bool_dec (c x) true); eauto.
+  Qed.
+
 End ProcStructure.
 
 Hint Constructors no_atomics.
 Hint Resolve no_atomics_thread_get.
+Hint Resolve no_atomics_thread_upd_NoProc.
+Hint Resolve no_atomics_thread_upd_Proc.
+Hint Resolve no_atomics_exec_tid.
 
 
 Section Compiler.

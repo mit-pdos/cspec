@@ -799,7 +799,7 @@ Module LockProtocol <: LayerImplRequiresRule RawLockAPI LockAPI LockingRule.
     edestruct IHexec.
       eapply follows_protocol_s_exec_tid_upd; eauto.
       intros; eapply allowed_stable; eauto.
-      admit.
+      destruct result; eauto.
 
     eexists; intuition idtac.
     eapply ExecPrefixOne.
@@ -807,7 +807,7 @@ Module LockProtocol <: LayerImplRequiresRule RawLockAPI LockAPI LockingRule.
       eapply follows_protocol_preserves_exec_tid; eauto.
       eauto.
     eauto.
-  Admitted.
+  Qed.
 
   Theorem absInitP :
     forall s1 s2,
