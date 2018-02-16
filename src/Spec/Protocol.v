@@ -11,9 +11,18 @@ Section Protocol.
 
   Variable opT : Type -> Type.
   Variable State : Type.
-  Variable lo_step : OpSemantics opT State. (* Unrestricted version *)
-  Variable hi_step : OpSemantics opT State. (* Protocol-restricted version *)
-  Variable loopInv : forall (s : State) (tid : nat), Prop.
+
+  Definition OpProtocol := forall T, opT T -> nat -> State -> Prop.
+
+  Variable lo_step : OpSemantics opT State.
+  Variable op_allow : OpProtocol.
+
+  Definition restricted_step : OpSemantics opT State :=
+    fun T op tid s r s' =>
+      ( op_allow op tid s /\
+        lo_step op tid s r s' ) \/
+      ( ~ op_allow op tid s /\
+        s' = s ).
 
   Inductive exec_any (tid : nat) (s : State) :
     forall T (p : proc opT T) (r : T) (s' : State), Prop :=
@@ -21,27 +30,56 @@ Section Protocol.
     forall T (p : proc opT T) (r : T) (s' : State)
            T' (op' : opT T') tid' s0 r0,
     tid <> tid' ->
-    hi_step op' tid' s r0 s0 ->
+    restricted_step op' tid' s r0 s0 ->
     exec_any tid s0 p r s' ->
     exec_any tid s p r s'
   | ExecAnyThisDone :
     forall T (p : proc opT T) (r : T) (s' : State) evs,
-    exec_tid hi_step tid s p s' (inl r) evs ->
+    exec_tid restricted_step tid s p s' (inl r) evs ->
     exec_any tid s p r s'
   | ExecAnyThisMore :
     forall T (p p' : proc opT T) (s' s0 : State) r evs,
-    exec_tid hi_step tid s p s0 (inr p') evs ->
+    exec_tid restricted_step tid s p s0 (inr p') evs ->
     exec_any tid s0 p' r s' ->
     exec_any tid s p r s'
   .
+
+  Definition exec_others (tid : nat) (s s' : State) : Prop :=
+    clos_refl_trans_1n _
+      (fun s0 s1 =>
+        exists tid' `(op' : opT T') r',
+          tid' <> tid /\
+          restricted_step op' tid' s0 r' s1)
+      s s'.
+
+  Lemma exec_any_op : forall `(op : opT T) tid r s s',
+    exec_any tid s (Op op) r s' ->
+      exists s0,
+        exec_others tid s s0 /\
+        restricted_step op tid s0 r s'.
+  Proof.
+    intros.
+    remember (Op op).
+    induction H; subst.
+    - edestruct IHexec_any; eauto; intuition idtac.
+      eexists; split; eauto.
+      econstructor; eauto.
+      do 4 eexists; split.
+      eauto.
+      unfold restricted_step in *; intuition eauto.
+    - exists s; split.
+      eapply rt1n_refl.
+      exec_tid_inv; eauto.
+    - exec_tid_inv.
+  Qed.
+
+  Variable loopInv : forall (s : State) (tid : nat), Prop.
 
   Inductive follows_protocol_proc (tid : nat) (s : State) :
     forall T (p : proc opT T), Prop :=
   | FollowsProtocolProcOp :
     forall T (op : opT T),
-    (forall s' r,
-      lo_step op tid s r s' ->
-      hi_step op tid s r s') ->
+    op_allow op tid s ->
     follows_protocol_proc tid s (Op op)
   | FollowsProtocolProcBind :
     forall T1 T2 (p1 : proc _ T1) (p2 : T1 -> proc _ T2),
@@ -76,30 +114,25 @@ Section Protocol.
       follows_protocol_proc tid s p.
 
 
-  Definition allowed_op `(op : opT T) (tid : nat) (s : State) :=
-    forall r s',
-      lo_step op tid s r s' ->
-      hi_step op tid s r s'.
-
   Variable allowed_stable :
     forall `(op : opT T) `(op' : opT T') tid tid' s s' r,
       tid <> tid' ->
-      allowed_op op tid s ->
-      hi_step op' tid' s r s' ->
-      allowed_op op tid s'.
+      op_allow op tid s ->
+      restricted_step op' tid' s r s' ->
+      op_allow op tid s'.
 
   Variable loopInv_stable :
     forall `(op' : opT T') tid tid' s s' r,
       tid <> tid' ->
       loopInv s tid ->
-      hi_step op' tid' s r s' ->
+      restricted_step op' tid' s r s' ->
       loopInv s' tid.
 
   Theorem follows_protocol_preserves_exec_tid :
     forall tid `(p : proc _ T) s s' result evs,
       follows_protocol_proc tid s p ->
       exec_tid lo_step tid s p s' result evs ->
-      exec_tid hi_step tid s p s' result evs.
+      exec_tid restricted_step tid s p s' result evs.
   Proof.
     intros.
     induction H0; simpl in *; intros; eauto;
@@ -107,6 +140,7 @@ Section Protocol.
       | H : follows_protocol_proc _ _ _ |- _ =>
         inversion H; clear H; repeat sigT_eq; subst
       end; eauto.
+    unfold restricted_step; eauto.
   Qed.
 
   Hint Resolve follows_protocol_preserves_exec_tid.
@@ -150,15 +184,11 @@ Section Protocol.
     forall `(p : proc opT T) `(op' : opT T') tid tid' s s' r,
       tid <> tid' ->
       follows_protocol_proc tid s p ->
-      hi_step op' tid' s r s' ->
+      restricted_step op' tid' s r s' ->
       follows_protocol_proc tid s' p.
   Proof.
     intros.
     induction H0; eauto.
-
-    constructor; intros.
-    eapply allowed_stable; eauto.
-    unfold allowed_op; eauto.
   Qed.
 
   Hint Resolve follows_protocol_stable.
@@ -167,7 +197,7 @@ Section Protocol.
     forall `(p : proc opT T) `(p' : proc opT T') tid tid' s s' r evs,
       tid <> tid' ->
       follows_protocol_proc tid s p ->
-      exec_tid hi_step tid' s p' s' r evs ->
+      exec_tid restricted_step tid' s p' s' r evs ->
       no_atomics p' ->
       follows_protocol_proc tid s' p.
   Proof.

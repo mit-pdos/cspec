@@ -130,33 +130,18 @@ Module LockAPI <: Layer.
   Definition opT := LockOpT.
   Definition State := LockState.
 
-  (**
-   * These semantics have a built-in protocol for how threads
-   * must interact with the state.  Namely, a thread cannot acquire
-   * a lock that is already held; a thread cannot release another
-   * thread's lock; a thread cannot read or write unless it is holding
-   * the lock.
-   *
-   * Separately we can prove that a particular implementation
-   * (e.g., ours) follows this protocol on top of a lower-level
-   * semantics that does not enforce these rules.  See ExampleProtocol.v.
-   *
-   * So, in our framework, a concurrency protocol (e.g., rely-guarantee)
-   * seems to be an extra level of refinement with semantics that codify
-   * protocol violations as undefined behavior?
-   *)
-
-  Inductive xstep : forall T, opT T -> nat -> State -> T -> State -> Prop :=
-  | StepAcquire : forall tid v r,
-    xstep Acquire tid (mkState v None) r (mkState v (Some tid))
+  Inductive step_allow : forall T, opT T -> nat -> State -> Prop :=
+  | StepAcquire : forall tid s,
+    step_allow Acquire tid s
   | StepRelease : forall tid v,
-    xstep Release tid (mkState v (Some tid)) tt (mkState v None)
+    step_allow Release tid (mkState v (Some tid))
   | StepRead : forall tid v,
-    xstep Read tid (mkState v (Some tid)) v (mkState v (Some tid))
+    step_allow Read tid (mkState v (Some tid))
   | StepWrite : forall tid v0 v,
-    xstep (Write v) tid (mkState v0 (Some tid)) tt (mkState v (Some tid)).
+    step_allow (Write v) tid (mkState v0 (Some tid)).
 
-  Definition step := xstep.
+  Definition step :=
+    restricted_step RawLockAPI.step step_allow.
 
   Definition initP s :=
     Lock s = None.
@@ -210,7 +195,7 @@ Module LockingRule <: ProcRule LockAPI.
 
   Definition follows_protocol (ts : @threads_state LockAPI.opT) :=
     forall s,
-      follows_protocol_s RawLockAPI.step LockAPI.step loopInv ts s.
+      follows_protocol_s RawLockAPI.step LockAPI.step_allow loopInv ts s.
 
 End LockingRule.
 
@@ -244,43 +229,63 @@ Module LockingCounter <: LayerImplFollowsRule LockAPI LockedCounterAPI LockingRu
     match goal with
     | H : LockAPI.step _ _ _ _ _ |- _ =>
       inversion H; clear H; subst; repeat sigT_eq
+    | H : LockAPI.step_allow _ _ _ |- _ =>
+      inversion H; clear H; subst; repeat sigT_eq
+    | H : LockAPI.step_allow _ _ _ -> False |- _ =>
+      solve [ exfalso; eauto ]
+    | H : RawLockAPI.step _ _ _ _ _ |- _ =>
+      inversion H; clear H; subst; repeat sigT_eq
     | H : LockedCounterAPI.step _ _ _ _ _ |- _ =>
       inversion H; clear H; subst; repeat sigT_eq
-    end.
+    end; intuition idtac.
 
-  Hint Extern 1 (LockAPI.step _ _ _ _ _) => econstructor.
+  Hint Extern 1 (RawLockAPI.step _ _ _ _ _) => econstructor.
+  Hint Extern 1 (LockAPI.step _ _ _ _ _) => left.
+  Hint Extern 1 (LockAPI.step _ _ _ _ _) => right.
+  Hint Extern 1 (LockAPI.step_allow _ _ _) => econstructor.
   Hint Extern 1 (LockedCounterAPI.step _ _ _ _ _) => econstructor.
+  Hint Extern 1 (~ LockAPI.step_allow _ _ _) => intro H'; inversion H'.
+  Hint Extern 1 (LockAPI.step_allow _ _ _ -> False) => intro H'; inversion H'.
 
   Lemma acquire_right_mover :
     right_mover LockAPI.step Acquire.
   Proof.
     unfold right_mover; intros.
-    repeat step_inv; try congruence; eauto.
+    repeat step_inv; try congruence; eauto;
+      try solve [ exfalso; eauto ].
+
+    destruct op1; repeat step_inv; eauto 10;
+      try solve [ exfalso; eauto ].
   Qed.
 
   Lemma release_left_mover :
     left_mover LockAPI.step Release.
   Proof.
     split.
-    - unfold always_enabled; intros.
+    - eapply always_enabled_to_stable.
+      unfold always_enabled, enabled_in; intros.
       destruct s. destruct Lock0. destruct (n == tid); subst.
-      all: eauto.
+      all: eauto 10.
     - unfold left_mover; intros.
-      repeat step_inv; try congruence; eauto.
+      repeat step_inv; try congruence; subst; eauto 10.
+      destruct op0; eauto 10.
+  Unshelve.
+    all: exact tt.
   Qed.
 
   Lemma read_right_mover :
     right_mover LockAPI.step Read.
   Proof.
     unfold right_mover; intros.
-    repeat step_inv; try congruence; eauto.
+    repeat step_inv; try congruence; subst; eauto 10.
   Qed.
 
   Lemma write_right_mover : forall v,
     right_mover LockAPI.step (Write v).
   Proof.
     unfold right_mover; intros.
-    repeat step_inv; try congruence; eauto.
+    repeat step_inv; try congruence; subst; eauto 10.
+    destruct op1; eauto 10.
   Qed.
 
   Hint Resolve acquire_right_mover.
@@ -318,14 +323,12 @@ Module LockingCounter <: LayerImplFollowsRule LockAPI LockedCounterAPI LockingRu
     destruct op.
 
     + repeat atomic_exec_inv.
-      repeat step_inv.
-      simpl; intuition eauto 20; compute; eauto.
-      simpl; intuition eauto 20; compute; eauto.
+      simpl; intuition eauto.
+      repeat step_inv; eauto.
 
     + repeat atomic_exec_inv.
-      repeat step_inv.
-      simpl; intuition eauto 20; compute; eauto.
-      simpl; intuition eauto 20; compute; eauto.
+      simpl; intuition eauto.
+      repeat step_inv; eauto.
   Qed.
 
   Theorem my_atomize_correct :
@@ -382,54 +385,86 @@ Module LockingCounter <: LayerImplFollowsRule LockAPI LockedCounterAPI LockingRu
 
   Hint Constructors follows_protocol_proc.
 
-  Lemma exec_any_op : forall `(op : LockAPI.opT T) tid r s s',
-    exec_any LockAPI.step tid s (Op op) r s' ->
-    exists s0,
-      LockAPI.step op tid s0 r s'.
+  Theorem exec_others_preserves_lock :
+    forall tid s s',
+      exec_others RawLockAPI.step LockAPI.step_allow tid s s' ->
+      Lock s = Some tid ->
+      Lock s' = Some tid.
   Proof.
-    intros.
-    remember (Op op).
-    induction H; subst; try exec_tid_inv; eauto.
+    induction 1; intros; eauto.
+    repeat deex.
+    clear H0.
+    assert (Lock x = Lock y).
+    {
+      clear IHclos_refl_trans_1n.
+      unfold restricted_step in *; intuition idtac;
+        repeat step_inv; simpl in *; congruence.
+    }
+    rewrite IHclos_refl_trans_1n; congruence.
   Qed.
 
-  Ltac proto_step_inv :=
+  Ltac exec_propagate :=
     match goal with
-    | H : RawLockAPI.step _ _ _ _ _ |- _ =>
-      inversion H; clear H; subst; repeat sigT_eq
-    | H : LockAPI.step _ _ _ _ _ |- _ =>
-      inversion H; clear H; subst; repeat sigT_eq
-    | H : exec_any LockAPI.step _ _ (Op _) _ _ |- _ =>
+    | s : RawLockAPI.State |- _ =>
+      destruct s
+    | H : exec_any RawLockAPI.step LockAPI.step_allow _ _ (Op _) _ _ |- _ =>
       eapply exec_any_op in H; repeat deex
+    | H : exec_others _ _ _ _ _ |- _ =>
+      eapply exec_others_preserves_lock in H; simpl in *; subst; [ | congruence ]
     end.
 
   Lemma inc_follows_protocol : forall tid s,
-    follows_protocol_proc RawLockAPI.step LockAPI.step LockingRule.loopInv tid s inc_core.
+    follows_protocol_proc RawLockAPI.step LockAPI.step_allow LockingRule.loopInv tid s inc_core.
   Proof.
     intros.
-    constructor; intros; repeat proto_step_inv.
-      constructor; intros; proto_step_inv; simpl in *; subst; eauto.
-    constructor; intros; repeat proto_step_inv.
-      constructor; intros; proto_step_inv; simpl in *; subst; eauto.
-    constructor; intros; repeat proto_step_inv.
-      constructor; intros; proto_step_inv; simpl in *; subst; eauto.
-    constructor; intros; repeat proto_step_inv.
-      constructor; intros; proto_step_inv; simpl in *; subst; eauto.
-    constructor; intros; repeat proto_step_inv.
+    constructor; intros.
+      constructor; intros. eauto.
+
+    repeat exec_propagate.
+      unfold restricted_step in *; intuition idtac; repeat step_inv.
+    constructor; intros.
+      constructor; intros. eauto.
+
+    repeat exec_propagate.
+      unfold restricted_step in *; intuition idtac; repeat step_inv.
+    constructor; intros.
+      constructor; intros. eauto.
+
+    repeat exec_propagate.
+      unfold restricted_step in *; intuition idtac; repeat step_inv.
+    constructor; intros.
+      constructor; intros. eauto.
+
+    repeat exec_propagate.
+      unfold restricted_step in *; intuition idtac; repeat step_inv.
+    constructor; intros.
   Qed.
 
   Lemma dec_follows_protocol : forall tid s,
-    follows_protocol_proc RawLockAPI.step LockAPI.step LockingRule.loopInv tid s dec_core.
+    follows_protocol_proc RawLockAPI.step LockAPI.step_allow LockingRule.loopInv tid s dec_core.
   Proof.
     intros.
-    constructor; intros; repeat proto_step_inv.
-      constructor; intros; proto_step_inv; simpl in *; subst; eauto.
-    constructor; intros; repeat proto_step_inv.
-      constructor; intros; proto_step_inv; simpl in *; subst; eauto.
-    constructor; intros; repeat proto_step_inv.
-      constructor; intros; proto_step_inv; simpl in *; subst; eauto.
-    constructor; intros; repeat proto_step_inv.
-      constructor; intros; proto_step_inv; simpl in *; subst; eauto.
-    constructor; intros; repeat proto_step_inv.
+    constructor; intros.
+      constructor; intros. eauto.
+
+    repeat exec_propagate.
+      unfold restricted_step in *; intuition idtac; repeat step_inv.
+    constructor; intros.
+      constructor; intros. eauto.
+
+    repeat exec_propagate.
+      unfold restricted_step in *; intuition idtac; repeat step_inv.
+    constructor; intros.
+      constructor; intros. eauto.
+
+    repeat exec_propagate.
+      unfold restricted_step in *; intuition idtac; repeat step_inv.
+    constructor; intros.
+      constructor; intros. eauto.
+
+    repeat exec_propagate.
+      unfold restricted_step in *; intuition idtac; repeat step_inv.
+    constructor; intros.
   Qed.
 
   Hint Resolve inc_follows_protocol.
@@ -706,69 +741,22 @@ Module LockProtocol <: LayerImplRequiresRule RawLockAPI LockAPI LockingRule.
     match goal with
     | H : RawLockAPI.step _ _ _ _ _ |- _ =>
       inversion H; clear H; subst; repeat sigT_eq
-    | H : LockAPI.step _ _ _ _ _ |- _ =>
+    | H : LockAPI.step_allow _ _ _ |- _ =>
       inversion H; clear H; subst; repeat sigT_eq
+    | H : LockAPI.step _ _ _ _ _ |- _ =>
+      destruct H; intuition idtac
     end.
-
-  Lemma allowed_op_release : forall tid s,
-    allowed_op RawLockAPI.step LockAPI.step Release tid s ->
-    Lock s = Some tid.
-  Proof.
-    unfold allowed_op; intros.
-
-    assert (exists r s', RawLockAPI.step Release tid s r s').
-      destruct s; do 2 eexists; econstructor.
-    repeat deex.
-    specialize (H _ _ H0).
-    repeat step_inv.
-    eauto.
-  Qed.
-
-  Lemma allowed_op_read : forall tid s,
-    allowed_op RawLockAPI.step LockAPI.step Read tid s ->
-    Lock s = Some tid.
-  Proof.
-    unfold allowed_op; intros.
-
-    assert (exists r s', RawLockAPI.step Read tid s r s').
-      destruct s; do 2 eexists; econstructor.
-    repeat deex.
-    specialize (H _ _ H0).
-    repeat step_inv.
-    eauto.
-  Qed.
-
-  Lemma allowed_op_write : forall tid s v,
-    allowed_op RawLockAPI.step LockAPI.step (Write v) tid s ->
-    Lock s = Some tid.
-  Proof.
-    unfold allowed_op; intros.
-
-    assert (exists r s', RawLockAPI.step (Write v) tid s r s').
-      destruct s; do 2 eexists; econstructor.
-    repeat deex.
-    specialize (H _ _ H0).
-    repeat step_inv.
-    eauto.
-  Qed.
 
   Theorem allowed_stable :
     forall `(op : LockAPI.opT T) `(op' : LockAPI.opT T') tid tid' s s' r,
       tid <> tid' ->
-      allowed_op RawLockAPI.step LockAPI.step op tid s ->
+      LockAPI.step_allow op tid s ->
       LockAPI.step op' tid' s r s' ->
-      allowed_op RawLockAPI.step LockAPI.step op tid s'.
+      LockAPI.step_allow op tid s'.
   Proof.
     intros.
-    destruct op; destruct op'.
-    all: try eapply allowed_op_release in H0.
-    all: try eapply allowed_op_read in H0.
-    all: try eapply allowed_op_write in H0.
-    all: step_inv.
-    all: simpl in *; subst.
-    all: try congruence.
-    all: eauto.
-    all: unfold allowed_op; intros; step_inv; eauto.
+    destruct op; destruct op'; repeat step_inv; subst; eauto.
+    all: congruence.
   Qed.
 
   Definition compile_ts (ts : @threads_state LockAPI.opT) := ts.
