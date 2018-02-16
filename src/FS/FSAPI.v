@@ -17,46 +17,35 @@ Notation "x <?- p1 ; p2" := (r <- p1; match r with | None => Ret None | Some x =
   (at level 60, right associativity).
 
 
-Fixpoint namei_spec (nstep : nat) (startnode : Node) (pn : Pathname) : proc _ (option Node) :=
-  match nstep with
-  | O => Ret None
-  | S nstep' =>
-    match pn with
-    | nil =>
-      Ret (Some startnode)
-    | name :: pn' =>
-      match startnode with
-      | DirNode startdir =>
-        r <- Op (LinkLookup startdir name);
-        match r with
-        | None => Ret None
-        | Some (SymlinkNode sympath) =>
-          osymnode <- namei_spec nstep' startnode sympath;
-          match osymnode with
-          | None => Ret None
-          | Some symnode =>
-            namei_spec nstep' symnode pn'
-          end
-        | Some n =>
-          namei_spec nstep' n pn'
-        end
-      | _ => Ret None
+Fixpoint namei_spec (startnode : Node) (pn : Pathname) : proc _ (option Node) :=
+  match pn with
+  | nil =>
+    Ret (Some startnode)
+  | name :: pn' =>
+    match startnode with
+    | DirNode startdir =>
+      r <- Op (LinkLookup startdir name);
+      match r with
+      | None => Ret None
+      | Some n =>
+        namei_spec n pn'
       end
+    | _ => Ret None
     end
   end.
 
 Definition namei_cwd (cwd : nat) (pn : Pathname) : proc _ (option Node) :=
-  namei_spec 5 (DirNode cwd) pn.
+  namei_spec (DirNode cwd) pn.
 
 Definition namei_cwd_dir (cwd : nat) (pn : Pathname) : proc _ (option nat) :=
-  r <?- namei_spec 5 (DirNode cwd) pn;
+  r <?- namei_spec (DirNode cwd) pn;
   match r with
   | DirNode dirnum => Ret (Some dirnum)
   | _ => Ret None
   end.
 
 Definition namei_cwd_file (cwd : nat) (pn : Pathname) : proc _ (option nat) :=
-  r <?- namei_spec 5 (DirNode cwd) pn;
+  r <?- namei_spec (DirNode cwd) pn;
   match r with
   | FileNode h => Ret (Some h)
   | _ => Ret None
@@ -82,7 +71,6 @@ Definition stat (cwd : nat) (dir : Pathname) (name : string) :=
   match n with
   | FileNode _ => Ret (Some StatFile)
   | DirNode _ => Ret (Some StatDir)
-  | _ => Ret None
   end.
 
 Definition readdir (cwd : nat) (pn : Pathname) :=

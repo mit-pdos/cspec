@@ -10,12 +10,6 @@ Require Import String.
 Open Scope string.
 Open Scope list.
 
-Axiom starts_with_tid_proper_name : forall tid name,
-  starts_with_tid tid name ->
-  proper_name name.
-
-Hint Resolve starts_with_tid_proper_name.
-
 
 (*
 Module MailProtoExperiment <: LayerImpl MailLinkAPI MailServerLinkAPI.
@@ -61,6 +55,8 @@ Ltac step_inv :=
     inversion H; clear H; subst; repeat sigT_eq
   | H : LinkAPI.step _ _ _ _ _ |- _ =>
     inversion H; clear H; subst; repeat sigT_eq
+  | H : restricted_step _ _ _ _ _ _ _ |- _ =>
+    inversion H; clear H; subst; repeat sigT_eq
   end.
 
 Hint Extern 1 (MailLinkAPI.step _ _ _ _ _) => econstructor.
@@ -69,23 +65,161 @@ Hint Extern 1 (LinkAPI.step _ _ _ _ _) => econstructor.
 Hint Constructors mailfs_step_allowed.
 
 
-(*
-Definition proc_follows_protocol T (p : proc LinkAPI.opT T) (s : State) :=
-  
-*)
+Hint Constructors follows_protocol_proc.
 
-Inductive ts_follows_protocol (s : LinkAPI.State) (ts : @threads_state LinkAPI.opT) : Prop :=
-| TSFP :
-  (forall tid T (p : proc _ T) s' result evs,
-    ts [[ tid ]] = Proc p ->
-    exec_tid LinkAPI.step tid s p s' result evs ->
-    exec_tid MailLinkAPI.step tid s p s' result evs /\
-    ts_follows_protocol s' ts [[ tid :=
-      match result with
-      | inl v => NoProc
-      | inr p' => Proc p'
-      end ]]) ->
-  ts_follows_protocol s ts.
+Theorem restricted_step_preserves_invariant :
+  forall tid `(op : LinkAPI.opT T) s r s',
+    restricted_step LinkAPI.step mailfs_step_allowed op tid s r s' ->
+    invariant s ->
+    invariant s'.
+Proof.
+  intros.
+  destruct H; intuition idtac; subst; eauto.
+  repeat step_inv; eauto.
+  - split.
+    unfold unique_dir_pn. admit.
+    unfold unique_pn_node. admit.
+  - admit.
+  - admit.
+  - split.
+    unfold unique_dir_pn. admit.
+    unfold unique_pn_node. admit.
+Admitted.
+
+Theorem restricted_step_preserves_root :
+  forall tid `(op : LinkAPI.opT T) s r s',
+    restricted_step LinkAPI.step mailfs_step_allowed op tid s r s' ->
+    FSRoot s = FSRoot s'.
+Proof.
+  intros.
+  destruct H; intuition idtac; subst; eauto.
+  repeat step_inv; eauto.
+Qed.
+
+Theorem exec_others_preserves_invariant :
+  forall tid s s',
+    exec_others LinkAPI.step mailfs_step_allowed tid s s' ->
+    invariant s ->
+    invariant s'.
+Proof.
+  induction 1; intros; eauto.
+  repeat deex.
+  clear H0.
+  eapply IHclos_refl_trans_1n; clear IHclos_refl_trans_1n.
+  clear H.
+  eapply restricted_step_preserves_invariant; eauto.
+Qed.
+
+Theorem exec_others_preserves_root :
+  forall tid s s',
+    exec_others LinkAPI.step mailfs_step_allowed tid s s' ->
+    FSRoot s = FSRoot s'.
+Proof.
+  induction 1; intros; eauto.
+  repeat deex.
+  clear H0.
+  rewrite <- IHclos_refl_trans_1n; clear IHclos_refl_trans_1n.
+  clear H.
+  eapply restricted_step_preserves_root; eauto.
+Qed.
+
+
+Ltac exec_propagate :=
+  match goal with
+(*
+  | s : RawLockAPI.State |- _ =>
+    destruct s
+*)
+  | H : exec_any _ _ _ _ (Op _) _ _ |- _ =>
+    eapply exec_any_op in H; repeat deex
+  | H : exec_others _ _ _ ?s _,
+    Hi : invariant ?s |- _ =>
+    eapply exec_others_preserves_invariant in Hi; [ | exact H ]
+  | H : exec_others _ _ _ ?s _,
+    Hi : context[FSRoot ?s] |- _ =>
+    rewrite (exec_others_preserves_root H) in Hi
+  | H : restricted_step _ _ _ _ ?s _ _,
+    Hi : invariant ?s |- _ =>
+    eapply restricted_step_preserves_invariant in Hi; [ | exact H ]
+  end.
+
+Ltac clear_allowed :=
+  match goal with
+  | H: mailfs_step_allowed _ _ _ |- _ =>
+    clear H
+  end.
+
+Definition loopInv (s : FS) (tid : nat) := True.
+
+Lemma namei_maildir_user :
+  forall s r user tid,
+    r = FSRoot s ->
+    follows_protocol_proc LinkAPI.step mailfs_step_allowed loopInv
+      tid s (namei_spec (DirNode r) [maildir; user]).
+Proof.
+  intros.
+  constructor; intros.
+
+  constructor. constructor; eauto.
+
+  repeat exec_propagate.
+  step_inv. clear_allowed. repeat step_inv.
+
+  constructor.
+
+  destruct target; try constructor; intros.
+  constructor. eapply MailAllowLinkLookupMail.
+    econstructor; eauto. constructor.
+
+  repeat exec_propagate.
+  step_inv. clear_allowed. repeat step_inv.
+
+  constructor.
+  constructor.
+Qed.
+
+Lemma read_follows_protocol : forall tid s user,
+  follows_protocol_proc LinkAPI.step mailfs_step_allowed loopInv tid s (read user).
+Proof.
+  intros.
+  constructor; intros.
+    constructor; intros. eauto.
+
+  repeat exec_propagate.
+  repeat step_inv.
+
+  constructor; intros.
+  constructor; intros.
+  constructor; intros.
+  eapply namei_maildir_user; eauto.
+
+  destruct r; try constructor.
+  destruct n; constructor.
+  destruct r; try constructor.
+
+  repeat exec_propagate.
+  econstructor.
+
+  constructor; intros.
+    constructor; intros.
+  
+    constructor; intros. eauto.
+
+  repeat exec_propagate.
+    unfold restricted_step in *; intuition idtac; repeat step_inv.
+  constructor; intros.
+    constructor; intros. eauto.
+
+  repeat exec_propagate.
+    unfold restricted_step in *; intuition idtac; repeat step_inv.
+  constructor; intros.
+    constructor; intros. eauto.
+
+  repeat exec_propagate.
+    unfold restricted_step in *; intuition idtac; repeat step_inv.
+  constructor; intros.
+Qed.
+
 
 Theorem compile_follows_protocol : forall s ts,
   ts_follows_protocol s (compile_ts compile_op ts).

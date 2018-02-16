@@ -10,20 +10,11 @@ Require Import ProofIrrelevance.
 Import ListNotations.
 Open Scope string.
 
-(** Declarative spec for a FS interface with concurrent operations, modeled
- after POCS notes.  The file system is represented as set of links.  To allow
- for concurrent operations a directory may contain a link with the same name
- twice, but for different nodes.  For example, we model a rename as a link
- followed by an unlink.  Thus, a lookup after link and before unlink may observe
- a duplicate name, but each name has a different node. Similarly, there may be
- several ".." entries pointing to different parents. *)
-
 (** Data types *)
 
 Inductive Node :=
 | DirNode : forall (dirnum : nat), Node
-| FileNode : forall (filenum : nat), Node
-| SymlinkNode : forall (target : list string), Node.
+| FileNode : forall (filenum : nat), Node.
 
 Record Link := mkLink {
   LinkFrom : nat;   (* Always a DirNode *)
@@ -55,7 +46,7 @@ Proof.
   eapply (injection_Ordering (nat + nat + list string)).
   typeclasses eauto.
   unshelve econstructor; intros.
-  destruct H; [ left; left | left; right | right ]; eauto.
+  destruct H; [ left; left | left; right ]; eauto.
   destruct x, y; simpl in *; congruence.
 Defined.
 
@@ -71,15 +62,6 @@ Defined.
 
 Definition eq_string (s1 s2 : string) :=
   if string_dec s1 s2 then true else false.
-
-Definition proper_name n := n <> "." /\ n <> "..".
-Definition proper_link l := proper_name (LinkName l).
-Definition proper_links g := FSet.For_all proper_link g.
-
-Inductive PFSet: forall ls, Prop :=
-| LSProperNames: forall ls,
-    proper_links ls ->
-    PFSet ls.
 
 Definition File := string.
 Definition Files := list File.
@@ -97,31 +79,15 @@ Definition Pathname := list string.
 Inductive valid_link : forall (fs : FS) (dir : nat) (name : string) (target : Node), Prop :=
 | ValidLink : forall fs dir name target,
     FSet.In (mkLink dir target name) (FSLinks fs) ->
-    valid_link fs dir name target
-| ValidDot : forall fs dir,
-    valid_link fs dir "." (DirNode dir)
-| ValidDotDot : forall fs dir name parent,
-    FSet.In (mkLink parent (DirNode dir) name) (FSLinks fs) ->
-    valid_link fs dir ".." (DirNode parent)
-| ValidDotDotRoot : forall fs dir,
-    dir = FSRoot fs ->
-    valid_link fs dir ".." (DirNode dir).
+    valid_link fs dir name target.
 
 Inductive path_evaluates : forall (fs : FS) (start : Node) (pn : Pathname) (target : Node), Prop :=
 | PathEvalEmpty : forall fs start,
   path_evaluates fs start nil start
-| PathEvalFileLink : forall fs startdir name inum,
-  valid_link fs startdir name (FileNode inum)  ->
-  path_evaluates fs (DirNode startdir) ([name]) (FileNode inum)
-| PathEvalDirLink : forall fs startdir name inum pn namenode,
-  valid_link fs startdir name (DirNode inum) ->
-  path_evaluates fs (DirNode inum) pn namenode ->
-  path_evaluates fs (DirNode startdir) (name :: pn) namenode
-| PathEvalSymlink : forall fs startdir name sympath symtarget pn target,
-  valid_link fs startdir name (SymlinkNode sympath) ->
-  path_evaluates fs (DirNode startdir) sympath symtarget ->
-  path_evaluates fs symtarget pn target ->
-  path_evaluates fs (DirNode startdir) (name :: pn) target.
+| PathEvalDirLink : forall fs startdir name x pn namenode,
+  valid_link fs startdir name x ->
+  path_evaluates fs x pn namenode ->
+  path_evaluates fs (DirNode startdir) (name :: pn) namenode.
 
 Definition path_eval_root (fs : FS) (pn : Pathname) (target : Node) : Prop :=
   path_evaluates fs (DirNode (FSRoot fs)) pn target.
@@ -129,6 +95,8 @@ Definition path_eval_root (fs : FS) (pn : Pathname) (target : Node) : Prop :=
 Hint Constructors valid_link : model.
 Hint Constructors path_evaluates : model.
 
+
+(*
 Lemma path_evaluates_cons': forall fs startdir name pn node,
     path_evaluates fs startdir (name::pn) node ->
     exists node',
@@ -136,6 +104,7 @@ Lemma path_evaluates_cons': forall fs startdir name pn node,
       path_evaluates fs node' pn node.
 Proof.
   intros.
+  inversion H; subst.
   inversion H; subst; eexists; eauto with model.
 Qed.
 
@@ -158,6 +127,7 @@ Proof.
     inversion H8; subst; clear H8.
     eapply PathEvalSymlink; eauto.
 Qed.
+*)
 
 Definition does_not_exist (fs : FS) dirnum name :=
   ~ exists n, FSet.In (mkLink dirnum n name) (FSLinks fs).
@@ -195,6 +165,8 @@ Definition readdir fs dir :=
 Definition readdir_names fs dir :=
   map LinkName (FSet.elements (readdir fs dir)).
 
+
+(*
 (* if pn exists, then it is unique *)
 Definition maybe_unique_pathname (fs : FS) startdir pn :=
   forall node node',
@@ -277,23 +249,6 @@ Proof.
   reflexivity.
 Qed.
 
-(* Proper pathname: no symlinks, no dots, no dot-dots *)
-Inductive proper_pathname : forall (fs : FS) (startdir : nat) (pn : Pathname), Prop :=
-| ProperPathNil : forall fs startdir,
-  proper_pathname fs startdir []
-| ProperPathCons : forall fs startdir name namedir pn,
-  proper_name name ->
-  valid_link fs startdir name (DirNode namedir) ->
-  proper_pathname fs namedir pn ->
-  proper_pathname fs startdir (name :: pn)
-| ProperPathConsMissing : forall fs startdir name pn,
-  proper_name name ->
-  (~ exists target, valid_link fs startdir name target) ->
-  proper_pathname fs startdir (name :: pn).
-
-Definition proper_pathname_root fs pn :=
-  proper_pathname fs (FSRoot fs) pn.
-
 
 (* A stronger version of unique_pathname, requiring all intermediate nodes match *)
 Inductive stable_pathname : forall (fs: FS) (startdir: Node) (pn: Pathname), Prop :=
@@ -349,37 +304,12 @@ Proof.
   intros.
   edestruct H; eauto.
 Qed.
-
-Definition fs_invariant (fs : FS) := proper_links (FSLinks fs).
-
-Lemma fs_proper_name: forall fs startdir node name,
-    fs_invariant fs ->
-    FSet.In (mkLink startdir node name) (FSLinks fs) ->
-    proper_name name.
-Proof.
-  intros.
-  unfold fs_invariant in *.
-  unfold proper_links in *.
-  eapply FSet.For_all_in in H; eauto.
-  auto.
-Qed.
-
-Lemma fs_invariant_add_link: forall fs dirnum name node,
-    fs_invariant fs ->
-    proper_name name ->
-    does_not_exist fs dirnum name ->
-    fs_invariant (add_link dirnum node name fs).
-Proof.
-  intros.
-  unfold fs_invariant in *.
-  unfold proper_links in *.
-  unfold proper_link in *.
-  eapply FSet.add_forall; eauto.
-Qed.
+*)
 
 Hint Resolve FSet.add_incr.
 
 
+(*
 Lemma path_evaluates_add_link : forall fs startdir dirnum name dirpn n node,
   path_evaluates fs startdir dirpn node ->
   path_evaluates (add_link dirnum n name fs) startdir dirpn node.
@@ -755,4 +685,4 @@ Proof.
   - eapply ValidDotDot. eauto.
   - eapply ValidDotDotRoot. eauto.
 Qed.
-
+*)
