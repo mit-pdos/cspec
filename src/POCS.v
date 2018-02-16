@@ -35,3 +35,4 @@ Require Export Spec.Compile.
 Require Export Spec.Abstraction.
 Require Export Spec.Modules.
 Require Export Spec.Movers.
+Require Export Spec.Protocol.
