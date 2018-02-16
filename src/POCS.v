@@ -28,6 +28,7 @@ Require Export Helpers.Helpers.
 Require Export Helpers.ListStuff.
 Require Export Helpers.Sets.
 Require Export Helpers.Ordering.
+Require Export Helpers.StringUtils.
 
 Require Export Spec.ConcurProc.
 Require Export Spec.Equiv.
