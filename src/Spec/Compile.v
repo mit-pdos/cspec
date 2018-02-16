@@ -48,9 +48,22 @@ Section ProcStructure.
     inversion H; intuition.
   Qed.
 
+  Theorem no_atomics_thread_get : forall `(p : proc _ T) ts tid,
+    no_atomics_ts ts ->
+    ts [[ tid ]] = Proc p ->
+    no_atomics p.
+  Proof.
+    unfold no_atomics_ts, thread_get; intros.
+    destruct (nth_error ts tid) eqn:He; try congruence.
+    eapply Forall_forall in H.
+    2: eapply nth_error_In; eauto.
+    subst; eauto.
+  Qed.
+
 End ProcStructure.
 
 Hint Constructors no_atomics.
+Hint Resolve no_atomics_thread_get.
 
 
 Section Compiler.

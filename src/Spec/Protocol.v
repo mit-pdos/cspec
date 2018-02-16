@@ -1,5 +1,7 @@
 Require Import ConcurProc.
 Require Import Helpers.
+Require Import Relation_Operators.
+Require Import Compile.
 
 Global Set Implicit Arguments.
 Global Generalizable All Variables.
@@ -9,225 +11,172 @@ Section Protocol.
 
   Variable opT : Type -> Type.
   Variable State : Type.
-  Variable StateView : Type.
-  Variable ViewF : State -> nat -> StateView.
+  Variable lo_step : OpSemantics opT State. (* Unrestricted version *)
+  Variable hi_step : OpSemantics opT State. (* Protocol-restricted version *)
+  Variable loopInv : forall (s : State) (tid : nat), Prop.
 
-  Variable op_proto : forall {T} (op : opT T), StateView -> StateView -> Prop.
+  Inductive exec_any (tid : nat) (s : State) :
+    forall T (p : proc opT T) (r : T) (s' : State), Prop :=
+  | ExecAnyOther :
+    forall T (p : proc opT T) (r : T) (s' : State)
+           T' (op' : opT T') tid' s0 r0,
+    tid <> tid' ->
+    hi_step op' tid' s r0 s0 ->
+    exec_any tid s0 p r s' ->
+    exec_any tid s p r s'
+  | ExecAnyThisDone :
+    forall T (p : proc opT T) (r : T) (s' : State) evs,
+    exec_tid hi_step tid s p s' (inl r) evs ->
+    exec_any tid s p r s'
+  | ExecAnyThisMore :
+    forall T (p p' : proc opT T) (s' s0 : State) r evs,
+    exec_tid hi_step tid s p s0 (inr p') evs ->
+    exec_any tid s0 p' r s' ->
+    exec_any tid s p r s'
+  .
 
-  Inductive follows_protocol_proc (old_state new_state : StateView) :
+  Inductive follows_protocol_proc (tid : nat) (s : State) :
     forall T (p : proc opT T), Prop :=
   | FollowsProtocolProcOp :
     forall T (op : opT T),
-    op_proto op old_state new_state ->
-    follows_protocol_proc old_state new_state (Op op)
+    (forall s' r,
+      lo_step op tid s r s' ->
+      hi_step op tid s r s') ->
+    follows_protocol_proc tid s (Op op)
   | FollowsProtocolProcBind :
-    forall T1 T2 (p1 : proc _ T1) (p2 : T1 -> proc _ T2) mid_state,
-    follows_protocol_proc old_state mid_state p1 ->
-    (forall x, follows_protocol_proc mid_state new_state (p2 x)) ->
-    follows_protocol_proc old_state new_state (Bind p1 p2)
+    forall T1 T2 (p1 : proc _ T1) (p2 : T1 -> proc _ T2),
+    follows_protocol_proc tid s p1 ->
+    (forall r s',
+      exec_any tid s p1 r s' ->
+      follows_protocol_proc tid s' (p2 r)) ->
+    follows_protocol_proc tid s (Bind p1 p2)
   | FollowsProtocolProcUntil :
     forall T (p : proc _ T) c,
-    old_state = new_state ->
-    follows_protocol_proc old_state new_state p ->
-    follows_protocol_proc old_state new_state (Until c p)
-  | FollowsProtocolProcAtomic :
-    forall T (p : proc _ T),
-    follows_protocol_proc old_state new_state p ->
-    follows_protocol_proc old_state new_state (Atomic p)
+    loopInv s tid ->
+    (forall s',
+      loopInv s' tid ->
+      follows_protocol_proc tid s' p) ->
+    (forall s' s'' r,
+      loopInv s' tid ->
+      exec_any tid s' p r s'' ->
+      loopInv s'' tid) ->
+    follows_protocol_proc tid s (Until c p)
   | FollowsProtocolProcLog :
     forall T (v : T),
-    old_state = new_state ->
-    follows_protocol_proc old_state new_state (Log v)
+    follows_protocol_proc tid s (Log v)
   | FollowsProtocolProcRet :
     forall T (v : T),
-    old_state = new_state ->
-    follows_protocol_proc old_state new_state (Ret v).
-
-  Hint Constructors follows_protocol_proc.
+    follows_protocol_proc tid s (Ret v)
+  .
 
 
   Definition follows_protocol_s (ts : @threads_state opT) (s : State) :=
     forall tid T (p : proc _ T),
       ts [[ tid ]] = Proc p ->
-      exists new_state,
-        follows_protocol_proc (ViewF s tid) new_state p.
+      follows_protocol_proc tid s p.
 
 
-  Variable lo_step : OpSemantics opT State.
-  Variable hi_step : OpSemantics opT State.
+  Definition allowed_op `(op : opT T) (tid : nat) (s : State) :=
+    forall r s',
+      lo_step op tid s r s' ->
+      hi_step op tid s r s'.
 
-  Variable op_proto_view : forall `(op : opT T) tid s v s' b,
-    lo_step op tid s v s' ->
-    op_proto op (ViewF s tid) b ->
-    b = ViewF s' tid.
+  Variable allowed_stable :
+    forall `(op : opT T) `(op' : opT T') tid tid' s s' r,
+      tid <> tid' ->
+      allowed_op op tid s ->
+      hi_step op' tid' s r s' ->
+      allowed_op op tid s'.
 
-  Variable op_proto_step : forall `(op : opT T) tid s v s' b,
-    lo_step op tid s v s' ->
-    op_proto op (ViewF s tid) b ->
-    hi_step op tid s v s'.
+  Variable loopInv_stable :
+    forall `(op' : opT T') tid tid' s s' r,
+      tid <> tid' ->
+      loopInv s tid ->
+      hi_step op' tid' s r s' ->
+      loopInv s' tid.
 
-  Variable view_disjoint : forall `(op : opT T) tid tid' s s' r b,
-    lo_step op tid s r s' ->
-    op_proto op (ViewF s tid) b ->
-    tid <> tid' ->
-    ViewF s tid' = ViewF s' tid'.
-
-
-  Theorem follows_protocol_atomic_view :
-    forall `(p : proc opT T) tid s0 r s1 evs b,
-    atomic_exec lo_step p tid s0 r s1 evs ->
-    follows_protocol_proc (ViewF s0 tid) b p ->
-    b = ViewF s1 tid.
-  Proof.
-    intros.
-    generalize dependent b.
-    induction H; simpl in *; intros; eauto;
-      match goal with
-      | H : follows_protocol_proc _ _ _ |- _ =>
-        inversion H; clear H; repeat sigT_eq; subst
-      end; eauto.
-    - repeat deex.
-      eapply IHatomic_exec1 in H5; subst.
-      specialize (H7 v1); eauto.
-    - erewrite <- IHatomic_exec. reflexivity.
-      econstructor; eauto; intros.
-      destruct (Bool.bool_dec (c x)).
-      constructor; eauto.
-      constructor; eauto.
-  Qed.
-
-  Theorem follows_protocol_atomic_exec : forall `(p : proc opT T) tid s v s' evs b,
-    atomic_exec lo_step p tid s v s' evs ->
-    follows_protocol_proc (ViewF s tid) b p ->
-    atomic_exec hi_step p tid s v s' evs.
-  Proof.
-    intros.
-    erewrite follows_protocol_atomic_view with (b0 := b) in H0; eauto.
-    induction H; intros; eauto;
-      match goal with
-      | H : follows_protocol_proc _ _ _ |- _ =>
-        inversion H; clear H; repeat sigT_eq; subst
-      end; eauto.
-
-    eapply follows_protocol_atomic_view in H5 as H5'; eauto; subst.
-    eauto.
-
-    constructor.
-    eapply IHatomic_exec.
-    econstructor; eauto; intros.
-    destruct (Bool.bool_dec (c x)).
-    constructor; eauto.
-    constructor; eauto.
-    congruence.
-  Qed.
-
-  Hint Resolve follows_protocol_atomic_exec.
-
-
-  Theorem follows_protocol_exec_tid :
-    forall ts tid `(p : proc _ T) s s' result evs,
-      follows_protocol_s ts s ->
-      ts [[ tid ]] = Proc p ->
+  Theorem follows_protocol_preserves_exec_tid :
+    forall tid `(p : proc _ T) s s' result evs,
+      follows_protocol_proc tid s p ->
       exec_tid lo_step tid s p s' result evs ->
       exec_tid hi_step tid s p s' result evs.
   Proof.
     intros.
-    specialize (H tid _ p); intuition idtac; deex.
-    generalize dependent ts.
-    generalize dependent new_state.
-    induction H1; simpl in *; intros; eauto;
-      match goal with
-      | H : follows_protocol_proc _ _ _ |- _ =>
-        inversion H; clear H; repeat sigT_eq; subst
-      end; eauto.
-
-    constructor.
-    eapply IHexec_tid.
-    eauto.
-    rewrite thread_upd_eq with (ts := ts). reflexivity.
-  Qed.
-
-
-  Theorem view_disjoint_atomic_exec : forall `(p : proc opT T) tid tid' s s' r evs b,
-    atomic_exec lo_step p tid s r s' evs ->
-    follows_protocol_proc (ViewF s tid) b p ->
-    tid <> tid' ->
-    ViewF s tid' = ViewF s' tid'.
-  Proof.
-    intros.
-    generalize dependent b.
-    induction H; simpl in *; intros; eauto;
-      match goal with
-      | H : follows_protocol_proc _ _ _ |- _ =>
-        inversion H; clear H; repeat sigT_eq; subst
-      end; eauto.
-
-    intuition idtac.
-    eapply follows_protocol_atomic_view in H6 as H6'; eauto; subst.
-    erewrite H2; eauto.
-
-    intuition idtac.
-    eapply H0.
-    econstructor; eauto; intros.
-    destruct (Bool.bool_dec (c x)).
-    constructor; eauto.
-    constructor; eauto.
-  Qed.
-
-  Hint Resolve view_disjoint_atomic_exec.
-
-
-  Theorem view_disjoint_exec_tid : forall `(p : proc opT T) tid tid' s s' r evs b,
-    exec_tid lo_step tid s p s' r evs ->
-    follows_protocol_proc (ViewF s tid) b p ->
-    tid <> tid' ->
-    ViewF s tid' = ViewF s' tid'.
-  Proof.
-    intros.
-    generalize dependent b.
-    induction H; simpl in *; intros; eauto;
+    induction H0; simpl in *; intros; eauto;
       match goal with
       | H : follows_protocol_proc _ _ _ |- _ =>
         inversion H; clear H; repeat sigT_eq; subst
       end; eauto.
   Qed.
 
+  Hint Resolve follows_protocol_preserves_exec_tid.
+  Hint Constructors exec_any.
+  Hint Constructors follows_protocol_proc.
 
-  Theorem follows_protocol_proc_exec_tid :
-    forall `(p : proc opT T) tid s s' p' evs b,
-    follows_protocol_proc (ViewF s tid) b p ->
+  Theorem exec_tid_preserves_follows_protocol :
+    forall `(p : proc opT T) tid s s' p' evs,
+    follows_protocol_proc tid s p ->
     exec_tid lo_step tid s p s' (inr p') evs ->
-    follows_protocol_proc (ViewF s' tid) b p'.
+    follows_protocol_proc tid s' p'.
   Proof.
     intros.
     remember (inr p').
     generalize dependent p'.
-    generalize dependent b.
     induction H0; intros; simpl in *; try congruence.
 
-    match goal with
-    | H : follows_protocol_proc _ _ _ |- _ =>
-      inversion H; clear H; repeat sigT_eq; subst
-    end; eauto.
+    + match goal with
+      | H : follows_protocol_proc _ _ _ |- _ =>
+        inversion H; clear H; repeat sigT_eq; subst
+      end; eauto.
 
-    inversion Heqs0; clear Heqs0; subst.
-    destruct result.
-    - inversion H0; repeat sigT_eq; simpl in *; subst;
-                    repeat sigT_eq; simpl in *; subst; eauto;
-        match goal with
-        | H : follows_protocol_proc _ _ _ |- _ =>
-          inversion H; clear H; repeat sigT_eq; subst
-        end; eauto.
-      eapply op_proto_view in H2; eauto; subst; eauto.
-      eapply follows_protocol_atomic_view in H2; eauto; subst; eauto.
-    - specialize (IHexec_tid _ H4 _ eq_refl).
-      simpl. eauto.
-    - inversion Heqs0; clear Heqs0; subst.
-      inversion H; clear H; repeat sigT_eq; subst.
-      econstructor; eauto; intros.
-      destruct (Bool.bool_dec (c x)).
+      intuition idtac.
+      inversion Heqs0; clear Heqs0; subst.
+      destruct result; eauto.
+
+      econstructor; eauto.
+
+    + remember H as H'; clear HeqH'.
+      inversion H; clear H; subst; repeat sigT_eq.
+      inversion Heqs0; clear Heqs0; subst.
+      unfold until1.
+
       constructor; eauto.
-      constructor; eauto.
+      intros.
+
+      destruct (Bool.bool_dec (c r) true); eauto.
+  Qed.
+
+  Theorem follows_protocol_stable :
+    forall `(p : proc opT T) `(op' : opT T') tid tid' s s' r,
+      tid <> tid' ->
+      follows_protocol_proc tid s p ->
+      hi_step op' tid' s r s' ->
+      follows_protocol_proc tid s' p.
+  Proof.
+    intros.
+    induction H0; eauto.
+
+    constructor; intros.
+    eapply allowed_stable; eauto.
+    unfold allowed_op; eauto.
+  Qed.
+
+  Hint Resolve follows_protocol_stable.
+
+  Theorem exec_tid'_preserves_follows_protocol :
+    forall `(p : proc opT T) `(p' : proc opT T') tid tid' s s' r evs,
+      tid <> tid' ->
+      follows_protocol_proc tid s p ->
+      exec_tid hi_step tid' s p' s' r evs ->
+      no_atomics p' ->
+      follows_protocol_proc tid s' p.
+  Proof.
+    intros.
+    induction H1; intros; simpl in *; try congruence;
+      match goal with
+      | H : no_atomics _ |- _ =>
+        inversion H; clear H; subst; repeat sigT_eq
+      end; eauto.
   Qed.
 
   Theorem follows_protocol_s_exec_tid_upd :
@@ -235,25 +184,24 @@ Section Protocol.
       follows_protocol_s ts s ->
       ts [[ tid ]] = Proc p ->
       exec_tid lo_step tid s p s' result evs ->
+      no_atomics_ts ts ->
       follows_protocol_s ts [[ tid := match result with
                                       | inl _ => NoProc
                                       | inr p' => Proc p'
                                       end ]] s'.
   Proof.
     unfold follows_protocol_s; intros.
-    destruct (tid == tid0); subst.
+    destruct (tid0 == tid); subst.
     - autorewrite with t in *.
       destruct result; try congruence.
       repeat maybe_proc_inv.
-      specialize (H _ _ _ H0); deex.
-
-      eexists.
-      eapply follows_protocol_proc_exec_tid; eauto.
+      specialize (H _ _ _ H0).
+      eapply exec_tid_preserves_follows_protocol; eauto.
 
     - autorewrite with t in *.
-      specialize (H _ _ _ H2) as Ha; deex.
-      specialize (H _ _ _ H0) as Hb; deex.
-      erewrite <- view_disjoint_exec_tid; eauto.
+      eapply follows_protocol_preserves_exec_tid in H1; eauto.
+      specialize (H _ _ _ H3).
+      eapply exec_tid'_preserves_follows_protocol; eauto.
   Qed.
 
 End Protocol.
