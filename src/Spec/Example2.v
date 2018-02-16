@@ -141,7 +141,7 @@ Module LockAPI <: Layer.
     step_allow (Write v) tid (mkState v0 (Some tid)).
 
   Definition step :=
-    restricted_step RawLockAPI.step step_allow.
+    nilpotent_step RawLockAPI.step step_allow.
 
   Definition initP s :=
     Lock s = None.

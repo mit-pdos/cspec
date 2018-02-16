@@ -17,12 +17,17 @@ Section Protocol.
   Variable lo_step : OpSemantics opT State.
   Variable op_allow : OpProtocol.
 
-  Definition restricted_step : OpSemantics opT State :=
+  Definition nilpotent_step : OpSemantics opT State :=
     fun T op tid s r s' =>
       ( op_allow op tid s /\
         lo_step op tid s r s' ) \/
       ( ~ op_allow op tid s /\
         s' = s ).
+
+  Definition restricted_step : OpSemantics opT State :=
+    fun T op tid s r s' =>
+      op_allow op tid s /\
+      lo_step op tid s r s'.
 
   Inductive exec_any (tid : nat) (s : State) :
     forall T (p : proc opT T) (r : T) (s' : State), Prop :=
@@ -128,7 +133,7 @@ Section Protocol.
       restricted_step op' tid' s r s' ->
       loopInv s' tid.
 
-  Theorem follows_protocol_preserves_exec_tid :
+  Theorem follows_protocol_preserves_exec_tid' :
     forall tid `(p : proc _ T) s s' result evs,
       follows_protocol_proc tid s p ->
       exec_tid lo_step tid s p s' result evs ->
@@ -143,6 +148,39 @@ Section Protocol.
     unfold restricted_step; eauto.
   Qed.
 
+  Theorem atomic_exec_restricted_to_nilpotent :
+    forall tid `(p : proc _ T) s s' result evs,
+      atomic_exec restricted_step p tid s result s' evs ->
+      atomic_exec nilpotent_step p tid s result s' evs.
+  Proof.
+    induction 1; eauto.
+    constructor. firstorder.
+  Qed.
+
+  Theorem exec_tid_restricted_to_nilpotent :
+    forall tid `(p : proc _ T) s s' result evs,
+      exec_tid restricted_step tid s p s' result evs ->
+      exec_tid nilpotent_step tid s p s' result evs.
+  Proof.
+    intros.
+    induction H; simpl in *; intros; eauto.
+    constructor. firstorder.
+    constructor.
+    eapply atomic_exec_restricted_to_nilpotent; eauto.
+  Qed.
+
+  Theorem follows_protocol_preserves_exec_tid :
+    forall tid `(p : proc _ T) s s' result evs,
+      follows_protocol_proc tid s p ->
+      exec_tid lo_step tid s p s' result evs ->
+      exec_tid nilpotent_step tid s p s' result evs.
+  Proof.
+    intros.
+    eapply exec_tid_restricted_to_nilpotent.
+    eapply follows_protocol_preserves_exec_tid'; eauto.
+  Qed.
+
+  Hint Resolve follows_protocol_preserves_exec_tid'.
   Hint Resolve follows_protocol_preserves_exec_tid.
   Hint Constructors exec_any.
   Hint Constructors follows_protocol_proc.
@@ -229,7 +267,7 @@ Section Protocol.
       eapply exec_tid_preserves_follows_protocol; eauto.
 
     - autorewrite with t in *.
-      eapply follows_protocol_preserves_exec_tid in H1; eauto.
+      eapply follows_protocol_preserves_exec_tid' in H1; eauto.
       specialize (H _ _ _ H3).
       eapply exec_tid'_preserves_follows_protocol; eauto.
   Qed.
