@@ -151,11 +151,6 @@ Module LockAPI <: Layer.
     xstep Acquire tid (mkState v None) r (mkState v (Some tid))
   | StepRelease : forall tid v,
     xstep Release tid (mkState v (Some tid)) tt (mkState v None)
-  | StepReleaseHack0 : forall tid v,
-    xstep Release tid (mkState v None) tt (mkState v None)
-  | StepReleaseHack1 : forall tid tid' v,
-    tid' <> tid ->
-    xstep Release tid (mkState v (Some tid')) tt (mkState v (Some tid'))
   | StepRead : forall tid v,
     xstep Read tid (mkState v (Some tid)) v (mkState v (Some tid))
   | StepWrite : forall tid v0 v,
@@ -211,26 +206,11 @@ End CounterAPI.
 
 Module LockingRule <: ProcRule LockAPI.
 
-  Definition locked_protocol_op T (op : LockAPI.opT T)
-                                (old_owner : bool) (new_owner : bool) :=
-    match op with
-    | Acquire => old_owner = false /\ new_owner = true
-    | Release => old_owner = true /\ new_owner = false
-    | Read => old_owner = true /\ new_owner = true
-    | Write _ => old_owner = true /\ new_owner = true
-    end.
+  Definition loopInv (s : LockAPI.State) (tid : nat) := True.
 
-  Definition lock_match s tid :=
-    match Lock s with
-    | Some tid' =>
-      if tid' == tid then true else false
-    | None => false
-    end.
-
-  Definition follows_protocol ts :=
+  Definition follows_protocol (ts : @threads_state LockAPI.opT) :=
     forall s,
-      LockAPI.initP s ->
-      follows_protocol_s lock_match locked_protocol_op ts s.
+      follows_protocol_s RawLockAPI.step LockAPI.step loopInv ts s.
 
 End LockingRule.
 
@@ -399,7 +379,111 @@ Module LockingCounter <: LayerImplFollowsRule LockAPI LockedCounterAPI LockingRu
     eapply Compile.compile_ts_ok; eauto.
   Qed.
 
+
   Hint Constructors follows_protocol_proc.
+
+  Ltac raw_step_inv :=
+    match goal with
+    | H : RawLockAPI.step _ _ _ _ _ |- _ =>
+      inversion H; clear H; subst; repeat sigT_eq
+    end.
+
+  Lemma inc_follows_protocol : forall tid s,
+    follows_protocol_proc RawLockAPI.step LockAPI.step LockingRule.loopInv tid s inc_core.
+  Proof.
+    unfold inc_core; intros.
+    constructor; intros.
+    {
+      constructor; intros.
+      raw_step_inv.
+      eauto.
+    }
+
+    assert (Lock s' = Some tid).
+    admit.
+
+    constructor; intros.
+    {
+      constructor; intros.
+      raw_step_inv.
+      simpl in *; subst.
+      eauto.
+    }
+
+    assert (Lock s'0 = Some tid).
+    admit.
+
+    constructor; intros.
+    {
+      constructor; intros.
+      raw_step_inv.
+      simpl in *; subst.
+      eauto.
+    }
+
+    assert (Lock s'1 = Some tid).
+    admit.
+
+    constructor; intros.
+    {
+      constructor; intros.
+      raw_step_inv.
+      simpl in *; subst.
+      eauto.
+    }
+
+    constructor.
+  Admitted.
+
+  Lemma dec_follows_protocol : forall tid s,
+    follows_protocol_proc RawLockAPI.step LockAPI.step LockingRule.loopInv tid s dec_core.
+  Proof.
+    unfold inc_core; intros.
+    constructor; intros.
+    {
+      constructor; intros.
+      raw_step_inv.
+      eauto.
+    }
+
+    assert (Lock s' = Some tid).
+    admit.
+
+    constructor; intros.
+    {
+      constructor; intros.
+      raw_step_inv.
+      simpl in *; subst.
+      eauto.
+    }
+
+    assert (Lock s'0 = Some tid).
+    admit.
+
+    constructor; intros.
+    {
+      constructor; intros.
+      raw_step_inv.
+      simpl in *; subst.
+      eauto.
+    }
+
+    assert (Lock s'1 = Some tid).
+    admit.
+
+    constructor; intros.
+    {
+      constructor; intros.
+      raw_step_inv.
+      simpl in *; subst.
+      eauto.
+    }
+
+    constructor.
+  Admitted.
+
+  Hint Resolve inc_follows_protocol.
+  Hint Resolve dec_follows_protocol.
 
   Theorem compile_ts_follows_protocol :
     forall ts,
@@ -413,8 +497,10 @@ Module LockingCounter <: LayerImplFollowsRule LockAPI LockedCounterAPI LockingRu
 
     edestruct proc_match_pick with (tid := tid).
       eapply Compile.compile_ts_ok with (compile_op := compile_op); eauto.
-    intuition congruence.
-    repeat deex.
+    unfold LockAPI.opT, RawLockAPI.opT in *.
+      intuition congruence.
+    unfold LockAPI.opT, RawLockAPI.opT in *.
+      repeat deex.
     match goal with
     | H1 : _ [[ tid ]] = Proc _,
       H2 : _ [[ tid ]] = Proc _ |- _ =>
@@ -423,17 +509,17 @@ Module LockingCounter <: LayerImplFollowsRule LockAPI LockedCounterAPI LockingRu
     end.
 
     clear dependent ts.
-    match goal with
-    | H : LockAPI.initP _ |- _ =>
-      unfold LockingRule.lock_match; rewrite H; clear H
-    end.
-    exists false.
+    generalize dependent s.
 
     match goal with
     | H : Compile.compile_ok _ _ _ |- _ =>
-      induction H; eauto
+      induction H; intros; eauto
     end.
-    destruct op; simpl; repeat econstructor.
+
+    destruct op; simpl; eauto.
+
+    unfold LockingRule.loopInv.
+    econstructor; eauto.
   Qed.
 
   Theorem absInitP :
@@ -674,50 +760,66 @@ Module LockProtocol <: LayerImplRequiresRule RawLockAPI LockAPI LockingRule.
       inversion H; clear H; subst; repeat sigT_eq
     end.
 
-  Theorem locked_protocol_step : forall `(op : LockAPI.opT T) tid s v s' b,
-    RawLockAPI.step op tid s v s' ->
-    locked_protocol_op op (lock_match s tid) b ->
-    LockAPI.step op tid s v s'.
+  Lemma allowed_op_release : forall tid s,
+    allowed_op RawLockAPI.step LockAPI.step Release tid s ->
+    Lock s = Some tid.
+  Proof.
+    unfold allowed_op; intros.
+
+    assert (exists r s', RawLockAPI.step Release tid s r s').
+      destruct s; do 2 eexists; econstructor.
+    repeat deex.
+    specialize (H _ _ H0).
+    repeat step_inv.
+    eauto.
+  Qed.
+
+  Lemma allowed_op_read : forall tid s,
+    allowed_op RawLockAPI.step LockAPI.step Read tid s ->
+    Lock s = Some tid.
+  Proof.
+    unfold allowed_op; intros.
+
+    assert (exists r s', RawLockAPI.step Read tid s r s').
+      destruct s; do 2 eexists; econstructor.
+    repeat deex.
+    specialize (H _ _ H0).
+    repeat step_inv.
+    eauto.
+  Qed.
+
+  Lemma allowed_op_write : forall tid s v,
+    allowed_op RawLockAPI.step LockAPI.step (Write v) tid s ->
+    Lock s = Some tid.
+  Proof.
+    unfold allowed_op; intros.
+
+    assert (exists r s', RawLockAPI.step (Write v) tid s r s').
+      destruct s; do 2 eexists; econstructor.
+    repeat deex.
+    specialize (H _ _ H0).
+    repeat step_inv.
+    eauto.
+  Qed.
+
+  Theorem allowed_stable :
+    forall `(op : LockAPI.opT T) `(op' : LockAPI.opT T') tid tid' s s' r,
+      tid <> tid' ->
+      allowed_op RawLockAPI.step LockAPI.step op tid s ->
+      LockAPI.step op' tid' s r s' ->
+      allowed_op RawLockAPI.step LockAPI.step op tid s'.
   Proof.
     intros.
-    destruct s.
-    step_inv; unfold lock_match in *; simpl in *.
-    - eauto.
-    - destruct Lock0; [ destruct (n == tid) | ]; subst; simpl in *;
-        intuition eauto; congruence.
-    - destruct Lock0; [ destruct (n == tid) | ]; subst; simpl in *;
-        intuition eauto; congruence.
-    - destruct Lock0; [ destruct (n == tid) | ]; subst; simpl in *;
-        intuition eauto; congruence.
+    destruct op; destruct op'.
+    all: try eapply allowed_op_release in H0.
+    all: try eapply allowed_op_read in H0.
+    all: try eapply allowed_op_write in H0.
+    all: step_inv.
+    all: simpl in *; subst.
+    all: try congruence.
+    all: eauto.
+    all: unfold allowed_op; intros; step_inv; eauto.
   Qed.
-
-  Lemma locked_protocol_owner : forall `(op : RawLockAPI.opT T) tid s v s' b,
-    RawLockAPI.step op tid s v s' ->
-    locked_protocol_op op (lock_match s tid) b ->
-    b = lock_match s' tid.
-  Proof.
-    intros; step_inv; unfold lock_match in *; simpl in *;
-      intuition try congruence.
-    destruct (tid == tid); congruence.
-  Qed.
-
-  Lemma lock_match_disjoint : forall `(op : RawLockAPI.opT T) tid tid' s s' r b,
-    RawLockAPI.step op tid s r s' ->
-    locked_protocol_op op (lock_match s tid) b ->
-    tid <> tid' ->
-    lock_match s tid' = lock_match s' tid'.
-  Proof.
-    intros.
-    step_inv; unfold lock_match in *; simpl in *.
-    destruct (tid == tid'); congruence.
-    all: destruct l; eauto.
-    destruct (n == tid); destruct (n == tid'); subst; intuition congruence.
-  Qed.
-
-  Hint Resolve locked_protocol_step.
-  Hint Resolve locked_protocol_owner.
-  Hint Resolve lock_match_disjoint.
-
 
   Definition compile_ts (ts : @threads_state LockAPI.opT) := ts.
 
@@ -737,23 +839,25 @@ Module LockProtocol <: LayerImplRequiresRule RawLockAPI LockAPI LockingRule.
   Proof.
     unfold compile_ts, follows_protocol, absR.
     unfold traces_match_abs; intros; subst.
-    specialize (H sm H1).
-    clear H0 H1.
+    clear H1.
+    specialize (H sm).
     destruct H2.
-    induction H0; eauto.
+    induction H1; eauto.
     specialize (H tid _ p) as Htid.
     intuition idtac; repeat deex.
 
     edestruct IHexec.
       eapply follows_protocol_s_exec_tid_upd; eauto.
+      intros; eapply allowed_stable; eauto.
+      admit.
 
     eexists; intuition idtac.
     eapply ExecPrefixOne.
       eauto.
-      eapply follows_protocol_exec_tid; eauto.
+      eapply follows_protocol_preserves_exec_tid; eauto.
       eauto.
     eauto.
-  Qed.
+  Admitted.
 
   Theorem absInitP :
     forall s1 s2,
