@@ -382,105 +382,55 @@ Module LockingCounter <: LayerImplFollowsRule LockAPI LockedCounterAPI LockingRu
 
   Hint Constructors follows_protocol_proc.
 
-  Ltac raw_step_inv :=
+  Lemma exec_any_op : forall `(op : LockAPI.opT T) tid r s s',
+    exec_any LockAPI.step tid s (Op op) r s' ->
+    exists s0,
+      LockAPI.step op tid s0 r s'.
+  Proof.
+    intros.
+    remember (Op op).
+    induction H; subst; try exec_tid_inv; eauto.
+  Qed.
+
+  Ltac proto_step_inv :=
     match goal with
     | H : RawLockAPI.step _ _ _ _ _ |- _ =>
       inversion H; clear H; subst; repeat sigT_eq
+    | H : LockAPI.step _ _ _ _ _ |- _ =>
+      inversion H; clear H; subst; repeat sigT_eq
+    | H : exec_any LockAPI.step _ _ (Op _) _ _ |- _ =>
+      eapply exec_any_op in H; repeat deex
     end.
 
   Lemma inc_follows_protocol : forall tid s,
     follows_protocol_proc RawLockAPI.step LockAPI.step LockingRule.loopInv tid s inc_core.
   Proof.
-    unfold inc_core; intros.
-    constructor; intros.
-    {
-      constructor; intros.
-      raw_step_inv.
-      eauto.
-    }
-
-    assert (Lock s' = Some tid).
-    admit.
-
-    constructor; intros.
-    {
-      constructor; intros.
-      raw_step_inv.
-      simpl in *; subst.
-      eauto.
-    }
-
-    assert (Lock s'0 = Some tid).
-    admit.
-
-    constructor; intros.
-    {
-      constructor; intros.
-      raw_step_inv.
-      simpl in *; subst.
-      eauto.
-    }
-
-    assert (Lock s'1 = Some tid).
-    admit.
-
-    constructor; intros.
-    {
-      constructor; intros.
-      raw_step_inv.
-      simpl in *; subst.
-      eauto.
-    }
-
-    constructor.
-  Admitted.
+    intros.
+    constructor; intros; repeat proto_step_inv.
+      constructor; intros; proto_step_inv; simpl in *; subst; eauto.
+    constructor; intros; repeat proto_step_inv.
+      constructor; intros; proto_step_inv; simpl in *; subst; eauto.
+    constructor; intros; repeat proto_step_inv.
+      constructor; intros; proto_step_inv; simpl in *; subst; eauto.
+    constructor; intros; repeat proto_step_inv.
+      constructor; intros; proto_step_inv; simpl in *; subst; eauto.
+    constructor; intros; repeat proto_step_inv.
+  Qed.
 
   Lemma dec_follows_protocol : forall tid s,
     follows_protocol_proc RawLockAPI.step LockAPI.step LockingRule.loopInv tid s dec_core.
   Proof.
-    unfold inc_core; intros.
-    constructor; intros.
-    {
-      constructor; intros.
-      raw_step_inv.
-      eauto.
-    }
-
-    assert (Lock s' = Some tid).
-    admit.
-
-    constructor; intros.
-    {
-      constructor; intros.
-      raw_step_inv.
-      simpl in *; subst.
-      eauto.
-    }
-
-    assert (Lock s'0 = Some tid).
-    admit.
-
-    constructor; intros.
-    {
-      constructor; intros.
-      raw_step_inv.
-      simpl in *; subst.
-      eauto.
-    }
-
-    assert (Lock s'1 = Some tid).
-    admit.
-
-    constructor; intros.
-    {
-      constructor; intros.
-      raw_step_inv.
-      simpl in *; subst.
-      eauto.
-    }
-
-    constructor.
-  Admitted.
+    intros.
+    constructor; intros; repeat proto_step_inv.
+      constructor; intros; proto_step_inv; simpl in *; subst; eauto.
+    constructor; intros; repeat proto_step_inv.
+      constructor; intros; proto_step_inv; simpl in *; subst; eauto.
+    constructor; intros; repeat proto_step_inv.
+      constructor; intros; proto_step_inv; simpl in *; subst; eauto.
+    constructor; intros; repeat proto_step_inv.
+      constructor; intros; proto_step_inv; simpl in *; subst; eauto.
+    constructor; intros; repeat proto_step_inv.
+  Qed.
 
   Hint Resolve inc_follows_protocol.
   Hint Resolve dec_follows_protocol.
