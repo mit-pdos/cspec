@@ -20,10 +20,31 @@ Section Movers.
   Variable moverT : Type.
   Variable opMover : opT moverT.
 
+  Definition enabled_in (tid : nat) (s : State) :=
+    exists rM sM,
+      op_step opMover tid s rM sM.
+
   Definition always_enabled :=
     forall tid s,
-      exists r s',
-        op_step opMover tid s r s'.
+      enabled_in tid s.
+
+  Definition enabled_after `(p : proc opT T) :=
+    forall tid s v s' evs,
+      atomic_exec op_step p tid s v s' evs ->
+      enabled_in tid s'.
+
+  Definition enabled_stable :=
+    forall tid tid' s `(op : opT T) r s',
+      tid <> tid' ->
+      enabled_in tid s ->
+      op_step op tid' s r s' ->
+      enabled_in tid s'.
+
+  Lemma always_enabled_to_stable :
+    always_enabled -> enabled_stable.
+  Proof.
+    firstorder.
+  Qed.
 
   Definition right_mover :=
     forall `(op1 : opT T2) tid0 tid1 s s0 s1 v0 v1,
@@ -35,7 +56,7 @@ Section Movers.
         op_step opMover tid0 s' v0 s1.
 
   Definition left_mover :=
-    always_enabled /\
+    enabled_stable /\
     forall `(op0 : opT T0) tid0 tid1 s s0 s1 v0 v1,
       tid0 <> tid1 ->
       op_step op0 tid0 s v0 s0 ->
@@ -133,8 +154,37 @@ Section Movers.
     - edestruct IHexec_tid; intuition eauto.
   Qed.
 
+  Lemma enabled_stable_atomic_exec :
+    enabled_stable ->
+    forall tid tid' s `(p : proc opT T) r s' evs,
+      tid <> tid' ->
+      enabled_in tid s ->
+      atomic_exec op_step p tid' s r s' evs ->
+      enabled_in tid s'.
+  Proof.
+    intros.
+    induction H2; eauto.
+  Qed.
+
+  Hint Resolve enabled_stable_atomic_exec.
+
+  Lemma enabled_stable_exec_tid :
+    enabled_stable ->
+    forall tid tid' s `(p : proc opT T) r s' evs,
+      tid <> tid' ->
+      enabled_in tid s ->
+      exec_tid op_step tid' s p s' r evs ->
+      enabled_in tid s'.
+  Proof.
+    intros.
+    induction H2; eauto.
+  Qed.
+
+  Hint Resolve enabled_stable_exec_tid.
+
   Lemma exec_left_mover : forall s ts tid `(rx : _ -> proc opT T) tr,
     left_mover ->
+    enabled_in tid s ->
     exec_prefix op_step s ts [[ tid := Proc (x <- Op opMover; rx x) ]] tr ->
     exists s' r,
       op_step opMover tid s r s' /\
@@ -159,10 +209,12 @@ Section Movers.
       + autorewrite with t in *.
 
         edestruct IHexec; intuition idtac.
+          eapply enabled_stable_exec_tid; eauto.
+          destruct H; eauto.
         rewrite thread_upd_upd_ne; eauto.
         repeat deex.
 
-        eapply exec_tid_left_mover in H1; eauto.
+        eapply exec_tid_left_mover in H2; eauto.
         repeat deex.
 
         do 2 eexists; intuition eauto.
@@ -172,8 +224,7 @@ Section Movers.
           eauto.
           rewrite thread_upd_upd_ne; eauto.
 
-    - destruct H.
-      edestruct H; repeat deex.
+    - edestruct H0; repeat deex.
       do 2 eexists; split.
       eauto.
       eauto.
@@ -227,9 +278,10 @@ Section Movers.
   Qed.
 
   Theorem trace_incl_atomize_op_left_mover :
-    left_mover ->
     forall `(p : proc opT TP)
            `(rx : _ -> proc opT TF),
+    left_mover ->
+    enabled_after p ->
     trace_incl op_step
       (Bind (Bind (Atomic p) (fun _ => Op opMover)) rx)
       (Bind (Atomic (Bind p (fun _ => Op opMover))) rx).
@@ -237,7 +289,7 @@ Section Movers.
     intros.
     eapply trace_incl_proof_helper; intros.
     repeat exec_tid_inv.
-    eapply exec_left_mover in H1; eauto.
+    eapply exec_left_mover in H2; eauto.
     repeat deex.
 
     eexists; split.
@@ -249,10 +301,11 @@ Section Movers.
   Qed.
 
   Theorem trace_incl_atomize_op_ret_left_mover :
-    left_mover ->
     forall `(p : proc opT TP)
            `(f : TP -> _ -> TR)
            `(rx : _ -> proc opT TF),
+    left_mover ->
+    enabled_after p ->
     trace_incl op_step
       (Bind (Bind (Atomic p) (fun a => Bind (Op opMover) (fun b => Ret (f a b)))) rx)
       (Bind (Atomic (Bind p (fun a => Bind (Op opMover) (fun b => Ret (f a b))))) rx).
@@ -260,11 +313,11 @@ Section Movers.
     intros.
     eapply trace_incl_proof_helper; intros.
     repeat exec_tid_inv.
-    rewrite exec_equiv_bind_bind in H1.
-    eapply exec_left_mover in H1; eauto.
+    rewrite exec_equiv_bind_bind in H2.
+    eapply exec_left_mover in H2; eauto.
     repeat deex.
 
-    eapply trace_incl_ts_proof_helper in H1.
+    eapply trace_incl_ts_proof_helper in H2.
     repeat deex.
 
     eexists; split.
@@ -283,10 +336,14 @@ End Movers.
 
 Hint Resolve both_mover_left.
 Hint Resolve both_mover_right.
+Hint Resolve always_enabled_to_stable.
 
 Arguments left_mover {opT State} op_step {moverT}.
 Arguments right_mover {opT State} op_step {moverT}.
 Arguments both_mover {opT State} op_step {moverT}.
+Arguments enabled_after {opT State} op_step {moverT} opMover {T} p.
+Arguments enabled_in {opT State} op_step {moverT}.
+Arguments always_enabled {opT State} op_step {moverT}.
 
 
 Section YSA.
@@ -301,6 +358,7 @@ Section YSA.
   | LeftMoversOne :
     forall `(opMover : opT oT) `(rx : _ -> proc _ T),
     left_mover op_step opMover ->
+    always_enabled op_step opMover ->
     (forall a, left_movers (rx a)) ->
     left_movers (Bind (Op opMover) rx)
   | LeftMoversRet :
@@ -364,10 +422,10 @@ Section YSA.
     generalize dependent evs.
     induction H; intros.
 
-    - repeat rewrite exec_equiv_bind_bind in H2.
-      eapply exec_left_mover in H2; eauto; repeat deex.
+    - repeat rewrite exec_equiv_bind_bind in H3.
+      eapply exec_left_mover in H3; eauto; repeat deex.
 
-      edestruct H1 with (p := Bind p (fun _ => Op opMover)).
+      edestruct H2 with (p := Bind p (fun _ => Op opMover)).
       eassumption.
       reflexivity.
       eauto.
