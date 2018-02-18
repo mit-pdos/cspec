@@ -46,13 +46,13 @@ run_proc s (Atomic _) = do
 run_proc s (Log v) = do
   -- debugmsg $ "Log"
   return $ unsafeCoerce v
-run_proc s (Until c p) = do
+run_proc s (Until c p v0) = do
   -- debugmsg $ "Until"
-  v <- run_proc s p
+  v <- run_proc s (p v0)
   if (c $ unsafeCoerce v) then
     return v
   else
-    run_proc s (Until c p)
+    run_proc s (Until c p (unsafeCoerce v))
 run_proc (S lck val) (Op ReadTAS) = do
   v <- readIORef val
   -- debugmsg $ "ReadTAS " ++ (show v)

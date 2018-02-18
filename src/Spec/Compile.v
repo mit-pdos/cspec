@@ -24,9 +24,9 @@ Section ProcStructure.
     no_atomics pa ->
     (forall x, no_atomics (pb x)) ->
     no_atomics (Bind pa pb)
-  | NoAtomicsUntil : forall `(p : proc opT T) (c : T -> bool),
-    no_atomics p ->
-    no_atomics (Until c p)
+  | NoAtomicsUntil : forall `(p : T -> proc opT T) (c : T -> bool) v,
+    (forall v, no_atomics (p v)) ->
+    no_atomics (Until c p v)
   | NoAtomicsLog : forall `(v : T),
     no_atomics (Log v).
 
@@ -148,9 +148,9 @@ Section Compiler.
     compile_ok p1a p2a ->
     (forall x, compile_ok (p1b x) (p2b x)) ->
     compile_ok (Bind p1a p1b) (Bind p2a p2b)
-  | CompileUntil : forall `(p1 : proc opLoT T) (p2 : proc opMidT T) (c : T -> bool),
-    compile_ok p1 p2 ->
-    compile_ok (Until c p1) (Until c p2)
+  | CompileUntil : forall `(p1 : T -> proc opLoT T) (p2 : T -> proc opMidT T) (c : T -> bool) v,
+    (forall v', compile_ok (p1 v') (p2 v')) ->
+    compile_ok (Until c p1 v) (Until c p2 v)
   | CompileLog : forall `(v : T),
     compile_ok (Log v) (Log v).
 
@@ -164,9 +164,9 @@ Section Compiler.
     atomic_compile_ok p1a p2a ->
     (forall x, atomic_compile_ok (p1b x) (p2b x)) ->
     atomic_compile_ok (Bind p1a p1b) (Bind p2a p2b)
-  | ACompileUntil : forall `(p1 : proc opLoT T) (p2 : proc opMidT T) (c : T -> bool),
-    atomic_compile_ok p1 p2 ->
-    atomic_compile_ok (Until c p1) (Until c p2)
+  | ACompileUntil : forall `(p1 : T -> proc opLoT T) (p2 : T -> proc opMidT T) (c : T -> bool) v,
+    (forall v', atomic_compile_ok (p1 v') (p2 v')) ->
+    atomic_compile_ok (Until c p1 v) (Until c p2 v)
   | ACompileLog : forall `(v : T),
     atomic_compile_ok (Log v) (Log v).
 
@@ -181,7 +181,7 @@ Section Compiler.
     | Bind p1 p2 => Bind (compile p1) (fun r => compile (p2 r))
     | Log v => Log v
     | Atomic p => Atomic (compile p)
-    | Until c p => Until c (compile p)
+    | Until c p v => Until c (fun r => compile (p r)) v
     end.
 
 
@@ -193,7 +193,7 @@ Section Compiler.
     induction p; simpl; intros; eauto.
     - inversion H0; clear H0; repeat sigT_eq.
       eauto.
-    - inversion H; clear H; repeat sigT_eq.
+    - inversion H0; clear H0; repeat sigT_eq.
       eauto.
     - inversion H.
   Qed.
@@ -205,7 +205,7 @@ Section Compiler.
   Proof.
     induction p; simpl; intros; eauto.
     - inversion H0; clear H0; repeat sigT_eq. eauto.
-    - inversion H; clear H; repeat sigT_eq. eauto.
+    - inversion H0; clear H0; repeat sigT_eq. eauto.
     - inversion H.
   Qed.
 
@@ -376,9 +376,9 @@ Section Atomization.
     atomize_ok p1a p2a ->
     (forall x, atomize_ok (p1b x) (p2b x)) ->
     atomize_ok (Bind p1a p1b) (Bind p2a p2b)
-  | AtomizeUntil : forall T (p1 p2 : proc opLoT T) (c : T -> bool),
-    atomize_ok p1 p2 ->
-    atomize_ok (Until c p1) (Until c p2)
+  | AtomizeUntil : forall T (p1 p2 : T -> proc opLoT T) (c : T -> bool) v,
+    (forall v', atomize_ok (p1 v') (p2 v')) ->
+    atomize_ok (Until c p1 v) (Until c p2 v)
   | AtomizeLog : forall `(v : T),
     atomize_ok (Log v) (Log v).
 
@@ -411,8 +411,8 @@ Section Atomization.
     - etransitivity.
       eapply trace_incl_rx_to_trace_incl.
       eapply trace_incl_rx_until.
-      eapply trace_incl_to_trace_incl_rx; intros.
-      eapply IHatomize_ok; intros.
+      intros. eapply trace_incl_to_trace_incl_rx; intros.
+      eapply H0; intros.
       reflexivity.
       eapply trace_incl_bind_a; intros.
       eauto.
@@ -492,7 +492,8 @@ Proof.
   - intuition idtac.
     constructor. eauto. intros. specialize (H1 x). intuition eauto.
     constructor. eauto. intros. specialize (H1 x). intuition eauto.
-  - split; constructor; intuition eauto.
+  - split; constructor; intuition eauto;
+      edestruct H0; eauto.
   - split; constructor.
 Qed.
 

@@ -17,23 +17,27 @@ Section Compiler.
   Variable opLoT : Type -> Type.
   Variable opMidT : Type -> Type.
 
-  Variable compile_op : forall T, opMidT T -> ((opLoT T) * (T -> bool)).
+  Variable compile_op : forall T, opMidT T -> ((T -> opLoT T) * (T -> bool) * T).
 
   Fixpoint compile T (p : proc opMidT T) : proc opLoT T :=
     match p with
     | Ret t => Ret t
-    | Op op => Until (snd (compile_op op)) (Op (fst (compile_op op)))
+    | Op op =>
+      let '(body, cond, iv) := compile_op op in
+      Until cond (fun x => Op (body x)) iv
     | Bind p1 p2 => Bind (compile p1) (fun r => compile (p2 r))
     | Log v => Log v
     | Atomic p => Atomic (compile p)
-    | Until c p => Until c (compile p)
+    | Until c p v => Until c (fun r => compile (p r)) v
     end.
 
   Inductive compile_ok : forall T (p1 : proc opLoT T) (p2 : proc opMidT T), Prop :=
-  | CompileOp : forall `(op : opMidT T),
-    compile_ok (Until (snd (compile_op op)) (Op (fst (compile_op op)))) (Op op)
-  | CompileOp1 : forall `(op : opMidT T),
-    compile_ok (until1 (snd (compile_op op)) (Op (fst (compile_op op)))) (Op op)
+  | CompileOp : forall `(op : opMidT T) body cond iv v,
+    compile_op op = (body, cond, iv) ->
+    compile_ok (Until cond (fun x => Op (body x)) v) (Op op)
+  | CompileOp1 : forall `(op : opMidT T) body cond iv v,
+    compile_op op = (body, cond, iv) ->
+    compile_ok (until1 cond (fun x => Op (body x)) v) (Op op)
   | CompileRet : forall `(x : T),
     compile_ok (Ret x) (Ret x)
   | CompileExtraRet : forall `(x : T) `(p1 : T -> proc opLoT TF) p2,
@@ -44,9 +48,9 @@ Section Compiler.
     compile_ok p1a p2a ->
     (forall x, compile_ok (p1b x) (p2b x)) ->
     compile_ok (Bind p1a p1b) (Bind p2a p2b)
-  | CompileUntil : forall `(p1 : proc opLoT T) (p2 : proc opMidT T) (c : T -> bool),
-    compile_ok p1 p2 ->
-    compile_ok (Until c p1) (Until c p2)
+  | CompileUntil : forall `(p1 : T -> proc opLoT T) (p2 : T -> proc opMidT T) (c : T -> bool) v,
+    (forall v', compile_ok (p1 v') (p2 v')) ->
+    compile_ok (Until c p1 v) (Until c p2 v)
   | CompileLog : forall `(v : T),
     compile_ok (Log v) (Log v).
 
@@ -58,9 +62,12 @@ Section Compiler.
       compile_ok (compile p) p.
   Proof.
     induction p; simpl; intros; eauto.
+    - destruct (compile_op op) as [x iv] eqn:He1.
+      destruct x as [body cond] eqn:He2.
+      eauto.
     - inversion H0; clear H0; repeat sigT_eq.
       eauto.
-    - inversion H; clear H; repeat sigT_eq.
+    - inversion H0; clear H0; repeat sigT_eq.
       eauto.
     - inversion H.
   Qed.
@@ -71,8 +78,11 @@ Section Compiler.
       no_atomics (compile p).
   Proof.
     induction p; simpl; intros; eauto.
+    - destruct (compile_op op) as [x iv] eqn:He1.
+      destruct x as [body cond] eqn:He2.
+      eauto.
     - inversion H0; clear H0; repeat sigT_eq. eauto.
-    - inversion H; clear H; repeat sigT_eq. eauto.
+    - inversion H0; clear H0; repeat sigT_eq. eauto.
     - inversion H.
   Qed.
 
@@ -130,11 +140,12 @@ Section Compiler.
   Variable hi_step : OpSemantics opMidT State.
 
   Definition noop_or_success :=
-    forall `(opM : opMidT T) opL cond tid s r s',
-      (opL, cond) = compile_op opM ->
-      lo_step opL tid s r s' ->
-      cond r = false /\ s = s' \/
-      cond r = true /\ hi_step opM tid s r s'.
+    forall `(opM : opMidT T) opL cond iv tid s r s',
+      (opL, cond, iv) = compile_op opM ->
+      forall v,
+        lo_step (opL v) tid s r s' ->
+          cond r = false /\ s = s' \/
+          cond r = true /\ hi_step opM tid s r s'.
 
   Variable is_noop_or_success : noop_or_success.
 
@@ -167,19 +178,18 @@ Section Compiler.
       eexists; intuition idtac.
       eauto.
     - repeat exec_tid_inv.
-      eapply is_noop_or_success in H5.
-      2: rewrite surjective_pairing; eauto.
+      eapply is_noop_or_success in H6; eauto.
       intuition idtac; subst.
       + left.
         eexists; intuition idtac.
-        rewrite H0.
+        rewrite H1.
         destruct (Bool.bool_dec false true); try congruence.
-        constructor.
+        eauto.
       + right.
         eexists; intuition idtac.
         eauto.
         simpl.
-        rewrite H0.
+        rewrite H1.
         destruct (Bool.bool_dec true true); try congruence.
     - right.
       exec_tid_inv.

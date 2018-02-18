@@ -644,27 +644,15 @@ Module LockImpl <: LayerImpl TASLockAPI RawLockAPI.
   Definition acquire_cond (r : bool) :=
     if r == false then true else false.
 
-  Definition acquire_core : proc TASLockAPI.opT _ :=
-    Until acquire_cond (Op TestAndSet).
-
   Definition once_cond {T} (r : T) :=
     true.
 
-  Definition release_core : proc TASLockAPI.opT _ :=
-    Until once_cond (Op Clear).
-
-  Definition read_core : proc TASLockAPI.opT _ :=
-    Until once_cond (Op ReadTAS).
-
-  Definition write_core v : proc TASLockAPI.opT _ :=
-    Until once_cond (Op (WriteTAS v)).
-
-  Definition compile_op T (op : RawLockAPI.opT T) : (TASLockAPI.opT T) * (T -> bool) :=
+  Definition compile_op T (op : RawLockAPI.opT T) : (T -> TASLockAPI.opT T) * (T -> bool) * T :=
     match op with
-    | Acquire => (TestAndSet, acquire_cond)
-    | Release => (Clear, once_cond)
-    | Read => (ReadTAS, once_cond)
-    | Write v => (WriteTAS v, once_cond)
+    | Acquire => (fun _ => TestAndSet, acquire_cond, true)
+    | Release => (fun _ => Clear, once_cond, tt)
+    | Read => (fun _ => ReadTAS, once_cond, 0)
+    | Write v => (fun _ => WriteTAS v, once_cond, tt)
     end.
 
   Definition compile_ts ts :=
@@ -835,7 +823,10 @@ Print Assumptions c.compile_traces_match.
 
 
 Definition test_thread :=
-  Until (fun _ => false) (_ <- Op Inc; _ <- Op Dec; Ret tt).
+  Until
+    (fun _ => false)
+    (fun _ => _ <- Op Inc; _ <- Op Dec; Ret tt)
+    tt.
 
 Definition test_threads :=
   repeat (Proc test_thread) 16.

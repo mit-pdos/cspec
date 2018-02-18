@@ -610,8 +610,8 @@ Proof.
   reflexivity.
 Qed.
 
-Theorem exec_equiv_until : forall `(p : proc opT T) (c : T -> bool),
-  exec_equiv_rx (Until c p) (until1 c p).
+Theorem exec_equiv_until : forall `(p : T -> proc opT T) (c : T -> bool) v,
+  exec_equiv_rx (Until c p v) (until1 c p v).
 Proof.
   intros.
   eapply exec_equiv_rx_proof_helper; intros.
@@ -1766,11 +1766,11 @@ Proof.
 Qed.
 
 Theorem trace_incl_rx_until_helper :
-  forall T opT (p1 p2 : proc opT T)
+  forall T opT (p1 p2 : T -> proc opT T)
          `(op_step : OpSemantics opT State)
-         (c : T -> bool) n,
-    trace_incl_rx_N (n-1) op_step p1 p2 ->
-    trace_incl_rx_N n op_step (Until c p1) (Until c p2).
+         (c : T -> bool) n v,
+    (forall v', trace_incl_rx_N (n-1) op_step (p1 v') (p2 v')) ->
+    trace_incl_rx_N n op_step (Until c p1 v) (Until c p2 v).
 Proof.
   induction n; intros.
 
@@ -1808,7 +1808,7 @@ Proof.
 
       match goal with
       | H : exec _ _ _ _ _,
-        H' : trace_incl_rx_N _ _ _ _ |- _ =>
+        H' : forall _, trace_incl_rx_N _ _ _ _ |- _ =>
         eapply H' in H; try omega
       end.
       deex.
@@ -1833,14 +1833,14 @@ Proof.
 
       * repeat ( intro; intros ).
         eapply IHn.
-        eapply trace_incl_rx_N_le; eauto; omega.
+        intros. eapply trace_incl_rx_N_le; eauto; omega.
         4: eassumption.
         3: reflexivity.
         omega.
         intros; eapply trace_incl_N_le; eauto; omega.
 
     + edestruct IHn.
-        eapply trace_incl_rx_N_le; eauto; omega.
+        intros. eapply trace_incl_rx_N_le; eauto; omega.
         4: rewrite thread_upd_upd_ne in H6 by eauto; eassumption.
         3: reflexivity. omega.
         intros. eapply trace_incl_N_le; eauto; omega.
@@ -1855,17 +1855,17 @@ Proof.
 Qed.
 
 Theorem trace_incl_rx_until :
-  forall T opT (p1 p2 : proc opT T)
+  forall T opT (p1 p2 : T -> proc opT T)
          `(op_step : OpSemantics opT State)
-         (c : T -> bool),
-    trace_incl_rx op_step p1 p2 ->
-    trace_incl_rx op_step (Until c p1) (Until c p2).
+         (c : T -> bool) v,
+    (forall v', trace_incl_rx op_step (p1 v') (p2 v')) ->
+    trace_incl_rx op_step (Until c p1 v) (Until c p2 v).
 Proof.
   repeat ( intro; intros ).
   eapply trace_incl_rx_until_helper in H3.
   5: reflexivity.
   eassumption.
-  eapply H.
+  intros. eapply H.
   reflexivity.
   intros; eapply trace_incl_N_le; eauto; omega.
 Qed.

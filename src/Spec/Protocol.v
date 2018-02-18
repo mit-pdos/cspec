@@ -94,16 +94,16 @@ Section Protocol.
       follows_protocol_proc tid s' (p2 r)) ->
     follows_protocol_proc tid s (Bind p1 p2)
   | FollowsProtocolProcUntil :
-    forall T (p : proc _ T) c,
+    forall T (p : T -> proc _ T) c v,
     loopInv s tid ->
-    (forall s',
+    (forall s' v',
       loopInv s' tid ->
-      follows_protocol_proc tid s' p) ->
-    (forall s' s'' r,
+      follows_protocol_proc tid s' (p v')) ->
+    (forall s' s'' r v',
       loopInv s' tid ->
-      exec_any tid s' p r s'' ->
+      exec_any tid s' (p v') r s'' ->
       loopInv s'' tid) ->
-    follows_protocol_proc tid s (Until c p)
+    follows_protocol_proc tid s (Until c p v)
   | FollowsProtocolProcLog :
     forall T (v : T),
     follows_protocol_proc tid s (Log v)
