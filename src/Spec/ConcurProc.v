@@ -193,6 +193,54 @@ Section Proc.
     unfold exec_prefix; eauto.
   Qed.
 
+
+  Inductive exec_any (tid : nat) (s : State) :
+    forall T (p : proc T) (r : T) (s' : State), Prop :=
+  | ExecAnyOther :
+    forall T (p : proc T) (r : T) (s' : State)
+           T' (op' : opT T') tid' s0 r0,
+    tid <> tid' ->
+    op_step op' tid' s r0 s0 ->
+    exec_any tid s0 p r s' ->
+    exec_any tid s p r s'
+  | ExecAnyThisDone :
+    forall T (p : proc T) (r : T) (s' : State) evs,
+    exec_tid tid s p s' (inl r) evs ->
+    exec_any tid s p r s'
+  | ExecAnyThisMore :
+    forall T (p p' : proc T) (s' s0 : State) r evs,
+    exec_tid tid s p s0 (inr p') evs ->
+    exec_any tid s0 p' r s' ->
+    exec_any tid s p r s'
+  .
+
+  Definition exec_others (tid : nat) (s s' : State) : Prop :=
+    clos_refl_trans_1n _
+      (fun s0 s1 =>
+        exists tid' `(op' : opT T') r',
+          tid' <> tid /\
+          op_step op' tid' s0 r' s1)
+      s s'.
+
+  Lemma exec_any_op : forall `(op : opT T) tid r s s',
+    exec_any tid s (Op op) r s' ->
+      exists s0,
+        exec_others tid s s0 /\
+        op_step op tid s0 r s'.
+  Proof.
+    intros.
+    remember (Op op).
+    induction H; subst.
+    - edestruct IHexec_any; eauto; intuition idtac.
+      eexists; split; eauto.
+      econstructor; eauto.
+      do 4 eexists; split; eauto.
+    - exists s; split.
+      eapply rt1n_refl.
+      inversion H; subst; repeat sigT_eq; eauto.
+    - inversion H.
+  Qed.
+
 End Proc.
 
 Arguments Op {opT T}.

@@ -387,7 +387,7 @@ Module LockingCounter <: LayerImplFollowsRule LockAPI LockedCounterAPI LockingRu
 
   Theorem exec_others_preserves_lock :
     forall tid s s',
-      exec_others RawLockAPI.step LockAPI.step_allow tid s s' ->
+      exec_others (restricted_step RawLockAPI.step LockAPI.step_allow) tid s s' ->
       Lock s = Some tid ->
       Lock s' = Some tid.
   Proof.
@@ -407,9 +407,9 @@ Module LockingCounter <: LayerImplFollowsRule LockAPI LockedCounterAPI LockingRu
     match goal with
     | s : RawLockAPI.State |- _ =>
       destruct s
-    | H : exec_any RawLockAPI.step LockAPI.step_allow _ _ (Op _) _ _ |- _ =>
+    | H : exec_any _ _ _ (Op _) _ _ |- _ =>
       eapply exec_any_op in H; repeat deex
-    | H : exec_others _ _ _ _ _ |- _ =>
+    | H : exec_others _ _ _ _ |- _ =>
       eapply exec_others_preserves_lock in H; simpl in *; subst; [ | congruence ]
     end.
 
