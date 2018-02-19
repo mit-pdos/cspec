@@ -1145,6 +1145,16 @@ Definition trace_incl_rx {opT T} `(op_step : OpSemantics opT State) (p1 p2 : pro
     trace_incl_rx_N n op_step p1 p2.
 
 
+Theorem trace_incl_trace_incl_s : forall T `(op_step : OpSemantics opT State) (p1 p2 : proc opT T),
+  trace_incl op_step p1 p2 <->
+  (forall s tid,
+    trace_incl_s s tid op_step p1 p2).
+Proof.
+  unfold trace_incl, trace_incl_opt, trace_incl_s, trace_incl_ts.
+  split; eauto.
+Qed.
+
+
 Instance trace_incl_opt_preorder :
   PreOrder (@trace_incl_opt opT State op_step).
 Proof.
@@ -1440,6 +1450,62 @@ Theorem trace_incl_bind_a : forall `(p : proc opT T) `(p2 : T -> proc _ T') p2' 
 Proof.
   unfold trace_incl, trace_incl_opt,
          trace_incl_ts, trace_incl_ts_s.
+  intros.
+
+  match goal with
+  | H : exec_prefix _ _ (thread_upd ?ts ?tid ?pp) _ |- _ =>
+    remember (thread_upd ts tid pp);
+    generalize dependent ts;
+    generalize dependent p;
+    unfold exec_prefix in H; repeat deex;
+    induction H; intros; subst; eauto
+
+  end.
+
+  destruct (tid0 == tid); subst.
+  + autorewrite with t in *.
+    repeat maybe_proc_inv.
+    exec_tid_inv.
+    destruct result0.
+
+    * edestruct H; eauto.
+      intuition idtac.
+
+      eexists; split.
+      eapply ExecPrefixOne with (tid := tid).
+        autorewrite with t; eauto.
+        eauto.
+        autorewrite with t; eauto.
+      eauto.
+
+    * edestruct IHexec; eauto.
+      intuition idtac.
+
+      eexists; split.
+      eapply ExecPrefixOne with (tid := tid).
+        autorewrite with t; eauto.
+        eauto.
+        autorewrite with t; eauto.
+      eauto.
+
+  + edestruct IHexec.
+    rewrite thread_upd_upd_ne; eauto.
+    intuition idtac.
+
+    autorewrite with t in *.
+    eexists; split.
+    eapply ExecPrefixOne with (tid := tid0).
+      autorewrite with t; eauto.
+      eauto.
+      rewrite thread_upd_upd_ne; eauto.
+    eauto.
+Qed.
+
+Theorem trace_incl_s_bind_a : forall `(p : proc opT T) `(p2 : T -> proc _ T') p2' `(op_step : OpSemantics opT State) s tid,
+  (forall s' x, trace_incl_s s' tid op_step (p2 x) (p2' x)) ->
+  trace_incl_s s tid op_step (Bind p p2) (Bind p p2').
+Proof.
+  unfold trace_incl_s, trace_incl_ts_s.
   intros.
 
   match goal with
