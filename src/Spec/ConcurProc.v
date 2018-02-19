@@ -254,6 +254,19 @@ Section Proc.
       econstructor; eauto.
   Qed.
 
+  Lemma exec_others_exec_any :
+    forall tid s s' s'' `(p : proc T) v,
+      exec_others tid s s' ->
+      exec_any tid s' p v s'' ->
+      exec_any tid s p v s''.
+  Proof.
+    induction 1; intros; eauto.
+    repeat deex.
+    intuition idtac.
+    eapply ExecAnyOther; try eassumption.
+    eauto.
+  Qed.
+
 End Proc.
 
 Arguments Op {opT T}.
@@ -272,6 +285,7 @@ Hint Constructors exec.
 Hint Constructors exec_any.
 Hint Resolve exec_to_exec_prefix.
 Hint Resolve exec_tid_exec_any.
+Hint Resolve exec_others_exec_any.
 
 
 Notation "x <- p1 ; p2" := (Bind p1 (fun x => p2))
