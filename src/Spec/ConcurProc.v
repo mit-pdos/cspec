@@ -241,17 +241,33 @@ Section Proc.
     - inversion H.
   Qed.
 
-  Lemma exec_tid_exec_any :
-    forall tid tid' `(p : proc T) `(p' : proc T') s s' s'' result evs v,
-      tid <> tid' ->
-      exec_tid tid' s p' s' result evs ->
-      exec_any tid s' p v s'' ->
-      exec_any tid s p v s''.
+  Lemma exec_others_trans :
+    forall tid s0 s1 s2,
+      exec_others tid s0 s1 ->
+      exec_others tid s1 s2 ->
+      exec_others tid s0 s2.
   Proof.
-    induction 2; intros; eauto.
-    - econstructor; eauto.
-    - induction H0; intros; eauto.
-      econstructor; eauto.
+    induction 1; intros; eauto.
+    intuition idtac.
+    repeat deex.
+    econstructor; eauto 20.
+  Qed.
+
+  Lemma exec_tid_exec_others :
+    forall tid tid' `(p : proc T) s s' result evs,
+      tid <> tid' ->
+      exec_tid tid' s p s' result evs ->
+      exec_others tid s s'.
+  Proof.
+    induction 2; intros; eauto;
+      try solve [ constructor ].
+    - econstructor; eauto 10.
+      eapply rt1n_refl.
+    - induction H0; intros; eauto 10;
+        try solve [ constructor ].
+      eapply exec_others_trans; eauto.
+      econstructor; eauto 10.
+      eapply rt1n_refl.
   Qed.
 
   Lemma exec_others_exec_any :
@@ -284,8 +300,9 @@ Arguments threads_state {opT}.
 Hint Constructors exec.
 Hint Constructors exec_any.
 Hint Resolve exec_to_exec_prefix.
-Hint Resolve exec_tid_exec_any.
+Hint Resolve exec_tid_exec_others.
 Hint Resolve exec_others_exec_any.
+Hint Resolve exec_others_trans.
 
 
 Notation "x <- p1 ; p2" := (Bind p1 (fun x => p2))

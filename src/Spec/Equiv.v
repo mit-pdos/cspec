@@ -1332,22 +1332,23 @@ Proof.
   eauto.
 Qed.
 
-Lemma trace_incl_ts_proof_helper :
-  forall `(p1 : proc opT T) (p2 : proc _ T) ts tid `(op_step : OpSemantics opT State),
-  (forall ts s s' result tr evs,
-    exec_tid op_step tid s p1 s' result evs ->
+Lemma trace_incl_ts_s_proof_helper :
+  forall `(p1 : proc opT T) (p2 : proc _ T) ts tid `(op_step : OpSemantics opT State) s,
+  (forall ts s0 s' result tr evs,
+    exec_others op_step tid s s0 ->
+    exec_tid op_step tid s0 p1 s' result evs ->
     exec_prefix op_step s' (ts [[tid := match result with
                                  | inl _ => NoProc
                                  | inr p' => Proc p'
                                  end]]) tr ->
     exists tr',
-      exec_prefix op_step s ts [[tid := Proc p2]] tr' /\
+      exec_prefix op_step s0 ts [[tid := Proc p2]] tr' /\
       trace_eq (prepend tid evs tr) tr') ->
-  trace_incl_ts op_step
+  trace_incl_ts_s op_step s s
     (ts [[ tid := Proc p1 ]])
     (ts [[ tid := Proc p2 ]]).
 Proof.
-  unfold trace_incl_ts, trace_incl_ts_s.
+  unfold trace_incl_ts_s.
   intros.
 
   match goal with
@@ -1361,19 +1362,22 @@ Proof.
   destruct (tid == tid0); subst.
   + autorewrite with t in *.
     repeat maybe_proc_inv.
-    eauto.
+    eapply H; eauto.
 
-  + edestruct IHexec; intuition idtac.
-    rewrite thread_upd_upd_ne; eauto.
+  + edestruct IHexec.
+    * eauto.
+    * rewrite thread_upd_upd_ne; eauto.
+    * intuition idtac.
+      autorewrite with t in *.
+      eexists; split.
 
-    autorewrite with t in *.
-    eexists; split.
-
-    eapply ExecPrefixOne with (tid := tid0).
-      autorewrite with t; eauto.
+      eapply ExecPrefixOne with (tid := tid0).
+        autorewrite with t; eauto.
+        eauto.
+        rewrite thread_upd_upd_ne; eauto.
       eauto.
-      rewrite thread_upd_upd_ne; eauto.
-    eauto.
+Grab Existential Variables.
+  all: exact tt.
 Qed.
 
 Lemma trace_incl_proof_helper :
@@ -1390,10 +1394,32 @@ Lemma trace_incl_proof_helper :
   trace_incl op_step
     p1 p2.
 Proof.
-  unfold trace_incl, trace_incl_opt.
+  unfold trace_incl, trace_incl_opt, trace_incl_ts.
   intros.
 
-  eapply trace_incl_ts_proof_helper.
+  eapply trace_incl_ts_s_proof_helper.
+  eauto.
+Qed.
+
+Lemma trace_incl_s_proof_helper :
+  forall `(p1 : proc opT T) p2 `(op_step : OpSemantics opT State) s tid,
+  (forall ts s0 s' result tr evs,
+    exec_others op_step tid s s0 ->
+    exec_tid op_step tid s0 p1 s' result evs ->
+    exec_prefix op_step s' (ts [[tid := match result with
+                                 | inl _ => NoProc
+                                 | inr p' => Proc p'
+                                 end]]) tr ->
+    exists tr',
+      exec_prefix op_step s0 ts [[tid := Proc p2]] tr' /\
+      trace_eq (prepend tid evs tr) tr') ->
+  trace_incl_s s tid op_step
+    p1 p2.
+Proof.
+  unfold trace_incl_s.
+  intros.
+
+  eapply trace_incl_ts_s_proof_helper.
   eauto.
 Qed.
 
@@ -1430,7 +1456,7 @@ Proof.
   eapply trace_incl_proof_helper; intros.
   repeat exec_tid_inv.
 
-  eapply trace_incl_ts_proof_helper in H0.
+  eapply trace_incl_ts_s_proof_helper in H0.
   deex.
   eexists; split.
   eapply ExecPrefixOne with (tid := tid).

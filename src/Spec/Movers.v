@@ -11,6 +11,69 @@ Global Set Implicit Arguments.
 Global Generalizable All Variables.
 
 
+Section StatePred.
+
+  Variable opT : Type -> Type.
+  Variable State : Type.
+  Variable op_step : OpSemantics opT State.
+  Variable P : forall (tid : nat) (s : State), Prop.
+
+  Definition pred_stable :=
+    forall tid tid' s s' `(op : opT T) r,
+      P tid s ->
+      tid' <> tid ->
+      op_step op tid' s r s' ->
+      P tid s'.
+
+  Theorem pred_stable_atomic_exec :
+    forall s0 s1 tid tid' `(p : proc _ T) r evs,
+      pred_stable ->
+      tid <> tid' ->
+      P tid s0 ->
+      atomic_exec op_step p tid' s0 r s1 evs ->
+      P tid s1.
+  Proof.
+    intros.
+    induction H2; eauto.
+  Qed.
+
+  Theorem pred_stable_exec_tid :
+    forall s0 s1 tid tid' `(p : proc _ T) r evs,
+      pred_stable ->
+      tid <> tid' ->
+      P tid s0 ->
+      exec_tid op_step tid' s0 p s1 r evs ->
+      P tid s1.
+  Proof.
+    intros.
+    induction H2; eauto.
+    eapply pred_stable_atomic_exec; eauto.
+  Qed.
+
+End StatePred.
+
+
+Definition any {State} (tid : nat) (s : State) : Prop := True.
+
+Theorem pred_stable_any : forall `(op_step : OpSemantics opT State),
+  pred_stable op_step any.
+Proof.
+  firstorder.
+Qed.
+
+Theorem pred_stable_exec_any_others : forall `(op_step : OpSemantics opT State) `(p : proc _ T) P r,
+  pred_stable op_step
+    (fun tid s' => exists s s0,
+      P tid s /\ exec_any op_step tid s p r s0 /\ exec_others op_step tid s0 s').
+Proof.
+  unfold pred_stable; intros; repeat deex.
+  do 2 eexists; intuition eauto.
+Qed.
+
+Hint Resolve pred_stable_any.
+Hint Resolve pred_stable_exec_any_others.
+
+
 Section Movers.
 
   Variable opT : Type -> Type.
@@ -65,11 +128,11 @@ Section Movers.
         op_step opMover tid1 s v1 s' /\
         op_step op0 tid0 s' v0 s1.
 
-  Definition left_mover_pred (P : State -> Prop) :=
+  Definition left_mover_pred (P : nat -> State -> Prop) :=
     enabled_stable /\
     forall `(op0 : opT T0) tid0 tid1 s s0 s1 v0 v1,
       tid0 <> tid1 ->
-      P s ->
+      P tid1 s ->
       op_step op0 tid0 s v0 s0 ->
       op_step opMover tid1 s0 v1 s1 ->
       exists s',
@@ -83,6 +146,12 @@ Section Movers.
 
   Theorem both_mover_right : both_mover -> right_mover.
   Proof. unfold both_mover; intuition. Qed.
+
+  Theorem left_mover_left_mover_pred :
+    forall P, left_mover -> left_mover_pred P.
+  Proof.
+    unfold left_mover, left_mover_pred; intuition eauto.
+  Qed.
 
 
   Lemma atomic_exec_right_mover : forall tid0 tid1 s s0 `(ap : proc opT T) s1 v1 evs v0,
@@ -104,8 +173,10 @@ Section Movers.
     - edestruct IHatomic_exec; intuition eauto.
   Qed.
 
-  Lemma atomic_exec_left_mover : forall tid0 tid1 s s0 `(ap : proc opT T) s1 v1 evs v0,
-    left_mover ->
+  Lemma atomic_exec_left_mover : forall tid0 tid1 s s0 `(ap : proc opT T) s1 v1 evs v0 P,
+    left_mover_pred P ->
+    pred_stable op_step P ->
+    P tid0 s ->
     tid0 <> tid1 ->
     atomic_exec op_step ap tid1 s v1 s0 evs ->
     op_step opMover tid0 s0 v0 s1 ->
@@ -115,13 +186,15 @@ Section Movers.
   Proof.
     intros.
     generalize dependent s1.
-    induction H1; intros; eauto.
+    induction H3; intros; eauto.
     - edestruct IHatomic_exec2; eauto.
+      eapply pred_stable_atomic_exec; eauto.
       edestruct IHatomic_exec1; intuition eauto.
     - edestruct H.
-      edestruct H4.
+      edestruct H6.
+      4: eauto.
       3: eauto.
-      2: eauto.
+      eauto.
       eauto.
       intuition eauto.
     - edestruct IHatomic_exec; intuition eauto.
@@ -144,8 +217,10 @@ Section Movers.
     - edestruct IHexec_tid; intuition eauto.
   Qed.
 
-  Lemma exec_tid_left_mover : forall tid0 tid1 s s0 `(p : proc opT T) s1 result' evs v0,
-    left_mover ->
+  Lemma exec_tid_left_mover : forall tid0 tid1 s s0 `(p : proc opT T) s1 result' evs v0 P,
+    left_mover_pred P ->
+    pred_stable op_step P ->
+    P tid0 s ->
     tid0 <> tid1 ->
     exec_tid op_step tid1 s p s0 result' evs ->
     op_step opMover tid0 s0 v0 s1 ->
@@ -154,11 +229,12 @@ Section Movers.
       exec_tid op_step tid1 s0' p s1 result' evs.
   Proof.
     intros.
-    induction H1; simpl; eauto.
+    induction H3; simpl; eauto.
     - edestruct H.
-      edestruct H4.
+      edestruct H6.
+      4: eauto.
       3: eauto.
-      2: eauto.
+      eauto.
       eauto.
       intuition eauto.
     - edestruct atomic_exec_left_mover; intuition eauto.
@@ -193,9 +269,11 @@ Section Movers.
 
   Hint Resolve enabled_stable_exec_tid.
 
-  Lemma exec_left_mover : forall s ts tid `(rx : _ -> proc opT T) tr,
-    left_mover ->
+  Lemma exec_left_mover : forall s ts tid `(rx : _ -> proc opT T) tr P,
+    left_mover_pred P ->
+    pred_stable op_step P ->
     enabled_in tid s ->
+    P tid s ->
     exec_prefix op_step s ts [[ tid := Proc (x <- Op opMover; rx x) ]] tr ->
     exists s' r,
       op_step opMover tid s r s' /\
@@ -222,6 +300,7 @@ Section Movers.
         edestruct IHexec; intuition idtac.
           eapply enabled_stable_exec_tid; eauto.
           destruct H; eauto.
+          eapply pred_stable_exec_tid; eauto.
         rewrite thread_upd_upd_ne; eauto.
         repeat deex.
 
@@ -235,7 +314,7 @@ Section Movers.
           eauto.
           rewrite thread_upd_upd_ne; eauto.
 
-    - edestruct H0; repeat deex.
+    - edestruct H1; repeat deex.
       do 2 eexists; split.
       eauto.
       eauto.
@@ -300,7 +379,7 @@ Section Movers.
     intros.
     eapply trace_incl_proof_helper; intros.
     repeat exec_tid_inv.
-    eapply exec_left_mover in H2; eauto.
+    eapply exec_left_mover with (P := any) in H2; eauto.
     repeat deex.
 
     eexists; split.
@@ -309,6 +388,9 @@ Section Movers.
       eauto.
       autorewrite with t. eauto.
     rewrite app_nil_r; eauto.
+
+    eapply left_mover_left_mover_pred; eauto.
+    firstorder.
   Qed.
 
   Theorem trace_incl_atomize_op_ret_left_mover :
@@ -325,10 +407,10 @@ Section Movers.
     eapply trace_incl_proof_helper; intros.
     repeat exec_tid_inv.
     rewrite exec_equiv_bind_bind in H2.
-    eapply exec_left_mover in H2; eauto.
+    eapply exec_left_mover with (P := any) in H2; eauto.
     repeat deex.
 
-    eapply trace_incl_ts_proof_helper in H2.
+    eapply trace_incl_ts_s_proof_helper in H2.
     repeat deex.
 
     eexists; split.
@@ -341,12 +423,16 @@ Section Movers.
     intros.
     repeat exec_tid_inv.
     eauto.
+
+    eapply left_mover_left_mover_pred; eauto.
+    firstorder.
   Qed.
 
 End Movers.
 
 Hint Resolve both_mover_left.
 Hint Resolve both_mover_right.
+Hint Resolve left_mover_left_mover_pred.
 Hint Resolve always_enabled_to_stable.
 
 Arguments left_mover {opT State} op_step {moverT}.
@@ -366,47 +452,79 @@ Section YSA.
 
   (** Something similar to the Yield Sufficiency Automaton from the GC paper *)
 
-  Inductive left_movers : forall T, proc opT T -> Prop :=
+  Inductive left_movers (P : nat -> State -> Prop) : forall T, proc opT T -> Prop :=
   | LeftMoversOne :
     forall `(opMover : opT oT) `(rx : _ -> proc _ T),
-    left_mover op_step opMover ->
-    always_enabled op_step opMover ->
-    (forall a, left_movers (rx a)) ->
-    left_movers (Bind (Op opMover) rx)
+    left_mover_pred op_step opMover P ->
+    (forall tid s,
+      P tid s ->
+      enabled_in op_step opMover tid s) ->
+    (forall r,
+      left_movers
+        (fun tid s' =>
+          exists s s0,
+            P tid s /\
+            exec_any op_step tid s (Op opMover) r s0 /\
+            exec_others op_step tid s0 s')
+        (rx r)) ->
+    left_movers P (Bind (Op opMover) rx)
   | LeftMoversRet :
     forall `(v : T),
-    left_movers (Ret v).
+    left_movers P (Ret v).
 
-  Inductive at_most_one_non_mover : forall T, proc opT T -> Prop :=
+  Inductive at_most_one_non_mover (P : nat -> State -> Prop) : forall T, proc opT T -> Prop :=
   | ZeroNonMovers :
     forall `(p : proc _ T),
-    left_movers p ->
-    at_most_one_non_mover p
+    left_movers P p ->
+    at_most_one_non_mover P p
   | OneNonMover :
     forall `(op : opT T) `(rx : _ -> proc _ R),
-    (forall a, left_movers (rx a)) ->
-    at_most_one_non_mover (Bind (Op op) rx).
+    (forall r,
+      left_movers
+        (fun tid s' =>
+          exists s s0,
+            P tid s /\
+            exec_any op_step tid s (Op op) r s0 /\
+            exec_others op_step tid s0 s')
+        (rx r)) ->
+    at_most_one_non_mover P (Bind (Op op) rx).
 
-  Inductive ysa_movers : forall T, proc opT T -> Prop :=
+  Inductive right_movers (P : nat -> State -> Prop) : forall T, proc opT T -> Prop :=
   | RightMoversOne :
     forall `(opMover : opT oT) `(rx : _ -> proc _ T),
     right_mover op_step opMover ->
-    (forall a, ysa_movers (rx a)) ->
-    ysa_movers (Bind (Op opMover) rx)
+    (forall r,
+      right_movers
+        (fun tid s' =>
+          exists s s0,
+            P tid s /\
+            exec_any op_step tid s (Op opMover) r s0 /\
+            exec_others op_step tid s0 s')
+        (rx r)) ->
+    right_movers P (Bind (Op opMover) rx)
   | RightMoversDone :
     forall `(p : proc _ T),
-    at_most_one_non_mover p ->
-    ysa_movers p.
+    at_most_one_non_mover P p ->
+    right_movers P p.
+
+  Definition ysa_movers `(p : proc opT T) :=
+    right_movers
+      any
+      p.
 
   Theorem trace_incl_atomize_ysa_left_movers :
-    forall T L R (p : proc _ T) (l : _ -> proc _ L) (rx : _ -> proc _ R),
-      (forall a, left_movers (l a)) ->
-      trace_incl op_step
+    forall T L R (p : proc _ T) (l : _ -> proc _ L) (rx : _ -> proc _ R) P s tid,
+      (forall r, pred_stable op_step (P r)) ->
+      (forall r s',
+        exec_any op_step tid s (Atomic p) r s' ->
+          (P r) tid s' /\
+          left_movers (P r) (l r)) ->
+      trace_incl_s s tid op_step
         (Bind (Bind (Atomic p) l) rx)
         (Bind (Atomic (Bind p l)) rx).
   Proof.
     intros.
-    eapply trace_incl_proof_helper; intros.
+    eapply trace_incl_s_proof_helper; intros.
     repeat exec_tid_inv.
 
     cut (exists tr' v1 s1 evs1,
@@ -425,22 +543,27 @@ Section YSA.
       eauto.
     }
 
-    specialize (H v); remember (l v).
+    edestruct H0; clear H0; eauto.
+    specialize (H v).
+    remember (P v) as P0; clear HeqP0 P.
+    remember (l v).
     clear dependent s.
     clear dependent p.
+    clear s0 evs.
     generalize dependent l.
     generalize dependent T.
     generalize dependent s'.
     generalize dependent tr.
-    induction H; intros.
+    induction H4; intros.
 
-    - repeat rewrite exec_equiv_bind_bind in H3.
-      eapply exec_left_mover in H3; eauto; repeat deex.
+    - repeat rewrite exec_equiv_bind_bind in H4.
+      eapply exec_left_mover in H4; eauto; repeat deex.
 
-      edestruct H2.
-      eassumption.
-      reflexivity.
+      edestruct H3.
       eauto.
+      eassumption.
+      eauto 20.
+      reflexivity.
 
       repeat deex.
       do 4 eexists; intuition idtac.
@@ -450,12 +573,46 @@ Section YSA.
       rewrite app_nil_l in *.
       eauto.
 
-    - rewrite exec_equiv_ret_bind in H1.
+    - rewrite exec_equiv_ret_bind in H3.
       do 4 eexists; intuition idtac.
       eauto.
       eauto.
       eauto.
+  Grab Existential Variables.
+    all: exact tt.
   Qed.
+
+
+  Lemma exec_any_atomic_op :
+    forall `(op : opT T) s r s' tid,
+      exec_any op_step tid s (Atomic (Op op)) r s' ->
+      exec_any op_step tid s (Op op) r s'.
+  Proof.
+    intros.
+    remember (Atomic (Op op)).
+    induction H; intros; subst; eauto; exec_tid_inv.
+    atomic_exec_inv.
+    eauto.
+  Grab Existential Variables.
+    all: exact tt.
+  Qed.
+
+  Lemma pred_stable_exec_any_atomic_ret :
+    forall P tid s s' `(v : T) r,
+      pred_stable op_step P ->
+      P tid s ->
+      exec_any op_step tid s (Atomic (Ret v)) r s' ->
+      P tid s'.
+  Proof.
+    intros.
+    remember (Atomic (Ret v)).
+    induction H1; intros; subst; eauto; exec_tid_inv.
+    atomic_exec_inv.
+    eauto.
+  Qed.
+
+  Hint Resolve exec_any_atomic_op.
+
 
   Theorem trace_incl_atomize_ysa :
     forall T R (p : proc _ T) (rx : _ -> proc _ R),
@@ -464,29 +621,47 @@ Section YSA.
         (Bind p rx)
         (Bind (Atomic p) rx).
   Proof.
+    unfold ysa_movers.
     intros.
-    induction H.
+    eapply trace_incl_trace_incl_s; intros.
+    assert (any tid s) by firstorder.
+    assert (pred_stable op_step any) by eauto.
+    generalize dependent (@any State); intros.
+    generalize dependent s.
+    induction H; intros.
     {
       rewrite <- trace_incl_atomize_op_right_mover by eauto.
       repeat rewrite exec_equiv_bind_bind.
-      eapply trace_incl_bind_a; intros.
-      eauto.
+      eapply trace_incl_s_bind_a; eauto 10.
     }
 
     inversion H; clear H; repeat sigT_eq.
     - rewrite <- exec_equiv_ret_bind with (v := tt) (p0 := (fun _ => p)) at 1.
       rewrite <- atomic_equiv_ret_bind with (v := tt) (p0 := (fun _ => p)).
-      erewrite <- trace_incl_atomize_ysa_left_movers; eauto.
+      erewrite <- trace_incl_atomize_ysa_left_movers with (P := fun _ => P); eauto.
       rewrite exec_equiv_atomicret_ret.
       reflexivity.
-    - erewrite <- trace_incl_atomize_ysa_left_movers; eauto.
+
+      intros; intuition eauto.
+      eapply pred_stable_exec_any_atomic_ret; eauto.
+
+    - erewrite <- trace_incl_atomize_ysa_left_movers with (P := fun _ => _).
       repeat rewrite exec_equiv_bind_bind.
       rewrite trace_incl_op.
       reflexivity.
+
+      2: intros; intuition eauto.
+      2: simpl.
+      2: eauto 20.
+
+      eauto.
+
+  Grab Existential Variables.
+    all: exact tt.
   Qed.
 
 End YSA.
 
-Hint Constructors ysa_movers.
+Hint Constructors right_movers.
 Hint Constructors at_most_one_non_mover.
 Hint Constructors left_movers.

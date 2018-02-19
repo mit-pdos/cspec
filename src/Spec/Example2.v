@@ -302,7 +302,7 @@ Module LockingCounter <: LayerImplFollowsRule LockAPI LockedCounterAPI LockingRu
     intros.
     eapply trace_incl_atomize_ysa.
     simpl.
-    unfold inc_core; eauto 20.
+    unfold inc_core, ysa_movers; eauto 20.
   Qed.
 
   Theorem dec_atomic : forall `(rx : _ -> proc _ T),
@@ -313,7 +313,7 @@ Module LockingCounter <: LayerImplFollowsRule LockAPI LockedCounterAPI LockingRu
     intros.
     eapply trace_incl_atomize_ysa.
     simpl.
-    unfold dec_core; eauto 20.
+    unfold dec_core, ysa_movers; eauto 20.
   Qed.
 
   Theorem my_compile_correct :
