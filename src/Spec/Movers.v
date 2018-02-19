@@ -154,6 +154,15 @@ Section Movers.
   Qed.
 
 
+  Theorem left_mover_pred_impl : forall (P1 P2 : nat -> State -> Prop),
+    (forall tid s, P2 tid s -> P1 tid s) ->
+    left_mover_pred P1 ->
+    left_mover_pred P2.
+  Proof.
+    unfold left_mover_pred; intuition eauto.
+  Qed.
+
+
   Lemma atomic_exec_right_mover : forall tid0 tid1 s s0 `(ap : proc opT T) s1 v1 evs v0,
     right_mover ->
     tid0 <> tid1 ->
@@ -511,6 +520,24 @@ Section YSA.
     right_movers
       any
       p.
+
+
+  Hint Resolve left_mover_pred_impl.
+
+  Theorem left_movers_impl :
+    forall (P1 : nat -> State -> Prop) `(p : proc _ T),
+      left_movers P1 p ->
+      forall (P2 : nat -> State -> Prop),
+        (forall tid s, P2 tid s -> P1 tid s) ->
+        left_movers P2 p.
+  Proof.
+    induction 1; intros.
+    - econstructor; eauto; intros.
+      eapply H2; intros; repeat deex.
+      eauto 20.
+    - econstructor.
+  Qed.
+
 
   Theorem trace_incl_atomize_ysa_left_movers :
     forall T L R (p : proc _ T) (l : _ -> proc _ L) (rx : _ -> proc _ R) P s tid,
