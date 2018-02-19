@@ -1102,9 +1102,9 @@ Qed.
 
 (** Trace inclusion for a single thread *)
 
-Definition trace_incl_s `(s : State) s' tid `(op_step : OpSemantics opT State) `(p1 : proc opT T) (p2 : proc _ T) :=
+Definition trace_incl_s `(s : State) tid `(op_step : OpSemantics opT State) `(p1 : proc opT T) (p2 : proc _ T) :=
   forall ts,
-    trace_incl_ts_s op_step s s'
+    trace_incl_ts_s op_step s s
       (ts [[ tid := Proc p1 ]])
       (ts [[ tid := Proc p2 ]]).
 
@@ -1118,9 +1118,9 @@ Definition trace_incl {opT T} `(op_step : OpSemantics opT State) (p1 p2 : proc o
   trace_incl_opt op_step (Proc p1) (Proc p2).
 
 
-Definition trace_incl_s_N n `(s : State) s' tid `(op_step : OpSemantics opT State) `(p1 : proc opT T) (p2 : proc _ T) :=
+Definition trace_incl_s_N n `(s : State) tid `(op_step : OpSemantics opT State) `(p1 : proc opT T) (p2 : proc _ T) :=
   forall ts,
-    trace_incl_ts_s_N n op_step s s'
+    trace_incl_ts_s_N n op_step s s
       (ts [[ tid := Proc p1 ]])
       (ts [[ tid := Proc p2 ]]).
 
@@ -1158,7 +1158,7 @@ Proof.
 Qed.
 
 Instance trace_incl_s_preorder :
-  PreOrder (@trace_incl_s State s s tid opT op_step T).
+  PreOrder (@trace_incl_s State s tid opT op_step T).
 Proof.
   split.
   - unfold Reflexive; intros.
@@ -1224,7 +1224,7 @@ Qed.
 Instance trace_incl_s_proper :
   Proper (Basics.flip (@trace_incl opT T State op_step) ==>
           @trace_incl opT T State op_step ==>
-          Basics.impl) (@trace_incl_s State s s' tid opT op_step T).
+          Basics.impl) (@trace_incl_s State s tid opT op_step T).
 Proof.
   intros.
   intros p1 p2 H12 p3 p4 H34 H; subst.
@@ -1240,7 +1240,7 @@ Qed.
 Instance trace_incl_s_proper_flip :
   Proper (@trace_incl opT T State op_step ==>
           Basics.flip (@trace_incl opT T State op_step) ==>
-          Basics.flip Basics.impl) (@trace_incl_s State s s' tid opT op_step T).
+          Basics.flip Basics.impl) (@trace_incl_s State s tid opT op_step T).
 Proof.
   intros.
   intros p1 p2 H12 p3 p4 H34 H; subst.
@@ -1278,7 +1278,7 @@ Qed.
 
 Instance trace_incl_s_exec_equiv_proper :
   Proper (exec_equiv ==> exec_equiv ==> iff)
-         (@trace_incl_s State s s' tid opT op_step T).
+         (@trace_incl_s State s tid opT op_step T).
 Proof.
   intros.
   intros p1 p1' ?.
@@ -1320,15 +1320,6 @@ Proof.
 
   unfold trace_incl_opt in H.
   eauto.
-Qed.
-
-Theorem trace_incl_s_trans : forall `(s0 : State) s1 s2 tid `(op_step : OpSemantics opT State) `(p1 : proc opT T) p2 p3,
-  trace_incl_s s0 s1 tid op_step p1 p2 ->
-  trace_incl_s s1 s2 tid op_step p2 p3 ->
-  trace_incl_s s0 s2 tid op_step p1 p3.
-Proof.
-  unfold trace_incl_s; intros.
-  eapply trace_incl_ts_s_trans; eauto.
 Qed.
 
 Lemma trace_incl_ts_proof_helper :
