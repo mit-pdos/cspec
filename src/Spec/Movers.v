@@ -426,18 +426,18 @@ Section YSA.
     }
 
     specialize (H v); remember (l v).
-    generalize dependent p.
+    clear dependent s.
+    clear dependent p.
     generalize dependent l.
     generalize dependent T.
     generalize dependent s'.
     generalize dependent tr.
-    generalize dependent evs.
     induction H; intros.
 
     - repeat rewrite exec_equiv_bind_bind in H3.
       eapply exec_left_mover in H3; eauto; repeat deex.
 
-      edestruct H2 with (p := Bind p (fun _ => Op opMover)).
+      edestruct H2.
       eassumption.
       reflexivity.
       eauto.
