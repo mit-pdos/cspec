@@ -241,6 +241,19 @@ Section Proc.
     - inversion H.
   Qed.
 
+  Lemma exec_tid_exec_any :
+    forall tid tid' `(p : proc T) `(p' : proc T') s s' s'' result evs v,
+      tid <> tid' ->
+      exec_tid tid' s p' s' result evs ->
+      exec_any tid s' p v s'' ->
+      exec_any tid s p v s''.
+  Proof.
+    induction 2; intros; eauto.
+    - econstructor; eauto.
+    - induction H0; intros; eauto.
+      econstructor; eauto.
+  Qed.
+
 End Proc.
 
 Arguments Op {opT T}.
@@ -256,7 +269,9 @@ Arguments NoProc {opT}.
 Arguments threads_state {opT}.
 
 Hint Constructors exec.
+Hint Constructors exec_any.
 Hint Resolve exec_to_exec_prefix.
+Hint Resolve exec_tid_exec_any.
 
 
 Notation "x <- p1 ; p2" := (Bind p1 (fun x => p2))

@@ -1502,7 +1502,9 @@ Proof.
 Qed.
 
 Theorem trace_incl_s_bind_a : forall `(p : proc opT T) `(p2 : T -> proc _ T') p2' `(op_step : OpSemantics opT State) s tid,
-  (forall s' x, trace_incl_s s' tid op_step (p2 x) (p2' x)) ->
+  (forall s' x,
+    exec_any op_step tid s p x s' ->
+    trace_incl_s s' tid op_step (p2 x) (p2' x)) ->
   trace_incl_s s tid op_step (Bind p p2) (Bind p p2').
 Proof.
   unfold trace_incl_s, trace_incl_ts_s.
@@ -1513,9 +1515,8 @@ Proof.
     remember (thread_upd ts tid pp);
     generalize dependent ts;
     generalize dependent p;
-    unfold exec_prefix in H; repeat deex;
+    destruct H as [? H];
     induction H; intros; subst; eauto
-
   end.
 
   destruct (tid0 == tid); subst.
@@ -1524,7 +1525,7 @@ Proof.
     exec_tid_inv.
     destruct result0.
 
-    * edestruct H; eauto.
+    * edestruct H2; eauto.
       intuition idtac.
 
       eexists; split.
@@ -1545,6 +1546,7 @@ Proof.
       eauto.
 
   + edestruct IHexec.
+    eauto.
     rewrite thread_upd_upd_ne; eauto.
     intuition idtac.
 
@@ -1555,6 +1557,9 @@ Proof.
       eauto.
       rewrite thread_upd_upd_ne; eauto.
     eauto.
+
+Grab Existential Variables.
+  all: exact tt.
 Qed.
 
 Theorem trace_incl_N_bind_a : forall `(p : proc opT T) `(p2 : T -> proc _ T') p2' `(op_step : OpSemantics opT State) n,
