@@ -2,6 +2,7 @@
 CODE += $(wildcard src/Helpers/*.v)
 CODE += $(wildcard src/Spec/*.v)
 CODE += $(wildcard src/*.v)
+CODE += $(wildcard src/Mail2/*.v)
 CODE += $(wildcard src/FS/SepLogic/Mem/*.v)
 CODE += $(wildcard src/FS/SepLogic/Pred/*.v)
 CODE += $(wildcard src/FS/SepLogic/*.v)

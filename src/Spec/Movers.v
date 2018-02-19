@@ -65,6 +65,17 @@ Section Movers.
         op_step opMover tid1 s v1 s' /\
         op_step op0 tid0 s' v0 s1.
 
+  Definition left_mover_pred (P : State -> Prop) :=
+    enabled_stable /\
+    forall `(op0 : opT T0) tid0 tid1 s s0 s1 v0 v1,
+      tid0 <> tid1 ->
+      P s ->
+      op_step op0 tid0 s v0 s0 ->
+      op_step opMover tid1 s0 v1 s1 ->
+      exists s',
+        op_step opMover tid1 s v1 s' /\
+        op_step op0 tid0 s' v0 s1.
+
   Definition both_mover := right_mover /\ left_mover.
 
   Theorem both_mover_left : both_mover -> left_mover.
@@ -339,6 +350,7 @@ Hint Resolve both_mover_right.
 Hint Resolve always_enabled_to_stable.
 
 Arguments left_mover {opT State} op_step {moverT}.
+Arguments left_mover_pred {opT State} op_step {moverT}.
 Arguments right_mover {opT State} op_step {moverT}.
 Arguments both_mover {opT State} op_step {moverT}.
 Arguments enabled_after {opT State} op_step {moverT} opMover {T} p.
