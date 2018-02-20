@@ -110,34 +110,34 @@ Section Movers.
   Qed.
 
   Definition right_mover :=
-    forall `(op1 : opT T2) tid0 tid1 s s0 s1 v0 v1,
+    forall `(op1 : opT T2) tid0 tid1 s s0 s1 v0 v1 evs0 evs1,
       tid0 <> tid1 ->
-      op_step opMover tid0 s v0 s0 ->
-      op_step op1 tid1 s0 v1 s1 ->
+      op_step opMover tid0 s v0 s0 evs0 ->
+      op_step op1 tid1 s0 v1 s1 evs1 ->
       exists s',
-        op_step op1 tid1 s v1 s' /\
-        op_step opMover tid0 s' v0 s1.
+        op_step op1 tid1 s v1 s' evs1 /\
+        op_step opMover tid0 s' v0 s1 evs0.
 
   Definition left_mover :=
     enabled_stable /\
-    forall `(op0 : opT T0) tid0 tid1 s s0 s1 v0 v1,
+    forall `(op0 : opT T0) tid0 tid1 s s0 s1 v0 v1 evs0 evs1,
       tid0 <> tid1 ->
-      op_step op0 tid0 s v0 s0 ->
-      op_step opMover tid1 s0 v1 s1 ->
+      op_step op0 tid0 s v0 s0 evs0 ->
+      op_step opMover tid1 s0 v1 s1 evs1 ->
       exists s',
-        op_step opMover tid1 s v1 s' /\
-        op_step op0 tid0 s' v0 s1.
+        op_step opMover tid1 s v1 s' evs1 /\
+        op_step op0 tid0 s' v0 s1 evs0.
 
   Definition left_mover_pred (P : nat -> State -> Prop) :=
     enabled_stable /\
-    forall `(op0 : opT T0) tid0 tid1 s s0 s1 v0 v1,
+    forall `(op0 : opT T0) tid0 tid1 s s0 s1 v0 v1 evs0 evs1,
       tid0 <> tid1 ->
       P tid1 s ->
-      op_step op0 tid0 s v0 s0 ->
-      op_step opMover tid1 s0 v1 s1 ->
+      op_step op0 tid0 s v0 s0 evs0 ->
+      op_step opMover tid1 s0 v1 s1 evs1 ->
       exists s',
-        op_step opMover tid1 s v1 s' /\
-        op_step op0 tid0 s' v0 s1.
+        op_step opMover tid1 s v1 s' evs1 /\
+        op_step op0 tid0 s' v0 s1 evs0.
 
   Definition both_mover := right_mover /\ left_mover.
 
@@ -163,14 +163,14 @@ Section Movers.
   Qed.
 
 
-  Lemma atomic_exec_right_mover : forall tid0 tid1 s s0 `(ap : proc opT T) s1 v1 evs v0,
+  Lemma atomic_exec_right_mover : forall tid0 tid1 s s0 `(ap : proc opT T) s1 v1 evsM evs v0,
     right_mover ->
     tid0 <> tid1 ->
-    op_step opMover tid0 s v0 s0 ->
+    op_step opMover tid0 s v0 s0 evsM ->
     atomic_exec op_step ap tid1 s0 v1 s1 evs ->
       exists s0',
       atomic_exec op_step ap tid1 s v1 s0' evs /\
-      op_step opMover tid0 s0' v0 s1.
+      op_step opMover tid0 s0' v0 s1 evsM.
   Proof.
     intros.
     generalize dependent s.
@@ -182,15 +182,15 @@ Section Movers.
     - edestruct IHatomic_exec; intuition eauto.
   Qed.
 
-  Lemma atomic_exec_left_mover : forall tid0 tid1 s s0 `(ap : proc opT T) s1 v1 evs v0 P,
+  Lemma atomic_exec_left_mover : forall tid0 tid1 s s0 `(ap : proc opT T) s1 v1 evs evsM v0 P,
     left_mover_pred P ->
     pred_stable op_step P ->
     P tid0 s ->
     tid0 <> tid1 ->
     atomic_exec op_step ap tid1 s v1 s0 evs ->
-    op_step opMover tid0 s0 v0 s1 ->
+    op_step opMover tid0 s0 v0 s1 evsM ->
       exists s0',
-      op_step opMover tid0 s v0 s0' /\
+      op_step opMover tid0 s v0 s0' evsM /\
       atomic_exec op_step ap tid1 s0' v1 s1 evs.
   Proof.
     intros.
@@ -210,14 +210,14 @@ Section Movers.
     - edestruct IHatomic_exec; intuition eauto.
   Qed.
 
-  Lemma exec_tid_right_mover : forall tid0 tid1 s s0 `(p : proc opT T) s1 result' evs v0,
+  Lemma exec_tid_right_mover : forall tid0 tid1 s s0 `(p : proc opT T) s1 result' evs evsM v0,
     right_mover ->
     tid0 <> tid1 ->
-    op_step opMover tid0 s v0 s0 ->
+    op_step opMover tid0 s v0 s0 evsM ->
     exec_tid op_step tid1 s0 p s1 result' evs ->
       exists s0',
       exec_tid op_step tid1 s p s0' result' evs /\
-      op_step opMover tid0 s0' v0 s1.
+      op_step opMover tid0 s0' v0 s1 evsM.
   Proof.
     intros.
     induction H2; simpl; eauto.
@@ -226,15 +226,15 @@ Section Movers.
     - edestruct IHexec_tid; intuition eauto.
   Qed.
 
-  Lemma exec_tid_left_mover : forall tid0 tid1 s s0 `(p : proc opT T) s1 result' evs v0 P,
+  Lemma exec_tid_left_mover : forall tid0 tid1 s s0 `(p : proc opT T) s1 result' evs evsM v0 P,
     left_mover_pred P ->
     pred_stable op_step P ->
     P tid0 s ->
     tid0 <> tid1 ->
     exec_tid op_step tid1 s p s0 result' evs ->
-    op_step opMover tid0 s0 v0 s1 ->
+    op_step opMover tid0 s0 v0 s1 evsM ->
       exists s0',
-      op_step opMover tid0 s v0 s0' /\
+      op_step opMover tid0 s v0 s0' evsM /\
       exec_tid op_step tid1 s0' p s1 result' evs.
   Proof.
     intros.
@@ -285,7 +285,7 @@ Section Movers.
     P tid s ->
     exec_prefix op_step s ts [[ tid := Proc (x <- Op opMover; rx x) ]] tr ->
     exists s' r,
-      op_step opMover tid s r s' /\
+      op_step opMover tid s r s' nil /\
       exec_prefix op_step s' ts [[ tid := Proc (rx r) ]] tr.
   Proof.
     intros.
