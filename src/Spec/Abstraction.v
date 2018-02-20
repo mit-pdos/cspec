@@ -26,12 +26,12 @@ Section StateAbstraction.
   Variable lo_step : OpSemantics opLoT StateLo.
   Variable hi_step : OpSemantics opLoT StateHi.
 
-  Definition op_abs := forall `(op : opLoT T) s1 s1' s2 tid r,
+  Definition op_abs := forall `(op : opLoT T) s1 s1' s2 tid r evs,
     absR s1 s2 ->
-    lo_step op tid s1 r s1' ->
+    lo_step op tid s1 r s1' evs ->
       exists s2',
         absR s1' s2' /\
-        hi_step op tid s2 r s2'.
+        hi_step op tid s2 r s2' evs.
 
   Variable op_abs_holds : op_abs.
 

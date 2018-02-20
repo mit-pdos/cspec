@@ -27,8 +27,7 @@ Section ProcStructure.
   | NoAtomicsUntil : forall `(p : T -> proc opT T) (c : T -> bool) v,
     (forall v, no_atomics (p v)) ->
     no_atomics (Until c p v)
-  | NoAtomicsLog : forall `(v : T),
-    no_atomics (Log v).
+  .
 
   Hint Constructors no_atomics.
 
@@ -151,8 +150,7 @@ Section Compiler.
   | CompileUntil : forall `(p1 : T -> proc opLoT T) (p2 : T -> proc opMidT T) (c : T -> bool) v,
     (forall v', compile_ok (p1 v') (p2 v')) ->
     compile_ok (Until c p1 v) (Until c p2 v)
-  | CompileLog : forall `(v : T),
-    compile_ok (Log v) (Log v).
+  .
 
   Inductive atomic_compile_ok : forall T (p1 : proc opLoT T) (p2 : proc opMidT T), Prop :=
   | ACompileOp : forall `(op : opMidT T),
@@ -167,8 +165,7 @@ Section Compiler.
   | ACompileUntil : forall `(p1 : T -> proc opLoT T) (p2 : T -> proc opMidT T) (c : T -> bool) v,
     (forall v', atomic_compile_ok (p1 v') (p2 v')) ->
     atomic_compile_ok (Until c p1 v) (Until c p2 v)
-  | ACompileLog : forall `(v : T),
-    atomic_compile_ok (Log v) (Log v).
+  .
 
   Hint Constructors compile_ok.
   Hint Constructors atomic_compile_ok.
@@ -179,7 +176,6 @@ Section Compiler.
     | Ret t => Ret t
     | Op op => compile_op op
     | Bind p1 p2 => Bind (compile p1) (fun r => compile (p2 r))
-    | Log v => Log v
     | Atomic p => Atomic (compile p)
     | Until c p v => Until c (fun r => compile (p r)) v
     end.
@@ -265,8 +261,7 @@ Section Compiler.
   Definition compile_correct :=
     forall `(op : opMidT T) tid s v s' evs,
       atomic_exec lo_step (compile_op op) tid s v s' evs ->
-      trace_eq (prepend tid evs TraceEmpty) TraceEmpty /\
-      hi_step op tid s v s'.
+      hi_step op tid s v s' evs.
 
   Variable compile_is_correct : compile_correct.
 
@@ -379,8 +374,7 @@ Section Atomization.
   | AtomizeUntil : forall T (p1 p2 : T -> proc opLoT T) (c : T -> bool) v,
     (forall v', atomize_ok (p1 v') (p2 v')) ->
     atomize_ok (Until c p1 v) (Until c p2 v)
-  | AtomizeLog : forall `(v : T),
-    atomize_ok (Log v) (Log v).
+  .
 
 
   Variable State : Type.
@@ -416,7 +410,6 @@ Section Atomization.
       reflexivity.
       eapply trace_incl_bind_a; intros.
       eauto.
-    - eapply trace_incl_bind_a; eauto.
   Qed.
 
   Theorem atomize_ok_trace_incl :
@@ -494,7 +487,6 @@ Proof.
     constructor. eauto. intros. specialize (H1 x). intuition eauto.
   - split; constructor; intuition eauto;
       edestruct H0; eauto.
-  - split; constructor.
 Qed.
 
 Hint Resolve proc_match_cons_Proc.

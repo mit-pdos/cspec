@@ -19,10 +19,10 @@ Section StatePred.
   Variable P : forall (tid : nat) (s : State), Prop.
 
   Definition pred_stable :=
-    forall tid tid' s s' `(op : opT T) r,
+    forall tid tid' s s' `(op : opT T) r evs,
       P tid s ->
       tid' <> tid ->
-      op_step op tid' s r s' ->
+      op_step op tid' s r s' evs ->
       P tid s'.
 
   Theorem pred_stable_atomic_exec :
@@ -84,8 +84,8 @@ Section Movers.
   Variable opMover : opT moverT.
 
   Definition enabled_in (tid : nat) (s : State) :=
-    exists rM sM,
-      op_step opMover tid s rM sM.
+    exists rM sM evs,
+      op_step opMover tid s rM sM evs.
 
   Definition always_enabled :=
     forall tid s,
@@ -97,10 +97,10 @@ Section Movers.
       enabled_in tid s'.
 
   Definition enabled_stable :=
-    forall tid tid' s `(op : opT T) r s',
+    forall tid tid' s `(op : opT T) r s' evs,
       tid <> tid' ->
       enabled_in tid s ->
-      op_step op tid' s r s' ->
+      op_step op tid' s r s' evs ->
       enabled_in tid s'.
 
   Lemma always_enabled_to_stable :

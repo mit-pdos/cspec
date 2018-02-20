@@ -46,11 +46,10 @@ Section Proc.
   | Ret : forall T (v : T), proc T
   | Bind : forall T (T1 : Type) (p1 : proc T1) (p2 : T1 -> proc T), proc T
   | Until : forall T (c : T -> bool) (p : T -> proc T) (v : T), proc T
-  | Log : forall T (v : T), proc T
   | Atomic : forall T (p : proc T), proc T.
 
 
-  Definition OpSemantics := forall T, opT T -> nat -> State -> T -> State -> Prop.
+  Definition OpSemantics := forall T, opT T -> nat -> State -> T -> State -> list event -> Prop.
   Variable op_step : OpSemantics.
 
 
@@ -86,13 +85,9 @@ Section Proc.
     atomic_exec (p2 v1) tid s1 v2 s2 ev2 ->
     atomic_exec (Bind p1 p2) tid s0 v2 s2 (ev1 ++ ev2)
 
-  | AtomicOp : forall T tid (v : T) s s' op,
-    op_step op tid s v s' ->
-    atomic_exec (Op op) tid s v s' nil
-
-  | AtomicLog : forall T (r : T) tid s,
-    atomic_exec (Log r) tid s r s
-      [Event r]
+  | AtomicOp : forall T tid (v : T) s s' op evs,
+    op_step op tid s v s' evs ->
+    atomic_exec (Op op) tid s v s' evs
 
   | AtomicUntil : forall T (p : T -> proc T) (c : T -> bool) v tid s r s' ev',
     atomic_exec (until1 c p v) tid s r s' ev' ->
@@ -112,22 +107,17 @@ Section Proc.
                  s (inl v)
                  nil
 
-  | ExecTidOp : forall tid T (v : T) s s' op,
-    op_step op tid s v s' ->
+  | ExecTidOp : forall tid T (v : T) s s' op evs,
+    op_step op tid s v s' evs ->
     exec_tid tid s (Op op)
                  s' (inl v)
-                 nil
+                 evs
 
   | ExecTidAtomic : forall tid T (v : T) ap s s' evs,
     atomic_exec ap tid s v s' evs ->
     exec_tid tid s (Atomic ap)
                  s' (inl v)
                  evs
-
-  | ExecTidLog : forall tid s T' (r : T'),
-    exec_tid tid s (Log r)
-                 s (inl r)
-                 [Event r]
 
   | ExecTidBind : forall tid T1 (p1 : proc T1) T2 (p2 : T1 -> proc T2) s s' result evs,
     exec_tid tid s p1
@@ -198,9 +188,9 @@ Section Proc.
     forall T (p : proc T) (r : T) (s' : State), Prop :=
   | ExecAnyOther :
     forall T (p : proc T) (r : T) (s' : State)
-           T' (op' : opT T') tid' s0 r0,
+           T' (op' : opT T') tid' s0 r0 evs,
     tid <> tid' ->
-    op_step op' tid' s r0 s0 ->
+    op_step op' tid' s r0 s0 evs ->
     exec_any tid s0 p r s' ->
     exec_any tid s p r s'
   | ExecAnyThisDone :
@@ -217,25 +207,26 @@ Section Proc.
   Definition exec_others (tid : nat) (s s' : State) : Prop :=
     clos_refl_trans_1n _
       (fun s0 s1 =>
-        exists tid' `(op' : opT T') r',
+        exists tid' `(op' : opT T') r' evs,
           tid' <> tid /\
-          op_step op' tid' s0 r' s1)
+          op_step op' tid' s0 r' s1 evs)
       s s'.
 
   Lemma exec_any_op : forall `(op : opT T) tid r s s',
     exec_any tid s (Op op) r s' ->
-      exists s0,
+      exists s0 evs,
         exec_others tid s s0 /\
-        op_step op tid s0 r s'.
+        op_step op tid s0 r s' evs.
   Proof.
     intros.
     remember (Op op).
     induction H; subst.
     - edestruct IHexec_any; eauto; intuition idtac.
-      eexists; split; eauto.
+      deex.
+      do 2 eexists; split; eauto.
       econstructor; eauto.
-      do 4 eexists; split; eauto.
-    - exists s; split.
+      do 5 eexists; split; eauto.
+    - exists s; eexists; split.
       eapply rt1n_refl.
       inversion H; subst; repeat sigT_eq; eauto.
     - inversion H.
@@ -289,7 +280,6 @@ Arguments Op {opT T}.
 Arguments Ret {opT T}.
 Arguments Bind {opT T T1}.
 Arguments Until {opT T}.
-Arguments Log {opT T}.
 Arguments Atomic {opT T}.
 
 Arguments Proc {opT T}.

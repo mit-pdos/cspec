@@ -26,7 +26,6 @@ Section Compiler.
       let '(body, cond, iv) := compile_op op in
       Until cond (fun x => Op (body x)) iv
     | Bind p1 p2 => Bind (compile p1) (fun r => compile (p2 r))
-    | Log v => Log v
     | Atomic p => Atomic (compile p)
     | Until c p v => Until c (fun r => compile (p r)) v
     end.
@@ -51,8 +50,7 @@ Section Compiler.
   | CompileUntil : forall `(p1 : T -> proc opLoT T) (p2 : T -> proc opMidT T) (c : T -> bool) v,
     (forall v', compile_ok (p1 v') (p2 v')) ->
     compile_ok (Until c p1 v) (Until c p2 v)
-  | CompileLog : forall `(v : T),
-    compile_ok (Log v) (Log v).
+  .
 
   Hint Constructors compile_ok.
 
@@ -142,10 +140,10 @@ Section Compiler.
   Definition noop_or_success :=
     forall `(opM : opMidT T) opL cond iv tid s r s',
       (opL, cond, iv) = compile_op opM ->
-      forall v,
-        lo_step (opL v) tid s r s' ->
-          cond r = false /\ s = s' \/
-          cond r = true /\ hi_step opM tid s r s'.
+      forall v evs,
+        lo_step (opL v) tid s r s' evs ->
+          cond r = false /\ s = s' /\ evs = nil \/
+          cond r = true /\ hi_step opM tid s r s' evs.
 
   Variable is_noop_or_success : noop_or_success.
 
@@ -218,11 +216,6 @@ Section Compiler.
       simpl; eauto.
       constructor; eauto; intros.
       destruct (Bool.bool_dec (c x) true); eauto.
-    - right.
-      exec_tid_inv.
-      eexists; intuition idtac.
-      eauto.
-      simpl; eauto.
   Qed.
 
   Theorem compile_traces_match_ts :
