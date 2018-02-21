@@ -20,24 +20,27 @@ Module MailboxAPI <: Layer.
   Definition State := mbox_contents.
   Definition initP (s : State) := True.
 
-  Inductive xstep : forall T, opT T -> nat -> State -> T -> State -> Prop :=
+  Inductive xstep : forall T, opT T -> nat -> State -> T -> State -> list event -> Prop :=
   | StepDeliver : forall m mbox tid fn,
     ~ Dir.In fn mbox ->
     xstep (Deliver m) tid
       mbox
       tt
       (Dir.add fn m mbox)
+      nil
   | StepList : forall mbox tid,
     xstep List tid
       mbox
       (map fst (Dir.elements mbox))
       mbox
+      nil
   | StepRead : forall fn mbox tid m,
     Dir.MapsTo fn m mbox ->
     xstep (Read fn) tid
       mbox
       m
       mbox
+      nil
   .
 
   Definition step := xstep.
@@ -58,19 +61,21 @@ Module AtomicMailboxAPI <: Layer.
   Definition State := MailboxAPI.State.
   Definition initP (s : State) := True.
 
-  Inductive xstep : forall T, opT T -> nat -> State -> T -> State -> Prop :=
+  Inductive xstep : forall T, opT T -> nat -> State -> T -> State -> list event -> Prop :=
   | StepDeliver : forall m mbox tid fn,
     ~ Dir.In fn mbox ->
     xstep (Deliver m) tid
       mbox
       tt
       (Dir.add fn m mbox)
+      nil
   | StepList : forall mbox tid r,
     r = map snd (Dir.elements mbox) ->
     xstep ReadAll tid
       mbox
       r
       mbox
+      nil
   .
 
   Definition step := xstep.

@@ -110,34 +110,40 @@ Section Movers.
   Qed.
 
   Definition right_mover :=
-    forall `(op1 : opT T2) tid0 tid1 s s0 s1 v0 v1 evs0 evs1,
-      tid0 <> tid1 ->
+    forall tid0 s s0 v0 evs0,
       op_step opMover tid0 s v0 s0 evs0 ->
-      op_step op1 tid1 s0 v1 s1 evs1 ->
-      exists s',
-        op_step op1 tid1 s v1 s' evs1 /\
-        op_step opMover tid0 s' v0 s1 evs0.
+      evs0 = nil /\
+      ( forall `(op1 : opT T2) tid1 s1 v1 evs1,
+          tid0 <> tid1 ->
+          op_step op1 tid1 s0 v1 s1 evs1 ->
+          exists s',
+            op_step op1 tid1 s v1 s' evs1 /\
+            op_step opMover tid0 s' v0 s1 evs0 ).
 
   Definition left_mover :=
     enabled_stable /\
-    forall `(op0 : opT T0) tid0 tid1 s s0 s1 v0 v1 evs0 evs1,
-      tid0 <> tid1 ->
-      op_step op0 tid0 s v0 s0 evs0 ->
+    forall tid1 s0 s1 v1 evs1,
       op_step opMover tid1 s0 v1 s1 evs1 ->
-      exists s',
-        op_step opMover tid1 s v1 s' evs1 /\
-        op_step op0 tid0 s' v0 s1 evs0.
+      evs1 = nil /\
+      ( forall `(op0 : opT T0) tid0 s v0 evs0,
+        tid0 <> tid1 ->
+        op_step op0 tid0 s v0 s0 evs0 ->
+        exists s',
+          op_step opMover tid1 s v1 s' evs1 /\
+          op_step op0 tid0 s' v0 s1 evs0 ).
 
   Definition left_mover_pred (P : nat -> State -> Prop) :=
     enabled_stable /\
-    forall `(op0 : opT T0) tid0 tid1 s s0 s1 v0 v1 evs0 evs1,
-      tid0 <> tid1 ->
-      P tid1 s ->
-      op_step op0 tid0 s v0 s0 evs0 ->
+    forall tid1 s0 s1 v1 evs1,
       op_step opMover tid1 s0 v1 s1 evs1 ->
-      exists s',
-        op_step opMover tid1 s v1 s' evs1 /\
-        op_step op0 tid0 s' v0 s1 evs0.
+      evs1 = nil /\
+      ( forall `(op0 : opT T0) tid0 s v0 evs0,
+        P tid1 s ->
+        tid0 <> tid1 ->
+        op_step op0 tid0 s v0 s0 evs0 ->
+        exists s',
+          op_step opMover tid1 s v1 s' evs1 /\
+          op_step op0 tid0 s' v0 s1 evs0 ).
 
   Definition both_mover := right_mover /\ left_mover.
 
@@ -151,6 +157,8 @@ Section Movers.
     forall P, left_mover -> left_mover_pred P.
   Proof.
     unfold left_mover, left_mover_pred; intuition eauto.
+    edestruct H1; eauto.
+    edestruct H1; eauto.
   Qed.
 
 
@@ -160,6 +168,8 @@ Section Movers.
     left_mover_pred P2.
   Proof.
     unfold left_mover_pred; intuition eauto.
+    edestruct H2; eauto.
+    edestruct H2; eauto.
   Qed.
 
 
@@ -169,15 +179,19 @@ Section Movers.
     op_step opMover tid0 s v0 s0 evsM ->
     atomic_exec op_step ap tid1 s0 v1 s1 evs ->
       exists s0',
-      atomic_exec op_step ap tid1 s v1 s0' evs /\
-      op_step opMover tid0 s0' v0 s1 evsM.
+        evsM = nil /\
+        atomic_exec op_step ap tid1 s v1 s0' evs /\
+        op_step opMover tid0 s0' v0 s1 evsM.
   Proof.
     intros.
     generalize dependent s.
     induction H2; intros; eauto.
+    - edestruct H; eauto.
     - edestruct IHatomic_exec1; eauto.
       edestruct IHatomic_exec2; intuition eauto.
     - edestruct H; intuition eauto.
+      edestruct H4; eauto.
+      eexists; intuition eauto.
     - edestruct IHatomic_exec; intuition eauto.
     - edestruct IHatomic_exec; intuition eauto.
   Qed.
@@ -189,18 +203,22 @@ Section Movers.
     tid0 <> tid1 ->
     atomic_exec op_step ap tid1 s v1 s0 evs ->
     op_step opMover tid0 s0 v0 s1 evsM ->
-      exists s0',
+    exists s0',
+      evsM = nil /\
       op_step opMover tid0 s v0 s0' evsM /\
       atomic_exec op_step ap tid1 s0' v1 s1 evs.
   Proof.
     intros.
     generalize dependent s1.
     induction H3; intros; eauto.
+    - edestruct H.
+      edestruct H5; eauto.
     - edestruct IHatomic_exec2; eauto.
       eapply pred_stable_atomic_exec; eauto.
       edestruct IHatomic_exec1; intuition eauto.
-    - edestruct H.
-      edestruct H6.
+    - edestruct H; clear H.
+      edestruct H6; clear H6; eauto.
+      edestruct H7.
       4: eauto.
       3: eauto.
       eauto.
@@ -215,15 +233,19 @@ Section Movers.
     tid0 <> tid1 ->
     op_step opMover tid0 s v0 s0 evsM ->
     exec_tid op_step tid1 s0 p s1 result' evs ->
-      exists s0',
+    exists s0',
+      evsM = nil /\
       exec_tid op_step tid1 s p s0' result' evs /\
       op_step opMover tid0 s0' v0 s1 evsM.
   Proof.
     intros.
     induction H2; simpl; eauto.
-    - edestruct H; intuition eauto.
+    - edestruct H; eauto.
+    - edestruct H; eauto.
+      edestruct H4; intuition eauto.
     - edestruct atomic_exec_right_mover; intuition eauto.
     - edestruct IHexec_tid; intuition eauto.
+    - edestruct H; eauto.
   Qed.
 
   Lemma exec_tid_left_mover : forall tid0 tid1 s s0 `(p : proc opT T) s1 result' evs evsM v0 P,
@@ -233,14 +255,18 @@ Section Movers.
     tid0 <> tid1 ->
     exec_tid op_step tid1 s p s0 result' evs ->
     op_step opMover tid0 s0 v0 s1 evsM ->
-      exists s0',
+    exists s0',
+      evsM = nil /\
       op_step opMover tid0 s v0 s0' evsM /\
       exec_tid op_step tid1 s0' p s1 result' evs.
   Proof.
     intros.
     induction H3; simpl; eauto.
-    - edestruct H.
-      edestruct H6.
+    - edestruct H; eauto.
+      edestruct H5; eauto.
+    - edestruct H; clear H.
+      edestruct H6; clear H6; eauto.
+      edestruct H7.
       4: eauto.
       3: eauto.
       eauto.
@@ -248,6 +274,8 @@ Section Movers.
       intuition eauto.
     - edestruct atomic_exec_left_mover; intuition eauto.
     - edestruct IHexec_tid; intuition eauto.
+    - edestruct H; eauto.
+      edestruct H5; eauto.
   Qed.
 
   Lemma enabled_stable_atomic_exec :
@@ -302,6 +330,10 @@ Section Movers.
       + autorewrite with t in *.
         repeat maybe_proc_inv.
         repeat exec_tid_inv.
+
+        edestruct H; clear H; eauto.
+        edestruct H4; clear H4; eauto.
+        subst.
         do 2 eexists; intuition eauto.
 
       + autorewrite with t in *.
@@ -324,6 +356,9 @@ Section Movers.
           rewrite thread_upd_upd_ne; eauto.
 
     - edestruct H1; repeat deex.
+      edestruct H; clear H; eauto.
+      edestruct H5; clear H5; eauto.
+      subst.
       do 2 eexists; split.
       eauto.
       eauto.
@@ -362,6 +397,8 @@ Section Movers.
         simpl. autorewrite with t. eauto.
       simpl; eauto.
 
+      edestruct H; eauto; subst; simpl; eauto.
+
     + autorewrite with t in *.
       edestruct exec_tid_right_mover; intuition eauto.
       edestruct IHexec; eauto.
@@ -373,7 +410,9 @@ Section Movers.
         autorewrite with t; eauto.
         eauto.
         rewrite thread_upd_upd_ne; eauto.
-      eauto.
+      subst; simpl; eauto.
+
+    + edestruct H; eauto; subst; simpl; eauto.
   Qed.
 
   Theorem trace_incl_atomize_op_left_mover :

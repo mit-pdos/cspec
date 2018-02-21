@@ -43,9 +43,6 @@ run_proc s (Bind p1 p2) = do
 run_proc s (Atomic _) = do
   -- debugmsg $ "Atomic"
   error "Running atomic"
-run_proc s (Log v) = do
-  -- debugmsg $ "Log"
-  return $ unsafeCoerce v
 run_proc s (Until c p v0) = do
   -- debugmsg $ "Until"
   v <- run_proc s (p v0)

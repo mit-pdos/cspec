@@ -41,14 +41,14 @@ Module AtomicReader <: LayerImpl MailboxAPI AtomicMailboxAPI.
 
   Ltac step_inv :=
     match goal with
-    | H : MailboxAPI.step _ _ _ _ _ |- _ =>
+    | H : MailboxAPI.step _ _ _ _ _ _ |- _ =>
       inversion H; clear H; subst; repeat sigT_eq
-    | H : AtomicMailboxAPI.step _ _ _ _ _ |- _ =>
+    | H : AtomicMailboxAPI.step _ _ _ _ _ _ |- _ =>
       inversion H; clear H; subst; repeat sigT_eq
     end; intuition idtac.
 
-  Hint Extern 1 (MailboxAPI.step _ _ _ _ _) => econstructor.
-  Hint Extern 1 (AtomicMailboxAPI.step _ _ _ _ _) => econstructor.
+  Hint Extern 1 (MailboxAPI.step _ _ _ _ _ _) => econstructor.
+  Hint Extern 1 (AtomicMailboxAPI.step _ _ _ _ _ _) => econstructor.
 
   Module DirFacts := WFacts_fun String_as_OT MailboxAPI.Dir.
 
@@ -62,12 +62,12 @@ Module AtomicReader <: LayerImpl MailboxAPI AtomicMailboxAPI.
     - unfold enabled_stable, enabled_in; intros; repeat deex.
       repeat step_inv; eauto.
       destruct (fn0 == fn); subst; try congruence.
-      + exfalso. eapply H10. eexists. eauto.
-      + do 2 eexists; econstructor.
+      + exfalso. eapply H11. eexists. eauto.
+      + do 3 eexists; econstructor.
         eapply MailboxAPI.Dir.add_2; eauto.
     - intros; repeat step_inv; eauto; repeat deex.
       destruct (fn0 == fn); subst; try congruence.
-      eapply MailboxAPI.Dir.add_3 in H5; eauto.
+      eapply MailboxAPI.Dir.add_3 in H2; eauto.
   Qed.
 
   Hint Resolve read_left_mover.
@@ -136,7 +136,7 @@ Module AtomicReader <: LayerImpl MailboxAPI AtomicMailboxAPI.
         intros; repeat deex.
         inversion H; clear H; subst.
 
-        eapply exec_any_op in H0; deex.
+        eapply exec_any_op in H0; repeat deex.
         step_inv.
 
         eapply Forall_impl; eauto; intros; simpl in *.
@@ -145,7 +145,7 @@ Module AtomicReader <: LayerImpl MailboxAPI AtomicMailboxAPI.
     }
 
     intros; repeat deex.
-    eapply exec_any_op in H0; deex.
+    eapply exec_any_op in H0; repeat deex.
     step_inv.
     eapply Forall_in'; intros.
 

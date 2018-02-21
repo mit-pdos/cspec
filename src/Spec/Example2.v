@@ -59,15 +59,16 @@ Module TASAPI <: Layer.
   Definition opT := TASOpT.
   Definition State := TASState.
 
-  Inductive xstep : forall T, opT T -> nat -> State -> T -> State -> Prop :=
+  Inductive xstep : forall T, opT T -> nat -> State -> T -> State -> list event -> Prop :=
   | StepTAS : forall tid v l,
-    xstep TestAndSet tid (mkTASState v l) l (mkTASState v true)
+    xstep TestAndSet tid (mkTASState v l) l (mkTASState v true) nil
   | StepClear : forall tid v l,
-    xstep Clear tid (mkTASState v l) tt (mkTASState v false)
+    xstep Clear tid (mkTASState v l) tt (mkTASState v false) nil
   | StepRead : forall tid v l,
-    xstep ReadTAS tid (mkTASState v l) v (mkTASState v l)
+    xstep ReadTAS tid (mkTASState v l) v (mkTASState v l) nil
   | StepWrite : forall tid v0 v l,
-    xstep (WriteTAS v) tid (mkTASState v0 l) tt (mkTASState v l).
+    xstep (WriteTAS v) tid (mkTASState v0 l) tt (mkTASState v l) nil
+  .
 
   Definition step := xstep.
 
@@ -82,17 +83,18 @@ Module TASLockAPI <: Layer.
   Definition opT := TASOpT.
   Definition State := LockState.
 
-  Inductive xstep : forall T, opT T -> nat -> State -> T -> State -> Prop :=
+  Inductive xstep : forall T, opT T -> nat -> State -> T -> State -> list event -> Prop :=
   | StepTAS0 : forall tid v,
-    xstep TestAndSet tid (mkState v None) false (mkState v (Some tid))
+    xstep TestAndSet tid (mkState v None) false (mkState v (Some tid)) nil
   | StepTAS1 : forall tid tid' v,
-    xstep TestAndSet tid (mkState v (Some tid')) true (mkState v (Some tid'))
+    xstep TestAndSet tid (mkState v (Some tid')) true (mkState v (Some tid')) nil
   | StepClear : forall tid v l,
-    xstep Clear tid (mkState v l) tt (mkState v None)
+    xstep Clear tid (mkState v l) tt (mkState v None) nil
   | StepRead : forall tid v l,
-    xstep ReadTAS tid (mkState v l) v (mkState v l)
+    xstep ReadTAS tid (mkState v l) v (mkState v l) nil
   | StepWrite : forall tid v0 v l,
-    xstep (WriteTAS v) tid (mkState v0 l) tt (mkState v l).
+    xstep (WriteTAS v) tid (mkState v0 l) tt (mkState v l) nil
+  .
 
   Definition step := xstep.
 
@@ -107,15 +109,16 @@ Module RawLockAPI <: Layer.
   Definition opT := LockOpT.
   Definition State := LockState.
 
-  Inductive xstep : forall T, opT T -> nat -> State -> T -> State -> Prop :=
+  Inductive xstep : forall T, opT T -> nat -> State -> T -> State -> list event -> Prop :=
   | StepAcquire : forall tid v r,
-    xstep Acquire tid (mkState v None) r (mkState v (Some tid))
+    xstep Acquire tid (mkState v None) r (mkState v (Some tid)) nil
   | StepRelease : forall tid v l,
-    xstep Release tid (mkState v l) tt (mkState v None)
+    xstep Release tid (mkState v l) tt (mkState v None) nil
   | StepRead : forall tid v l,
-    xstep Read tid (mkState v l) v (mkState v l)
+    xstep Read tid (mkState v l) v (mkState v l) nil
   | StepWrite : forall tid v0 v l,
-    xstep (Write v) tid (mkState v0 l) tt (mkState v l).
+    xstep (Write v) tid (mkState v0 l) tt (mkState v l) nil
+  .
 
   Definition step := xstep.
 
@@ -154,11 +157,11 @@ Module LockedCounterAPI <: Layer.
   Definition opT := CounterOpT.
   Definition State := LockState.
 
-  Inductive xstep : forall T, opT T -> nat -> State -> T -> State -> Prop :=
+  Inductive xstep : forall T, opT T -> nat -> State -> T -> State -> list event -> Prop :=
   | StepInc : forall tid v,
-    xstep Inc tid (mkState v None) v (mkState (v + 1) None)
+    xstep Inc tid (mkState v None) v (mkState (v + 1) None) nil
   | StepDec : forall tid v,
-    xstep Dec tid (mkState v None) v (mkState (v - 1) None).
+    xstep Dec tid (mkState v None) v (mkState (v - 1) None) nil.
 
   Definition step := xstep.
 
@@ -173,11 +176,11 @@ Module CounterAPI <: Layer.
   Definition opT := CounterOpT.
   Definition State := CounterState.
 
-  Inductive xstep : forall T, opT T -> nat -> State -> T -> State -> Prop :=
+  Inductive xstep : forall T, opT T -> nat -> State -> T -> State -> list event -> Prop :=
   | StepInc : forall tid v,
-    xstep Inc tid v v (v + 1)
+    xstep Inc tid v v (v + 1) nil
   | StepDec : forall tid v,
-    xstep Dec tid v v (v - 1).
+    xstep Dec tid v v (v - 1) nil.
 
   Definition step := xstep.
 
@@ -227,23 +230,23 @@ Module LockingCounter <: LayerImplFollowsRule LockAPI LockedCounterAPI LockingRu
 
   Ltac step_inv :=
     match goal with
-    | H : LockAPI.step _ _ _ _ _ |- _ =>
+    | H : LockAPI.step _ _ _ _ _ _ |- _ =>
       inversion H; clear H; subst; repeat sigT_eq
     | H : LockAPI.step_allow _ _ _ |- _ =>
       inversion H; clear H; subst; repeat sigT_eq
     | H : LockAPI.step_allow _ _ _ -> False |- _ =>
       solve [ exfalso; eauto ]
-    | H : RawLockAPI.step _ _ _ _ _ |- _ =>
+    | H : RawLockAPI.step _ _ _ _ _ _ |- _ =>
       inversion H; clear H; subst; repeat sigT_eq
-    | H : LockedCounterAPI.step _ _ _ _ _ |- _ =>
+    | H : LockedCounterAPI.step _ _ _ _ _ _ |- _ =>
       inversion H; clear H; subst; repeat sigT_eq
     end; intuition idtac.
 
-  Hint Extern 1 (RawLockAPI.step _ _ _ _ _) => econstructor.
-  Hint Extern 1 (LockAPI.step _ _ _ _ _) => left.
-  Hint Extern 1 (LockAPI.step _ _ _ _ _) => right.
+  Hint Extern 1 (RawLockAPI.step _ _ _ _ _ _) => econstructor.
+  Hint Extern 1 (LockAPI.step _ _ _ _ _ _) => left.
+  Hint Extern 1 (LockAPI.step _ _ _ _ _ _) => right.
   Hint Extern 1 (LockAPI.step_allow _ _ _) => econstructor.
-  Hint Extern 1 (LockedCounterAPI.step _ _ _ _ _) => econstructor.
+  Hint Extern 1 (LockedCounterAPI.step _ _ _ _ _ _) => econstructor.
   Hint Extern 1 (~ LockAPI.step_allow _ _ _) => intro H'; inversion H'.
   Hint Extern 1 (LockAPI.step_allow _ _ _ -> False) => intro H'; inversion H'.
 
@@ -671,9 +674,9 @@ Module LockImpl <: LayerImpl TASLockAPI RawLockAPI.
 
   Ltac step_inv :=
     match goal with
-    | H : TASLockAPI.step _ _ _ _ _ |- _ =>
+    | H : TASLockAPI.step _ _ _ _ _ _ |- _ =>
       inversion H; clear H; subst; repeat sigT_eq
-    | H : RawLockAPI.step _ _ _ _ _ |- _ =>
+    | H : RawLockAPI.step _ _ _ _ _ _ |- _ =>
       inversion H; clear H; subst; repeat sigT_eq
     end.
 
@@ -727,19 +730,19 @@ Module LockProtocol <: LayerImplRequiresRule RawLockAPI LockAPI LockingRule.
 
   Ltac step_inv :=
     match goal with
-    | H : RawLockAPI.step _ _ _ _ _ |- _ =>
+    | H : RawLockAPI.step _ _ _ _ _ _ |- _ =>
       inversion H; clear H; subst; repeat sigT_eq
     | H : LockAPI.step_allow _ _ _ |- _ =>
       inversion H; clear H; subst; repeat sigT_eq
-    | H : LockAPI.step _ _ _ _ _ |- _ =>
+    | H : LockAPI.step _ _ _ _ _ _ |- _ =>
       destruct H; intuition idtac
     end.
 
   Theorem allowed_stable :
-    forall `(op : LockAPI.opT T) `(op' : LockAPI.opT T') tid tid' s s' r,
+    forall `(op : LockAPI.opT T) `(op' : LockAPI.opT T') tid tid' s s' r evs,
       tid <> tid' ->
       LockAPI.step_allow op tid s ->
-      LockAPI.step op' tid' s r s' ->
+      LockAPI.step op' tid' s r s' evs ->
       LockAPI.step_allow op tid s'.
   Proof.
     intros.
