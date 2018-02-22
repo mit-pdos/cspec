@@ -6,7 +6,8 @@ Require Import DeliverAPI.
 Module AtomicDeliver <: LayerImpl TmpdirAPI MailboxAPI.
 
   Definition deliver_core (m : string) :=
-    tmpfn <- Op (TmpdirAPI.CreateTmp m);
+    tmpfn <- Op (TmpdirAPI.CreateTmp);
+    _ <- Op (TmpdirAPI.WriteTmp tmpfn m);
     _ <- Op (TmpdirAPI.LinkMail tmpfn);
     _ <- Op (TmpdirAPI.UnlinkTmp tmpfn);
     Ret tt.
@@ -37,10 +38,10 @@ Module AtomicDeliver <: LayerImpl TmpdirAPI MailboxAPI.
   Hint Extern 1 (MailboxAPI.step _ _ _ _ _ _) => econstructor.
   Hint Extern 1 (TmpdirAPI.step _ _ _ _ _ _) => econstructor.
 
-  Lemma createtmp_right_mover : forall m,
+  Lemma createtmp_right_mover :
     right_mover
       TmpdirAPI.step
-      (TmpdirAPI.CreateTmp m).
+      (TmpdirAPI.CreateTmp).
   Proof.
     unfold right_mover; intros.
     repeat step_inv.
@@ -50,13 +51,22 @@ Module AtomicDeliver <: LayerImpl TmpdirAPI MailboxAPI.
         eapply FMap.in_add; eauto.
       + rewrite FMap.add_add_ne by congruence.
         econstructor.
-        contradict H2.
+        contradict H1.
+        eapply FMap.in_add_ne; eauto.
+        congruence.
+    - eexists; split.
+      + econstructor.
+        eapply FMap.in_add_ne; eauto.
+        congruence.
+      + rewrite FMap.add_add_ne by congruence.
+        econstructor.
+        contradict H1.
         eapply FMap.in_add_ne; eauto.
         congruence.
     - eexists; split; eauto.
       rewrite <- FMap.add_remove_ne by congruence.
       econstructor.
-      contradict H2.
+      contradict H1.
       eapply FMap.in_remove; eauto.
     - eexists; split; eauto.
       econstructor; eauto.
@@ -67,6 +77,42 @@ Module AtomicDeliver <: LayerImpl TmpdirAPI MailboxAPI.
   Qed.
 
   Hint Resolve createtmp_right_mover.
+
+  Lemma writetmp_right_mover : forall fn data,
+    right_mover
+      TmpdirAPI.step
+      (TmpdirAPI.WriteTmp fn data).
+  Proof.
+    unfold right_mover; intros.
+    repeat step_inv.
+    - eexists; split.
+      + econstructor.
+        contradict H12.
+        eapply FMap.in_add; eauto.
+      + rewrite FMap.add_add_ne by congruence.
+        econstructor.
+        eapply FMap.in_add; eauto.
+    - eexists; split.
+      + econstructor.
+        eapply FMap.in_add_ne; eauto.
+        congruence.
+      + rewrite FMap.add_add_ne by congruence.
+        econstructor.
+        eapply FMap.in_add; eauto.
+    - eexists; split; eauto.
+      rewrite <- FMap.add_remove_ne by congruence.
+      econstructor.
+      eapply FMap.in_remove_ne; eauto.
+      congruence.
+    - eexists; split; eauto.
+      econstructor; eauto.
+      eapply FMap.mapsto_add_ne; eauto.
+      congruence.
+    - eauto 20.
+    - eauto 20.
+  Qed.
+
+  Hint Resolve writetmp_right_mover.
 
   Lemma unlinktmp_always_enabled : forall fn,
     always_enabled
@@ -91,6 +137,11 @@ Module AtomicDeliver <: LayerImpl TmpdirAPI MailboxAPI.
       econstructor.
       contradict H11.
       eapply FMap.in_remove; eauto.
+    + eexists; split; eauto.
+      rewrite <- FMap.add_remove_ne by congruence.
+      econstructor.
+      eapply FMap.in_remove_ne; eauto.
+      congruence.
     + eexists; split; eauto.
       rewrite FMap.remove_remove.
       econstructor.
@@ -147,6 +198,7 @@ Module AtomicDeliver <: LayerImpl TmpdirAPI MailboxAPI.
     + repeat atomic_exec_inv.
       repeat step_inv; eauto.
       simpl.
+      rewrite FMap.add_add.
       rewrite FMap.remove_add.
       eapply FMap.mapsto_add in H7; subst.
       econstructor.

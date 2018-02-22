@@ -59,10 +59,22 @@ Module FMap.
         In a1 m.
     Admitted.
 
+    Theorem in_remove_ne :
+      forall a1 a2 m,
+        In a1 m ->
+        a1 <> a2 ->
+        In a1 (remove a2 m).
+    Admitted.
+
     Theorem add_add_ne :
       forall a1 v1 a2 v2 m,
         a1 <> a2 ->
         add a1 v1 (add a2 v2 m) = add a2 v2 (add a1 v1 m).
+    Admitted.
+
+    Theorem add_add :
+      forall a v1 v2 m,
+        add a v1 (add a v2 m) = add a v1 m.
     Admitted.
 
     Theorem add_remove_ne :

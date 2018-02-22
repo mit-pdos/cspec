@@ -53,7 +53,8 @@ Module TmpdirAPI <: Layer.
   Import MailboxAPI.
 
   Inductive tmpdir_opT : Type -> Type :=
-  | CreateTmp : forall (data : string), tmpdir_opT string
+  | CreateTmp : tmpdir_opT string
+  | WriteTmp : forall (fn : string) (data : string), tmpdir_opT unit
   | LinkMail : forall (fn : string), tmpdir_opT unit
   | UnlinkTmp : forall (fn : string), tmpdir_opT unit
   | List : tmpdir_opT (list (nat * string))
@@ -65,12 +66,19 @@ Module TmpdirAPI <: Layer.
   Definition initP (s : State) := True.
 
   Inductive xstep : forall T, opT T -> nat -> State -> T -> State -> list event -> Prop :=
-  | StepCreateTmp : forall m tmp mbox tid fn,
+  | StepCreateTmp : forall tmp mbox tid fn,
     ~ FMap.In (tid, fn) tmp ->
-    xstep (CreateTmp m) tid
+    xstep (CreateTmp) tid
       (mk_state tmp mbox)
       fn
-      (mk_state (FMap.add (tid, fn) m tmp) mbox)
+      (mk_state (FMap.add (tid, fn) ""%string tmp) mbox)
+      nil
+  | StepWriteTmp : forall tmp mbox tid fn data,
+    FMap.In (tid, fn) tmp ->
+    xstep (WriteTmp fn data) tid
+      (mk_state tmp mbox)
+      tt
+      (mk_state (FMap.add (tid, fn) data tmp) mbox)
       nil
   | StepUnlinkTmp : forall tmp mbox tid fn,
     xstep (UnlinkTmp fn) tid
