@@ -222,3 +222,5 @@ Section Protocol.
   Qed.
 
 End Protocol.
+
+Hint Constructors follows_protocol_proc.

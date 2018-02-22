@@ -386,8 +386,6 @@ Module LockingCounter <: LayerImplFollowsRule LockAPI LockedCounterAPI LockingRu
   Qed.
 
 
-  Hint Constructors follows_protocol_proc.
-
   Theorem exec_others_preserves_lock :
     forall tid s s',
       exec_others (restricted_step RawLockAPI.step LockAPI.step_allow) tid s s' ->
