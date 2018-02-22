@@ -109,6 +109,12 @@ Section Movers.
     firstorder.
   Qed.
 
+  Lemma always_enabled_to_enabled_in : forall tid s,
+    always_enabled -> enabled_in tid s.
+  Proof.
+    firstorder.
+  Qed.
+
   Definition right_mover :=
     forall tid0 s s0 v0 evs0,
       op_step opMover tid0 s v0 s0 evs0 ->
@@ -482,6 +488,7 @@ Hint Resolve both_mover_left.
 Hint Resolve both_mover_right.
 Hint Resolve left_mover_left_mover_pred.
 Hint Resolve always_enabled_to_stable.
+Hint Resolve always_enabled_to_enabled_in.
 
 Arguments left_mover {opT State} op_step {moverT}.
 Arguments left_mover_pred {opT State} op_step {moverT}.
