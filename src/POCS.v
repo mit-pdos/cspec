@@ -27,6 +27,7 @@ infrastructure. *)
 Require Export Helpers.Helpers.
 Require Export Helpers.ListStuff.
 Require Export Helpers.Sets.
+Require Export Helpers.Maps.
 Require Export Helpers.Ordering.
 Require Export Helpers.StringUtils.
 
