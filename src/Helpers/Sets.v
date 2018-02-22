@@ -1,24 +1,8 @@
+Require Import List.
 Require Import Ordering.
 Require Import ProofIrrelevance.
 
 Set Implicit Arguments.
-
-Inductive Forall A (P: A -> Prop) : list A -> Prop :=
-| Forall_nil : Forall P nil
-| Forall_cons : forall x l,
-    Forall P l ->
-    P x ->
-    Forall P (x::l).
-
-Hint Constructors Forall.
-
-Theorem Forall_impl : forall A (P1 P2: A -> Prop) l,
-    Forall P1 l ->
-    (forall x, P1 x -> P2 x) ->
-    Forall P2 l.
-Proof.
-  induction 1; eauto.
-Qed.
 
 Theorem Forall_in : forall A (P: A -> Prop) l,
     Forall P l ->
@@ -164,7 +148,7 @@ Module FSet.
       - eauto.
       - constructor; eauto.
         constructor; eauto.
-        eapply Forall_impl; eauto.
+        eapply Forall_impl. 2: eauto.
         intros.
         eapply cmp_trans; eauto.
       - constructor; eauto.
