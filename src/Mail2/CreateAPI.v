@@ -44,12 +44,12 @@ Module MaildirAPI <: Layer.
 End MaildirAPI.
 
 
-Module RestrictedListAPI <: Layer.
+Module RL2API <: Layer.
 
   Import MaildirAPI.
 
   Inductive xopT : Type -> Type :=
-  | LinkMsg : forall (fn : string) (data : string), xopT unit
+  | LinkMsg : forall (fn : string) (data : string), xopT bool
   | List : xopT (list (nat * string))
   | ListRestricted : xopT (list string)
   | ReadMsg : forall (fn : nat*string), xopT string
@@ -60,12 +60,19 @@ Module RestrictedListAPI <: Layer.
   Definition initP (s : State) := True.
 
   Inductive xstep : forall T, opT T -> nat -> State -> T -> State -> list event -> Prop :=
-  | StepLinkMsg : forall mbox tid fn m,
+  | StepLinkMsg0 : forall mbox tid fn m,
     ~ FMap.In (tid, fn) mbox ->
     xstep (LinkMsg fn m) tid
       mbox
-      tt
+      true
       (FMap.add (tid, fn) m mbox)
+      nil
+  | StepLinkMsg1 : forall mbox tid fn m,
+    FMap.In (tid, fn) mbox ->
+    xstep (LinkMsg fn m) tid
+      mbox
+      false
+      mbox
       nil
   | StepReadMsg : forall mbox tid fn m,
     FMap.MapsTo fn m mbox ->
@@ -90,6 +97,32 @@ Module RestrictedListAPI <: Layer.
   .
 
   Definition step := xstep.
+
+End RL2API.
+
+
+Module RestrictedListAPI <: Layer.
+
+  Import RL2API.
+
+  Definition opT := RL2API.opT.
+  Definition State := RL2API.State.
+  Definition initP (s : State) := True.
+
+  Inductive step_allow : forall T, opT T -> nat -> State -> Prop :=
+  | AllowLinkMsg : forall fn data mbox tid,
+    ~ FMap.In (tid, fn) mbox ->
+    step_allow (LinkMsg fn data) tid mbox
+  | AllowList : forall mbox tid,
+    step_allow List tid mbox
+  | AllowListRestricted : forall mbox tid,
+    step_allow ListRestricted tid mbox
+  | AllowReadMsg : forall mbox tid fn,
+    step_allow (ReadMsg fn) tid mbox
+  .
+
+  Definition step :=
+    restricted_step RL2API.step step_allow.
 
 End RestrictedListAPI.
 
@@ -148,3 +181,14 @@ Module RawDirAPI <: Layer.
   Definition step := xstep.
 
 End RawDirAPI.
+
+
+Module LinkMsgRule <: ProcRule RL2API.
+
+  Definition loopInv (s : RL2API.State) (tid : nat) := True.
+
+  Definition follows_protocol (ts : @threads_state RL2API.opT) :=
+    forall s,
+      follows_protocol_s RL2API.step RestrictedListAPI.step_allow loopInv ts s.
+
+End LinkMsgRule.
