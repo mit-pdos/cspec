@@ -90,6 +90,7 @@ Module FMap.
 
     Theorem remove_add :
       forall a1 v1 m,
+        ~ In a1 m ->
         remove a1 (add a1 v1 m) = m.
     Admitted.
 

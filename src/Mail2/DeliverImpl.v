@@ -199,7 +199,7 @@ Module AtomicDeliver <: LayerImpl TmpdirAPI MailboxAPI.
       repeat step_inv; eauto.
       simpl.
       rewrite FMap.add_add.
-      rewrite FMap.remove_add.
+      rewrite FMap.remove_add by eauto.
       eapply FMap.mapsto_add in H7; subst.
       econstructor.
       eauto.
