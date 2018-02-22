@@ -127,7 +127,7 @@ Module AtomicReader <: LayerImpl MailboxAPI AtomicMailboxAPI.
 
       - intros.
         inversion H; clear H; subst.
-        eapply DirFacts.elements_in_iff in H3; deex.
+        eapply DirFacts.elements_in_iff in H2; deex.
         eapply MailboxAPI.Dir.elements_2 in H.
         do 2 eexists; econstructor; eauto.
 
