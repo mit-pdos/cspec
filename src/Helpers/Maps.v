@@ -20,6 +20,9 @@ Module FMap.
     Axiom In : A -> t -> Prop.
     Axiom MapsTo : A -> V -> t -> Prop.
 
+    Definition keys (m:t) : list A.
+    Admitted.
+
     Theorem empty_in : forall x,
         ~In x empty.
     Admitted.

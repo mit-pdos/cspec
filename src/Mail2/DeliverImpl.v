@@ -11,9 +11,19 @@ Module AtomicDeliver <: LayerImpl TmpdirAPI MailboxAPI.
     _ <- Op (TmpdirAPI.UnlinkTmp tmpfn);
     Ret tt.
 
+  Definition list_core :=
+    l <- Op (TmpdirAPI.List);
+    Ret l.
+
+  Definition read_core fn :=
+    r <- Op (TmpdirAPI.Read fn);
+    Ret r.
+
   Definition compile_op T (op : MailboxAPI.opT T) : proc _ T :=
     match op with
     | MailboxAPI.Deliver m => deliver_core m
+    | MailboxAPI.List => list_core
+    | MailboxAPI.Read fn => read_core fn
     end.
 
   Ltac step_inv :=
@@ -52,6 +62,8 @@ Module AtomicDeliver <: LayerImpl TmpdirAPI MailboxAPI.
       econstructor; eauto.
       eapply FMap.mapsto_add_ne; eauto.
       congruence.
+    - eauto 20.
+    - eauto 20.
   Qed.
 
   Hint Resolve createtmp_right_mover.
@@ -102,6 +114,30 @@ Module AtomicDeliver <: LayerImpl TmpdirAPI MailboxAPI.
     eauto 20.
   Qed.
 
+  Theorem list_atomic : forall `(rx : _ -> proc _ T),
+    trace_incl TmpdirAPI.step
+      (Bind (compile_op (MailboxAPI.List)) rx)
+      (Bind (atomize compile_op (MailboxAPI.List)) rx).
+  Proof.
+    intros.
+    eapply trace_incl_atomize_ysa.
+    simpl.
+    unfold list_core, ysa_movers.
+    eauto 20.
+  Qed.
+
+  Theorem read_atomic : forall `(rx : _ -> proc _ T) fn,
+    trace_incl TmpdirAPI.step
+      (Bind (compile_op (MailboxAPI.Read fn)) rx)
+      (Bind (atomize compile_op (MailboxAPI.Read fn)) rx).
+  Proof.
+    intros.
+    eapply trace_incl_atomize_ysa.
+    simpl.
+    unfold read_core, ysa_movers.
+    eauto 20.
+  Qed.
+
   Theorem my_compile_correct :
     compile_correct compile_op TmpdirAPI.step MailboxAPI.step.
   Proof.
@@ -115,6 +151,10 @@ Module AtomicDeliver <: LayerImpl TmpdirAPI MailboxAPI.
       eapply FMap.mapsto_add in H7; subst.
       econstructor.
       eauto.
+    + repeat atomic_exec_inv.
+      repeat step_inv; eauto.
+    + repeat atomic_exec_inv.
+      repeat step_inv; eauto.
   Qed.
 
   Theorem my_atomize_correct :
@@ -123,6 +163,12 @@ Module AtomicDeliver <: LayerImpl TmpdirAPI MailboxAPI.
     unfold atomize_correct; intros.
     destruct op.
     + rewrite deliver_atomic.
+      eapply trace_incl_bind_a.
+      eauto.
+    + rewrite list_atomic.
+      eapply trace_incl_bind_a.
+      eauto.
+    + rewrite read_atomic.
       eapply trace_incl_bind_a.
       eauto.
   Qed.

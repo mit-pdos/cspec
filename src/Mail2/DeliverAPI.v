@@ -8,6 +8,8 @@ Module MailboxAPI <: Layer.
 
   Inductive mbox_opT : Type -> Type :=
   | Deliver : forall (m : string), mbox_opT unit
+  | List : mbox_opT (list (nat * string))
+  | Read : forall (fn : nat * string), mbox_opT string
   .
 
   Definition opT := mbox_opT.
@@ -26,6 +28,19 @@ Module MailboxAPI <: Layer.
       tt
       (mk_state tmp (FMap.add fn m mbox))
       nil
+  | StepList : forall tmp mbox tid,
+    xstep List tid
+      (mk_state tmp mbox)
+      (FMap.keys mbox)
+      (mk_state tmp mbox)
+      nil
+  | StepRead : forall fn tmp mbox tid m,
+    FMap.MapsTo fn m mbox ->
+    xstep (Read fn) tid
+      (mk_state tmp mbox)
+      m
+      (mk_state tmp mbox)
+      nil
   .
 
   Definition step := xstep.
@@ -41,6 +56,8 @@ Module TmpdirAPI <: Layer.
   | CreateTmp : forall (data : string), tmpdir_opT string
   | LinkMail : forall (fn : string), tmpdir_opT unit
   | UnlinkTmp : forall (fn : string), tmpdir_opT unit
+  | List : tmpdir_opT (list (nat * string))
+  | Read : forall (fn : nat * string), tmpdir_opT string
   .
 
   Definition opT := tmpdir_opT.
@@ -68,6 +85,19 @@ Module TmpdirAPI <: Layer.
       (mk_state tmp mbox)
       tt
       (mk_state tmp (FMap.add (tid, mailfn) data mbox))
+      nil
+  | StepList : forall tmp mbox tid,
+    xstep List tid
+      (mk_state tmp mbox)
+      (FMap.keys mbox)
+      (mk_state tmp mbox)
+      nil
+  | StepRead : forall fn tmp mbox tid m,
+    FMap.MapsTo fn m mbox ->
+    xstep (Read fn) tid
+      (mk_state tmp mbox)
+      m
+      (mk_state tmp mbox)
       nil
   .
 
