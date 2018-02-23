@@ -384,3 +384,10 @@ Proof.
   f_equal.
   eapply H0; eauto.
 Defined.
+
+Inductive sorted A (lt: A -> A -> Prop) : list A -> Prop :=
+| sorted_nil : sorted lt nil
+| sorted_cons : forall x l,
+    List.Forall (lt x) l ->
+    sorted lt l ->
+    sorted lt (x::l).
