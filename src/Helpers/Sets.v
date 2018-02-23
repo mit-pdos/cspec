@@ -91,13 +91,31 @@ Module FMap.
       rewrite cmp_refl in *; congruence.
     Qed.
 
-    Hint Resolve cmp_lt_irrefl.
+    Hint Resolve cmp_lt_irrefl : falso.
+
+    Hint Extern 4 => exfalso; eauto with falso nocore.
+
+    Lemma Forall_fst : forall P (l: list (A * V)) x v,
+        Forall P (map fst l) ->
+        List.In (x, v) l ->
+        P x.
+    Proof.
+      intros.
+      apply -> Forall_map in H.
+      eapply Forall_in in H; eauto.
+      auto.
+    Qed.
 
     Ltac forall_in :=
       match goal with
       | [ H: Forall ?P ?l, H': List.In ?x ?l |- _ ] =>
         let Hnew := fresh in
         pose proof (Forall_in H _ H') as Hnew;
+        clear H';
+        simpl in Hnew
+      | [ H: Forall ?P (map fst ?l), H': List.In (?x, ?v) ?l |- _ ] =>
+        let Hnew := fresh in
+        pose proof (Forall_fst l x v H H') as Hnew;
         clear H';
         simpl in Hnew
       end.
@@ -107,10 +125,22 @@ Module FMap.
         forall v, ~List.In (x, v) l.
     Proof.
       unfold not; intros.
-      apply -> Forall_map in H.
-      forall_in.
-      exfalso; eauto.
+      repeat forall_in; eauto.
     Qed.
+
+    Lemma all_keys_lt_false : forall (l: list (A*V)) (x:A),
+        Forall (cmp_lt x) (map fst l) ->
+        forall v, List.In (x, v) l -> False.
+    Proof.
+      apply all_keys_lt.
+    Qed.
+
+    Hint Resolve all_keys_lt_false : falso.
+
+    Ltac abstract_map m :=
+      pose proof (elem_sorted m);
+      unfold keys in *;
+      generalize dependent (elements m); clear m.
 
     Theorem mapsto_unique : forall x v v' m,
         MapsTo x v m ->
@@ -118,21 +148,16 @@ Module FMap.
         v = v'.
     Proof.
       unfold MapsTo; intros.
-      pose proof (elem_sorted m).
-      unfold keys in *.
-      generalize dependent (elements m); clear m.
+      abstract_map m.
       induction l; simpl in *; intros; eauto.
-      - exfalso; auto.
-      - destruct a as [x' v'']; simpl in *.
-        inversion_clear H1.
-        intuition (subst; eauto);
-          repeat match goal with
-                 | [ H: (_, _) = (_, _) |- _ ] =>
-                   inversion H; subst; clear H
-                 end;
-          auto.
-        exfalso; eapply all_keys_lt; eauto.
-        exfalso; eapply all_keys_lt; eauto.
+      destruct a as [x' v'']; simpl in *.
+      inversion_clear H1.
+      intuition (subst; eauto);
+        repeat match goal with
+               | [ H: (_, _) = (_, _) |- _ ] =>
+                 inversion H; subst; clear H
+               end;
+        eauto.
     Qed.
 
     Definition For_all (P:A*V -> Prop) (s:t) :=
@@ -534,6 +559,8 @@ Module FMap.
       apply cmp_antisym in H; congruence.
     Qed.
 
+    Hint Resolve cmp_lt_antisym : falso.
+
     Theorem mapsto_extensionality : forall s1 s2,
         (forall x v, MapsTo x v s1 <-> MapsTo x v s2) ->
         s1 = s2.
@@ -566,24 +593,18 @@ Module FMap.
       assert (x = y /\ v1 = v2). {
         pose proof (H0 x v1).
         pose proof (H0 y v2).
-        apply -> Forall_map in H3.
-        apply -> Forall_map in H5.
         (intuition eauto);
           repeat match goal with
                  | [ H: (_, _) = (_, _) |- _ ] =>
                    inversion H; subst; clear H
                  end;
           intuition idtac.
-        repeat forall_in.
-        exfalso; eauto using cmp_lt_antisym.
-        repeat forall_in.
-        exfalso; eauto using cmp_lt_antisym.
+        repeat forall_in; eauto.
+        repeat forall_in; eauto.
       } intuition subst; f_equal.
       eapply H; eauto.
       intros.
       pose proof (H0 x v).
-      apply -> Forall_map in H3.
-      apply -> Forall_map in H5.
       (intuition eauto);
         repeat match goal with
                | [ H: (_, _) = (_, _) |- _ ] =>
