@@ -207,6 +207,41 @@ Module FMap.
       intuition simp.
     Qed.
 
+    Fixpoint get_opt (x0:A) (l:list (A*V)) : option V :=
+      match l with
+      | nil => None
+      | (x,v)::xs => if cmp_dec x x0 then Some v else get_opt x0 xs
+      end.
+
+    Definition in_mapsto_get a m :
+        In a m ->
+        {v | MapsTo a v m}.
+    Proof.
+      unfold_map.
+      destruct_with_eqn (get_opt a l).
+      exists v.
+      induction l; simp.
+      intuition simp.
+      destruct (cmp_dec a a); subst; try congruence.
+      inv Heqo; eauto.
+      destruct (cmp_dec x a); subst.
+      inv Heqo; eauto.
+      intuition eauto.
+
+      exfalso.
+      induction l; simp.
+      destruct (cmp_dec x a); subst; try congruence.
+      intuition eauto.
+    Defined.
+
+    Lemma in_mapsto_exists : forall a m,
+        In a m ->
+        exists v, MapsTo a v m.
+    Proof.
+      intros.
+      destruct (in_mapsto_get a m); eauto.
+    Qed.
+
     Definition For_all (P:A*V -> Prop) (s:t) :=
       Forall P (elements s).
 
@@ -347,6 +382,20 @@ Module FMap.
       eapply _add_forall'; eauto.
     Qed.
 
+    Theorem add_forall'_in : forall x v v0 (P: A*V -> Prop) s,
+        MapsTo x v0 s ->
+        P (x, v0) ->
+        For_all P (add x v s) ->
+        For_all P s.
+    Proof.
+      unfold_map; simp.
+      induction l; simp.
+      cmp_split.
+      intuition simp.
+      rewrite cmp_refl in *; simp.
+      intuition simp.
+    Qed.
+
     Theorem _add_mapsto : forall x v l,
         List.In (x, v) (_add x v l).
     Proof.
@@ -376,6 +425,15 @@ Module FMap.
     Qed.
 
     Hint Unfold add : map.
+
+    Theorem add_incr : forall x v s y,
+        In y s ->
+        In y (add x v s).
+    Proof.
+      unfold_map; simp.
+      induction l; simp.
+      cmp_split.
+    Qed.
 
     Theorem in_add : forall a1 a2 v m,
         In a1 m ->
