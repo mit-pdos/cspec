@@ -1,6 +1,7 @@
 Require Import List.
 Require Import Ordering.
 Require Import ProofIrrelevance.
+Require Import Helpers.
 
 Set Implicit Arguments.
 
@@ -137,31 +138,61 @@ Module FMap.
 
     Hint Resolve all_keys_lt_false : falso.
 
-    Ltac abstract_map m :=
-      pose proof (elem_sorted m);
-      unfold keys in *;
-      generalize dependent (elements m); clear m.
+    Hint Unfold In MapsTo elements keys : map.
+
+    Ltac unfold_map :=
+      autounfold with map in *;
+      intros;
+      repeat match goal with
+             | [ m: t |- _ ] =>
+               let l := fresh "l" in
+               destruct m as [l ?]
+             | [ keys := _ |- _ ] =>
+               subst keys
+             end;
+      cbv [elements keys] in *.
+
+    Ltac inv H :=
+      inversion H; subst; clear H.
+
+    Ltac simp :=
+      subst;
+      repeat match goal with
+             | |- forall _, _ => intros
+             | [ a: A * V |- _ ] =>
+               let x := fresh "x" in
+               let v := fresh "v" in
+               destruct a as [x v];
+               cbn [fst snd] in *
+             | [ H: (_,_) = (_,_) |- _ ] => inv H
+             | [ H: sorted _ (_::_) |- _ ] => inv H
+             | [ H: Forall _ (_::_) |- _ ] => inv H
+             | [ H: _ /\ _ |- _ ] => destruct H
+             | [ H: ?P -> _, H': ?P |- _ ] =>
+               lazymatch type of P with
+               | Prop => specialize (H H')
+               end
+             | [ H: context[cmp ?x ?y],
+                    H': cmp ?x ?y = _ |- _ ] =>
+               rewrite H' in H
+             | _ => progress simpl in *
+             end;
+      eauto.
 
     Theorem mapsto_unique : forall x v v' m,
         MapsTo x v m ->
         MapsTo x v' m ->
         v = v'.
     Proof.
-      unfold MapsTo; intros.
-      abstract_map m.
-      induction l; simpl in *; intros; eauto.
-      destruct a as [x' v'']; simpl in *.
-      inversion_clear H1.
-      intuition (subst; eauto);
-        repeat match goal with
-               | [ H: (_, _) = (_, _) |- _ ] =>
-                 inversion H; subst; clear H
-               end;
-        eauto.
+      unfold_map.
+      induction l; simp.
+      intuition simp.
     Qed.
 
     Definition For_all (P:A*V -> Prop) (s:t) :=
       Forall P (elements s).
+
+    Hint Unfold For_all : map.
 
     Theorem empty_Forall : forall P,
         For_all P empty.
@@ -173,7 +204,7 @@ Module FMap.
       For_all P s ->
       forall x v, MapsTo x v s -> P (x, v).
     Proof.
-      unfold For_all, MapsTo; simpl; intros.
+      unfold_map.
       eapply Forall_in; eauto.
     Qed.
 
@@ -181,11 +212,8 @@ Module FMap.
         ~In x s ->
         For_all (fun y => x <> fst y) s.
     Proof.
-      unfold In, For_all.
-      destruct s; simpl; intros.
-      unfold keys in *; simpl in *.
-      clear elem_sorted0.
-      induction elements0; simpl in *; eauto 10.
+      unfold_map.
+      induction l; simp; eauto 10.
     Qed.
 
     Definition In_dec x s : {In x s} + {~In x s}.
@@ -222,22 +250,27 @@ Module FMap.
     Theorem _add_key_keys : forall x v (l: list (A*V)),
         map fst (_add x v l) = _add_key x (map fst l).
     Proof.
-      induction l; simpl; auto.
-      destruct a; simpl.
-      destruct (cmp x a); simpl; auto.
-      congruence.
+      induction l; simp.
+      destruct matches; simpl; congruence.
     Qed.
+
+    Ltac cmp_split :=
+      let t x y :=
+          destruct (ord_spec x y);
+          simp;
+          try solve [ intuition eauto ] in
+      match goal with
+      | |- context[cmp ?x ?y] => t x y
+      | [ H: context[cmp ?x ?y] |- _ ] => t x y
+      end.
 
     Theorem _add_forall : forall x v P l,
         Forall P l ->
         P (x, v) ->
         Forall P (_add x v l).
     Proof.
-      induction l; simpl; intros; eauto.
-      inversion H; subst; clear H.
-      destruct a as [x' v'].
-      destruct (ord_spec x x');
-        (intuition subst); eauto.
+      induction l; simp.
+      cmp_split.
     Qed.
 
     Hint Resolve _add_forall.
@@ -247,16 +280,8 @@ Module FMap.
         Forall P (_add x v l) ->
         Forall P l.
     Proof.
-      induction l; simpl; intros; eauto.
-      destruct a as [x' v'].
-      destruct (ord_spec x x');
-        simpl in *;
-        intuition subst.
-      - congruence.
-      - rewrite H2 in *.
-        inversion H0; eauto.
-      - rewrite H3 in *.
-        inversion H0; eauto.
+      induction l; simp.
+      cmp_split.
     Qed.
 
     Theorem _add_key_forall : forall x P l,
@@ -264,13 +289,17 @@ Module FMap.
         P x ->
         Forall P (_add_key x l).
     Proof.
-      induction l; simpl; intros; eauto.
-      inversion H; subst; clear H.
-      destruct (ord_spec x a);
-        (intuition subst); eauto.
+      induction l; simp.
+      cmp_split.
     Qed.
 
     Hint Resolve _add_key_forall.
+
+    Ltac abstract_keys :=
+      match goal with
+      | |- context[map fst ?l] =>
+        generalize dependent (map fst l); clear l
+      end.
 
     Theorem _add_respectful : forall x v l,
         sorted cmp_lt (map fst l) ->
@@ -278,16 +307,14 @@ Module FMap.
     Proof.
       intros.
       rewrite _add_key_keys.
-      generalize dependent (map fst l); clear l.
-      induction 1; simpl; eauto.
-      destruct (ord_spec x x0); intuition subst.
-      - eauto.
-      - constructor; eauto.
-        constructor; eauto.
-        eapply Forall_impl; [ | eauto ].
-        intros.
-        eapply cmp_trans; eauto.
-      - constructor; eauto.
+      abstract_keys.
+      induction 1; simp.
+      cmp_split.
+      constructor; eauto.
+      constructor; eauto.
+      eapply Forall_impl; [ | eauto ].
+      intros.
+      eapply cmp_trans; eauto.
     Qed.
 
     Definition add (x:A) (v:V) (s:t) : t :=
@@ -300,8 +327,7 @@ Module FMap.
         P (x, v) ->
         For_all P (add x v s).
     Proof.
-      unfold For_all, add; simpl; intros.
-      eapply _add_forall; eauto.
+      unfold_map; simp.
     Qed.
 
     Theorem add_forall' : forall x v P s,
@@ -309,60 +335,49 @@ Module FMap.
         For_all P (add x v s) ->
         For_all P s.
     Proof.
-      unfold For_all, add; simpl; intros.
+      unfold_map; simp.
       eapply _add_forall'; eauto.
     Qed.
 
     Theorem _add_mapsto : forall x v l,
         List.In (x, v) (_add x v l).
     Proof.
-      induction l; simpl; eauto.
-      destruct a as [x' v'].
-      destruct (ord_spec x x'); subst; simpl; eauto.
+      induction l; simp.
+      cmp_split.
     Qed.
 
     Theorem _add_in : forall x v l,
         List.In x (map fst (_add x v l)).
     Proof.
-      induction l; simpl; eauto.
-      destruct a as [x' v'].
-      destruct (ord_spec x x'); subst; simpl; eauto.
+      induction l; simp.
+      cmp_split.
     Qed.
 
     Theorem add_mapsto : forall x v s,
         MapsTo x v (add x v s).
     Proof.
-      unfold add, MapsTo; simpl.
-      unfold keys; simpl; intros.
+      unfold_map; simp.
       eapply _add_mapsto.
     Qed.
 
     Theorem add_in : forall x v s,
         In x (add x v s).
     Proof.
-      unfold add, In; simpl.
-      unfold keys; simpl; intros.
+      unfold_map; simp.
       eapply _add_in.
     Qed.
+
+    Hint Unfold add : map.
 
     Theorem add_in' : forall x s y v,
         In x (add y v s) ->
         x = y \/ In x s.
     Proof.
-      destruct s as [s H].
-      unfold In, add; simpl; intros.
-      induction s; simpl in *; intuition eauto.
-      subst H.
-      compute [keys elements] in *.
-      destruct a as [y' v'].
-      inversion elem_sorted0; subst; clear elem_sorted0; intuition auto.
-      destruct (ord_spec y y'); subst; intuition.
-      - rewrite cmp_refl in *.
-        simpl in *; intuition auto.
-      - rewrite H4 in *; intuition eauto.
-        simpl in *; intuition auto.
-      - rewrite H5 in *.
-        simpl in *; intuition auto.
+      unfold_map.
+      induction l; simp.
+      intuition.
+      cmp_split.
+      rewrite cmp_refl in *; simp.
     Qed.
 
     Fixpoint _remove (x0:A) (l:list (A*V)) : list (A*V) :=
@@ -388,19 +403,17 @@ Module FMap.
     Theorem _remove_key_keys : forall x (l: list (A*V)),
         map fst (_remove x l) = _remove_key x (map fst l).
     Proof.
-      induction l; simpl; auto.
-      destruct a as [x' v]; simpl.
-      destruct (cmp x x'); simpl; congruence.
+      induction l; simp.
+      cmp_split.
+      congruence.
     Qed.
 
     Theorem _remove_forall : forall x P l,
         Forall P l ->
         Forall P (_remove x l).
     Proof.
-      induction 1; simpl; eauto.
-      destruct x0 as [x' v].
-      destruct (ord_spec x x');
-        subst; eauto.
+      induction 1; simp.
+      cmp_split.
     Qed.
 
     Hint Resolve _remove_forall.
@@ -409,9 +422,8 @@ Module FMap.
         Forall P l ->
         Forall P (_remove_key x l).
     Proof.
-      induction 1; simpl; eauto.
-      destruct (ord_spec x x0);
-        subst; eauto.
+      induction 1; simp.
+      cmp_split.
     Qed.
 
     Hint Resolve _remove_key_forall.
@@ -422,12 +434,9 @@ Module FMap.
     Proof.
       intros.
       rewrite _remove_key_keys.
-      generalize dependent (map fst l); clear l.
-      induction l; simpl; intros; eauto.
-      inversion H; subst; clear H.
-      destruct (ord_spec x a);
-        (intuition subst);
-        eauto.
+      abstract_keys.
+      induction l; simp.
+      cmp_split.
     Qed.
 
     Definition remove x (s:t) : t :=
@@ -439,38 +448,44 @@ Module FMap.
         Forall (cmp_lt x) l ->
         ~List.In x l.
     Proof.
-      unfold not, cmp_lt; intros.
-      eapply Forall_in in H; eauto.
+      unfold_map.
+      intro.
+      forall_in.
+      eauto.
     Qed.
+
+    Lemma forall_lt_not_in_False : forall x l,
+        Forall (cmp_lt x) l ->
+        List.In x l ->
+        False.
+    Proof.
+      apply forall_lt_not_in.
+    Qed.
+
+    Hint Resolve forall_lt_not_in_False : falso.
 
     Theorem _remove_not_in : forall x l,
         sorted cmp_lt l ->
         ~List.In x (_remove_key x l).
     Proof.
       unfold not; intros.
-      induction l; simpl in *; eauto.
-      inversion H; subst; clear H.
-      destruct (ord_spec x a);
-        intuition subst.
-      - rewrite cmp_refl in H0.
-        eapply forall_lt_not_in; eauto.
-      - rewrite H1 in *.
-        simpl in *; (intuition subst).
-        rewrite cmp_refl in H2; congruence.
-        repeat forall_in.
-        congruence.
-      - rewrite H2 in *.
-        simpl in *; (intuition subst).
-        rewrite cmp_refl in H2; congruence.
+      induction l; simp.
+      cmp_split.
+      rewrite cmp_refl in *; eauto.
+
+      intuition simp.
+      forall_in; congruence.
+      intuition simp.
     Qed.
+
+    Hint Unfold remove : map.
 
     Theorem remove_not_in : forall x s,
         ~In x (remove x s).
     Proof.
-      unfold In, remove, keys; simpl; intros.
+      unfold_map.
       rewrite _remove_key_keys.
-      eapply _remove_not_in.
-      apply (elem_sorted s).
+      eapply _remove_not_in; auto.
     Qed.
 
     Theorem _remove_mapsto : forall x l y v,
@@ -478,15 +493,9 @@ Module FMap.
         x <> y ->
         List.In (y, v) (_remove x l).
     Proof.
-      induction l; simpl; intuition subst.
-      - inversion_clear H1.
-        destruct (ord_spec x y);
-          simpl;
-          (intuition subst).
-      - destruct (ord_spec x a0);
-          simpl;
-          (intuition subst).
-        eauto.
+      induction l; simp.
+      cmp_split.
+      intuition simp.
     Qed.
 
     Theorem _remove_in : forall x l y,
@@ -494,14 +503,8 @@ Module FMap.
         x <> y ->
         List.In y (_remove_key x l).
     Proof.
-      induction l; simpl; intuition subst.
-      - destruct (ord_spec x y);
-          simpl;
-          (intuition subst).
-      - destruct (ord_spec x a);
-          simpl;
-          (intuition subst).
-        eauto.
+      induction l; simp.
+      cmp_split.
     Qed.
 
     Theorem remove_mapsto : forall x s y v,
@@ -509,7 +512,7 @@ Module FMap.
         x <> y ->
         MapsTo y v (remove x s).
     Proof.
-      unfold MapsTo, remove, keys; simpl; intros.
+      unfold_map; simp.
       auto using _remove_mapsto.
     Qed.
 
@@ -518,36 +521,33 @@ Module FMap.
         x <> y ->
         In y (remove x s).
     Proof.
-      unfold In, remove, keys; simpl; intros.
+      unfold_map; simp.
       rewrite _remove_key_keys.
-      auto using _remove_in.
+      eauto using _remove_in.
     Qed.
 
     Theorem remove_in' : forall x s y,
         In x (remove y s) ->
         In x s /\ x <> y.
     Proof.
-      destruct s as [s H].
-      unfold In, remove, keys; simpl; intros.
-      induction s; simpl in *; eauto.
-      destruct a as [y' v'].
-      subst H; simpl in *.
-      destruct (ord_spec y y'); subst.
+      unfold_map; simp.
+      induction l; simp.
+      cmp_split.
       - rewrite cmp_refl in *.
-        inversion elem_sorted0; subst; clear elem_sorted0;
-          intuition (subst; auto).
-        eapply Forall_in in H2; eauto.
-      - destruct H.
-        rewrite H in *; simpl in *.
-        intuition (subst; eauto).
-        inversion elem_sorted0; subst; clear elem_sorted0;
-          intuition eauto.
+        intuition simp.
+      - intuition (simp; try congruence).
         forall_in; congruence.
-      - destruct H.
-        rewrite H1 in *; simpl in *.
-        intuition (subst; eauto).
-        inversion_clear elem_sorted0; intuition eauto.
-        inversion_clear elem_sorted0; intuition eauto.
+      - intuition (simp; try congruence).
+    Qed.
+
+    Lemma elements_eq : forall m1 m2,
+        elements m1 = elements m2 ->
+        m1 = m2.
+    Proof.
+      unfold_map.
+      destruct H.
+      f_equal.
+      apply proof_irrelevance.
     Qed.
 
     Lemma cmp_lt_antisym : forall x y,
@@ -565,55 +565,34 @@ Module FMap.
         (forall x v, MapsTo x v s1 <-> MapsTo x v s2) ->
         s1 = s2.
     Proof.
-      unfold In; intros.
-      destruct s1 as [s1 ? s1_sorted].
-      destruct s2 as [s2 ? s2_sorted].
-      subst keys0 keys1.
-      unfold MapsTo, keys in *; simpl in *.
-      assert (s1 = s2).
-      generalize dependent H.
-      generalize dependent s2_sorted.
-      generalize dependent s1_sorted.
-      eapply two_list_induction with (l1:=s1) (l2:=s2);
-        simpl; intros; eauto.
-      destruct y as [x v].
-      exfalso; eapply H; eauto.
-      destruct x as [x v].
-      exfalso; eapply H; eauto.
-      inversion s1_sorted; subst; clear s1_sorted.
-      inversion s2_sorted; subst; clear s2_sorted.
-      intuition idtac.
-
-      destruct x as [x v1].
-      destruct y as [y v2].
-      simpl in *.
-      assert (~List.In (x, v1) xs) by eauto using all_keys_lt.
-      assert (~List.In (y, v2) ys) by eauto using all_keys_lt.
-
-      assert (x = y /\ v1 = v2). {
-        pose proof (H0 x v1).
-        pose proof (H0 y v2).
-        (intuition eauto);
-          repeat match goal with
-                 | [ H: (_, _) = (_, _) |- _ ] =>
-                   inversion H; subst; clear H
-                 end;
-          intuition idtac.
-        repeat forall_in; eauto.
-        repeat forall_in; eauto.
-      } intuition subst; f_equal.
-      eapply H; eauto.
       intros.
+      apply elements_eq.
+      unfold_map.
+
+      rename l into l1.
+      rename l0 into l2.
+      generalize dependent H.
+      generalize dependent elem_sorted1.
+      generalize dependent elem_sorted0.
+      eapply two_list_induction with (l1:=l1) (l2:=l2); simp.
+      exfalso; eapply H; eauto.
+      exfalso; eapply H; eauto.
+
+      rename x0 into x;
+        rename x1 into y.
+      rename v into v1;
+        rename v0 into v2.
+      assert (x = y /\ v1 = v2).
+      pose proof (H0 x v1).
+      pose proof (H0 y v2).
+      intuition simp.
+      repeat forall_in; eauto.
+      repeat forall_in; eauto.
+      intuition subst; f_equal.
+
+      eapply H; intros.
       pose proof (H0 x v).
-      (intuition eauto);
-        repeat match goal with
-               | [ H: (_, _) = (_, _) |- _ ] =>
-                 inversion H; subst; clear H
-               end;
-        intuition idtac.
-      destruct H0.
-      f_equal.
-      apply proof_irrelevance.
+      intuition simp.
     Qed.
 
     Fixpoint _filter (P: A -> bool) (l: list (A*V)) : list (A*V) :=
@@ -633,8 +612,7 @@ Module FMap.
     Theorem _filter_key_keys : forall P l,
         map fst (_filter P l) = _filter_key P (map fst l).
     Proof.
-      induction l; simpl; auto.
-      destruct a as [x v]; simpl.
+      induction l; simp.
       destruct (P x); simpl; congruence.
     Qed.
 
@@ -642,16 +620,15 @@ Module FMap.
         forall x v, List.In (x, v) (_filter P l) ->
                List.In (x, v) l.
     Proof.
-      induction l; simpl; intros; auto.
-      destruct a as [x' v'].
-      destruct (P x'); simpl in *; intuition eauto.
+      induction l; simp.
+      destruct (P x0); simpl in *; intuition eauto.
     Qed.
 
     Theorem _filter_key_in : forall P l,
         forall x, List.In x (_filter_key P l) ->
              List.In x l.
     Proof.
-      induction l; simpl; intros; auto.
+      induction l; simp.
       destruct (P a); simpl in *; intuition eauto.
     Qed.
 
@@ -663,9 +640,8 @@ Module FMap.
     Proof.
       intros.
       rewrite _filter_key_keys.
-      generalize dependent (map fst l); clear l.
-      induction l; simpl; intros; auto.
-      inversion H; subst; intuition eauto.
+      abstract_keys.
+      induction l; simp.
       destruct (P a); eauto.
       constructor; eauto.
       eapply Forall_subset; eauto.
@@ -681,21 +657,18 @@ Module FMap.
         In x (filter P s) ->
         In x s.
     Proof.
-      unfold In, filter, keys; simpl; intros.
+      unfold_map; simp.
       rewrite _filter_key_keys in *.
       eauto using _filter_in.
     Qed.
 
+    Hint Unfold filter : map.
+
     Theorem filter_spec : forall P s,
         For_all (fun '(x, _) => P x = true) (filter P s).
     Proof.
-      unfold For_all, filter.
-      destruct s as [s H].
-      simpl.
-      subst H.
-      induction s; simpl; intros; auto.
-      destruct a as [x v]; simpl in *.
-      inversion elem_sorted0; subst; clear elem_sorted0; intuition.
+      unfold_map.
+      induction l; simp.
       destruct_with_eqn (P x); eauto.
     Qed.
 
@@ -704,16 +677,11 @@ Module FMap.
         P x = true ->
         In x (filter P s).
     Proof.
-      destruct s as [s H].
-      unfold In, filter, keys; simpl; intros.
-      subst H.
-      induction s; simpl; intros; auto.
-      destruct a as [x' v']; simpl in *.
-      inversion elem_sorted0; subst; clear elem_sorted0; intuition.
-      - subst.
-        destruct_with_eqn (P x); simpl; intuition eauto.
-        congruence.
-      - destruct_with_eqn (P x'); simpl; intuition eauto.
+      unfold_map.
+      induction l; simp.
+      destruct_with_eqn (P x0);
+        intuition simp.
+      congruence.
     Qed.
 
   End Maps.
