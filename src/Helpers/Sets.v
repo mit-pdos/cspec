@@ -1,7 +1,6 @@
 Require Import List.
 Require Import Ordering.
 Require Import ProofIrrelevance.
-Require Import Helpers.
 
 Set Implicit Arguments.
 
@@ -179,6 +178,16 @@ Module FMap.
              end;
       eauto.
 
+    Ltac cmp_split :=
+      let t x y :=
+          destruct (ord_spec x y);
+          simp;
+          try solve [ intuition eauto ] in
+      match goal with
+      | |- context[cmp ?x ?y] => t x y
+      | [ H: context[cmp ?x ?y] |- _ ] => t x y
+      end.
+
     Theorem mapsto_unique : forall x v v' m,
         MapsTo x v m ->
         MapsTo x v' m ->
@@ -251,18 +260,8 @@ Module FMap.
         map fst (_add x v l) = _add_key x (map fst l).
     Proof.
       induction l; simp.
-      destruct matches; simpl; congruence.
+      cmp_split; congruence.
     Qed.
-
-    Ltac cmp_split :=
-      let t x y :=
-          destruct (ord_spec x y);
-          simp;
-          try solve [ intuition eauto ] in
-      match goal with
-      | |- context[cmp ?x ?y] => t x y
-      | [ H: context[cmp ?x ?y] |- _ ] => t x y
-      end.
 
     Theorem _add_forall : forall x v P l,
         Forall P l ->
