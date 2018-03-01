@@ -7,6 +7,12 @@ Require Import MailServerDirImpl.
 Require Import MailboxAPI.
 Require Import MailboxImpl.
 
+Require Import MailboxTmpAbsAPI.
+Require Import MailboxTmpAbsImpl.
+
+Require Import DeliverAPI.
+Require Import DeliverImpl.
+
 
 Import MailServerAPI.
 
@@ -28,11 +34,15 @@ Definition mail_server :=
   repeat (Proc mail_server_thread) 4.
 
 
-Module c := Link MailboxAPI MailServerDirAPI MailServerAPI
-                 AtomicReader MailServerDir.
+Module c1 := Link MailboxAPI MailServerDirAPI MailServerAPI
+                  AtomicReader MailServerDir.
+Module c2 := Link MailboxTmpAbsAPI MailboxAPI MailServerAPI
+                  MailboxTmpAbs c1.
+Module c3 := Link DeliverAPI MailboxTmpAbsAPI MailServerAPI
+                  AtomicDeliver c2.
 
 
-Definition ms_bottom := c.compile_ts mail_server.
+Definition ms_bottom := c3.compile_ts mail_server.
 Check ms_bottom.
 
-Print Assumptions c.compile_traces_match.
+Print Assumptions c3.compile_traces_match.

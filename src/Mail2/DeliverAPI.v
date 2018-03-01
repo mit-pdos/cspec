@@ -1,68 +1,28 @@
 Require Import POCS.
 Require Import String.
+Require Import MailServerAPI.
+Require Import MailboxTmpAbsAPI.
 
 
-Module MailboxAPI <: Layer.
+Module DeliverAPI <: Layer.
 
-  Definition dir_contents := FMap.t (nat*string) string.
+  Import MailServerAPI.
+  Import MailboxTmpAbsAPI.
 
-  Inductive mbox_opT : Type -> Type :=
-  | Deliver : forall (m : string), mbox_opT unit
-  | List : mbox_opT (list (nat * string))
-  | Read : forall (fn : nat * string), mbox_opT string
+  Inductive xopT : Type -> Type :=
+  | CreateTmp : xopT string
+  | WriteTmp : forall (fn : string) (data : string), xopT unit
+  | LinkMail : forall (fn : string), xopT unit
+  | UnlinkTmp : forall (fn : string), xopT unit
+
+  | List : xopT (list (nat * string))
+  | Read : forall (fn : nat * string), xopT string
+  | GetRequest : xopT request
+  | Respond : forall (T : Type) (v : T), xopT unit
   .
 
-  Definition opT := mbox_opT.
-  Record state_rec := mk_state {
-    tmpdir : dir_contents;
-    maildir : dir_contents;
-  }.
-  Definition State := state_rec.
-  Definition initP (s : State) := True.
-
-  Inductive xstep : forall T, opT T -> nat -> State -> T -> State -> list event -> Prop :=
-  | StepDeliver : forall m tmp mbox tid fn,
-    ~ FMap.In fn mbox ->
-    xstep (Deliver m) tid
-      (mk_state tmp mbox)
-      tt
-      (mk_state tmp (FMap.add fn m mbox))
-      nil
-  | StepList : forall tmp mbox tid,
-    xstep List tid
-      (mk_state tmp mbox)
-      (FMap.keys mbox)
-      (mk_state tmp mbox)
-      nil
-  | StepRead : forall fn tmp mbox tid m,
-    FMap.MapsTo fn m mbox ->
-    xstep (Read fn) tid
-      (mk_state tmp mbox)
-      m
-      (mk_state tmp mbox)
-      nil
-  .
-
-  Definition step := xstep.
-
-End MailboxAPI.
-
-
-Module TmpdirAPI <: Layer.
-
-  Import MailboxAPI.
-
-  Inductive tmpdir_opT : Type -> Type :=
-  | CreateTmp : tmpdir_opT string
-  | WriteTmp : forall (fn : string) (data : string), tmpdir_opT unit
-  | LinkMail : forall (fn : string), tmpdir_opT unit
-  | UnlinkTmp : forall (fn : string), tmpdir_opT unit
-  | List : tmpdir_opT (list (nat * string))
-  | Read : forall (fn : nat * string), tmpdir_opT string
-  .
-
-  Definition opT := tmpdir_opT.
-  Definition State := MailboxAPI.State.
+  Definition opT := xopT.
+  Definition State := MailboxTmpAbsAPI.State.
   Definition initP (s : State) := True.
 
   Inductive xstep : forall T, opT T -> nat -> State -> T -> State -> list event -> Prop :=
@@ -94,10 +54,12 @@ Module TmpdirAPI <: Layer.
       tt
       (mk_state tmp (FMap.add (tid, mailfn) data mbox))
       nil
-  | StepList : forall tmp mbox tid,
+
+  | StepList : forall tmp mbox tid r,
+    FMap.is_permutation_key r mbox ->
     xstep List tid
       (mk_state tmp mbox)
-      (FMap.keys mbox)
+      r
       (mk_state tmp mbox)
       nil
   | StepRead : forall fn tmp mbox tid m,
@@ -107,8 +69,20 @@ Module TmpdirAPI <: Layer.
       m
       (mk_state tmp mbox)
       nil
+  | StepGetRequest : forall s tid r,
+    xstep GetRequest tid
+      s
+      r
+      s
+      (Event r :: nil)
+  | StepRespond : forall s tid T (v : T),
+    xstep (Respond v) tid
+      s
+      tt
+      s
+      (Event v :: nil)
   .
 
   Definition step := xstep.
 
-End TmpdirAPI.
+End DeliverAPI.

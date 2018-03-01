@@ -1,23 +1,33 @@
 Require Import POCS.
 Require Import String.
 Require Import DeliverAPI.
+Require Import MailboxAPI.
+Require Import MailboxTmpAbsAPI.
 
 
-Module AtomicDeliver <: LayerImpl TmpdirAPI MailboxAPI.
+Module AtomicDeliver <: LayerImpl DeliverAPI MailboxTmpAbsAPI.
 
   Definition deliver_core (m : string) :=
-    tmpfn <- Op (TmpdirAPI.CreateTmp);
-    _ <- Op (TmpdirAPI.WriteTmp tmpfn m);
-    _ <- Op (TmpdirAPI.LinkMail tmpfn);
-    _ <- Op (TmpdirAPI.UnlinkTmp tmpfn);
+    tmpfn <- Op (DeliverAPI.CreateTmp);
+    _ <- Op (DeliverAPI.WriteTmp tmpfn m);
+    _ <- Op (DeliverAPI.LinkMail tmpfn);
+    _ <- Op (DeliverAPI.UnlinkTmp tmpfn);
     Ret tt.
 
   Definition list_core :=
-    l <- Op (TmpdirAPI.List);
+    l <- Op (DeliverAPI.List);
     Ret l.
 
   Definition read_core fn :=
-    r <- Op (TmpdirAPI.Read fn);
+    r <- Op (DeliverAPI.Read fn);
+    Ret r.
+
+  Definition getrequest_core :=
+    r <- Op (DeliverAPI.GetRequest);
+    Ret r.
+
+  Definition respond_core T (v : T) :=
+    r <- Op (DeliverAPI.Respond v);
     Ret r.
 
   Definition compile_op T (op : MailboxAPI.opT T) : proc _ T :=
@@ -25,23 +35,28 @@ Module AtomicDeliver <: LayerImpl TmpdirAPI MailboxAPI.
     | MailboxAPI.Deliver m => deliver_core m
     | MailboxAPI.List => list_core
     | MailboxAPI.Read fn => read_core fn
+    | MailboxAPI.GetRequest => getrequest_core
+    | MailboxAPI.Respond r => respond_core r
     end.
 
   Ltac step_inv :=
     match goal with
     | H : MailboxAPI.step _ _ _ _ _ _ |- _ =>
       inversion H; clear H; subst; repeat sigT_eq
-    | H : TmpdirAPI.step _ _ _ _ _ _ |- _ =>
+    | H : MailboxTmpAbsAPI.step _ _ _ _ _ _ |- _ =>
+      inversion H; clear H; subst; repeat sigT_eq
+    | H : DeliverAPI.step _ _ _ _ _ _ |- _ =>
       inversion H; clear H; subst; repeat sigT_eq
     end; intuition idtac.
 
   Hint Extern 1 (MailboxAPI.step _ _ _ _ _ _) => econstructor.
-  Hint Extern 1 (TmpdirAPI.step _ _ _ _ _ _) => econstructor.
+  Hint Extern 1 (MailboxTmpAbsAPI.step _ _ _ _ _ _) => econstructor.
+  Hint Extern 1 (DeliverAPI.step _ _ _ _ _ _) => econstructor.
 
   Lemma createtmp_right_mover :
     right_mover
-      TmpdirAPI.step
-      (TmpdirAPI.CreateTmp).
+      DeliverAPI.step
+      (DeliverAPI.CreateTmp).
   Proof.
     unfold right_mover; intros.
     repeat step_inv.
@@ -74,14 +89,16 @@ Module AtomicDeliver <: LayerImpl TmpdirAPI MailboxAPI.
       congruence.
     - eauto 20.
     - eauto 20.
+    - eauto 20.
+    - eauto 20.
   Qed.
 
   Hint Resolve createtmp_right_mover.
 
   Lemma writetmp_right_mover : forall fn data,
     right_mover
-      TmpdirAPI.step
-      (TmpdirAPI.WriteTmp fn data).
+      DeliverAPI.step
+      (DeliverAPI.WriteTmp fn data).
   Proof.
     unfold right_mover; intros.
     repeat step_inv.
@@ -110,14 +127,16 @@ Module AtomicDeliver <: LayerImpl TmpdirAPI MailboxAPI.
       congruence.
     - eauto 20.
     - eauto 20.
+    - eauto 20.
+    - eauto 20.
   Qed.
 
   Hint Resolve writetmp_right_mover.
 
   Lemma unlinktmp_always_enabled : forall fn,
     always_enabled
-      TmpdirAPI.step
-      (TmpdirAPI.UnlinkTmp fn).
+      DeliverAPI.step
+      (DeliverAPI.UnlinkTmp fn).
   Proof.
     unfold always_enabled, enabled_in; intros.
     destruct s; eauto.
@@ -127,8 +146,8 @@ Module AtomicDeliver <: LayerImpl TmpdirAPI MailboxAPI.
 
   Lemma unlinktmp_left_mover : forall fn,
     left_mover
-      TmpdirAPI.step
-      (TmpdirAPI.UnlinkTmp fn).
+      DeliverAPI.step
+      (DeliverAPI.UnlinkTmp fn).
   Proof.
     split; eauto.
     intros; repeat step_inv; eauto; repeat deex.
@@ -154,7 +173,7 @@ Module AtomicDeliver <: LayerImpl TmpdirAPI MailboxAPI.
   Hint Resolve unlinktmp_left_mover.
 
   Theorem deliver_atomic : forall `(rx : _ -> proc _ T) m,
-    trace_incl TmpdirAPI.step
+    trace_incl DeliverAPI.step
       (Bind (compile_op (MailboxAPI.Deliver m)) rx)
       (Bind (atomize compile_op (MailboxAPI.Deliver m)) rx).
   Proof.
@@ -166,7 +185,7 @@ Module AtomicDeliver <: LayerImpl TmpdirAPI MailboxAPI.
   Qed.
 
   Theorem list_atomic : forall `(rx : _ -> proc _ T),
-    trace_incl TmpdirAPI.step
+    trace_incl DeliverAPI.step
       (Bind (compile_op (MailboxAPI.List)) rx)
       (Bind (atomize compile_op (MailboxAPI.List)) rx).
   Proof.
@@ -178,7 +197,7 @@ Module AtomicDeliver <: LayerImpl TmpdirAPI MailboxAPI.
   Qed.
 
   Theorem read_atomic : forall `(rx : _ -> proc _ T) fn,
-    trace_incl TmpdirAPI.step
+    trace_incl DeliverAPI.step
       (Bind (compile_op (MailboxAPI.Read fn)) rx)
       (Bind (atomize compile_op (MailboxAPI.Read fn)) rx).
   Proof.
@@ -189,8 +208,32 @@ Module AtomicDeliver <: LayerImpl TmpdirAPI MailboxAPI.
     eauto 20.
   Qed.
 
+  Theorem getrequest_atomic : forall `(rx : _ -> proc _ T),
+    trace_incl DeliverAPI.step
+      (Bind (compile_op (MailboxAPI.GetRequest)) rx)
+      (Bind (atomize compile_op (MailboxAPI.GetRequest)) rx).
+  Proof.
+    intros.
+    eapply trace_incl_atomize_ysa.
+    simpl.
+    unfold getrequest_core, ysa_movers.
+    eauto 20.
+  Qed.
+
+  Theorem respond_atomic : forall `(rx : _ -> proc _ T) Tr (r : Tr),
+    trace_incl DeliverAPI.step
+      (Bind (compile_op (MailboxAPI.Respond r)) rx)
+      (Bind (atomize compile_op (MailboxAPI.Respond r)) rx).
+  Proof.
+    intros.
+    eapply trace_incl_atomize_ysa.
+    simpl.
+    unfold respond_core, ysa_movers.
+    eauto 20.
+  Qed.
+
   Theorem my_compile_correct :
-    compile_correct compile_op TmpdirAPI.step MailboxAPI.step.
+    compile_correct compile_op DeliverAPI.step MailboxTmpAbsAPI.step.
   Proof.
     unfold compile_correct; intros.
     destruct op.
@@ -207,10 +250,14 @@ Module AtomicDeliver <: LayerImpl TmpdirAPI MailboxAPI.
       repeat step_inv; eauto.
     + repeat atomic_exec_inv.
       repeat step_inv; eauto.
+    + repeat atomic_exec_inv.
+      repeat step_inv; eauto.
+    + repeat atomic_exec_inv.
+      repeat step_inv; eauto.
   Qed.
 
   Theorem my_atomize_correct :
-    atomize_correct compile_op TmpdirAPI.step.
+    atomize_correct compile_op DeliverAPI.step.
   Proof.
     unfold atomize_correct; intros.
     destruct op.
@@ -223,6 +270,12 @@ Module AtomicDeliver <: LayerImpl TmpdirAPI MailboxAPI.
     + rewrite read_atomic.
       eapply trace_incl_bind_a.
       eauto.
+    + rewrite getrequest_atomic.
+      eapply trace_incl_bind_a.
+      eauto.
+    + rewrite respond_atomic.
+      eapply trace_incl_bind_a.
+      eauto.
   Qed.
 
   Hint Resolve my_compile_correct.
@@ -231,13 +284,13 @@ Module AtomicDeliver <: LayerImpl TmpdirAPI MailboxAPI.
   Theorem all_traces_match :
     forall ts1 ts2,
       proc_match (Compile.compile_ok compile_op) ts1 ts2 ->
-      traces_match_ts TmpdirAPI.step MailboxAPI.step ts1 ts2.
+      traces_match_ts DeliverAPI.step MailboxTmpAbsAPI.step ts1 ts2.
   Proof.
     intros.
     eapply Compile.compile_traces_match_ts; eauto.
   Qed.
 
-  Definition absR (s1 : TmpdirAPI.State) (s2 : MailboxAPI.State) :=
+  Definition absR (s1 : DeliverAPI.State) (s2 : MailboxTmpAbsAPI.State) :=
     s1 = s2.
 
   Definition compile_ts := Compile.compile_ts compile_op.
@@ -254,7 +307,10 @@ Module AtomicDeliver <: LayerImpl TmpdirAPI MailboxAPI.
   Theorem compile_traces_match :
     forall ts2,
       no_atomics_ts ts2 ->
-      traces_match_abs absR TmpdirAPI.initP TmpdirAPI.step MailboxAPI.step (compile_ts ts2) ts2.
+      traces_match_abs absR
+        DeliverAPI.initP
+        DeliverAPI.step
+        MailboxTmpAbsAPI.step (compile_ts ts2) ts2.
   Proof.
     unfold traces_match_abs; intros.
     rewrite H2 in *; clear H2.
@@ -264,9 +320,9 @@ Module AtomicDeliver <: LayerImpl TmpdirAPI MailboxAPI.
 
   Theorem absInitP :
     forall s1 s2,
-      TmpdirAPI.initP s1 ->
+      DeliverAPI.initP s1 ->
       absR s1 s2 ->
-      MailboxAPI.initP s2.
+      MailboxTmpAbsAPI.initP s2.
   Proof.
     eauto.
   Qed.
