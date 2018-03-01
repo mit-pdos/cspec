@@ -987,6 +987,12 @@ Module FMap.
       apply mapsto_add_eq in H; auto.
     Qed.
 
+    Definition is_permutation_key (l : list A) (m : t) : Prop.
+    Admitted.
+
+    Definition is_permutation_val (l : list V) (m : t) : Prop.
+    Admitted.
+
   End Maps.
 
   Arguments t A V {Acmp}.

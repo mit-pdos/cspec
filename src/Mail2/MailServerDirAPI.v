@@ -1,25 +1,15 @@
 Require Import POCS.
-Require Import FMapInterface.
-Require Import FMapAVL.
 Require Import String.
 Require Import MailServerAPI.
-Require Import MailServerDirAPI.
 
 
-Module MailboxAPI <: Layer.
+Module MailServerDirAPI <: Layer.
 
   Import MailServerAPI.
-  Import MailServerDirAPI.
 
-  Inductive xopT : Type -> Type :=
-  | Deliver : forall (m : string), xopT unit
-  | List : xopT (list (nat*string))
-  | Read : forall (fn : nat*string), xopT string
-  | GetRequest : xopT request
-  | Respond : forall (T : Type) (v : T), xopT unit
-  .
+  Definition dir_contents := FMap.t (nat*string) string.
 
-  Definition opT := xopT.
+  Definition opT := MailServerAPI.opT.
   Definition State := dir_contents.
   Definition initP (s : State) := True.
 
@@ -32,17 +22,10 @@ Module MailboxAPI <: Layer.
       (FMap.add fn m mbox)
       nil
   | StepList : forall mbox tid r,
-    FMap.is_permutation_key r mbox ->
-    xstep List tid
+    FMap.is_permutation_val r mbox ->
+    xstep ReadAll tid
       mbox
       r
-      mbox
-      nil
-  | StepRead : forall fn mbox tid m,
-    FMap.MapsTo fn m mbox ->
-    xstep (Read fn) tid
-      mbox
-      m
       mbox
       nil
   | StepGetRequest : forall mbox tid r,
@@ -61,4 +44,4 @@ Module MailboxAPI <: Layer.
 
   Definition step := xstep.
 
-End MailboxAPI.
+End MailServerDirAPI.

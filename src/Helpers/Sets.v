@@ -210,6 +210,9 @@ Module FSet.
       eauto using FMap.filter_complete.
     Qed.
 
+    Definition is_permutation (l : list A) (s : t) : Prop.
+    Admitted.
+
   End Sets.
 
 End FSet.

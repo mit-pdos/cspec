@@ -1,27 +1,18 @@
 Require Import POCS.
 Require Import String.
 Require Import MailboxAPI.
+Require Import MailServerAPI.
+Require Import MailServerDirAPI.
 Require Import FMapFacts.
 
 
-Instance key_elt_equiv : Equivalence (MailboxAPI.Dir.eq_key_elt (elt:=string)).
-Proof.
-  split; intro; intros.
-  - constructor; eauto.
-  - inversion H. constructor; eauto.
-  - inversion H. inversion H0. constructor; congruence.
-Qed.
-
-Hint Resolve key_elt_equiv.
-
-
-Module AtomicReader <: LayerImpl MailboxAPI AtomicMailboxAPI.
+Module AtomicReader <: LayerImpl MailboxAPI MailServerDirAPI.
 
   Definition deliver_core (m : string) :=
     _ <- Op (MailboxAPI.Deliver m);
     Ret tt.
 
-  Fixpoint read_list (l : list string) (r : list string) :=
+  Fixpoint read_list (l : list (nat*string)) (r : list string) :=
     match l with
     | nil => Ret r
     | fn :: l' =>
@@ -33,49 +24,64 @@ Module AtomicReader <: LayerImpl MailboxAPI AtomicMailboxAPI.
     l <- Op MailboxAPI.List;
     read_list l nil.
 
-  Definition compile_op T (op : AtomicMailboxAPI.opT T) : proc _ T :=
+  Definition getrequest_core :=
+    r <- Op MailboxAPI.GetRequest;
+    Ret r.
+
+  Definition respond_core T (r : T) :=
+    r <- Op (MailboxAPI.Respond r);
+    Ret r.
+
+  Definition compile_op T (op : MailServerAPI.opT T) : proc _ T :=
     match op with
-    | AtomicMailboxAPI.Deliver m => deliver_core m
-    | AtomicMailboxAPI.ReadAll => readall_core
+    | MailServerAPI.Deliver m => deliver_core m
+    | MailServerAPI.ReadAll => readall_core
+    | MailServerAPI.GetRequest => getrequest_core
+    | MailServerAPI.Respond r => respond_core r
     end.
 
   Ltac step_inv :=
     match goal with
     | H : MailboxAPI.step _ _ _ _ _ _ |- _ =>
       inversion H; clear H; subst; repeat sigT_eq
-    | H : AtomicMailboxAPI.step _ _ _ _ _ _ |- _ =>
+    | H : MailServerAPI.step _ _ _ _ _ _ |- _ =>
+      inversion H; clear H; subst; repeat sigT_eq
+    | H : MailServerDirAPI.step _ _ _ _ _ _ |- _ =>
       inversion H; clear H; subst; repeat sigT_eq
     end; intuition idtac.
 
   Hint Extern 1 (MailboxAPI.step _ _ _ _ _ _) => econstructor.
-  Hint Extern 1 (AtomicMailboxAPI.step _ _ _ _ _ _) => econstructor.
+  Hint Extern 1 (MailServerAPI.step _ _ _ _ _ _) => econstructor.
+  Hint Extern 1 (MailServerDirAPI.step _ _ _ _ _ _) => econstructor.
 
-  Module DirFacts := WFacts_fun String_as_OT MailboxAPI.Dir.
 
   Lemma read_left_mover : forall fn,
     left_mover_pred
       MailboxAPI.step
       (MailboxAPI.Read fn)
-      (fun tid s => MailboxAPI.Dir.In fn s).
+      (fun tid s => FMap.In fn s).
   Proof.
     split.
+(*
     - unfold enabled_stable, enabled_in; intros; repeat deex.
       repeat step_inv; eauto.
       destruct (fn0 == fn); subst; try congruence.
       + exfalso. eapply H11. eexists. eauto.
       + do 3 eexists; econstructor.
-        eapply MailboxAPI.Dir.add_2; eauto.
+        eapply MailServerAPI.Dir.add_2; eauto.
     - intros; repeat step_inv; eauto; repeat deex.
       destruct (fn0 == fn); subst; try congruence.
-      eapply MailboxAPI.Dir.add_3 in H2; eauto.
+      eapply MailServerAPI.Dir.add_3 in H2; eauto.
   Qed.
+*)
+  Admitted.
 
   Hint Resolve read_left_mover.
 
   Theorem deliver_atomic : forall `(rx : _ -> proc _ T) m,
     trace_incl MailboxAPI.step
-      (Bind (compile_op (AtomicMailboxAPI.Deliver m)) rx)
-      (Bind (atomize compile_op (AtomicMailboxAPI.Deliver m)) rx).
+      (Bind (compile_op (MailServerAPI.Deliver m)) rx)
+      (Bind (atomize compile_op (MailServerAPI.Deliver m)) rx).
   Proof.
     intros.
     eapply trace_incl_atomize_ysa.
@@ -87,22 +93,21 @@ Module AtomicReader <: LayerImpl MailboxAPI AtomicMailboxAPI.
   Lemma mailbox_fn_monotonic :
     forall s s' tid fn,
       exec_others MailboxAPI.step tid s s' ->
-      MailboxAPI.Dir.In fn s ->
-      MailboxAPI.Dir.In fn s'.
+      FMap.In fn s ->
+      FMap.In fn s'.
   Proof.
     induction 1; eauto; intros.
     repeat deex.
     eapply IHclos_refl_trans_1n; clear IHclos_refl_trans_1n.
     clear H0.
     step_inv.
-    eapply DirFacts.add_in_iff.
-    eauto.
+    eapply FMap.add_incr; eauto.
   Qed.
 
   Theorem readall_atomic : forall `(rx : _ -> proc _ T),
     trace_incl MailboxAPI.step
-      (Bind (compile_op AtomicMailboxAPI.ReadAll) rx)
-      (Bind (atomize compile_op AtomicMailboxAPI.ReadAll) rx).
+      (Bind (compile_op MailServerAPI.ReadAll) rx)
+      (Bind (atomize compile_op MailServerAPI.ReadAll) rx).
   Proof.
     intros.
     eapply trace_incl_atomize_ysa.
@@ -113,7 +118,7 @@ Module AtomicReader <: LayerImpl MailboxAPI AtomicMailboxAPI.
 
     intros.
     eapply left_movers_impl with
-      (P1 := fun tid s => Forall (fun fn => MailboxAPI.Dir.In fn s) r).
+      (P1 := fun tid s => Forall (fun fn => FMap.In fn s) r).
 
     {
       generalize (@nil string).
@@ -127,8 +132,7 @@ Module AtomicReader <: LayerImpl MailboxAPI AtomicMailboxAPI.
 
       - intros.
         inversion H; clear H; subst.
-        eapply DirFacts.elements_in_iff in H2; deex.
-        eapply MailboxAPI.Dir.elements_2 in H.
+        eapply FMap.in_mapsto_exists in H2; deex.
         do 2 eexists; econstructor; eauto.
 
       - intros.
@@ -150,23 +154,42 @@ Module AtomicReader <: LayerImpl MailboxAPI AtomicMailboxAPI.
     eapply Forall_in'; intros.
 
     eapply mailbox_fn_monotonic; eauto.
-    eapply DirFacts.elements_in_iff.
 
-    eapply in_map_iff in H2; deex.
-    destruct x0; simpl in *.
+    admit.
+  Admitted.
 
-    eexists.
-    eapply In_InA; eauto.
+  Theorem getrequest_atomic : forall `(rx : _ -> proc _ T),
+    trace_incl MailboxAPI.step
+      (Bind (compile_op (MailServerAPI.GetRequest)) rx)
+      (Bind (atomize compile_op (MailServerAPI.GetRequest)) rx).
+  Proof.
+    intros.
+    eapply trace_incl_atomize_ysa.
+    simpl.
+    unfold getrequest_core, ysa_movers.
+    eauto.
+  Qed.
+
+  Theorem respond_atomic : forall `(rx : _ -> proc _ T) Tr (r : Tr),
+    trace_incl MailboxAPI.step
+      (Bind (compile_op (MailServerAPI.Respond r)) rx)
+      (Bind (atomize compile_op (MailServerAPI.Respond r)) rx).
+  Proof.
+    intros.
+    eapply trace_incl_atomize_ysa.
+    simpl.
+    unfold respond_core, ysa_movers.
+    eauto.
   Qed.
 
   Lemma read_list_exec : forall l l0 r s s' evs v tid,
-    List.Forall (fun fn => MailboxAPI.Dir.In fn s) l ->
-    Forall2 (fun fn m => MailboxAPI.Dir.MapsTo fn m s) l0 r ->
+    List.Forall (fun fn => FMap.In fn s) l ->
+    Forall2 (fun fn m => FMap.MapsTo fn m s) l0 r ->
     atomic_exec MailboxAPI.step
       (read_list l r) tid
       s v s' evs ->
     s' = s /\ evs = nil /\
-    Forall2 (fun fn m => MailboxAPI.Dir.MapsTo fn m s) (l0 ++ l) v.
+    Forall2 (fun fn m => FMap.MapsTo fn m s) (l0 ++ l) v.
   Proof.
     induction l; intros.
     - atomic_exec_inv.
@@ -182,7 +205,7 @@ Module AtomicReader <: LayerImpl MailboxAPI AtomicMailboxAPI.
   Qed.
 
   Theorem my_compile_correct :
-    compile_correct compile_op MailboxAPI.step AtomicMailboxAPI.step.
+    compile_correct compile_op MailboxAPI.step MailServerDirAPI.step.
   Proof.
     unfold compile_correct; intros.
     destruct op.
@@ -199,17 +222,17 @@ Module AtomicReader <: LayerImpl MailboxAPI AtomicMailboxAPI.
         step_inv; subst; eauto.
         econstructor.
 
-        assert (List.Forall (fun '(k, v) => MailboxAPI.Dir.MapsTo k v s1)
-                  (MailboxAPI.Dir.elements s1)).
+        assert (List.Forall (fun '(k, v) => FMap.MapsTo k v s1)
+                  (FMap.elements s1)).
         {
           eapply Forall_forall; intros.
           destruct x.
-          eapply MailboxAPI.Dir.elements_2.
-          eapply In_InA; eauto.
+          admit.
         }
 
-        generalize dependent (MailboxAPI.Dir.elements s1); intros.
+        generalize dependent (FMap.elements s1); intros.
         generalize dependent v.
+(*
         induction l; intros.
         - inversion H2; eauto.
         - inversion H2; clear H2; subst.
@@ -217,6 +240,8 @@ Module AtomicReader <: LayerImpl MailboxAPI AtomicMailboxAPI.
           specialize (IHl H4 _ H5); subst.
           destruct a; simpl in *; f_equal.
           eapply DirFacts.MapsTo_fun; eauto.
+*)
+        admit.
       }
 
       clear H10.
@@ -224,13 +249,25 @@ Module AtomicReader <: LayerImpl MailboxAPI AtomicMailboxAPI.
       step_inv.
 
       eapply Forall_forall; intros.
+(*
       eapply in_map_iff in H; deex.
       destruct x0.
       eapply DirFacts.elements_in_iff; eexists.
       eapply In_InA; eauto.
 
       eauto.
-  Qed.
+*)
+      admit.
+      admit.
+
+    + repeat atomic_exec_inv.
+      simpl; intuition eauto.
+      repeat step_inv; eauto.
+
+    + repeat atomic_exec_inv.
+      simpl; intuition eauto.
+      repeat step_inv; eauto.
+  Admitted.
 
   Theorem my_atomize_correct :
     atomize_correct compile_op MailboxAPI.step.
@@ -243,6 +280,12 @@ Module AtomicReader <: LayerImpl MailboxAPI AtomicMailboxAPI.
     + rewrite readall_atomic.
       eapply trace_incl_bind_a.
       eauto.
+    + rewrite getrequest_atomic.
+      eapply trace_incl_bind_a.
+      eauto.
+    + rewrite respond_atomic.
+      eapply trace_incl_bind_a.
+      eauto.
   Qed.
 
   Hint Resolve my_compile_correct.
@@ -251,13 +294,13 @@ Module AtomicReader <: LayerImpl MailboxAPI AtomicMailboxAPI.
   Theorem all_traces_match :
     forall ts1 ts2,
       proc_match (Compile.compile_ok compile_op) ts1 ts2 ->
-      traces_match_ts MailboxAPI.step AtomicMailboxAPI.step ts1 ts2.
+      traces_match_ts MailboxAPI.step MailServerDirAPI.step ts1 ts2.
   Proof.
     intros.
     eapply Compile.compile_traces_match_ts; eauto.
   Qed.
 
-  Definition absR (s1 : MailboxAPI.State) (s2 : AtomicMailboxAPI.State) :=
+  Definition absR (s1 : MailboxAPI.State) (s2 : MailServerDirAPI.State) :=
     s1 = s2.
 
   Definition compile_ts := Compile.compile_ts compile_op.
@@ -282,7 +325,7 @@ Module AtomicReader <: LayerImpl MailboxAPI AtomicMailboxAPI.
   Theorem compile_traces_match :
     forall ts2,
       no_atomics_ts ts2 ->
-      traces_match_abs absR MailboxAPI.initP MailboxAPI.step AtomicMailboxAPI.step (compile_ts ts2) ts2.
+      traces_match_abs absR MailboxAPI.initP MailboxAPI.step MailServerDirAPI.step (compile_ts ts2) ts2.
   Proof.
     unfold traces_match_abs; intros.
     rewrite H2 in *; clear H2.
@@ -294,7 +337,7 @@ Module AtomicReader <: LayerImpl MailboxAPI AtomicMailboxAPI.
     forall s1 s2,
       MailboxAPI.initP s1 ->
       absR s1 s2 ->
-      AtomicMailboxAPI.initP s2.
+      MailServerDirAPI.initP s2.
   Proof.
     eauto.
   Qed.

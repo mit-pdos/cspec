@@ -1,14 +1,10 @@
 Require Import POCS.
-Require Import FMapInterface.
-Require Import FMapAVL.
 Require Import String.
 
 
 Module MailServerAPI <: Layer.
 
-  Module Dir := FMapAVL.Make(String_as_OT).
-
-  Definition mbox_contents := Dir.t string.
+  Definition mbox_contents := FSet.t string.
 
   Inductive request :=
   | ReqDeliver (msg : string)
@@ -27,15 +23,14 @@ Module MailServerAPI <: Layer.
   Definition initP (s : State) := True.
 
   Inductive xstep : forall T, opT T -> nat -> State -> T -> State -> list event -> Prop :=
-  | StepDeliver : forall m mbox tid fn,
-    ~ Dir.In fn mbox ->
+  | StepDeliver : forall m mbox tid,
     xstep (Deliver m) tid
       mbox
       tt
-      (Dir.add fn m mbox)
+      (FSet.add m mbox)
       nil
   | StepList : forall mbox tid r,
-    r = map snd (Dir.elements mbox) ->
+    FSet.is_permutation r mbox ->
     xstep ReadAll tid
       mbox
       r
