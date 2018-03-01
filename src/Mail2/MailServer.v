@@ -16,6 +16,9 @@ Require Import DeliverImpl.
 Require Import DeliverListTidAPI.
 Require Import DeliverListTidImpl.
 
+Require Import MailFSAPI.
+Require Import MailFSImpl.
+
 
 Import MailServerAPI.
 
@@ -45,9 +48,11 @@ Module c3 := Link DeliverAPI MailboxTmpAbsAPI MailServerAPI
                   AtomicDeliver c2.
 Module c4 := Link DeliverListTidAPI DeliverAPI MailServerAPI
                   DeliverListTidImpl c3.
+Module c5 := Link MailFSAPI DeliverListTidAPI MailServerAPI
+                  MailFSImpl c4.
 
 
-Definition ms_bottom := c4.compile_ts mail_server.
+Definition ms_bottom := c5.compile_ts mail_server.
 Check ms_bottom.
 
-Print Assumptions c4.compile_traces_match.
+Print Assumptions c5.compile_traces_match.
