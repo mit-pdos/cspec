@@ -210,8 +210,8 @@ Module FSet.
       eauto using FMap.filter_complete.
     Qed.
 
-    Definition is_permutation (l : list A) (s : t) : Prop.
-    Admitted.
+    Definition is_permutation (l : list A) (s : t) : Prop :=
+      forall x, List.In x l <-> In x s.
 
   End Sets.
 
