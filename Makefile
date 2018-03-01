@@ -49,7 +49,7 @@ concur-test/extract: build/Spec/Example2.vo
 
 bin/%: %/extract
 	mkdir -p $(@D)
-	cd $(patsubst %/extract,%,$<) && PATH=$(PATH):"$(shell pwd)"/bin stack build --copy-bins --local-bin-path ../bin
+	cd $(patsubst %/extract,%,$<) && PATH="$(PATH):"$(shell pwd)"/bin" stack build --copy-bins --local-bin-path ../bin
 
 .PHONY: clean
 clean:
