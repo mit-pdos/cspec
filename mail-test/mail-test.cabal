@@ -12,6 +12,8 @@ executable mail-test
                      , mtl
                      , bytestring
                      , atomic-primops
+                     , unix
+                     , directory
   other-modules:       Interpreter
                      , Compile
                      , ConcurProc

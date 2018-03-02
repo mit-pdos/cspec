@@ -6,6 +6,8 @@ import Data.Atomics
 import Data.IORef
 import Data.Maybe
 import GHC.Prim
+import System.Posix.Files
+import System.Directory
 
 -- Extracted code
 import ConcurProc
@@ -30,6 +32,12 @@ debugmsg s =
     putStrLn $ "[" ++ (show tid) ++ "] " ++ s
   else
     return ()
+
+dirPath :: String -> String
+dirPath dir = "/tmp/mailtest/" ++ dir
+
+filePath :: String -> String -> String
+filePath dir fn = (dirPath dir) ++ "/" ++ fn
 
 run_proc :: State -> Coq_proc (MailFSPathAPI__Coq_xopT a) GHC.Prim.Any -> IO a
 run_proc s (Ret v) = do
@@ -65,20 +73,25 @@ run_proc _ (Op (MailFSPathAPI__Respond _)) = do
 
 run_proc _ (Op (MailFSPathAPI__CreateWrite (dir, fn) contents)) = do
   debugmsg $ "CreateWrite " ++ dir ++ "/" ++ fn ++ ", " ++ (show contents)
+  writeFile (filePath dir fn) contents
   return $ unsafeCoerce ()
 
 run_proc _ (Op (MailFSPathAPI__Link (srcdir, srcfn) (dstdir, dstfn))) = do
   debugmsg $ "Link " ++ srcdir ++ "/" ++ srcfn ++ " to " ++ dstdir ++ "/" ++ dstfn
+  createLink (filePath srcdir srcfn) (filePath dstdir dstfn)
   return $ unsafeCoerce ()
 
 run_proc _ (Op (MailFSPathAPI__Unlink (dir, fn))) = do
   debugmsg $ "Unlink " ++ dir ++ "/" ++ (fn)
+  removeLink (filePath dir fn)
   return $ unsafeCoerce ()
 
 run_proc _ (Op (MailFSPathAPI__List dir)) = do
   debugmsg $ "List " ++ dir
-  return $ unsafeCoerce []
+  files <- listDirectory (dirPath dir)
+  return $ unsafeCoerce files
 
 run_proc _ (Op (MailFSPathAPI__Read (dir, fn))) = do
   debugmsg $ "Read " ++ dir ++ "/" ++ fn
-  return $ unsafeCoerce ""
+  contents <- readFile (filePath dir fn)
+  return $ unsafeCoerce contents
