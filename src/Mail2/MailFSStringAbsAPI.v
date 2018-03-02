@@ -5,8 +5,8 @@ Require Import MailboxTmpAbsAPI.
 Require Import MailFSAPI.
 
 
-Parameter encode_tid_fn : nat -> string -> string.
-Parameter decode_tid_fn : string -> (nat * string).
+Parameter encode_tid_fn : nat -> nat -> string.
+Parameter decode_tid_fn : string -> (nat * nat).
 Axiom encode_decode_tid_fn : forall tid fn,
   decode_tid_fn (encode_tid_fn tid fn) = (tid, fn).
 
@@ -30,20 +30,20 @@ Module MailFSStringAbsAPI <: Layer.
 
   Inductive xstep : forall T, opT T -> nat -> State -> T -> State -> list event -> Prop :=
   | StepCreateWriteTmp : forall tmp mbox tid data,
-    ~ FMap.In (encode_tid_fn tid ""%string) tmp ->
+    ~ FMap.In (encode_tid_fn tid 0) tmp ->
     xstep (CreateWriteTmp data) tid
       (mk_state tmp mbox)
       tt
-      (mk_state (FMap.add (encode_tid_fn tid ""%string) data tmp) mbox)
+      (mk_state (FMap.add (encode_tid_fn tid 0) data tmp) mbox)
       nil
   | StepUnlinkTmp : forall tmp mbox tid,
     xstep (UnlinkTmp) tid
       (mk_state tmp mbox)
       tt
-      (mk_state (FMap.remove (encode_tid_fn tid ""%string) tmp) mbox)
+      (mk_state (FMap.remove (encode_tid_fn tid 0) tmp) mbox)
       nil
   | StepLinkMail : forall tmp mbox tid mailfn data,
-    FMap.MapsTo (encode_tid_fn tid ""%string) data tmp ->
+    FMap.MapsTo (encode_tid_fn tid 0) data tmp ->
     ~ FMap.In (encode_tid_fn tid mailfn) mbox ->
     xstep (LinkMail mailfn) tid
       (mk_state tmp mbox)

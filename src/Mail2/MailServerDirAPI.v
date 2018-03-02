@@ -7,7 +7,7 @@ Module MailServerDirAPI <: Layer.
 
   Import MailServerAPI.
 
-  Definition dir_contents := FMap.t (nat*string) string.
+  Definition dir_contents := FMap.t (nat*nat) string.
 
   Definition opT := MailServerAPI.opT.
   Definition State := dir_contents.

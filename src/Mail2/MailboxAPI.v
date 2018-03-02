@@ -11,8 +11,8 @@ Module MailboxAPI <: Layer.
 
   Inductive xopT : Type -> Type :=
   | Deliver : forall (m : string), xopT unit
-  | List : xopT (list (nat*string))
-  | Read : forall (fn : nat*string), xopT string
+  | List : xopT (list (nat*nat))
+  | Read : forall (fn : nat*nat), xopT string
   | GetRequest : xopT request
   | Respond : forall (T : Type) (v : T), xopT unit
   .

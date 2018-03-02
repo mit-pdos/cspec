@@ -7,13 +7,13 @@ Require Import DeliverListTidAPI.
 
 Module DeliverListTidRestrictedImpl <: LayerImplFollowsRule DeliverListTidRestrictedAPI DeliverAPI LinkMailRule.
 
-  Fixpoint nextfn (files : list string) (r : string) : string :=
+  Fixpoint nextfn (files : list nat) (r : nat) : nat :=
     match files with
     | nil => r
     | fn' :: files' =>
       let r' :=
-        if (le_dec (String.length r) (String.length fn')) then
-          ("a" ++ fn')%string
+        if (le_dec r fn') then
+          fn' + 1
         else
           r
         in
@@ -22,7 +22,7 @@ Module DeliverListTidRestrictedImpl <: LayerImplFollowsRule DeliverListTidRestri
 
   Lemma nextfn_ok' : forall (tid : nat) `(s : FMap.t _ V) r1 r0 n,
     ( forall fn, FMap.In (tid, fn) s -> In fn (r0 ++ r1) ) ->
-    ( forall fn, In fn r0 -> String.length n > String.length fn ) ->
+    ( forall fn, In fn r0 -> n > fn ) ->
     ~ FMap.In (tid, nextfn r1 n) s.
   Proof.
     induction r1; simpl; intros.
@@ -34,9 +34,9 @@ Module DeliverListTidRestrictedImpl <: LayerImplFollowsRule DeliverListTidRestri
       + rewrite <- app_assoc; simpl. eauto.
       + eapply in_app_or in H1; intuition eauto.
         * specialize (H0 _ H2).
-          destruct (le_dec (length n) (length a)); simpl; omega.
+          destruct (le_dec n a); simpl; omega.
         * inversion H2; subst. 2: inversion H1.
-          destruct (le_dec (length n) (length fn)); simpl; omega.
+          destruct (le_dec n fn); simpl; omega.
   Qed.
 
   Lemma nextfn_ok : forall (tid : nat) `(s : FMap.t _ V) r n,
@@ -51,7 +51,7 @@ Module DeliverListTidRestrictedImpl <: LayerImplFollowsRule DeliverListTidRestri
 
   Definition linkmail_core :=
     files <- Op DeliverListTidAPI.ListTid;
-    let newname := nextfn files ""%string in
+    let newname := nextfn files 0 in
     _ <- Op (DeliverListTidAPI.LinkMail newname);
     Ret tt.
 

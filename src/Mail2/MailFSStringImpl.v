@@ -10,17 +10,17 @@ Module MailFSStringImpl <: LayerImpl MailFSStringAPI MailFSStringAbsAPI.
 
   Definition createwritetmp_core data :=
     tid <- Op (MailFSStringAPI.GetTID);
-    r <- Op (MailFSStringAPI.CreateWriteTmp (encode_tid_fn tid ""%string) data);
+    r <- Op (MailFSStringAPI.CreateWriteTmp (encode_tid_fn tid 0) data);
     Ret r.
 
   Definition linkmail_core mboxfn :=
     tid <- Op (MailFSStringAPI.GetTID);
-    v <- Op (MailFSStringAPI.LinkMail (encode_tid_fn tid ""%string) (encode_tid_fn tid mboxfn));
+    v <- Op (MailFSStringAPI.LinkMail (encode_tid_fn tid 0) (encode_tid_fn tid mboxfn));
     Ret v.
 
   Definition unlinktmp_core :=
     tid <- Op (MailFSStringAPI.GetTID);
-    r <- Op (MailFSStringAPI.UnlinkTmp (encode_tid_fn tid ""%string));
+    r <- Op (MailFSStringAPI.UnlinkTmp (encode_tid_fn tid 0));
     Ret r.
 
   Definition gettid_core :=
@@ -31,7 +31,7 @@ Module MailFSStringImpl <: LayerImpl MailFSStringAPI MailFSStringAbsAPI.
     l <- Op (MailFSStringAPI.List);
     Ret (map decode_tid_fn l).
 
-  Definition read_core (fn : nat*string) :=
+  Definition read_core (fn : nat*nat) :=
     r <- Op (MailFSStringAPI.Read (encode_tid_fn (fst fn) (snd fn)));
     Ret r.
 

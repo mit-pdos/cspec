@@ -12,7 +12,7 @@ Module AtomicReader <: LayerImpl MailboxAPI MailServerDirAPI.
     _ <- Op (MailboxAPI.Deliver m);
     Ret tt.
 
-  Fixpoint read_list (l : list (nat*string)) (r : list string) :=
+  Fixpoint read_list (l : list (nat*nat)) (r : list string) :=
     match l with
     | nil => Ret r
     | fn :: l' =>

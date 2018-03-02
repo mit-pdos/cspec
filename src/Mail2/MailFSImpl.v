@@ -7,7 +7,7 @@ Require Import MailFSAPI.
 
 Module MailFSImpl <: LayerImpl MailFSAPI DeliverListTidAPI.
 
-  Definition same_tid (tid : nat) (fn : nat * string) : bool :=
+  Definition same_tid (tid : nat) (fn : nat * nat) : bool :=
     if tid == fst fn then
       true
     else

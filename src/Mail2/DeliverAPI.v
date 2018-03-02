@@ -14,8 +14,8 @@ Module DeliverAPI <: Layer.
   | LinkMail : xopT unit
   | UnlinkTmp : xopT unit
 
-  | List : xopT (list (nat * string))
-  | Read : forall (fn : nat * string), xopT string
+  | List : xopT (list (nat * nat))
+  | Read : forall (fn : nat * nat), xopT string
   | GetRequest : xopT request
   | Respond : forall (T : Type) (v : T), xopT unit
   .
@@ -26,20 +26,20 @@ Module DeliverAPI <: Layer.
 
   Inductive xstep : forall T, opT T -> nat -> State -> T -> State -> list event -> Prop :=
   | StepCreateWriteTmp : forall tmp mbox tid data,
-    ~ FMap.In (tid, ""%string) tmp ->
+    ~ FMap.In (tid, 0) tmp ->
     xstep (CreateWriteTmp data) tid
       (mk_state tmp mbox)
       tt
-      (mk_state (FMap.add (tid, ""%string) data tmp) mbox)
+      (mk_state (FMap.add (tid, 0) data tmp) mbox)
       nil
   | StepUnlinkTmp : forall tmp mbox tid,
     xstep (UnlinkTmp) tid
       (mk_state tmp mbox)
       tt
-      (mk_state (FMap.remove (tid, ""%string) tmp) mbox)
+      (mk_state (FMap.remove (tid, 0) tmp) mbox)
       nil
   | StepLinkMail : forall tmp mbox tid mailfn data,
-    FMap.MapsTo (tid, ""%string) data tmp ->
+    FMap.MapsTo (tid, 0) data tmp ->
     ~ FMap.In (tid, mailfn) mbox ->
     xstep (LinkMail) tid
       (mk_state tmp mbox)
