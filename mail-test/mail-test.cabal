@@ -14,6 +14,7 @@ executable mail-test
                      , atomic-primops
                      , unix
                      , directory
+                     , random
   other-modules:       Interpreter
                      , Compile
                      , ConcurProc

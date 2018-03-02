@@ -8,6 +8,7 @@ import Data.Maybe
 import GHC.Prim
 import System.Posix.Files
 import System.Directory
+import System.Random
 
 -- Extracted code
 import ConcurProc
@@ -69,7 +70,11 @@ run_proc _ (Op MailFSPathAPI__GetTID) = do
 
 run_proc _ (Op MailFSPathAPI__GetRequest) = do
   debugmsg $ "GetRequest"
-  return $ unsafeCoerce (MailServerAPI__ReqDeliver "Test message")
+  rnd <- randomIO
+  if (rnd :: Integer) `mod` 100 == 0 then
+    return $ unsafeCoerce (MailServerAPI__ReqRead)
+  else
+    return $ unsafeCoerce (MailServerAPI__ReqDeliver "Test message")
 
 run_proc _ (Op (MailFSPathAPI__Respond _)) = do
   debugmsg $ "Respond"
