@@ -14,22 +14,9 @@ Axiom encode_decode_tid_fn : forall tid fn,
 Module MailFSStringAbsAPI <: Layer.
 
   Import MailServerAPI.
-  Import MailboxTmpAbsAPI.
+  Import MailFSAPI.
 
-  Inductive xopT : Type -> Type :=
-  | CreateTmp : xopT string
-  | WriteTmp : forall (fn : string) (data : string), xopT unit
-  | LinkMail : forall (tmpfn : string) (mboxfn : string), xopT unit
-  | UnlinkTmp : forall (fn : string), xopT unit
-
-  | GetTID : xopT nat
-  | List : xopT (list (nat * string))
-  | Read : forall (fn : nat * string), xopT string
-  | GetRequest : xopT request
-  | Respond : forall (T : Type) (v : T), xopT unit
-  .
-
-  Definition opT := xopT.
+  Definition opT := MailFSAPI.opT.
 
   Definition dir_contents := FMap.t string string.
 

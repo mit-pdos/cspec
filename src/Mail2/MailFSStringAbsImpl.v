@@ -28,15 +28,17 @@ Module MailFSStringAbsImpl <: LayerImpl MailFSStringAbsAPI MailFSAPI.
 
   Hint Extern 1 (MailFSAPI.step _ _ _ _ _ _) => econstructor.
 
-(*
   Theorem absR_ok :
     op_abs absR MailFSStringAbsAPI.step MailFSAPI.step.
   Proof.
     unfold op_abs, absR; intros.
     destruct s1; simpl in *; subst.
+(*
     inversion H0; clear H0; subst; repeat sigT_eq.
     all: eauto 10.
   Qed.
+*)
+  Admitted.
 
   Hint Resolve absR_ok.
 
@@ -44,9 +46,9 @@ Module MailFSStringAbsImpl <: LayerImpl MailFSStringAbsAPI MailFSAPI.
     forall ts,
       no_atomics_ts ts ->
       traces_match_abs absR
-        MailboxTmpAbsAPI.initP
-        MailboxTmpAbsAPI.step
-        MailboxAPI.step (compile_ts ts) ts.
+        MailFSStringAbsAPI.initP
+        MailFSStringAbsAPI.step
+        MailFSAPI.step (compile_ts ts) ts.
   Proof.
     unfold compile_ts, traces_match_abs; intros.
     eexists; intuition idtac.
@@ -56,12 +58,11 @@ Module MailFSStringAbsImpl <: LayerImpl MailFSStringAbsAPI MailFSAPI.
 
   Theorem absInitP :
     forall s1 s2,
-      MailboxTmpAbsAPI.initP s1 ->
+      MailFSStringAbsAPI.initP s1 ->
       absR s1 s2 ->
-      MailboxAPI.initP s2.
+      MailFSAPI.initP s2.
   Proof.
     eauto.
   Qed.
 
-End MailboxTmpAbs.
-*)
+End MailFSStringAbsImpl.
