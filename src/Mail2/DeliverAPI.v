@@ -10,10 +10,9 @@ Module DeliverAPI <: Layer.
   Import MailboxTmpAbsAPI.
 
   Inductive xopT : Type -> Type :=
-  | CreateTmp : xopT string
-  | WriteTmp : forall (fn : string) (data : string), xopT unit
-  | LinkMail : forall (fn : string), xopT unit
-  | UnlinkTmp : forall (fn : string), xopT unit
+  | CreateWriteTmp : forall (data : string), xopT unit
+  | LinkMail : xopT unit
+  | UnlinkTmp : xopT unit
 
   | List : xopT (list (nat * string))
   | Read : forall (fn : nat * string), xopT string
@@ -26,30 +25,23 @@ Module DeliverAPI <: Layer.
   Definition initP (s : State) := True.
 
   Inductive xstep : forall T, opT T -> nat -> State -> T -> State -> list event -> Prop :=
-  | StepCreateTmp : forall tmp mbox tid fn,
-    ~ FMap.In (tid, fn) tmp ->
-    xstep (CreateTmp) tid
-      (mk_state tmp mbox)
-      fn
-      (mk_state (FMap.add (tid, fn) ""%string tmp) mbox)
-      nil
-  | StepWriteTmp : forall tmp mbox tid fn data,
-    FMap.In (tid, fn) tmp ->
-    xstep (WriteTmp fn data) tid
+  | StepCreateWriteTmp : forall tmp mbox tid data,
+    ~ FMap.In (tid, ""%string) tmp ->
+    xstep (CreateWriteTmp data) tid
       (mk_state tmp mbox)
       tt
-      (mk_state (FMap.add (tid, fn) data tmp) mbox)
+      (mk_state (FMap.add (tid, ""%string) data tmp) mbox)
       nil
-  | StepUnlinkTmp : forall tmp mbox tid fn,
-    xstep (UnlinkTmp fn) tid
+  | StepUnlinkTmp : forall tmp mbox tid,
+    xstep (UnlinkTmp) tid
       (mk_state tmp mbox)
       tt
-      (mk_state (FMap.remove (tid, fn) tmp) mbox)
+      (mk_state (FMap.remove (tid, ""%string) tmp) mbox)
       nil
-  | StepLinkMail : forall tmp mbox tid tmpfn mailfn data,
-    FMap.MapsTo (tid, tmpfn) data tmp ->
+  | StepLinkMail : forall tmp mbox tid mailfn data,
+    FMap.MapsTo (tid, ""%string) data tmp ->
     ~ FMap.In (tid, mailfn) mbox ->
-    xstep (LinkMail tmpfn) tid
+    xstep (LinkMail) tid
       (mk_state tmp mbox)
       tt
       (mk_state tmp (FMap.add (tid, mailfn) data mbox))

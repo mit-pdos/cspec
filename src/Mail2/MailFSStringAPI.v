@@ -1,52 +1,53 @@
 Require Import POCS.
 Require Import String.
 Require Import MailServerAPI.
-Require Import MailboxTmpAbsAPI.
-Require Import DeliverAPI.
+Require Import MailFSStringAbsAPI.
+Require Import MailFSAPI.
 
 
-Module MailFSAPI <: Layer.
+Module MailFSStringAPI <: Layer.
 
   Import MailServerAPI.
-  Import MailboxTmpAbsAPI.
+  Import MailFSStringAbsAPI.
 
   Inductive xopT : Type -> Type :=
-  | CreateWriteTmp : forall (data : string), xopT unit
-  | LinkMail : forall (mboxfn : string), xopT unit
-  | UnlinkTmp : xopT unit
+  | CreateWriteTmp : forall (tmpfn : string) (data : string), xopT unit
+  | LinkMail : forall (tmpfn : string) (mboxfn : string), xopT unit
+  | UnlinkTmp : forall (tmpfn : string), xopT unit
 
   | GetTID : xopT nat
-  | List : xopT (list (nat * string))
-  | Read : forall (fn : nat * string), xopT string
+  | List : xopT (list string)
+  | Read : forall (fn : string), xopT string
   | GetRequest : xopT request
   | Respond : forall (T : Type) (v : T), xopT unit
   .
 
   Definition opT := xopT.
-  Definition State := DeliverAPI.State.
+
+  Definition State := MailFSStringAbsAPI.State.
   Definition initP (s : State) := True.
 
   Inductive xstep : forall T, opT T -> nat -> State -> T -> State -> list event -> Prop :=
-  | StepCreateWriteTmp : forall tmp mbox tid data,
-    ~ FMap.In (tid, ""%string) tmp ->
-    xstep (CreateWriteTmp data) tid
+  | StepCreateWriteTmp : forall tmp mbox tid tmpfn data,
+    ~ FMap.In tmpfn tmp ->
+    xstep (CreateWriteTmp tmpfn data) tid
       (mk_state tmp mbox)
       tt
-      (mk_state (FMap.add (tid, ""%string) data tmp) mbox)
+      (mk_state (FMap.add tmpfn data tmp) mbox)
       nil
-  | StepUnlinkTmp : forall tmp mbox tid,
-    xstep (UnlinkTmp) tid
+  | StepUnlinkTmp : forall tmp mbox tid tmpfn,
+    xstep (UnlinkTmp tmpfn) tid
       (mk_state tmp mbox)
       tt
-      (mk_state (FMap.remove (tid, ""%string) tmp) mbox)
+      (mk_state (FMap.remove tmpfn tmp) mbox)
       nil
-  | StepLinkMail : forall tmp mbox tid mailfn data,
-    FMap.MapsTo (tid, ""%string) data tmp ->
-    ~ FMap.In (tid, mailfn) mbox ->
-    xstep (LinkMail mailfn) tid
+  | StepLinkMail : forall tmp mbox tid mailfn data tmpfn,
+    FMap.MapsTo tmpfn data tmp ->
+    ~ FMap.In mailfn mbox ->
+    xstep (LinkMail tmpfn mailfn) tid
       (mk_state tmp mbox)
       tt
-      (mk_state tmp (FMap.add (tid, mailfn) data mbox))
+      (mk_state tmp (FMap.add mailfn data mbox))
       nil
 
   | StepList : forall tmp mbox tid r,
@@ -87,4 +88,4 @@ Module MailFSAPI <: Layer.
 
   Definition step := xstep.
 
-End MailFSAPI.
+End MailFSStringAPI.

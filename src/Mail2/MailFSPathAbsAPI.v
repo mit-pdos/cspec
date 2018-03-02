@@ -1,84 +1,71 @@
 Require Import POCS.
 Require Import String.
 Require Import MailServerAPI.
-Require Import MailServerDirAPI.
-Require Import MailboxTmpAbsAPI.
-Require Import MailFSAPI.
+Require Import MailFSStringAPI.
 
-Import ListNotations.
-Open Scope string.
 
 Module MailFSPathAbsAPI <: Layer.
 
   Import MailServerAPI.
-  Import MailFSAPI.
+  Import MailFSStringAPI.
 
-  Definition opT := xopT.
+  Definition opT := MailFSStringAPI.xopT.
 
-  Definition fs_contents := FMap.t (string * (nat*string)) string.
-  
+  Definition fs_contents := FMap.t (string * string) string.
+
   Definition State := fs_contents.
   Definition initP (s : State) := True.
 
-  Parameter mk_state: MailServerDirAPI.dir_contents -> MailServerDirAPI.dir_contents -> fs_contents.
-  
+  Definition filter_dir (dirname : string) (fs : State) :=
+    FMap.filter (fun '(dn, fn) => if string_dec dn dirname then true else false) fs.
+
+  Definition drop_dirname (fs : State) :=
+    FMap.map_keys (fun '(dn, fn) => fn) fs.
+
   Inductive xstep : forall T, opT T -> nat -> State -> T -> State -> list event -> Prop :=
-  | StepCreateTmp : forall tmp mbox tid fn,
-      let state := mk_state tmp mbox in
-    ~ FMap.In (tid, fn) tmp ->
-    xstep (CreateTmp) tid
-      state
-      fn
-      ((FMap.add ("tmp", (tid, fn)) "") state)
-      nil
-  | StepWriteTmp : forall tmp mbox tid fn data,
-    let state := mk_state tmp mbox in
-    FMap.In (tid, fn) tmp ->
-    xstep (WriteTmp fn data) tid
-      state
+  | StepCreateWriteTmp : forall fs tid tmpfn data,
+    ~ FMap.In ("tmp"%string, tmpfn) fs ->
+    xstep (CreateWriteTmp tmpfn data) tid
+      fs
       tt
-      ((FMap.add ("tmp", (tid, fn)) data) state)
+      (FMap.add ("tmp"%string, tmpfn) data fs)
       nil
-  | StepUnlinkTmp : forall tmp mbox tid fn,
-    let state := mk_state tmp mbox in
-    xstep (UnlinkTmp fn) tid
-      state
+  | StepUnlinkTmp : forall fs tid tmpfn,
+    xstep (UnlinkTmp tmpfn) tid
+      fs
       tt
-      (FMap.remove ("tmp", (tid, fn)) state)
+      (FMap.remove ("tmp"%string, tmpfn) fs)
       nil
-  | StepLinkMail : forall tmp mbox tid tmpfn mailfn data,
-    let state := mk_state tmp mbox in
-    FMap.MapsTo (tid, tmpfn) data tmp ->
-    ~ FMap.In (tid, mailfn) mbox ->
+  | StepLinkMail : forall fs tid mailfn data tmpfn,
+    FMap.MapsTo ("tmp"%string, tmpfn) data fs ->
+    ~ FMap.In ("mail"%string, mailfn) fs ->
     xstep (LinkMail tmpfn mailfn) tid
-      state
+      fs
       tt
-      ((FMap.add ("maildir", (tid, mailfn)) data) state)
+      (FMap.add ("mail"%string, mailfn) data fs)
       nil
-  | StepList : forall tmp mbox tid r,
-    let state := mk_state tmp mbox in
-    FMap.is_permutation_key r mbox ->
+
+  | StepList : forall fs tid r,
+    FMap.is_permutation_key r (drop_dirname (filter_dir "mail"%string fs)) ->
     xstep List tid
-      state
+      fs
       r
-      state
+      fs
       nil
 
-  | StepGetTID : forall tmp mbox tid,
-    let state := mk_state tmp mbox in
+  | StepGetTID : forall fs tid,
     xstep GetTID tid
-      state
+      fs
       tid
-      state
+      fs
       nil
 
-  | StepRead : forall fn tmp mbox tid m,
-    let state := mk_state tmp mbox in
-    FMap.MapsTo fn m mbox ->
+  | StepRead : forall fn fs tid m,
+    FMap.MapsTo ("mail"%string, fn) m fs ->
     xstep (Read fn) tid
-      state
+      fs
       m
-      state
+      fs
       nil
   | StepGetRequest : forall s tid r,
     xstep GetRequest tid

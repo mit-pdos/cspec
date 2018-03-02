@@ -49,22 +49,18 @@ Module DeliverListTidRestrictedImpl <: LayerImplFollowsRule DeliverListTidRestri
     omega.
   Qed.
 
-  Definition linkmail_core (tmpfn : string) :=
+  Definition linkmail_core :=
     files <- Op DeliverListTidAPI.ListTid;
     let newname := nextfn files ""%string in
-    _ <- Op (DeliverListTidAPI.LinkMail tmpfn newname);
+    _ <- Op (DeliverListTidAPI.LinkMail newname);
     Ret tt.
 
-  Definition createtmp_core :=
-    r <- Op DeliverListTidAPI.CreateTmp;
+  Definition createwritetmp_core data :=
+    r <- Op (DeliverListTidAPI.CreateWriteTmp data);
     Ret r.
 
-  Definition writetmp_core fn data :=
-    r <- Op (DeliverListTidAPI.WriteTmp fn data);
-    Ret r.
-
-  Definition unlinktmp_core fn :=
-    r <- Op (DeliverListTidAPI.UnlinkTmp fn);
+  Definition unlinktmp_core :=
+    r <- Op (DeliverListTidAPI.UnlinkTmp);
     Ret r.
 
   Definition list_core :=
@@ -85,10 +81,9 @@ Module DeliverListTidRestrictedImpl <: LayerImplFollowsRule DeliverListTidRestri
 
   Definition compile_op T (op : DeliverAPI.opT T) : proc _ T :=
     match op with
-    | DeliverAPI.CreateTmp => createtmp_core
-    | DeliverAPI.WriteTmp fn data => writetmp_core fn data
-    | DeliverAPI.LinkMail m => linkmail_core m
-    | DeliverAPI.UnlinkTmp fn => unlinktmp_core fn
+    | DeliverAPI.CreateWriteTmp data => createwritetmp_core data
+    | DeliverAPI.LinkMail => linkmail_core
+    | DeliverAPI.UnlinkTmp => unlinktmp_core
     | DeliverAPI.List => list_core
     | DeliverAPI.Read fn => read_core fn
     | DeliverAPI.GetRequest => getrequest_core
@@ -133,10 +128,10 @@ Module DeliverListTidRestrictedImpl <: LayerImplFollowsRule DeliverListTidRestri
 
   Hint Resolve listtid_right_mover.
 
-  Theorem linkmail_atomic : forall `(rx : _ -> proc _ T) m,
+  Theorem linkmail_atomic : forall `(rx : _ -> proc _ T),
     trace_incl DeliverListTidRestrictedAPI.step
-      (Bind (compile_op (DeliverAPI.LinkMail m)) rx)
-      (Bind (atomize compile_op (DeliverAPI.LinkMail m)) rx).
+      (Bind (compile_op (DeliverAPI.LinkMail)) rx)
+      (Bind (atomize compile_op (DeliverAPI.LinkMail)) rx).
   Proof.
     intros.
     eapply trace_incl_atomize_ysa.
@@ -169,34 +164,22 @@ Module DeliverListTidRestrictedImpl <: LayerImplFollowsRule DeliverListTidRestri
     eauto 20.
   Qed.
 
-  Theorem createtmp_atomic : forall `(rx : _ -> proc _ T),
+  Theorem createwritetmp_atomic : forall `(rx : _ -> proc _ T) data,
     trace_incl DeliverListTidRestrictedAPI.step
-      (Bind (compile_op (DeliverAPI.CreateTmp)) rx)
-      (Bind (atomize compile_op (DeliverAPI.CreateTmp)) rx).
+      (Bind (compile_op (DeliverAPI.CreateWriteTmp data)) rx)
+      (Bind (atomize compile_op (DeliverAPI.CreateWriteTmp data)) rx).
   Proof.
     intros.
     eapply trace_incl_atomize_ysa.
     simpl.
-    unfold createtmp_core, ysa_movers.
+    unfold createwritetmp_core, ysa_movers.
     eauto 20.
   Qed.
 
-  Theorem writetmp_atomic : forall `(rx : _ -> proc _ T) fn data,
+  Theorem unlinktmp_atomic : forall `(rx : _ -> proc _ T),
     trace_incl DeliverListTidRestrictedAPI.step
-      (Bind (compile_op (DeliverAPI.WriteTmp fn data)) rx)
-      (Bind (atomize compile_op (DeliverAPI.WriteTmp fn data)) rx).
-  Proof.
-    intros.
-    eapply trace_incl_atomize_ysa.
-    simpl.
-    unfold writetmp_core, ysa_movers.
-    eauto 20.
-  Qed.
-
-  Theorem unlinktmp_atomic : forall `(rx : _ -> proc _ T) fn,
-    trace_incl DeliverListTidRestrictedAPI.step
-      (Bind (compile_op (DeliverAPI.UnlinkTmp fn)) rx)
-      (Bind (atomize compile_op (DeliverAPI.UnlinkTmp fn)) rx).
+      (Bind (compile_op (DeliverAPI.UnlinkTmp)) rx)
+      (Bind (atomize compile_op (DeliverAPI.UnlinkTmp)) rx).
   Proof.
     intros.
     eapply trace_incl_atomize_ysa.
@@ -243,9 +226,7 @@ Module DeliverListTidRestrictedImpl <: LayerImplFollowsRule DeliverListTidRestri
   Proof.
     unfold atomize_correct; intros.
     destruct op.
-    + rewrite createtmp_atomic.
-      eapply trace_incl_bind_a; eauto.
-    + rewrite writetmp_atomic.
+    + rewrite createwritetmp_atomic.
       eapply trace_incl_bind_a; eauto.
     + rewrite linkmail_atomic.
       eapply trace_incl_bind_a; eauto.
@@ -322,11 +303,11 @@ Module DeliverListTidRestrictedImpl <: LayerImplFollowsRule DeliverListTidRestri
     constructor; intros.
   Qed.
 
-  Lemma createtmp_follows_protocol : forall tid s,
+  Lemma createwritetmp_follows_protocol : forall tid s data,
     follows_protocol_proc
       DeliverListTidAPI.step
       DeliverListTidRestrictedAPI.step_allow
-      LinkMailRule.loopInv tid s createtmp_core.
+      LinkMailRule.loopInv tid s (createwritetmp_core data).
   Proof.
     intros.
     constructor; intros.
@@ -334,23 +315,11 @@ Module DeliverListTidRestrictedImpl <: LayerImplFollowsRule DeliverListTidRestri
     constructor; intros.
   Qed.
 
-  Lemma writetmp_follows_protocol : forall tid s fn data,
+  Lemma unlinktmp_follows_protocol : forall tid s,
     follows_protocol_proc
       DeliverListTidAPI.step
       DeliverListTidRestrictedAPI.step_allow
-      LinkMailRule.loopInv tid s (writetmp_core fn data).
-  Proof.
-    intros.
-    constructor; intros.
-      constructor; intros. eauto.
-    constructor; intros.
-  Qed.
-
-  Lemma unlinktmp_follows_protocol : forall tid s fn,
-    follows_protocol_proc
-      DeliverListTidAPI.step
-      DeliverListTidRestrictedAPI.step_allow
-      LinkMailRule.loopInv tid s (unlinktmp_core fn).
+      LinkMailRule.loopInv tid s (unlinktmp_core).
   Proof.
     intros.
     constructor; intros.
@@ -394,11 +363,11 @@ Module DeliverListTidRestrictedImpl <: LayerImplFollowsRule DeliverListTidRestri
     constructor; intros.
   Qed.
 
-  Lemma linkmail_follows_protocol : forall tid s data,
+  Lemma linkmail_follows_protocol : forall tid s,
     follows_protocol_proc
       DeliverListTidAPI.step
       DeliverListTidRestrictedAPI.step_allow
-      LinkMailRule.loopInv tid s (linkmail_core data).
+      LinkMailRule.loopInv tid s (linkmail_core).
   Proof.
     intros.
     constructor; intros.
@@ -422,8 +391,7 @@ Module DeliverListTidRestrictedImpl <: LayerImplFollowsRule DeliverListTidRestri
   Hint Resolve linkmail_follows_protocol.
   Hint Resolve read_follows_protocol.
   Hint Resolve list_follows_protocol.
-  Hint Resolve createtmp_follows_protocol.
-  Hint Resolve writetmp_follows_protocol.
+  Hint Resolve createwritetmp_follows_protocol.
   Hint Resolve unlinktmp_follows_protocol.
   Hint Resolve getrequest_follows_protocol.
   Hint Resolve respond_follows_protocol.
@@ -495,7 +463,7 @@ Module DeliverListTidImpl' <: LayerImplRequiresRule DeliverListTidAPI DeliverLis
     intros.
     destruct op; destruct op'; repeat step_inv; subst; eauto.
     constructor.
-    contradict H4.
+    contradict H3.
     eapply FMap.in_add_ne; eauto.
     congruence.
   Qed.

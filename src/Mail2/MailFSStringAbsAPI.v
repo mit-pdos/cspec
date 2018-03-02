@@ -29,30 +29,23 @@ Module MailFSStringAbsAPI <: Layer.
   Definition initP (s : State) := True.
 
   Inductive xstep : forall T, opT T -> nat -> State -> T -> State -> list event -> Prop :=
-  | StepCreateTmp : forall tmp mbox tid fn,
-    ~ FMap.In (encode_tid_fn tid fn) tmp ->
-    xstep (CreateTmp) tid
-      (mk_state tmp mbox)
-      fn
-      (mk_state (FMap.add (encode_tid_fn tid fn) ""%string tmp) mbox)
-      nil
-  | StepWriteTmp : forall tmp mbox tid fn data,
-    FMap.In (encode_tid_fn tid fn) tmp ->
-    xstep (WriteTmp fn data) tid
+  | StepCreateWriteTmp : forall tmp mbox tid data,
+    ~ FMap.In (encode_tid_fn tid ""%string) tmp ->
+    xstep (CreateWriteTmp data) tid
       (mk_state tmp mbox)
       tt
-      (mk_state (FMap.add (encode_tid_fn tid fn) data tmp) mbox)
+      (mk_state (FMap.add (encode_tid_fn tid ""%string) data tmp) mbox)
       nil
-  | StepUnlinkTmp : forall tmp mbox tid fn,
-    xstep (UnlinkTmp fn) tid
+  | StepUnlinkTmp : forall tmp mbox tid,
+    xstep (UnlinkTmp) tid
       (mk_state tmp mbox)
       tt
-      (mk_state (FMap.remove (encode_tid_fn tid fn) tmp) mbox)
+      (mk_state (FMap.remove (encode_tid_fn tid ""%string) tmp) mbox)
       nil
-  | StepLinkMail : forall tmp mbox tid tmpfn mailfn data,
-    FMap.MapsTo (encode_tid_fn tid tmpfn) data tmp ->
+  | StepLinkMail : forall tmp mbox tid mailfn data,
+    FMap.MapsTo (encode_tid_fn tid ""%string) data tmp ->
     ~ FMap.In (encode_tid_fn tid mailfn) mbox ->
-    xstep (LinkMail tmpfn mailfn) tid
+    xstep (LinkMail mailfn) tid
       (mk_state tmp mbox)
       tt
       (mk_state tmp (FMap.add (encode_tid_fn tid mailfn) data mbox))

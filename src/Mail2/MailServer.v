@@ -19,6 +19,18 @@ Require Import DeliverListTidImpl.
 Require Import MailFSAPI.
 Require Import MailFSImpl.
 
+Require Import MailFSStringAbsAPI.
+Require Import MailFSStringAbsImpl.
+
+Require Import MailFSStringAPI.
+Require Import MailFSStringImpl.
+
+Require Import MailFSPathAbsAPI.
+Require Import MailFSPathAbsImpl.
+
+Require Import MailFSPathAPI.
+Require Import MailFSPathImpl.
+
 
 Import MailServerAPI.
 
@@ -50,9 +62,17 @@ Module c4 := Link DeliverListTidAPI DeliverAPI MailServerAPI
                   DeliverListTidImpl c3.
 Module c5 := Link MailFSAPI DeliverListTidAPI MailServerAPI
                   MailFSImpl c4.
+Module c6 := Link MailFSStringAbsAPI MailFSAPI MailServerAPI
+                  MailFSStringAbsImpl c5.
+Module c7 := Link MailFSStringAPI MailFSStringAbsAPI MailServerAPI
+                  MailFSStringImpl c6.
+Module c8 := Link MailFSPathAbsAPI MailFSStringAPI MailServerAPI
+                  MailFSPathAbsImpl c7.
+Module c9 := Link MailFSPathAPI MailFSPathAbsAPI MailServerAPI
+                  MailFSPathImpl c8.
 
 
-Definition ms_bottom := c5.compile_ts mail_server.
+Definition ms_bottom := c9.compile_ts mail_server.
 Check ms_bottom.
 
-Print Assumptions c5.compile_traces_match.
+Print Assumptions c9.compile_traces_match.

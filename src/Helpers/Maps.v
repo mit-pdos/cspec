@@ -865,6 +865,14 @@ Module FMap.
       destruct H; simp.
     Qed.
 
+    Theorem mapsto_add_or :
+      forall a1 v1 a2 v2 m,
+        MapsTo a1 v1 (add a2 v2 m) ->
+        a1 = a2 /\ v1 = v2 \/
+        a1 <> a2 /\ MapsTo a1 v1 m.
+    Proof.
+    Admitted.
+
     Lemma mapsto_ext_sym : forall T (m1 m2: T -> t),
         (forall t, forall a v, MapsTo a v (m1 t) -> MapsTo a v (m2 t)) ->
         (forall t, (forall a v, MapsTo a v (m1 t) -> MapsTo a v (m2 t)) ->

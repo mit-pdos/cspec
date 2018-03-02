@@ -8,10 +8,9 @@ Require Import MailboxTmpAbsAPI.
 Module AtomicDeliver <: LayerImpl DeliverAPI MailboxTmpAbsAPI.
 
   Definition deliver_core (m : string) :=
-    tmpfn <- Op (DeliverAPI.CreateTmp);
-    _ <- Op (DeliverAPI.WriteTmp tmpfn m);
-    _ <- Op (DeliverAPI.LinkMail tmpfn);
-    _ <- Op (DeliverAPI.UnlinkTmp tmpfn);
+    _ <- Op (DeliverAPI.CreateWriteTmp m);
+    _ <- Op (DeliverAPI.LinkMail);
+    _ <- Op (DeliverAPI.UnlinkTmp);
     Ret tt.
 
   Definition list_core :=
@@ -53,10 +52,10 @@ Module AtomicDeliver <: LayerImpl DeliverAPI MailboxTmpAbsAPI.
   Hint Extern 1 (MailboxTmpAbsAPI.step _ _ _ _ _ _) => econstructor.
   Hint Extern 1 (DeliverAPI.step _ _ _ _ _ _) => econstructor.
 
-  Lemma createtmp_right_mover :
+  Lemma createwritetmp_right_mover : forall data,
     right_mover
       DeliverAPI.step
-      (DeliverAPI.CreateTmp).
+      (DeliverAPI.CreateWriteTmp data).
   Proof.
     unfold right_mover; intros.
     repeat step_inv.
@@ -66,22 +65,13 @@ Module AtomicDeliver <: LayerImpl DeliverAPI MailboxTmpAbsAPI.
         eapply FMap.in_add; eauto.
       + rewrite FMap.add_add_ne by congruence.
         econstructor.
-        contradict H1.
-        eapply FMap.in_add_ne; eauto.
-        congruence.
-    - eexists; split.
-      + econstructor.
-        eapply FMap.in_add_ne; eauto.
-        congruence.
-      + rewrite FMap.add_add_ne by congruence.
-        econstructor.
-        contradict H1.
+        contradict H2.
         eapply FMap.in_add_ne; eauto.
         congruence.
     - eexists; split; eauto.
       rewrite <- FMap.add_remove_ne by congruence.
       econstructor.
-      contradict H1.
+      contradict H2.
       eapply FMap.in_remove; eauto.
     - eexists; split; eauto.
       econstructor; eauto.
@@ -93,50 +83,12 @@ Module AtomicDeliver <: LayerImpl DeliverAPI MailboxTmpAbsAPI.
     - eauto 20.
   Qed.
 
-  Hint Resolve createtmp_right_mover.
+  Hint Resolve createwritetmp_right_mover.
 
-  Lemma writetmp_right_mover : forall fn data,
-    right_mover
-      DeliverAPI.step
-      (DeliverAPI.WriteTmp fn data).
-  Proof.
-    unfold right_mover; intros.
-    repeat step_inv.
-    - eexists; split.
-      + econstructor.
-        contradict H12.
-        eapply FMap.in_add; eauto.
-      + rewrite FMap.add_add_ne by congruence.
-        econstructor.
-        eapply FMap.in_add; eauto.
-    - eexists; split.
-      + econstructor.
-        eapply FMap.in_add_ne; eauto.
-        congruence.
-      + rewrite FMap.add_add_ne by congruence.
-        econstructor.
-        eapply FMap.in_add; eauto.
-    - eexists; split; eauto.
-      rewrite <- FMap.add_remove_ne by congruence.
-      econstructor.
-      eapply FMap.in_remove_ne; eauto.
-      congruence.
-    - eexists; split; eauto.
-      econstructor; eauto.
-      eapply FMap.mapsto_add_ne; eauto.
-      congruence.
-    - eauto 20.
-    - eauto 20.
-    - eauto 20.
-    - eauto 20.
-  Qed.
-
-  Hint Resolve writetmp_right_mover.
-
-  Lemma unlinktmp_always_enabled : forall fn,
+  Lemma unlinktmp_always_enabled :
     always_enabled
       DeliverAPI.step
-      (DeliverAPI.UnlinkTmp fn).
+      (DeliverAPI.UnlinkTmp).
   Proof.
     unfold always_enabled, enabled_in; intros.
     destruct s; eauto.
@@ -144,10 +96,10 @@ Module AtomicDeliver <: LayerImpl DeliverAPI MailboxTmpAbsAPI.
 
   Hint Resolve unlinktmp_always_enabled.
 
-  Lemma unlinktmp_left_mover : forall fn,
+  Lemma unlinktmp_left_mover :
     left_mover
       DeliverAPI.step
-      (DeliverAPI.UnlinkTmp fn).
+      (DeliverAPI.UnlinkTmp).
   Proof.
     split; eauto.
     intros; repeat step_inv; eauto; repeat deex.
@@ -156,11 +108,6 @@ Module AtomicDeliver <: LayerImpl DeliverAPI MailboxTmpAbsAPI.
       econstructor.
       contradict H11.
       eapply FMap.in_remove; eauto.
-    + eexists; split; eauto.
-      rewrite <- FMap.add_remove_ne by congruence.
-      econstructor.
-      eapply FMap.in_remove_ne; eauto.
-      congruence.
     + eexists; split; eauto.
       rewrite FMap.remove_remove.
       econstructor.
@@ -241,9 +188,8 @@ Module AtomicDeliver <: LayerImpl DeliverAPI MailboxTmpAbsAPI.
     + repeat atomic_exec_inv.
       repeat step_inv; eauto.
       simpl.
-      rewrite FMap.add_add.
       rewrite FMap.remove_add by eauto.
-      eapply FMap.mapsto_add in H7; subst.
+      eapply FMap.mapsto_add in H3; subst.
       econstructor.
       eauto.
     + repeat atomic_exec_inv.

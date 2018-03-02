@@ -12,10 +12,9 @@ Module DeliverListTidAPI <: Layer.
   Import MailboxTmpAbsAPI.
 
   Inductive xopT : Type -> Type :=
-  | CreateTmp : xopT string
-  | WriteTmp : forall (fn : string) (data : string), xopT unit
-  | LinkMail : forall (tmpfn : string) (mboxfn : string), xopT unit
-  | UnlinkTmp : forall (fn : string), xopT unit
+  | CreateWriteTmp : forall (data : string), xopT unit
+  | LinkMail : forall (mboxfn : string), xopT unit
+  | UnlinkTmp : xopT unit
 
   | List : xopT (list (nat * string))
   | ListTid : xopT (list string)
@@ -29,30 +28,23 @@ Module DeliverListTidAPI <: Layer.
   Definition initP (s : State) := True.
 
   Inductive xstep : forall T, opT T -> nat -> State -> T -> State -> list event -> Prop :=
-  | StepCreateTmp : forall tmp mbox tid fn,
-    ~ FMap.In (tid, fn) tmp ->
-    xstep (CreateTmp) tid
-      (mk_state tmp mbox)
-      fn
-      (mk_state (FMap.add (tid, fn) ""%string tmp) mbox)
-      nil
-  | StepWriteTmp : forall tmp mbox tid fn data,
-    FMap.In (tid, fn) tmp ->
-    xstep (WriteTmp fn data) tid
+  | StepCreateWriteTmp : forall tmp mbox tid data,
+    ~ FMap.In (tid, ""%string) tmp ->
+    xstep (CreateWriteTmp data) tid
       (mk_state tmp mbox)
       tt
-      (mk_state (FMap.add (tid, fn) data tmp) mbox)
+      (mk_state (FMap.add (tid, ""%string) data tmp) mbox)
       nil
-  | StepUnlinkTmp : forall tmp mbox tid fn,
-    xstep (UnlinkTmp fn) tid
+  | StepUnlinkTmp : forall tmp mbox tid,
+    xstep (UnlinkTmp) tid
       (mk_state tmp mbox)
       tt
-      (mk_state (FMap.remove (tid, fn) tmp) mbox)
+      (mk_state (FMap.remove (tid, ""%string) tmp) mbox)
       nil
-  | StepLinkMail : forall tmp mbox tid tmpfn mailfn data,
-    FMap.MapsTo (tid, tmpfn) data tmp ->
+  | StepLinkMail : forall tmp mbox tid mailfn data,
+    FMap.MapsTo (tid, ""%string) data tmp ->
     ~ FMap.In (tid, mailfn) mbox ->
-    xstep (LinkMail tmpfn mailfn) tid
+    xstep (LinkMail mailfn) tid
       (mk_state tmp mbox)
       tt
       (mk_state tmp (FMap.add (tid, mailfn) data mbox))
@@ -109,15 +101,13 @@ Module DeliverListTidRestrictedAPI <: Layer.
   Definition initP (s : State) := True.
 
   Inductive step_allow : forall T, opT T -> nat -> State -> Prop :=
-  | AllowCreateTmp : forall tid s,
-    step_allow CreateTmp tid s
-  | AllowWriteTmp : forall tid s fn data,
-    step_allow (WriteTmp fn data) tid s
-  | AllowLinkMail : forall tid tmp mbox tmpfn mailfn,
+  | AllowCreateWriteTmp : forall tid s data,
+    step_allow (CreateWriteTmp data) tid s
+  | AllowLinkMail : forall tid tmp mbox mailfn,
     ~ FMap.In (tid, mailfn) mbox ->
-    step_allow (LinkMail tmpfn mailfn) tid (mk_state tmp mbox)
-  | AllowUnlinkTmp : forall tid s fn,
-    step_allow (UnlinkTmp fn) tid s
+    step_allow (LinkMail mailfn) tid (mk_state tmp mbox)
+  | AllowUnlinkTmp : forall tid s,
+    step_allow (UnlinkTmp) tid s
   | AllowList : forall tid s,
     step_allow List tid s
   | AllowListTid : forall tid s,

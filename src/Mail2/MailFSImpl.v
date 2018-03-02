@@ -13,8 +13,8 @@ Module MailFSImpl <: LayerImpl MailFSAPI DeliverListTidAPI.
     else
       false.
 
-  Definition linkmail_core newname data :=
-    v <- Op (MailFSAPI.LinkMail newname data);
+  Definition linkmail_core data :=
+    v <- Op (MailFSAPI.LinkMail data);
     Ret v.
 
   Definition list_core :=
@@ -30,16 +30,12 @@ Module MailFSImpl <: LayerImpl MailFSAPI DeliverListTidAPI.
     r <- Op (MailFSAPI.Read fn);
     Ret r.
 
-  Definition createtmp_core :=
-    r <- Op MailFSAPI.CreateTmp;
+  Definition createwritetmp_core data :=
+    r <- Op (MailFSAPI.CreateWriteTmp data);
     Ret r.
 
-  Definition writetmp_core fn data :=
-    r <- Op (MailFSAPI.WriteTmp fn data);
-    Ret r.
-
-  Definition unlinktmp_core fn :=
-    r <- Op (MailFSAPI.UnlinkTmp fn);
+  Definition unlinktmp_core :=
+    r <- Op (MailFSAPI.UnlinkTmp);
     Ret r.
 
   Definition getrequest_core :=
@@ -52,13 +48,12 @@ Module MailFSImpl <: LayerImpl MailFSAPI DeliverListTidAPI.
 
   Definition compile_op T (op : DeliverListTidAPI.opT T) : proc _ T :=
     match op with
-    | DeliverListTidAPI.LinkMail fn m => linkmail_core fn m
+    | DeliverListTidAPI.LinkMail m => linkmail_core m
     | DeliverListTidAPI.List => list_core
     | DeliverListTidAPI.ListTid => listtid_core
     | DeliverListTidAPI.Read fn => read_core fn
-    | DeliverListTidAPI.CreateTmp => createtmp_core
-    | DeliverListTidAPI.WriteTmp fn data => writetmp_core fn data
-    | DeliverListTidAPI.UnlinkTmp fn => unlinktmp_core fn
+    | DeliverListTidAPI.CreateWriteTmp data => createwritetmp_core data
+    | DeliverListTidAPI.UnlinkTmp => unlinktmp_core
     | DeliverListTidAPI.GetRequest => getrequest_core
     | DeliverListTidAPI.Respond r => respond_core r
     end.
@@ -85,10 +80,10 @@ Module MailFSImpl <: LayerImpl MailFSAPI DeliverListTidAPI.
 
   Hint Resolve gettid_right_mover.
 
-  Theorem linkmail_atomic : forall `(rx : _ -> proc _ T) fn m,
+  Theorem linkmail_atomic : forall `(rx : _ -> proc _ T) m,
     trace_incl MailFSAPI.step
-      (Bind (compile_op (DeliverListTidAPI.LinkMail fn m)) rx)
-      (Bind (atomize compile_op (DeliverListTidAPI.LinkMail fn m)) rx).
+      (Bind (compile_op (DeliverListTidAPI.LinkMail m)) rx)
+      (Bind (atomize compile_op (DeliverListTidAPI.LinkMail m)) rx).
   Proof.
     intros.
     eapply trace_incl_atomize_ysa.
@@ -133,34 +128,22 @@ Module MailFSImpl <: LayerImpl MailFSAPI DeliverListTidAPI.
     eauto 20.
   Qed.
 
-  Theorem createtmp_atomic : forall `(rx : _ -> proc _ T),
+  Theorem createwritetmp_atomic : forall `(rx : _ -> proc _ T) data,
     trace_incl MailFSAPI.step
-      (Bind (compile_op (DeliverListTidAPI.CreateTmp)) rx)
-      (Bind (atomize compile_op (DeliverListTidAPI.CreateTmp)) rx).
+      (Bind (compile_op (DeliverListTidAPI.CreateWriteTmp data)) rx)
+      (Bind (atomize compile_op (DeliverListTidAPI.CreateWriteTmp data)) rx).
   Proof.
     intros.
     eapply trace_incl_atomize_ysa.
     simpl.
-    unfold createtmp_core, ysa_movers.
+    unfold createwritetmp_core, ysa_movers.
     eauto 20.
   Qed.
 
-  Theorem writetmp_atomic : forall `(rx : _ -> proc _ T) fn data,
+  Theorem unlinktmp_atomic : forall `(rx : _ -> proc _ T),
     trace_incl MailFSAPI.step
-      (Bind (compile_op (DeliverListTidAPI.WriteTmp fn data)) rx)
-      (Bind (atomize compile_op (DeliverListTidAPI.WriteTmp fn data)) rx).
-  Proof.
-    intros.
-    eapply trace_incl_atomize_ysa.
-    simpl.
-    unfold writetmp_core, ysa_movers.
-    eauto 20.
-  Qed.
-
-  Theorem unlinktmp_atomic : forall `(rx : _ -> proc _ T) fn,
-    trace_incl MailFSAPI.step
-      (Bind (compile_op (DeliverListTidAPI.UnlinkTmp fn)) rx)
-      (Bind (atomize compile_op (DeliverListTidAPI.UnlinkTmp fn)) rx).
+      (Bind (compile_op (DeliverListTidAPI.UnlinkTmp)) rx)
+      (Bind (atomize compile_op (DeliverListTidAPI.UnlinkTmp)) rx).
   Proof.
     intros.
     eapply trace_incl_atomize_ysa.
@@ -227,9 +210,7 @@ Module MailFSImpl <: LayerImpl MailFSAPI DeliverListTidAPI.
   Proof.
     unfold atomize_correct; intros.
     destruct op.
-    + rewrite createtmp_atomic.
-      eapply trace_incl_bind_a; eauto.
-    + rewrite writetmp_atomic.
+    + rewrite createwritetmp_atomic.
       eapply trace_incl_bind_a; eauto.
     + rewrite linkmail_atomic.
       eapply trace_incl_bind_a; eauto.
