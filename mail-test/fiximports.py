@@ -7,29 +7,9 @@ import re
 import os, sys
 
 import_modules = {
-    "import qualified Data.ByteString":
+    "import qualified Support":
     [
-        "Disk",
-    ],
-
-    "import qualified Variables.Ops":
-    [
-        "VariablesImpl",
-        "StatDbCli",
-    ],
-
-    "import qualified CLI.Stubs":
-    [
-        "StatDbCli",
-    ],
-
-    "import Variables.State":
-    [
-        "Interface",
-        "VariablesImpl",
-        "StatDbImpl",
-        "StatDbCli",
-        "Abstraction",
+        "MailFSStringImpl",
     ],
 }
 

@@ -11,6 +11,7 @@ import GHC.Prim
 import ConcurProc
 import MailFSPathAPI
 import MailServer
+import MailServerAPI
 
 data State =
   S
@@ -50,6 +51,30 @@ run_proc s (Until c p v0) = do
   else
     run_proc s (Until c p (unsafeCoerce v))
 
-run_proc (S) (Op MailFSPathAPI__GetTID) = do
+run_proc _ (Op MailFSPathAPI__GetTID) = do
   -- XXX how to get an integer thread id?
   return $ unsafeCoerce 0
+
+run_proc _ (Op MailFSPathAPI__GetRequest) = do
+  debugmsg $ "GetRequest"
+  return $ unsafeCoerce (MailServerAPI__ReqDeliver "Test message")
+
+run_proc _ (Op (MailFSPathAPI__Respond _)) = do
+  debugmsg $ "Respond"
+  return $ unsafeCoerce ()
+
+run_proc _ (Op (MailFSPathAPI__CreateWrite (dir, fn) contents)) = do
+  debugmsg $ "CreateWrite " ++ (show dir) ++ "/" ++ (show fn) ++ ", " ++ (show contents)
+  return $ unsafeCoerce ()
+
+run_proc _ (Op (MailFSPathAPI__Link (srcdir, srcfn) (dstdir, dstfn))) = do
+  return $ unsafeCoerce ()
+
+run_proc _ (Op (MailFSPathAPI__Unlink (dir, fn))) = do
+  return $ unsafeCoerce ()
+
+run_proc _ (Op (MailFSPathAPI__List dir)) = do
+  return $ unsafeCoerce []
+
+run_proc _ (Op (MailFSPathAPI__Read (dir, fn))) = do
+  return $ unsafeCoerce ""
