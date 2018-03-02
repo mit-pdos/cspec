@@ -998,4 +998,26 @@ Module FMap.
   Arguments t A V {Acmp}.
   Arguments empty {A} {V} {Acmp}.
 
+  Section MapKeys.
+
+    Variable A1:Type.
+    Variable A2:Type.
+    Variable V:Type.
+    Context {A1cmp: Ordering A1}.
+    Context {A2cmp: Ordering A2}.
+
+    Variable f : A1 -> A2.
+
+    Fixpoint insert_f (l : list (A1*V)) (m : t A2 V) : t A2 V :=
+      match l with
+      | nil => m
+      | (a1, v) :: l' =>
+        insert_f l' (add (f a1) v m)
+      end.
+
+    Definition map_keys (m1 : t A1 V) : t A2 V :=
+      insert_f (elements m1) empty.
+
+  End MapKeys.
+
 End FMap.
