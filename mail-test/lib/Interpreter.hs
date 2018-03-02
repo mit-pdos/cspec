@@ -64,17 +64,21 @@ run_proc _ (Op (MailFSPathAPI__Respond _)) = do
   return $ unsafeCoerce ()
 
 run_proc _ (Op (MailFSPathAPI__CreateWrite (dir, fn) contents)) = do
-  debugmsg $ "CreateWrite " ++ (show dir) ++ "/" ++ (show fn) ++ ", " ++ (show contents)
+  debugmsg $ "CreateWrite " ++ dir ++ "/" ++ fn ++ ", " ++ (show contents)
   return $ unsafeCoerce ()
 
 run_proc _ (Op (MailFSPathAPI__Link (srcdir, srcfn) (dstdir, dstfn))) = do
+  debugmsg $ "Link " ++ srcdir ++ "/" ++ srcfn ++ " to " ++ dstdir ++ "/" ++ dstfn
   return $ unsafeCoerce ()
 
 run_proc _ (Op (MailFSPathAPI__Unlink (dir, fn))) = do
+  debugmsg $ "Unlink " ++ dir ++ "/" ++ (fn)
   return $ unsafeCoerce ()
 
 run_proc _ (Op (MailFSPathAPI__List dir)) = do
+  debugmsg $ "List " ++ dir
   return $ unsafeCoerce []
 
 run_proc _ (Op (MailFSPathAPI__Read (dir, fn))) = do
+  debugmsg $ "Read " ++ dir ++ "/" ++ fn
   return $ unsafeCoerce ""
