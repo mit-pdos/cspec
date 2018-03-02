@@ -12,14 +12,11 @@ executable mail-test
                      , mtl
                      , bytestring
                      , atomic-primops
-  other-modules:       Bool
-                     , Interpreter
+  other-modules:       Interpreter
                      , Compile
-                     , CompileLoop
                      , ConcurProc
                      , List
                      , Datatypes
-                     , Example2
-                     , Nat
+                     , MailServer
                      , Helpers
   default-language:    Haskell2010

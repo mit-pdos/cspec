@@ -10,7 +10,7 @@ CODE += $(wildcard src/FS/*.v)
 
 COQRFLAGS := -R build POCS
 
-BINS	:= concur-test
+BINS	:= concur-test mail-test
 
 .PHONY: default
 default: $(patsubst %,bin/%,$(BINS)) docs
@@ -46,6 +46,7 @@ docs: coq
 	./scripts/add-preprocess.sh $@/*.hs
 
 concur-test/extract: build/Spec/Example2.vo
+mail-test/extract: build/Mail2/MailServer.vo
 
 bin/%: %/extract
 	mkdir -p $(@D)

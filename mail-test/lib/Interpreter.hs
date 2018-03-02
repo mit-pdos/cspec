@@ -9,16 +9,15 @@ import GHC.Prim
 
 -- Extracted code
 import ConcurProc
-import Example2
+import MailFSPathAPI
+import MailServer
 
 data State =
-  S !(MVar ()) !(IORef Integer)
+  S
 
 mkState :: IO State
 mkState = do
-  lck <- newMVar ()
-  val <- newIORef 0
-  return $ S lck val
+  return $ S
 
 verbose :: Bool
 verbose = True
@@ -31,7 +30,7 @@ debugmsg s =
   else
     return ()
 
-run_proc :: State -> Coq_proc (TASOpT a) GHC.Prim.Any -> IO a
+run_proc :: State -> Coq_proc (MailFSPathAPI__Coq_xopT a) GHC.Prim.Any -> IO a
 run_proc s (Ret v) = do
   -- debugmsg $ "Ret"
   return $ unsafeCoerce v
@@ -50,23 +49,7 @@ run_proc s (Until c p v0) = do
     return v
   else
     run_proc s (Until c p (unsafeCoerce v))
-run_proc (S lck val) (Op ReadTAS) = do
-  v <- readIORef val
-  -- debugmsg $ "ReadTAS " ++ (show v)
-  return $ unsafeCoerce v
-run_proc (S lck val) (Op (WriteTAS v)) = do
-  debugmsg $ "WriteTAS " ++ (show v)
-  writeIORef val v
-  return $ unsafeCoerce ()
-run_proc (S lck val) (Op TestAndSet) = do
-  ok <- tryTakeMVar lck
-  -- debugmsg $ "TestAndSet " ++ (show ok)
-  if isJust ok then
-    return $ unsafeCoerce False
-  else do
-    yield
-    return $ unsafeCoerce True
-run_proc (S lck val) (Op Clear) = do
-  -- debugmsg $ "Clear"
-  tryPutMVar lck ()
-  return $ unsafeCoerce ()
+
+run_proc (S) (Op MailFSPathAPI__GetTID) = do
+  -- XXX how to get an integer thread id?
+  return $ unsafeCoerce 0

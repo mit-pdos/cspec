@@ -9,10 +9,11 @@ import Interpreter
 
 -- Extracted code
 import ConcurProc
-import Example2
+import MailFSPathAPI
+import MailServer
 
 
-run_thread :: State -> Coq_maybe_proc (TASOpT a) -> IO ()
+run_thread :: State -> Coq_maybe_proc (MailFSPathAPI__Coq_xopT a) -> IO ()
 run_thread _ NoProc = return ()
 run_thread s (Proc p) = do
   tid <- myThreadId
@@ -20,7 +21,7 @@ run_thread s (Proc p) = do
   run_proc s p
   return ()
 
-spawn_thread :: State -> Coq_maybe_proc (TASOpT a) -> IO ()
+spawn_thread :: State -> Coq_maybe_proc (MailFSPathAPI__Coq_xopT a) -> IO ()
 spawn_thread s p = do
   putStrLn $ "Spawning.."
   tid <- forkIO (run_thread s p)
@@ -30,6 +31,6 @@ spawn_thread s p = do
 main :: IO ()
 main = do
   s <- mkState
-  mapM_ (spawn_thread s) compiled_threads
+  mapM_ (spawn_thread s) ms_bottom
   putStrLn "Started all threads"
   threadDelay $ 60 * 1000000
