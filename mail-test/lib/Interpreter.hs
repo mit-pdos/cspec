@@ -60,8 +60,12 @@ run_proc s (Until c p v0) = do
     run_proc s (Until c p (unsafeCoerce v))
 
 run_proc _ (Op MailFSPathAPI__GetTID) = do
-  -- XXX how to get an integer thread id?
-  return $ unsafeCoerce 0
+  tid <- myThreadId
+  -- Horrible hack: get the numeric TID by printing the ThreadId as a string,
+  -- using [show], which returns something like "ThreadId 5", and then parse
+  -- it back to Integer using [read].
+  let (_, tidstr) = splitAt 9 (show tid) in do
+    return $ unsafeCoerce (read tidstr :: Integer)
 
 run_proc _ (Op MailFSPathAPI__GetRequest) = do
   debugmsg $ "GetRequest"
