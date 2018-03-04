@@ -38,7 +38,6 @@ Module MailFSPathAbsAPI <: Layer.
       nil
   | StepLinkMail : forall fs tid mailfn data tmpfn,
     FMap.MapsTo ("tmp"%string, tmpfn) data fs ->
-    ~ FMap.In ("mail"%string, mailfn) fs ->
     xstep (LinkMail tmpfn mailfn) tid
       fs
       tt

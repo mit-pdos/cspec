@@ -41,7 +41,6 @@ Module MailFSPathAPI <: Layer.
       nil
   | StepLink : forall fs tid mailfn data tmpfn,
     FMap.MapsTo tmpfn data fs ->
-    ~ FMap.In mailfn fs ->
     xstep (Link tmpfn mailfn) tid
       fs
       tt
