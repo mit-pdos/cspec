@@ -3,6 +3,21 @@ Require Import MailServerAPI.
 Require Import MailServerDirAPI.
 
 
+Lemma is_permutation_map_set_add: forall s m (fn: (nat*nat)) d,
+    ~ FMap.In fn m ->
+    FMap.is_permutation_val (FSet.elements s) m ->
+    FMap.is_permutation_val (FSet.elements (FSet.add d s)) (FMap.add fn d m).
+Proof.
+  intros.
+Admitted.
+
+Lemma is_permutation_map_set_list : forall s  (m : FMap.t (nat*nat) String.string) l,
+    FMap.is_permutation_val l m ->
+    FMap.is_permutation_val (FSet.elements s) m ->
+    FSet.is_permutation l s.
+Proof.
+Admitted.
+
 Module MailServerDir <: LayerImpl MailServerDirAPI MailServerAPI.
 
   Definition absR (s1 : MailServerDirAPI.State) (s2 : MailServerAPI.State) :=
@@ -22,15 +37,16 @@ Module MailServerDir <: LayerImpl MailServerDirAPI MailServerAPI.
     op_abs absR MailServerDirAPI.step MailServerAPI.step.
   Proof.
     unfold op_abs; intros.
-(*
-    destruct s1; inversion H; clear H.
-    simpl in *; subst.
-    unfold absR.
-    destruct op; inversion H0; clear H0; repeat sigT_eq.
-    all: eexists; intuition eauto; constructor.
+    inversion H0; clear H0; simpl in *; subst; repeat sigT_eq.
+    all: unfold absR in *.
+    - exists (FSet.add m s2).
+      split; [ | constructor].
+      apply is_permutation_map_set_add; eauto.
+    - eexists; intuition eauto; constructor.
+      eapply is_permutation_map_set_list; eauto.
+    - eexists; intuition eauto; constructor.
+    - eexists; intuition eauto; constructor.
   Qed.
-*)
-  Admitted.
 
   Hint Resolve absR_ok.
 
