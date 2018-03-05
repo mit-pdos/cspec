@@ -37,6 +37,25 @@ Module MailFSPathAbsImpl <: LayerImpl MailFSPathAbsAPI MailFSStringAPI.
   Hint Resolve FMap.mapsto_add_ne'.
   Hint Resolve fn_ne.
 
+  Lemma absR_add_tmp :
+    forall fs tmp mail fn data,
+      absR fs (MailFSStringAbsAPI.mk_state tmp mail) ->
+      absR (FMap.add ("tmp"%string, fn) data fs)
+           (MailFSStringAbsAPI.mk_state (FMap.add fn data tmp) mail).
+  Proof.
+  Admitted.
+
+  Lemma absR_add_mail :
+    forall fs tmp mail fn data,
+      absR fs (MailFSStringAbsAPI.mk_state tmp mail) ->
+      absR (FMap.add ("mail"%string, fn) data fs)
+           (MailFSStringAbsAPI.mk_state tmp (FMap.add fn data mail)).
+  Proof.
+  Admitted.
+
+  Hint Resolve absR_add_tmp.
+  Hint Resolve absR_add_mail.
+
   Theorem absR_ok :
     op_abs absR MailFSPathAbsAPI.step MailFSStringAPI.step.
   Proof.

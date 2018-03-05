@@ -28,17 +28,74 @@ Module MailFSStringAbsImpl <: LayerImpl MailFSStringAbsAPI MailFSAPI.
 
   Hint Extern 1 (MailFSAPI.step _ _ _ _ _ _) => econstructor.
 
+  Lemma dirR_fmap_in :
+    forall d1 d2 tid fn,
+      dirR d1 d2 ->
+      FMap.In (encode_tid_fn tid fn) d1 ->
+      FMap.In (tid, fn) d2.
+  Proof.
+    unfold dirR; intros.
+    admit.
+  Admitted.
+
+  Lemma dirR_fmap_in' :
+    forall d1 d2 tid fn,
+      dirR d1 d2 ->
+      FMap.In (tid, fn) d2 ->
+      FMap.In (encode_tid_fn tid fn) d1.
+  Proof.
+  Admitted.
+
+  Lemma dirR_mapsto :
+    forall d1 d2 tid fn data,
+      dirR d1 d2 ->
+      FMap.MapsTo (encode_tid_fn tid fn) data d1 ->
+      FMap.MapsTo (tid, fn) data d2.
+  Proof.
+  Admitted.
+
+  Lemma dirR_add :
+    forall d1 d2 tid fn data,
+      dirR d1 d2 ->
+      dirR (FMap.add (encode_tid_fn tid fn) data d1)
+           (FMap.add (tid, fn) data d2).
+  Proof.
+  Admitted.
+
+  Lemma dirR_remove :
+    forall d1 d2 tid fn,
+      dirR d1 d2 ->
+      dirR (FMap.remove (encode_tid_fn tid fn) d1)
+           (FMap.remove (tid, fn) d2).
+  Proof.
+  Admitted.
+
+  Lemma dirR_is_permutation_key :
+    forall d1 d2 l,
+      dirR d1 d2 ->
+      FMap.is_permutation_key l d1 ->
+      FMap.is_permutation_key (map decode_tid_fn l) d2.
+  Proof.
+  Admitted.
+
+  Hint Resolve dirR_fmap_in.
+  Hint Resolve dirR_fmap_in'.
+  Hint Resolve dirR_mapsto.
+  Hint Resolve dirR_add.
+  Hint Resolve dirR_remove.
+  Hint Resolve dirR_is_permutation_key.
+
   Theorem absR_ok :
     op_abs absR MailFSStringAbsAPI.step MailFSAPI.step.
   Proof.
     unfold op_abs, absR; intros.
     destruct s1; simpl in *; subst.
-(*
-    inversion H0; clear H0; subst; repeat sigT_eq.
-    all: eauto 10.
+    destruct s2; simpl in *; subst.
+    intuition idtac.
+    inversion H0; clear H0; subst; repeat sigT_eq; simpl in *.
+    all: eexists; split; [ split | econstructor ]; simpl.
+    all: eauto.
   Qed.
-*)
-  Admitted.
 
   Hint Resolve absR_ok.
 
