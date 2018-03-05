@@ -45,6 +45,14 @@ Module MailFSPathAbsImpl <: LayerImpl MailFSPathAbsAPI MailFSStringAPI.
   Proof.
   Admitted.
 
+  Lemma absR_remove_tmp :
+    forall fs tmp mail fn,
+      absR fs (MailFSStringAbsAPI.mk_state tmp mail) ->
+      absR (FMap.remove ("tmp"%string, fn) fs)
+           (MailFSStringAbsAPI.mk_state (FMap.remove fn tmp) mail).
+  Proof.
+  Admitted.
+
   Lemma absR_add_mail :
     forall fs tmp mail fn data,
       absR fs (MailFSStringAbsAPI.mk_state tmp mail) ->
@@ -53,8 +61,41 @@ Module MailFSPathAbsImpl <: LayerImpl MailFSPathAbsAPI MailFSStringAPI.
   Proof.
   Admitted.
 
+  Lemma absR_in_tmp :
+    forall fs tmp mail fn,
+      absR fs (MailFSStringAbsAPI.mk_state tmp mail) ->
+      FMap.In fn tmp ->
+      FMap.In ("tmp"%string, fn) fs.
+  Admitted.
+
+  Lemma absR_mapsto_tmp :
+    forall fs tmp mail fn data,
+      absR fs (MailFSStringAbsAPI.mk_state tmp mail) ->
+      FMap.MapsTo ("tmp"%string, fn) data fs ->
+      FMap.MapsTo fn data tmp.
+  Admitted.
+
+  Lemma absR_in_mail :
+    forall fs tmp mail fn,
+      absR fs (MailFSStringAbsAPI.mk_state tmp mail) ->
+      FMap.In fn mail ->
+      FMap.In ("mail"%string, fn) fs.
+  Admitted.
+
+  Lemma absR_mapsto_mail :
+    forall fs tmp mail fn data,
+      absR fs (MailFSStringAbsAPI.mk_state tmp mail) ->
+      FMap.MapsTo ("mail"%string, fn) data fs ->
+      FMap.MapsTo fn data mail.
+  Admitted.
+
   Hint Resolve absR_add_tmp.
+  Hint Resolve absR_remove_tmp.
   Hint Resolve absR_add_mail.
+  Hint Resolve absR_in_tmp.
+  Hint Resolve absR_mapsto_tmp.
+  Hint Resolve absR_in_mail.
+  Hint Resolve absR_mapsto_mail.
 
   Theorem absR_ok :
     op_abs absR MailFSPathAbsAPI.step MailFSStringAPI.step.
@@ -67,14 +108,8 @@ Module MailFSPathAbsImpl <: LayerImpl MailFSPathAbsAPI MailFSStringAPI.
     all: simpl.
     all: eauto 10.
 
-(*
-    split; intros.
-    eapply FMap.mapsto_add_or in H0; intuition idtac; subst.
-    inversion H0; clear H0; subst.
-    eauto.
-    eapply H in H3.
-    intuition ( subst; eauto ).
-*)
+    admit.
+    admit.
   Admitted.
 
   Hint Resolve absR_ok.
