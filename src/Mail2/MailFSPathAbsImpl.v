@@ -89,6 +89,15 @@ Module MailFSPathAbsImpl <: LayerImpl MailFSPathAbsAPI MailFSStringAPI.
       FMap.MapsTo fn data mail.
   Admitted.
 
+  Lemma absR_is_permutation_key :
+    forall fs tmp mail r,
+      absR fs (MailFSStringAbsAPI.mk_state tmp mail) ->
+      FMap.is_permutation_key r
+        (MailFSPathAbsAPI.drop_dirname
+           (MailFSPathAbsAPI.filter_dir "mail" fs)) ->
+      FMap.is_permutation_key r mail.
+  Admitted.
+
   Hint Resolve absR_add_tmp.
   Hint Resolve absR_remove_tmp.
   Hint Resolve absR_add_mail.
@@ -96,6 +105,7 @@ Module MailFSPathAbsImpl <: LayerImpl MailFSPathAbsAPI MailFSStringAPI.
   Hint Resolve absR_mapsto_tmp.
   Hint Resolve absR_in_mail.
   Hint Resolve absR_mapsto_mail.
+  Hint Resolve absR_is_permutation_key.
 
   Theorem absR_ok :
     op_abs absR MailFSPathAbsAPI.step MailFSStringAPI.step.
@@ -107,10 +117,7 @@ Module MailFSPathAbsImpl <: LayerImpl MailFSPathAbsAPI MailFSStringAPI.
     all: split; [ | econstructor ].
     all: simpl.
     all: eauto 10.
-
-    admit.
-    admit.
-  Admitted.
+  Qed.
 
   Hint Resolve absR_ok.
 

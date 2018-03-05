@@ -43,7 +43,6 @@ Module MailFSStringAPI <: Layer.
       nil
   | StepLinkMail : forall tmp mbox tid mailfn data tmpfn,
     FMap.MapsTo tmpfn data tmp ->
-    ~ FMap.In mailfn mbox ->
     xstep (LinkMail tmpfn mailfn) tid
       (mk_state tmp mbox)
       tt
