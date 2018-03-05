@@ -221,43 +221,19 @@ Module AtomicReader <: LayerImpl MailboxAPI MailServerDirAPI.
         step_inv; subst; eauto.
         econstructor.
 
-        assert (List.Forall (fun '(k, v) => FMap.MapsTo k v s1)
-                  (FMap.elements s1)).
-        {
-          eapply Forall_forall; intros.
-          destruct x.
-          admit.
-        }
-
-        generalize dependent (FMap.elements s1); intros.
-        generalize dependent v.
-(*
-        induction l; intros.
-        - inversion H2; eauto.
-        - inversion H2; clear H2; subst.
-          inversion H; clear H; subst.
-          specialize (IHl H4 _ H5); subst.
-          destruct a; simpl in *; f_equal.
-          eapply DirFacts.MapsTo_fun; eauto.
-*)
-        admit.
+        eapply FMap.is_permutation_key_to_val; eauto.
       }
 
-      clear H10.
-      atomic_exec_inv.
-      step_inv.
+      {
+        clear H10.
+        atomic_exec_inv.
+        step_inv.
 
-      eapply Forall_forall; intros.
-(*
-      eapply in_map_iff in H; deex.
-      destruct x0.
-      eapply DirFacts.elements_in_iff; eexists.
-      eapply In_InA; eauto.
+        eapply Forall_forall; intros.
+        eapply FMap.is_permutation_in; eauto.
+      }
 
-      eauto.
-*)
-      admit.
-      admit.
+      constructor.
 
     + repeat atomic_exec_inv.
       simpl; intuition eauto.
@@ -266,7 +242,7 @@ Module AtomicReader <: LayerImpl MailboxAPI MailServerDirAPI.
     + repeat atomic_exec_inv.
       simpl; intuition eauto.
       repeat step_inv; eauto.
-  Admitted.
+  Qed.
 
   Theorem my_atomize_correct :
     atomize_correct compile_op MailboxAPI.step.

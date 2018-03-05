@@ -1009,6 +1009,27 @@ Module FMap.
     Proof.
     Admitted.
 
+    Theorem in_elements_mapsto :
+      forall k v m,
+        List.In (k, v) (elements m) ->
+        MapsTo k v m.
+    Proof.
+      firstorder.
+    Qed.
+
+    Theorem is_permutation_key_to_val:
+      forall m kl vl,
+        is_permutation_key kl m ->
+        Forall2 (fun k v => MapsTo k v m) kl vl ->
+        is_permutation_val vl m.
+    Proof.
+      unfold is_permutation_key.
+      unfold is_permutation_val.
+      split; intros.
+      - admit.
+      - admit.
+    Admitted.
+
   End Maps.
 
   Arguments t A V {Acmp}.
