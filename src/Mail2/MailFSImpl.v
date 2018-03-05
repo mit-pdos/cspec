@@ -188,22 +188,20 @@ Module MailFSImpl <: LayerImpl MailFSAPI DeliverListTidAPI.
     repeat step_inv; eauto.
     econstructor; intros.
 
-(*
     split; intros.
     * eapply in_map_iff in H; deex. destruct x.
       eapply filter_In in H0; intuition idtac.
       unfold same_tid in *; simpl in *.
       destruct (v1 == n); try congruence.
       subst; eauto.
+      eapply FMap.is_permutation_in; eauto.
     * eapply in_map_iff.
       exists (v1, fn); intuition eauto.
       eapply filter_In; intuition eauto.
+      eapply FMap.is_permutation_in'; eauto.
       unfold same_tid; simpl.
       destruct (v1 == v1); congruence.
   Qed.
-*)
-    admit.
-  Admitted.
 
   Theorem my_atomize_correct :
     atomize_correct compile_op MailFSAPI.step.

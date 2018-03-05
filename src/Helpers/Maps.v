@@ -1007,7 +1007,17 @@ Module FMap.
         List.In k kl ->
         In k m.
     Proof.
-    Admitted.
+      firstorder.
+    Qed.
+
+    Theorem is_permutation_in' :
+      forall k kl m,
+        is_permutation_key kl m ->
+        In k m ->
+        List.In k kl.
+    Proof.
+      firstorder.
+    Qed.
 
     Theorem in_elements_mapsto :
       forall k v m,
