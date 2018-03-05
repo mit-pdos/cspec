@@ -62,19 +62,18 @@ Module AtomicReader <: LayerImpl MailboxAPI MailServerDirAPI.
       (fun tid s => FMap.In fn s).
   Proof.
     split.
-(*
     - unfold enabled_stable, enabled_in; intros; repeat deex.
       repeat step_inv; eauto.
-      destruct (fn0 == fn); subst; try congruence.
-      + exfalso. eapply H11. eexists. eauto.
+      destruct (fn == fn0); subst.
+      + exfalso. eapply H11. eapply FMap.mapsto_in. eauto.
       + do 3 eexists; econstructor.
-        eapply MailServerAPI.Dir.add_2; eauto.
+        eapply FMap.mapsto_add_ne'; eauto.
     - intros; repeat step_inv; eauto; repeat deex.
       destruct (fn0 == fn); subst; try congruence.
-      eapply MailServerAPI.Dir.add_3 in H2; eauto.
+      eexists; split.
+      econstructor. eapply FMap.mapsto_add_ne; eauto.
+      econstructor; eauto.
   Qed.
-*)
-  Admitted.
 
   Hint Resolve read_left_mover.
 
@@ -103,6 +102,8 @@ Module AtomicReader <: LayerImpl MailboxAPI MailServerDirAPI.
     step_inv.
     eapply FMap.add_incr; eauto.
   Qed.
+
+  Hint Resolve FMap.is_permutation_in.
 
   Theorem readall_atomic : forall `(rx : _ -> proc _ T),
     trace_incl MailboxAPI.step
@@ -154,9 +155,7 @@ Module AtomicReader <: LayerImpl MailboxAPI MailServerDirAPI.
     eapply Forall_in'; intros.
 
     eapply mailbox_fn_monotonic; eauto.
-
-    admit.
-  Admitted.
+  Qed.
 
   Theorem getrequest_atomic : forall `(rx : _ -> proc _ T),
     trace_incl MailboxAPI.step

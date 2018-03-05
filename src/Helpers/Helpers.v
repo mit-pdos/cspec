@@ -37,6 +37,14 @@ Instance bool_equal_dec : EqualDec bool := bool_dec.
 Instance string_equal_dec : EqualDec string := string_dec.
 Instance list_equal_dec A `{dec:EqualDec A} : EqualDec (list A) := list_eq_dec dec.
 
+Instance pair_equal_dec A B `{ea:EqualDec A} `{eb:EqualDec B} : EqualDec (A*B).
+  intro; intros.
+  destruct x; destruct y.
+  destruct (a == a0); subst.
+  destruct (b == b0); subst.
+  all: intuition congruence.
+Defined.
+
 (** * [maybe_holds] predicate.
 
     One pattern that shows up in our lab assignments is that we

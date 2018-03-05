@@ -1001,6 +1001,14 @@ Module FMap.
     Definition is_permutation_val (l : list V) (m : t) : Prop :=
       forall x, List.In x l <-> (exists k, MapsTo k x m).
 
+    Theorem is_permutation_in :
+      forall k kl m,
+        is_permutation_key kl m ->
+        List.In k kl ->
+        In k m.
+    Proof.
+    Admitted.
+
   End Maps.
 
   Arguments t A V {Acmp}.
