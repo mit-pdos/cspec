@@ -871,7 +871,11 @@ Module FMap.
         a1 = a2 /\ v1 = v2 \/
         a1 <> a2 /\ MapsTo a1 v1 m.
     Proof.
-    Admitted.
+      intros.
+      destruct (cmp_dec a1 a2); subst.
+      - eapply mapsto_add_eq in H; eauto.
+      - eapply mapsto_add_ne in H; eauto.
+    Qed.
 
     Lemma mapsto_ext_sym : forall T (m1 m2: T -> t),
         (forall t, forall a v, MapsTo a v (m1 t) -> MapsTo a v (m2 t)) ->
@@ -968,6 +972,7 @@ Module FMap.
       forall a1 v1 m,
         ~ In a1 m ->
         remove a1 (add a1 v1 m) = m.
+    Proof.
       intros.
       apply mapsto_extensionality; intuition idtac.
       - fwd.
@@ -1036,9 +1041,24 @@ Module FMap.
       unfold is_permutation_key.
       unfold is_permutation_val.
       split; intros.
-      - admit.
-      - admit.
-    Admitted.
+      - eapply in_split in H1.
+        destruct H1. destruct H1. subst.
+        eapply Forall2_app_inv_r in H0.
+        destruct H0. destruct H0. intuition subst.
+        inversion H0; clear H0; subst.
+        eauto.
+      - destruct H1.
+        eapply mapsto_in in H1 as H1'.
+        eapply H in H1'; clear H.
+        eapply in_split in H1'.
+        destruct H1'. destruct H. subst.
+        eapply Forall2_app_inv_l in H0.
+        destruct H0. destruct H. intuition subst.
+        inversion H; clear H; subst.
+        eapply mapsto_unique in H1; eauto; subst.
+        eapply in_or_app; right.
+        constructor; eauto.
+    Qed.
 
   End Maps.
 

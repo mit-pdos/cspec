@@ -28,24 +28,6 @@ Module MailFSStringAbsImpl <: LayerImpl MailFSStringAbsAPI MailFSAPI.
 
   Hint Extern 1 (MailFSAPI.step _ _ _ _ _ _) => econstructor.
 
-  Lemma dirR_fmap_in :
-    forall d1 d2 tid fn,
-      dirR d1 d2 ->
-      FMap.In (encode_tid_fn tid fn) d1 ->
-      FMap.In (tid, fn) d2.
-  Proof.
-    unfold dirR; intros.
-    admit.
-  Admitted.
-
-  Lemma dirR_fmap_in' :
-    forall d1 d2 tid fn,
-      dirR d1 d2 ->
-      FMap.In (tid, fn) d2 ->
-      FMap.In (encode_tid_fn tid fn) d1.
-  Proof.
-  Admitted.
-
   Lemma dirR_mapsto :
     forall d1 d2 tid fn data,
       dirR d1 d2 ->
@@ -53,6 +35,38 @@ Module MailFSStringAbsImpl <: LayerImpl MailFSStringAbsAPI MailFSAPI.
       FMap.MapsTo (tid, fn) data d2.
   Proof.
   Admitted.
+
+  Lemma dirR_mapsto' :
+    forall d1 d2 tid fn data,
+      dirR d1 d2 ->
+      FMap.MapsTo (tid, fn) data d2 ->
+      FMap.MapsTo (encode_tid_fn tid fn) data d1.
+  Proof.
+  Admitted.
+
+  Lemma dirR_fmap_in :
+    forall d1 d2 tid fn,
+      dirR d1 d2 ->
+      FMap.In (encode_tid_fn tid fn) d1 ->
+      FMap.In (tid, fn) d2.
+  Proof.
+    intros.
+    eapply FMap.in_mapsto_exists in H0; destruct H0.
+    eapply FMap.mapsto_in.
+    eapply dirR_mapsto; eauto.
+  Qed.
+
+  Lemma dirR_fmap_in' :
+    forall d1 d2 tid fn,
+      dirR d1 d2 ->
+      FMap.In (tid, fn) d2 ->
+      FMap.In (encode_tid_fn tid fn) d1.
+  Proof.
+    intros.
+    eapply FMap.in_mapsto_exists in H0; destruct H0.
+    eapply FMap.mapsto_in.
+    eapply dirR_mapsto'; eauto.
+  Qed.
 
   Lemma dirR_add :
     forall d1 d2 tid fn data,

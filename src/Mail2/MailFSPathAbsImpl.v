@@ -43,7 +43,21 @@ Module MailFSPathAbsImpl <: LayerImpl MailFSPathAbsAPI MailFSStringAPI.
       absR (FMap.add ("tmp"%string, fn) data fs)
            (MailFSStringAbsAPI.mk_state (FMap.add fn data tmp) mail).
   Proof.
-  Admitted.
+    unfold absR; simpl; split; intros.
+    - eapply FMap.mapsto_add_or in H0; intuition subst.
+      + inversion H0; clear H0; subst.
+        eauto.
+      + eapply H in H2; clear H.
+        intuition eauto; subst.
+        destruct (filename == fn); try congruence.
+        intuition eauto.
+    - intuition eauto; subst.
+      + eapply FMap.mapsto_add_or in H2; intuition subst; eauto.
+        eapply FMap.mapsto_add_ne'; try congruence.
+        eapply H; eauto.
+      + eapply FMap.mapsto_add_ne'; try congruence.
+        eapply H; eauto.
+  Qed.
 
   Lemma absR_remove_tmp :
     forall fs tmp mail fn,
@@ -59,35 +73,65 @@ Module MailFSPathAbsImpl <: LayerImpl MailFSPathAbsAPI MailFSStringAPI.
       absR (FMap.add ("mail"%string, fn) data fs)
            (MailFSStringAbsAPI.mk_state tmp (FMap.add fn data mail)).
   Proof.
-  Admitted.
+    unfold absR; simpl; split; intros.
+    - eapply FMap.mapsto_add_or in H0; intuition subst.
+      + inversion H0; clear H0; subst.
+        eauto.
+      + eapply H in H2; clear H.
+        intuition eauto; subst.
+        destruct (filename == fn); try congruence.
+        intuition eauto.
+    - intuition eauto; subst.
+      + eapply FMap.mapsto_add_ne'; try congruence.
+        eapply H; eauto.
+      + eapply FMap.mapsto_add_or in H2; intuition subst; eauto.
+        eapply FMap.mapsto_add_ne'; try congruence.
+        eapply H; eauto.
+  Qed.
 
   Lemma absR_in_tmp :
     forall fs tmp mail fn,
       absR fs (MailFSStringAbsAPI.mk_state tmp mail) ->
       FMap.In fn tmp ->
       FMap.In ("tmp"%string, fn) fs.
-  Admitted.
+  Proof.
+    unfold absR; intros.
+    eapply FMap.in_mapsto_exists in H0; destruct H0.
+    eapply FMap.mapsto_in.
+    eapply H; eauto.
+  Qed.
 
   Lemma absR_mapsto_tmp :
     forall fs tmp mail fn data,
       absR fs (MailFSStringAbsAPI.mk_state tmp mail) ->
       FMap.MapsTo ("tmp"%string, fn) data fs ->
       FMap.MapsTo fn data tmp.
-  Admitted.
+  Proof.
+    unfold absR; intros.
+    eapply H in H0; intuition congruence.
+  Qed.
 
   Lemma absR_in_mail :
     forall fs tmp mail fn,
       absR fs (MailFSStringAbsAPI.mk_state tmp mail) ->
       FMap.In fn mail ->
       FMap.In ("mail"%string, fn) fs.
-  Admitted.
+  Proof.
+    unfold absR; intros.
+    eapply FMap.in_mapsto_exists in H0; destruct H0.
+    eapply FMap.mapsto_in.
+    eapply H; eauto.
+  Qed.
 
   Lemma absR_mapsto_mail :
     forall fs tmp mail fn data,
       absR fs (MailFSStringAbsAPI.mk_state tmp mail) ->
       FMap.MapsTo ("mail"%string, fn) data fs ->
       FMap.MapsTo fn data mail.
-  Admitted.
+  Proof.
+    unfold absR; intros.
+    eapply H in H0; intuition congruence.
+  Qed.
 
   Lemma absR_is_permutation_key :
     forall fs tmp mail r,
