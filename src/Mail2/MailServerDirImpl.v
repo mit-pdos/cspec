@@ -11,13 +11,6 @@ Proof.
   intros.
 Admitted.
 
-Lemma is_permutation_map_set_list : forall s  (m : FMap.t (nat*nat) String.string) l,
-    FMap.is_permutation_val l m ->
-    FMap.is_permutation_val (FSet.elements s) m ->
-    FSet.is_permutation l s.
-Proof.
-Admitted.
-
 Module MailServerDir <: LayerImpl MailServerDirAPI MailServerAPI.
 
   Definition absR (s1 : MailServerDirAPI.State) (s2 : MailServerAPI.State) :=
@@ -33,6 +26,7 @@ Module MailServerDir <: LayerImpl MailServerDirAPI MailServerAPI.
     unfold compile_ts; eauto.
   Qed.
 
+
   Theorem absR_ok :
     op_abs absR MailServerDirAPI.step MailServerAPI.step.
   Proof.
@@ -43,7 +37,7 @@ Module MailServerDir <: LayerImpl MailServerDirAPI MailServerAPI.
       split; [ | constructor].
       apply is_permutation_map_set_add; eauto.
     - eexists; intuition eauto; constructor.
-      eapply is_permutation_map_set_list; eauto.
+      eapply FMap.permutation_val_is_permutation in H; eauto.
     - eexists; intuition eauto; constructor.
     - eexists; intuition eauto; constructor.
   Qed.

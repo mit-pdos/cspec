@@ -1060,6 +1060,31 @@ Module FMap.
         constructor; eauto.
     Qed.
 
+   Definition is_permutation (l1 : list V) (l2: list V) : Prop :=
+      forall x, List.In x l1 <-> List.In x l2.
+
+   Lemma permutation_val_is_permutation:  forall (l1: list V)  (l2: list V)  (m : t),
+      is_permutation_val l1 m ->
+      is_permutation_val l2 m ->
+      is_permutation l1 l2.
+   Proof.
+     intros.
+     unfold is_permutation_val in *.
+     unfold is_permutation in *.
+     intros; split; intros.
+     - specialize (H x).
+       destruct H; auto.
+       specialize (H H1).
+       specialize (H2 H).
+       specialize (H0 x).
+       destruct H0; auto.
+     - specialize (H0 x).
+       destruct H0; auto.
+       specialize (H0 H1).
+       specialize (H x).
+       destruct H; auto.
+   Qed.
+
   End Maps.
 
   Arguments t A V {Acmp}.
