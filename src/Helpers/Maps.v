@@ -1089,7 +1089,9 @@ Module FMap.
        is_permutation l2 l1 ->
        is_permutation_val l2 m ->
        is_permutation_val l1 m.
-   Admitted.
+   Proof.
+     firstorder.
+   Qed.
 
    Lemma is_permutation_val_add: forall k v (l:list V) (m:t),
        ~ In k m ->
