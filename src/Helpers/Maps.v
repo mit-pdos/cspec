@@ -1060,7 +1060,7 @@ Module FMap.
         constructor; eauto.
     Qed.
 
-   Definition is_permutation (l1 : list V) (l2: list V) : Prop :=
+   Definition is_permutation (T:Type) (l1 : list T) (l2: list T) : Prop :=
       forall x, List.In x l1 <-> List.In x l2.
 
    Lemma permutation_val_is_permutation:  forall (l1: list V)  (l2: list V)  (m : t),
@@ -1085,6 +1085,131 @@ Module FMap.
        destruct H; auto.
    Qed.
 
+   Lemma permutation_is_permutation_val : forall (l1: list V)  (l2: list V)  (m : t),
+       is_permutation l2 l1 ->
+       is_permutation_val l2 m ->
+       is_permutation_val l1 m.
+   Admitted.
+
+   Lemma is_permutation_val_add: forall k v (l:list V) (m:t),
+       ~ In k m ->
+       is_permutation_val l m ->
+       is_permutation_val (v::l) (add k v m).
+   Proof.
+     intros.
+     unfold is_permutation_val.
+     intros; split; intro.
+     - apply in_inv in H1. intuition; subst.
+       + eexists k.
+         apply add_mapsto.
+       + unfold is_permutation_val in *.
+         specialize (H0 x).
+         destruct H0.
+         specialize (H0 H2).
+         destruct H0.
+         exists x0.
+         eapply mapsto_add_ne'; eauto.
+         intro; subst.
+         apply mapsto_in in H0; congruence.
+     - destruct H1.
+       replace (v::l) with ([v]++l) by auto.
+       destruct (cmp_dec x0 k); subst.
+       + apply mapsto_add_eq in H1; subst.
+         apply in_eq; auto.
+         auto.
+       + apply mapsto_add_ne in H1; subst; auto.
+         apply in_or_app; auto.
+         right.
+            unfold is_permutation_val in *.
+            specialize (H0 x).
+            destruct H0.
+            apply H2.
+            exists x0; auto.
+   Qed.
+
+   Lemma in_keys: forall k (m:t),
+       In k m ->
+       List.In k (keys m).
+   Proof.
+     intros.
+     unfold keys.
+     apply in_mapsto_exists in H.
+     destruct H.
+     unfold MapsTo in *.
+     replace k with (fst (k, x)) by auto.
+     eapply in_map; auto.
+   Qed.
+
+   Lemma keys_in: forall k (m:t),
+       List.In k (keys m) ->
+       In k m.
+   Proof.
+     intros.
+     unfold keys in *.
+     eapply in_map_iff in H.
+     destruct H.
+     intuition.
+     destruct x.
+     eapply in_elements_mapsto in H1; simpl in *; subst.
+     apply mapsto_in in H1; auto.
+   Qed.
+
+   Lemma in_keys_add_eq: forall k v (m:t),
+       List.In k (keys (add k v m)).
+   Proof.
+     intros.
+     assert (In k (add k v m)).
+     apply add_in.
+     apply in_keys; auto.
+   Qed.
+
+   Lemma in_keys_add: forall k1 k2 v (m:t),
+       List.In k1 (keys m) ->
+       List.In k1 (keys (add k2 v m)).
+   Proof.
+     intros.
+     assert (In k1 m).
+     apply keys_in; auto.
+     eapply in_add with (a2 := k2) (v := v) in H0.
+     apply in_keys in H0; auto.
+   Qed.
+
+   Lemma in_add_or: forall k1 k2 v (m:t),
+       List.In k1 (keys (add k2 v m)) ->
+       k1 = k2 \/ List.In k1 (keys m).
+   Proof.
+     intros.
+     unfold keys in *.
+     destruct (cmp_dec k1 k2); auto.
+     right.
+     eapply in_map_iff in H.
+     destruct H.
+     destruct x.
+     intuition.
+     eapply in_map_iff.
+     exists (a, v0).
+     split; auto.
+     apply in_elements_mapsto in H1.
+     apply mapsto_add_ne in H1; auto.
+     intro. subst. simpl in *. congruence.
+   Qed.
+
+   Lemma is_permutation_cons_add_key: forall (k:A) (v:V) (m:t),
+       is_permutation (k :: (keys m)) (keys (add k v m)).
+   Proof.
+     intros.
+     unfold is_permutation.
+     intro. split; intro.
+     - destruct (cmp_dec x k); subst.
+       apply in_keys_add_eq.
+       apply in_keys_add.
+       apply in_inv in H; auto.
+       intuition; auto.
+     - apply in_add_or in H.
+       intuition; subst.
+       apply in_eq.
+  Qed.
+   
   End Maps.
 
   Arguments t A V {Acmp}.

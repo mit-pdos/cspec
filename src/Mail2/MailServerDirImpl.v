@@ -2,6 +2,7 @@ Require Import POCS.
 Require Import MailServerAPI.
 Require Import MailServerDirAPI.
 
+Import List.ListNotations.
 
 Lemma is_permutation_map_set_add: forall s m (fn: (nat*nat)) d,
     ~ FMap.In fn m ->
@@ -9,7 +10,12 @@ Lemma is_permutation_map_set_add: forall s m (fn: (nat*nat)) d,
     FMap.is_permutation_val (FSet.elements (FSet.add d s)) (FMap.add fn d m).
 Proof.
   intros.
-Admitted.
+  unfold FSet.elements, FSet.add in *.
+  assert (FMap.is_permutation (d:: (FMap.keys s)) (FMap.keys (FMap.add d tt s))).
+  apply FMap.is_permutation_cons_add_key.
+  apply FMap.permutation_is_permutation_val with (l2 := (d :: (FMap.keys s))); auto.
+  apply FMap.is_permutation_val_add; auto.
+Qed.
 
 Module MailServerDir <: LayerImpl MailServerDirAPI MailServerAPI.
 
@@ -25,7 +31,6 @@ Module MailServerDir <: LayerImpl MailServerDirAPI MailServerAPI.
   Proof.
     unfold compile_ts; eauto.
   Qed.
-
 
   Theorem absR_ok :
     op_abs absR MailServerDirAPI.step MailServerAPI.step.

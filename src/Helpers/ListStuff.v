@@ -88,7 +88,4 @@ Proof.
   rewrite IHl; auto.
 Qed.
 
-Definition is_permutation `(l1 : list T) `(l2: list T) : Prop :=
-  forall x, List.In x l1 <-> In x l2.
-
  
