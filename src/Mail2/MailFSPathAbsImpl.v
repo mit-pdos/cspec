@@ -65,8 +65,29 @@ Module MailFSPathAbsImpl <: LayerImpl MailFSPathAbsAPI MailFSStringAPI.
       absR (FMap.remove ("tmp"%string, fn) fs)
            (MailFSStringAbsAPI.mk_state (FMap.remove fn tmp) mail).
   Proof.
-  Admitted.
-
+    unfold absR; simpl; split; intros.
+    - eapply FMap.mapsto_remove in H0; intuition subst.
+      eapply H in H2; clear H.
+      intuition subst.
+      destruct (filename == fn); try congruence.
+      left; split; try reflexivity.
+      eapply FMap.remove_mapsto with (x := fn) in H2; auto.
+    - intuition eauto; subst.
+      + destruct (filename == fn); try congruence; subst.
+        eapply FMap.mapsto_remove in H2; intuition subst.
+        eapply FMap.mapsto_remove in H2; intuition subst.
+        specialize (H "tmp"%string filename contents); simpl in *.
+        intuition idtac.
+        -- eapply FMap.remove_mapsto; eauto.
+           intro. inversion H4. apply H0; auto.
+        -- inversion H.
+      + specialize (H "mail"%string filename contents); simpl in *.
+        intuition idtac.
+        -- inversion H3.
+        -- eapply FMap.remove_mapsto; eauto.
+           intro. inversion H0.
+  Qed.
+      
   Lemma absR_add_mail :
     forall fs tmp mail fn data,
       absR fs (MailFSStringAbsAPI.mk_state tmp mail) ->
