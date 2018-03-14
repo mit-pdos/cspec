@@ -83,7 +83,9 @@ Module MailFSStringAbsImpl <: LayerImpl MailFSStringAbsAPI MailFSAPI.
       dirR (FMap.add (encode_tid_fn tid fn) data d1)
            (FMap.add (tid, fn) data d2).
   Proof.
-  Admitted.
+    unfold dirR; intros; subst.
+    rewrite FMap.map_keys_add; eauto.
+  Qed.
 
   Lemma dirR_remove :
     forall d1 d2 tid fn,
@@ -91,7 +93,9 @@ Module MailFSStringAbsImpl <: LayerImpl MailFSStringAbsAPI MailFSAPI.
       dirR (FMap.remove (encode_tid_fn tid fn) d1)
            (FMap.remove (tid, fn) d2).
   Proof.
-  Admitted.
+    unfold dirR; intros; subst.
+    rewrite FMap.map_keys_remove; eauto.
+  Qed.
 
   Lemma dirR_is_permutation_key :
     forall d1 d2 l,
@@ -99,7 +103,20 @@ Module MailFSStringAbsImpl <: LayerImpl MailFSStringAbsAPI MailFSAPI.
       FMap.is_permutation_key l d1 ->
       FMap.is_permutation_key (map decode_tid_fn l) d2.
   Proof.
-  Admitted.
+    unfold dirR, FMap.is_permutation_key.
+    split; subst; intros.
+    - eapply in_map_iff in H; deex.
+      eapply H0 in H1.
+      eapply FMap.map_keys_in' in H1; deex.
+      destruct k'.
+      rewrite encode_decode_tid_fn; eauto.
+    - destruct x.
+      eapply FMap.map_keys_in in H.
+      eapply H0 in H.
+      eapply in_map_iff.
+      eexists; split; eauto.
+      rewrite encode_decode_tid_fn; eauto.
+  Qed.
 
   Hint Resolve dirR_fmap_in.
   Hint Resolve dirR_fmap_in'.

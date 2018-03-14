@@ -1350,6 +1350,22 @@ Module FMap.
         intuition eauto.
     Qed.
 
+    Theorem map_keys_add : forall k v m,
+      injective ->
+      map_keys (add k v m) = add (f k) v (map_keys m).
+    Proof.
+      destruct m; intros.
+      unfold map_keys.
+      eapply elements_eq.
+      unfold add; simpl.
+    Admitted.
+
+    Theorem map_keys_remove : forall k m,
+      injective ->
+      map_keys (remove k m) = remove (f k) (map_keys m).
+    Proof.
+    Admitted.
+
   End MapKeys.
 
 End FMap.
