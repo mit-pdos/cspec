@@ -22,6 +22,18 @@ Module MailFSPathAbsAPI <: Layer.
   Definition drop_dirname (fs : State) :=
     FMap.map_keys (fun '(dn, fn) => fn) fs.
 
+  Lemma drop_dirname_filter_dir: forall s dirname k,
+      FMap.In k (drop_dirname (filter_dir dirname s)) ->
+      FMap.In (dirname, k) s.
+  Admitted.
+
+  Lemma filter_dir_drop_dirname: forall s dirname k,
+      FMap.In (dirname, k) s ->
+      FMap.In k (drop_dirname (filter_dir dirname s)).
+  Proof.
+    intros.
+  Admitted.
+
   Inductive xstep : forall T, opT T -> nat -> State -> T -> State -> list event -> Prop :=
   | StepCreateWriteTmp : forall fs tid tmpfn data,
     ~ FMap.In ("tmp"%string, tmpfn) fs ->

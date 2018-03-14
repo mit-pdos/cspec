@@ -155,13 +155,38 @@ Module MailFSPathAbsImpl <: LayerImpl MailFSPathAbsAPI MailFSStringAPI.
   Qed.
 
   Lemma absR_is_permutation_key :
-    forall fs tmp mail r,
+    forall r fs tmp mail,
       absR fs (MailFSStringAbsAPI.mk_state tmp mail) ->
       FMap.is_permutation_key r
         (MailFSPathAbsAPI.drop_dirname
            (MailFSPathAbsAPI.filter_dir "mail" fs)) ->
       FMap.is_permutation_key r mail.
-  Admitted.
+  Proof.
+    intros.
+    unfold FMap.is_permutation_key in *.
+    intros.
+    split; intros.
+    + apply H0 in H1.
+      eapply MailFSPathAbsAPI.drop_dirname_filter_dir in H1 as Hx.
+      unfold absR in *.
+      apply FMap.in_mapsto_get in Hx.
+      destruct Hx.
+      specialize (H "mail"%string x x0) as Hy.
+      apply Hy in m.
+      intuition; try congruence.
+      clear H5 H7.
+      simpl in H8.
+      apply FMap.mapsto_in in H8; auto.
+    + unfold absR in *.
+      apply FMap.in_mapsto_get in H1.
+      destruct H1.
+      specialize (H "mail"%string x x0) as Hy.
+      intuition; try congruence.
+      simpl in *.
+      apply FMap.mapsto_in in H3.
+      apply MailFSPathAbsAPI.filter_dir_drop_dirname in H3.
+      apply H0 in H3; auto.
+  Qed.
 
   Hint Resolve absR_add_tmp.
   Hint Resolve absR_remove_tmp.
