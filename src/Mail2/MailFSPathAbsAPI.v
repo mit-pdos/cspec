@@ -22,17 +22,58 @@ Module MailFSPathAbsAPI <: Layer.
   Definition drop_dirname (fs : State) :=
     FMap.map_keys (fun '(dn, fn) => fn) fs.
 
+  Lemma in_filter_dir_eq: forall dirname k s,
+      FMap.In (dirname, k) s ->
+      FMap.In (dirname, k) (filter_dir dirname s).
+  Proof.
+    intros.
+    unfold filter_dir.
+    apply FMap.filter_complete; auto.
+    destruct (dirname == dirname); simpl in *; try congruence.
+    destruct (string_dec dirname dirname); try congruence.
+  Qed.
+
+  Lemma filter_dir_in_eq: forall dirname k s,
+      FMap.In (dirname, k) (filter_dir dirname s) ->
+      FMap.In (dirname, k) s.
+  Proof.
+    intros.
+    unfold filter_dir in *.
+    eapply FMap.filter_in; eauto.
+  Qed.
+
+  Lemma in_drop_dirname_eq: forall dirname k s,
+      FMap.In (dirname, k) (filter_dir dirname s) ->
+      FMap.In k (drop_dirname (filter_dir dirname s)).
+  Proof.
+    intros.
+    unfold drop_dirname.
+  Admitted.
+
+  Lemma drop_dirname_in_eq: forall dirname k s,
+      FMap.In k (drop_dirname (filter_dir dirname s)) ->
+      FMap.In (dirname, k) (filter_dir dirname s).
+  Proof.
+    intros.
+  Admitted.
+
   Lemma drop_dirname_filter_dir: forall s dirname k,
       FMap.In k (drop_dirname (filter_dir dirname s)) ->
       FMap.In (dirname, k) s.
-  Admitted.
-
+  Proof.
+    intros.
+    apply filter_dir_in_eq.
+    apply drop_dirname_in_eq; auto.
+  Qed.
+  
   Lemma filter_dir_drop_dirname: forall s dirname k,
       FMap.In (dirname, k) s ->
       FMap.In k (drop_dirname (filter_dir dirname s)).
   Proof.
     intros.
-  Admitted.
+    apply in_drop_dirname_eq.
+    apply in_filter_dir_eq; auto.
+  Qed.
 
   Inductive xstep : forall T, opT T -> nat -> State -> T -> State -> list event -> Prop :=
   | StepCreateWriteTmp : forall fs tid tmpfn data,
