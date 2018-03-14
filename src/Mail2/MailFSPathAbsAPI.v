@@ -47,15 +47,21 @@ Module MailFSPathAbsAPI <: Layer.
       FMap.In k (drop_dirname (filter_dir dirname s)).
   Proof.
     intros.
-    unfold drop_dirname.
-  Admitted.
+    eapply FMap.map_keys_in in H.
+    exact H.
+  Qed.
 
   Lemma drop_dirname_in_eq: forall dirname k s,
       FMap.In k (drop_dirname (filter_dir dirname s)) ->
       FMap.In (dirname, k) (filter_dir dirname s).
   Proof.
+    unfold drop_dirname, filter_dir.
     intros.
-  Admitted.
+    eapply FMap.map_keys_in' in H; deex.
+    destruct k'.
+    eapply FMap.filter_holds in H as H'.
+    destruct (string_dec s0 dirname); congruence.
+  Qed.
 
   Lemma drop_dirname_filter_dir: forall s dirname k,
       FMap.In k (drop_dirname (filter_dir dirname s)) ->
@@ -65,7 +71,7 @@ Module MailFSPathAbsAPI <: Layer.
     apply filter_dir_in_eq.
     apply drop_dirname_in_eq; auto.
   Qed.
-  
+
   Lemma filter_dir_drop_dirname: forall s dirname k,
       FMap.In (dirname, k) s ->
       FMap.In k (drop_dirname (filter_dir dirname s)).

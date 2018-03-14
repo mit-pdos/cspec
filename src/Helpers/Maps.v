@@ -812,6 +812,17 @@ Module FMap.
       congruence.
     Qed.
 
+    Theorem filter_holds : forall P s x,
+        In x (filter P s) ->
+        P x = true.
+    Proof.
+      unfold_map.
+      induction l; simp.
+      destruct_with_eqn (P x0);
+        intuition simp.
+      intuition congruence.
+    Qed.
+
     (* whole-map equational specifications *)
 
     (* intuition is creating extra typeclass obligations that aren't true *)
@@ -1231,11 +1242,44 @@ Module FMap.
       match l with
       | nil => m
       | (a1, v) :: l' =>
-        insert_f l' (add (f a1) v m)
+        add (f a1) v (insert_f l' m)
       end.
 
     Definition map_keys (m1 : t A1 V) : t A2 V :=
       insert_f (elements m1) empty.
+
+    Theorem map_keys_in : forall k m,
+      In k m ->
+      In (f k) (map_keys m).
+    Proof.
+      destruct m.
+      unfold map_keys; simpl.
+      unfold In at 1; unfold keys; simpl.
+      clear.
+      induction elements0; simpl; intros; eauto.
+      intuition; subst.
+      - destruct a; simpl.
+        eapply add_in.
+      - eapply in_add; eauto.
+    Qed.
+
+    Theorem map_keys_in' : forall k m,
+      In k (map_keys m) ->
+        exists k',
+          In k' m /\
+          k = f k'.
+    Proof.
+      destruct m.
+      unfold map_keys; simpl.
+      unfold In at 2; unfold keys; simpl.
+      clear.
+      induction elements0; simpl; intros; eauto.
+      - inversion H.
+      - destruct a.
+        eapply add_in' in H.
+        intuition; subst; eauto.
+        destruct H; intuition eauto.
+    Qed.
 
   End MapKeys.
 
