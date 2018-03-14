@@ -9,6 +9,7 @@ import GHC.Prim
 import System.Posix.Files
 import System.Directory
 import System.Random
+import System.IO
 
 -- Extracted code
 import ConcurProc
@@ -102,5 +103,7 @@ run_proc _ (Op (MailFSPathAPI__List dir)) = do
 
 run_proc _ (Op (MailFSPathAPI__Read (dir, fn))) = do
   debugmsg $ "Read " ++ dir ++ "/" ++ fn
-  contents <- readFile (filePath dir fn)
+  h <- openFile (filePath dir fn) ReadMode
+  contents <- hGetContents h
+  hClose h
   return $ unsafeCoerce contents
