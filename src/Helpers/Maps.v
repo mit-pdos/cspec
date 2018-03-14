@@ -1330,7 +1330,6 @@ Module FMap.
           eapply sorted_distinct; eauto.
     Qed.
 
-(*
     Theorem map_keys_mapsto' : forall k v m,
       MapsTo k v (map_keys m) ->
         exists k',
@@ -1339,16 +1338,17 @@ Module FMap.
     Proof.
       destruct m.
       unfold map_keys; simpl.
-      unfold In at 2; unfold keys; simpl.
-      clear.
+      unfold MapsTo at 2; simpl.
+      subst keys0.
       induction elements0; simpl; intros; eauto.
       - inversion H.
       - destruct a.
-        eapply add_in' in H.
+        eapply mapsto_add_or in H.
         intuition; subst; eauto.
-        destruct H; intuition eauto.
+        edestruct IHelements0; eauto.
+        inversion elem_sorted0; eauto.
+        intuition eauto.
     Qed.
-*)
 
   End MapKeys.
 

@@ -10,6 +10,28 @@ Parameter decode_tid_fn : string -> (nat * nat).
 Axiom encode_decode_tid_fn : forall tid fn,
   decode_tid_fn (encode_tid_fn tid fn) = (tid, fn).
 
+Theorem encode_tid_eq : forall t1 t2 n1 n2,
+  encode_tid_fn t1 n1 = encode_tid_fn t2 n2 ->
+  (t1, n1) = (t2, n2).
+Proof.
+  intros.
+  rewrite <- encode_decode_tid_fn at 1.
+  rewrite H.
+  rewrite encode_decode_tid_fn.
+  eauto.
+Qed.
+
+Theorem encode_tid_fn_injective :
+  FMap.injective (fun '(tid, fn) => encode_tid_fn tid fn).
+Proof.
+  unfold FMap.injective; intros.
+  destruct k1; destruct k2.
+  contradict H.
+  eapply encode_tid_eq; eauto.
+Qed.
+
+Hint Resolve encode_tid_fn_injective.
+
 
 Module MailFSStringAbsAPI <: Layer.
 

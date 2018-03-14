@@ -34,7 +34,12 @@ Module MailFSStringAbsImpl <: LayerImpl MailFSStringAbsAPI MailFSAPI.
       FMap.MapsTo (encode_tid_fn tid fn) data d1 ->
       FMap.MapsTo (tid, fn) data d2.
   Proof.
-  Admitted.
+    unfold dirR; intros; subst.
+    eapply FMap.map_keys_mapsto' in H0; deex.
+    destruct k'.
+    apply encode_tid_eq in H0; inversion H0; clear H0; subst.
+    eauto.
+  Qed.
 
   Lemma dirR_mapsto' :
     forall d1 d2 tid fn data,
@@ -42,7 +47,11 @@ Module MailFSStringAbsImpl <: LayerImpl MailFSStringAbsAPI MailFSAPI.
       FMap.MapsTo (tid, fn) data d2 ->
       FMap.MapsTo (encode_tid_fn tid fn) data d1.
   Proof.
-  Admitted.
+    unfold dirR; intros; subst.
+    eapply FMap.map_keys_mapsto in H0.
+    exact H0.
+    eauto.
+  Qed.
 
   Lemma dirR_fmap_in :
     forall d1 d2 tid fn,
