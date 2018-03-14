@@ -103,7 +103,5 @@ run_proc _ (Op (MailFSPathAPI__List dir)) = do
 
 run_proc _ (Op (MailFSPathAPI__Read (dir, fn))) = do
   debugmsg $ "Read " ++ dir ++ "/" ++ fn
-  h <- openFile (filePath dir fn) ReadMode
-  contents <- hGetContents h
-  hClose h
+  contents <- withFile (filePath dir fn) ReadMode hGetContents
   return $ unsafeCoerce contents
