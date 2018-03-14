@@ -1377,7 +1377,47 @@ Module FMap.
       injective ->
       map_keys (remove k m) = remove (f k) (map_keys m).
     Proof.
-    Admitted.
+      destruct m; intros.
+      unfold map_keys. simpl.
+      subst keys0.
+      induction elements0; simpl; intros; eauto.
+      + eapply elements_eq; simpl. eauto.
+      + destruct a.
+        inversion elem_sorted0; clear elem_sorted0; subst.
+        intuition idtac.
+        destruct (cmp k a) eqn:He; simpl.
+        - apply cmp_eq in He; subst.
+          rewrite remove_add.
+          reflexivity.
+
+          clear H3. clear H0.
+          induction elements0; simpl; eauto.
+          inversion H2; clear H2; intuition subst.
+          eapply H5; clear H5.
+          destruct a0; simpl in *.
+          eapply cmp_lt_neq2 in H3.
+          eapply in_add_ne in H2; eauto.
+
+        - eapply cmp_lt_neq2 in He as He'.
+          assert (f k <> f a) by firstorder.
+          rewrite <- add_remove_ne; eauto.
+          rewrite <- H0; clear H0.
+          f_equal. f_equal.
+
+          clear H3. clear H1. clear He'. clear H. clear f.
+          induction elements0; simpl; eauto.
+          inversion H2; clear H2; subst; intuition idtac.
+          destruct a0.
+          unfold cmp_lt in H1; simpl in *.
+          eapply cmp_trans in H1; eauto.
+          destruct (cmp k a0) eqn:He'; congruence.
+
+        - eapply cmp_lt_neq1 in He.
+          assert (f k <> f a) by firstorder.
+          rewrite <- add_remove_ne; eauto.
+          rewrite <- H0.
+          eauto.
+    Qed.
 
   End MapKeys.
 
