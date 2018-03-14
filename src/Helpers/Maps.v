@@ -242,6 +242,22 @@ Module FMap.
       destruct (in_mapsto_get a m); eauto.
     Qed.
 
+    Lemma sorted_distinct : forall a b l1 l2,
+      sorted cmp_lt (a :: l1 ++ b :: l2) ->
+      a <> b.
+    Proof.
+      intros.
+      inversion H; clear H; subst.
+      clear H3.
+      eapply Forall_forall with (x := b) in H2.
+      - intro.
+        unfold cmp_lt in *.
+        destruct (cmp_eq a b).
+        intuition.
+        congruence.
+      - eapply in_or_app. right. constructor. eauto.
+    Qed.
+
     Definition For_all (P:A*V -> Prop) (s:t) :=
       Forall P (elements s).
 
@@ -1280,6 +1296,59 @@ Module FMap.
         intuition; subst; eauto.
         destruct H; intuition eauto.
     Qed.
+
+    Definition injective :=
+      forall k1 k2,
+        k1 <> k2 ->
+        f k1 <> f k2.
+
+    Theorem map_keys_mapsto : forall k v m,
+      injective ->
+      MapsTo k v m ->
+      MapsTo (f k) v (map_keys m).
+    Proof.
+      destruct m.
+      intro.
+      unfold map_keys; simpl.
+      unfold MapsTo at 1; simpl.
+      subst keys0.
+      induction elements0; simpl; intros; eauto.
+      intuition; subst.
+      - eapply add_mapsto.
+      - destruct a.
+        eapply mapsto_add_ne'.
+        + eapply IHelements0; eauto.
+          inversion elem_sorted0; eauto.
+        + clear IHelements0.
+          eapply H; clear H.
+          eapply in_split in H1.
+          destruct H1. destruct H. subst.
+          simpl in *.
+          rewrite map_app in *.
+          simpl in *.
+          assert (a <> k); eauto.
+          eapply sorted_distinct; eauto.
+    Qed.
+
+(*
+    Theorem map_keys_mapsto' : forall k v m,
+      MapsTo k v (map_keys m) ->
+        exists k',
+          MapsTo k' v m /\
+          k = f k'.
+    Proof.
+      destruct m.
+      unfold map_keys; simpl.
+      unfold In at 2; unfold keys; simpl.
+      clear.
+      induction elements0; simpl; intros; eauto.
+      - inversion H.
+      - destruct a.
+        eapply add_in' in H.
+        intuition; subst; eauto.
+        destruct H; intuition eauto.
+    Qed.
+*)
 
   End MapKeys.
 
