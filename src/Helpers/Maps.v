@@ -1355,10 +1355,23 @@ Module FMap.
       map_keys (add k v m) = add (f k) v (map_keys m).
     Proof.
       destruct m; intros.
-      unfold map_keys.
-      eapply elements_eq.
-      unfold add; simpl.
-    Admitted.
+      unfold map_keys. simpl.
+      subst keys0.
+      induction elements0; simpl; intros; eauto.
+      destruct a.
+      inversion elem_sorted0; clear elem_sorted0; subst.
+      intuition idtac.
+      destruct (cmp k a) eqn:He.
+      - apply cmp_eq in He; subst.
+        rewrite add_add.
+        reflexivity.
+      - reflexivity.
+      - simpl.
+        rewrite add_add_ne. f_equal.
+        eauto.
+        eapply cmp_lt_neq1 in He.
+        eapply H; eauto.
+    Qed.
 
     Theorem map_keys_remove : forall k m,
       injective ->
