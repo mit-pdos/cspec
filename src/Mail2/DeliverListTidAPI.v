@@ -135,10 +135,8 @@ End DeliverListTidRestrictedAPI.
 
 Module LinkMailRule <: ProcRule DeliverListTidAPI.
 
-  Definition loopInv (s : DeliverListTidAPI.State) (tid : nat) := True.
-
   Definition follows_protocol (ts : @threads_state DeliverListTidAPI.opT) :=
     forall s,
-      follows_protocol_s DeliverListTidAPI.step DeliverListTidRestrictedAPI.step_allow loopInv ts s.
+      follows_protocol_s DeliverListTidAPI.step DeliverListTidRestrictedAPI.step_allow ts s.
 
 End LinkMailRule.

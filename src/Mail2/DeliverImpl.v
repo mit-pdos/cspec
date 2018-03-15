@@ -212,9 +212,8 @@ Module AtomicDeliverRestricted <: LayerImplFollowsRule DeliverRestrictedAPI Mail
     follows_protocol_proc
       DeliverAPI.step
       DeliverRestrictedAPI.step_allow
-      DeliverTmpExistenceRule.loopInv tid s (deliver_core data).
+      tid s (deliver_core data).
   Proof.
-    unfold DeliverTmpExistenceRule.loopInv.
     destruct s; simpl.
     intros.
 
@@ -265,9 +264,6 @@ Module AtomicDeliverRestricted <: LayerImplFollowsRule DeliverRestrictedAPI Mail
     end.
 
     destruct op; simpl; eauto.
-
-    unfold DeliverTmpExistenceRule.loopInv.
-    econstructor; eauto.
   Qed.
 
 End AtomicDeliverRestricted.

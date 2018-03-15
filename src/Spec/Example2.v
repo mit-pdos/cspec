@@ -194,11 +194,9 @@ End CounterAPI.
 
 Module LockingRule <: ProcRule LockAPI.
 
-  Definition loopInv (s : LockAPI.State) (tid : nat) := True.
-
   Definition follows_protocol (ts : @threads_state LockAPI.opT) :=
     forall s,
-      follows_protocol_s RawLockAPI.step LockAPI.step_allow loopInv ts s.
+      follows_protocol_s RawLockAPI.step LockAPI.step_allow ts s.
 
 End LockingRule.
 
@@ -415,7 +413,7 @@ Module LockingCounter <: LayerImplFollowsRule LockAPI LockedCounterAPI LockingRu
     end.
 
   Lemma inc_follows_protocol : forall tid s,
-    follows_protocol_proc RawLockAPI.step LockAPI.step_allow LockingRule.loopInv tid s inc_core.
+    follows_protocol_proc RawLockAPI.step LockAPI.step_allow tid s inc_core.
   Proof.
     intros.
     constructor; intros.
@@ -442,7 +440,7 @@ Module LockingCounter <: LayerImplFollowsRule LockAPI LockedCounterAPI LockingRu
   Qed.
 
   Lemma dec_follows_protocol : forall tid s,
-    follows_protocol_proc RawLockAPI.step LockAPI.step_allow LockingRule.loopInv tid s dec_core.
+    follows_protocol_proc RawLockAPI.step LockAPI.step_allow tid s dec_core.
   Proof.
     intros.
     constructor; intros.
@@ -503,9 +501,6 @@ Module LockingCounter <: LayerImplFollowsRule LockAPI LockedCounterAPI LockingRu
     end.
 
     destruct op; simpl; eauto.
-
-    unfold LockingRule.loopInv.
-    econstructor; eauto.
   Qed.
 
   Theorem absInitP :

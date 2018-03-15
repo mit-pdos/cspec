@@ -121,10 +121,8 @@ End DeliverRestrictedAPI.
 
 Module DeliverTmpExistenceRule <: ProcRule DeliverAPI.
 
-  Definition loopInv (s : DeliverAPI.State) (tid : nat) := True.
-
   Definition follows_protocol (ts : @threads_state DeliverAPI.opT) :=
     forall s,
-      follows_protocol_s DeliverAPI.step DeliverRestrictedAPI.step_allow loopInv ts s.
+      follows_protocol_s DeliverAPI.step DeliverRestrictedAPI.step_allow ts s.
 
 End DeliverTmpExistenceRule.

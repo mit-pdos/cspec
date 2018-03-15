@@ -189,7 +189,7 @@ Module DeliverListTidRestrictedImpl <: LayerImplFollowsRule DeliverListTidRestri
     follows_protocol_proc
       DeliverListTidAPI.step
       DeliverListTidRestrictedAPI.step_allow
-      LinkMailRule.loopInv tid s (linkmail_core).
+      tid s (linkmail_core).
   Proof.
     intros.
     constructor; intros.
@@ -244,9 +244,6 @@ Module DeliverListTidRestrictedImpl <: LayerImplFollowsRule DeliverListTidRestri
     end.
 
     destruct op; simpl; eauto.
-
-    unfold LinkMailRule.loopInv.
-    econstructor; eauto.
   Qed.
 
 End DeliverListTidRestrictedImpl.

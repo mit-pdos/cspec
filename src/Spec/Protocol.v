@@ -30,8 +30,6 @@ Section Protocol.
       op_allow op tid s /\
       lo_step op tid s r s' evs.
 
-  Variable loopInv : forall (s : State) (tid : nat), Prop.
-
   Inductive follows_protocol_proc (tid : nat) (s : State) :
     forall T (p : proc opT T), Prop :=
   | FollowsProtocolProcOp :
@@ -47,14 +45,8 @@ Section Protocol.
     follows_protocol_proc tid s (Bind p1 p2)
   | FollowsProtocolProcUntil :
     forall T (p : T -> proc _ T) c v,
-    loopInv s tid ->
     (forall s' v',
-      loopInv s' tid ->
       follows_protocol_proc tid s' (p v')) ->
-    (forall s' s'' r v',
-      loopInv s' tid ->
-      exec_any restricted_step tid s' (p v') r s'' ->
-      loopInv s'' tid) ->
     follows_protocol_proc tid s (Until c p v)
   | FollowsProtocolProcRet :
     forall T (v : T),
@@ -74,13 +66,6 @@ Section Protocol.
       op_allow op tid s ->
       restricted_step op' tid' s r s' evs ->
       op_allow op tid s'.
-
-  Variable loopInv_stable :
-    forall `(op' : opT T') tid tid' s s' r evs,
-      tid <> tid' ->
-      loopInv s tid ->
-      restricted_step op' tid' s r s' evs ->
-      loopInv s' tid.
 
   Theorem follows_protocol_preserves_exec_tid' :
     forall tid `(p : proc _ T) s s' result evs,
