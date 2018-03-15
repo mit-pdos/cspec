@@ -5,7 +5,7 @@ Require Import MailboxAPI.
 Require Import MailboxTmpAbsAPI.
 
 
-Module AtomicDeliver <: LayerImpl DeliverAPI MailboxTmpAbsAPI.
+Module AtomicDeliverRestricted <: LayerImplFollowsRule DeliverRestrictedAPI MailboxTmpAbsAPI DeliverTmpExistenceRule.
 
   Definition deliver_core (m : string) :=
     _ <- Op (DeliverAPI.CreateWriteTmp m);
@@ -44,39 +44,50 @@ Module AtomicDeliver <: LayerImpl DeliverAPI MailboxTmpAbsAPI.
       inversion H; clear H; subst; repeat sigT_eq
     | H : MailboxTmpAbsAPI.step _ _ _ _ _ _ |- _ =>
       inversion H; clear H; subst; repeat sigT_eq
+    | H : DeliverRestrictedAPI.step _ _ _ _ _ _ |- _ =>
+      inversion H; clear H; subst; repeat sigT_eq
     | H : DeliverAPI.step _ _ _ _ _ _ |- _ =>
+      inversion H; clear H; subst; repeat sigT_eq
+    | H : DeliverRestrictedAPI.step_allow _ _ _ |- _ =>
       inversion H; clear H; subst; repeat sigT_eq
     end; intuition idtac.
 
   Hint Extern 1 (MailboxAPI.step _ _ _ _ _ _) => econstructor.
   Hint Extern 1 (MailboxTmpAbsAPI.step _ _ _ _ _ _) => econstructor.
+  Hint Extern 1 (DeliverRestrictedAPI.step _ _ _ _ _ _) => econstructor.
+  Hint Extern 1 (DeliverRestrictedAPI.step_allow _ _ _) => econstructor.
   Hint Extern 1 (DeliverAPI.step _ _ _ _ _ _) => econstructor.
+
+  Lemma tid_neq : forall (tid1 tid2 : nat),
+    tid1 <> tid2 ->
+    (tid1, 0) <> (tid2, 0).
+  Proof.
+    congruence.
+  Qed.
+
+  Hint Resolve tid_neq.
+  Hint Resolve FMap.add_incr.
+  Hint Resolve FMap.in_add_ne.
+  Hint Resolve FMap.in_remove.
+  Hint Resolve FMap.in_remove_ne.
 
   Lemma createwritetmp_right_mover : forall data,
     right_mover
-      DeliverAPI.step
+      DeliverRestrictedAPI.step
       (DeliverAPI.CreateWriteTmp data).
   Proof.
     unfold right_mover; intros.
     repeat step_inv.
-    - eexists; split.
-      + econstructor.
-        contradict H12.
-        eapply FMap.in_add; eauto.
-      + rewrite FMap.add_add_ne by congruence.
-        econstructor.
-        contradict H2.
-        eapply FMap.in_add_ne; eauto.
-        congruence.
+    - eexists; split; eauto 10.
+      rewrite FMap.add_add_ne by congruence.
+      eauto 10.
     - eexists; split; eauto.
       rewrite <- FMap.add_remove_ne by congruence.
-      econstructor.
-      contradict H2.
-      eapply FMap.in_remove; eauto.
+      eauto 10.
     - eexists; split; eauto.
       econstructor; eauto.
+      econstructor; eauto.
       eapply FMap.mapsto_add_ne; eauto.
-      congruence.
     - eauto 20.
     - eauto 20.
     - eauto 20.
@@ -87,7 +98,7 @@ Module AtomicDeliver <: LayerImpl DeliverAPI MailboxTmpAbsAPI.
 
   Lemma unlinktmp_always_enabled :
     always_enabled
-      DeliverAPI.step
+      DeliverRestrictedAPI.step
       (DeliverAPI.UnlinkTmp).
   Proof.
     unfold always_enabled, enabled_in; intros.
@@ -98,29 +109,29 @@ Module AtomicDeliver <: LayerImpl DeliverAPI MailboxTmpAbsAPI.
 
   Lemma unlinktmp_left_mover :
     left_mover
-      DeliverAPI.step
+      DeliverRestrictedAPI.step
       (DeliverAPI.UnlinkTmp).
   Proof.
     split; eauto.
     intros; repeat step_inv; eauto; repeat deex.
     + eexists; split; eauto.
       rewrite <- FMap.add_remove_ne by congruence.
-      econstructor.
-      contradict H11.
-      eapply FMap.in_remove; eauto.
+      eauto 10.
     + eexists; split; eauto.
       rewrite FMap.remove_remove.
-      econstructor.
+      eauto.
     + eexists; split; eauto.
       econstructor; eauto.
+      econstructor; eauto.
       eapply FMap.mapsto_remove_ne; eauto.
-      congruence.
+    + eexists; split; eauto.
+    + eexists; split; eauto.
   Qed.
 
   Hint Resolve unlinktmp_left_mover.
 
   Theorem deliver_atomic : forall `(rx : _ -> proc _ T) m,
-    trace_incl DeliverAPI.step
+    trace_incl DeliverRestrictedAPI.step
       (Bind (compile_op (MailboxAPI.Deliver m)) rx)
       (Bind (atomize compile_op (MailboxAPI.Deliver m)) rx).
   Proof.
@@ -132,7 +143,7 @@ Module AtomicDeliver <: LayerImpl DeliverAPI MailboxTmpAbsAPI.
   Qed.
 
   Theorem list_atomic : forall `(rx : _ -> proc _ T),
-    trace_incl DeliverAPI.step
+    trace_incl DeliverRestrictedAPI.step
       (Bind (compile_op (MailboxAPI.List)) rx)
       (Bind (atomize compile_op (MailboxAPI.List)) rx).
   Proof.
@@ -144,7 +155,7 @@ Module AtomicDeliver <: LayerImpl DeliverAPI MailboxTmpAbsAPI.
   Qed.
 
   Theorem read_atomic : forall `(rx : _ -> proc _ T) fn,
-    trace_incl DeliverAPI.step
+    trace_incl DeliverRestrictedAPI.step
       (Bind (compile_op (MailboxAPI.Read fn)) rx)
       (Bind (atomize compile_op (MailboxAPI.Read fn)) rx).
   Proof.
@@ -156,7 +167,7 @@ Module AtomicDeliver <: LayerImpl DeliverAPI MailboxTmpAbsAPI.
   Qed.
 
   Theorem getrequest_atomic : forall `(rx : _ -> proc _ T),
-    trace_incl DeliverAPI.step
+    trace_incl DeliverRestrictedAPI.step
       (Bind (compile_op (MailboxAPI.GetRequest)) rx)
       (Bind (atomize compile_op (MailboxAPI.GetRequest)) rx).
   Proof.
@@ -168,7 +179,7 @@ Module AtomicDeliver <: LayerImpl DeliverAPI MailboxTmpAbsAPI.
   Qed.
 
   Theorem respond_atomic : forall `(rx : _ -> proc _ T) Tr (r : Tr),
-    trace_incl DeliverAPI.step
+    trace_incl DeliverRestrictedAPI.step
       (Bind (compile_op (MailboxAPI.Respond r)) rx)
       (Bind (atomize compile_op (MailboxAPI.Respond r)) rx).
   Proof.
@@ -180,7 +191,7 @@ Module AtomicDeliver <: LayerImpl DeliverAPI MailboxTmpAbsAPI.
   Qed.
 
   Theorem my_compile_correct :
-    compile_correct compile_op DeliverAPI.step MailboxTmpAbsAPI.step.
+    compile_correct compile_op DeliverRestrictedAPI.step MailboxTmpAbsAPI.step.
   Proof.
     unfold compile_correct; intros.
     destruct op.
@@ -188,9 +199,7 @@ Module AtomicDeliver <: LayerImpl DeliverAPI MailboxTmpAbsAPI.
     + repeat atomic_exec_inv.
       repeat step_inv; eauto.
       simpl.
-      rewrite FMap.remove_add by eauto.
-      eapply FMap.mapsto_add in H3; subst.
-      econstructor.
+      eapply FMap.mapsto_add in H7; subst.
       eauto.
     + repeat atomic_exec_inv.
       repeat step_inv; eauto.
@@ -203,7 +212,7 @@ Module AtomicDeliver <: LayerImpl DeliverAPI MailboxTmpAbsAPI.
   Qed.
 
   Theorem my_atomize_correct :
-    atomize_correct compile_op DeliverAPI.step.
+    atomize_correct compile_op DeliverRestrictedAPI.step.
   Proof.
     unfold atomize_correct; intros.
     destruct op.
@@ -230,13 +239,13 @@ Module AtomicDeliver <: LayerImpl DeliverAPI MailboxTmpAbsAPI.
   Theorem all_traces_match :
     forall ts1 ts2,
       proc_match (Compile.compile_ok compile_op) ts1 ts2 ->
-      traces_match_ts DeliverAPI.step MailboxTmpAbsAPI.step ts1 ts2.
+      traces_match_ts DeliverRestrictedAPI.step MailboxTmpAbsAPI.step ts1 ts2.
   Proof.
     intros.
     eapply Compile.compile_traces_match_ts; eauto.
   Qed.
 
-  Definition absR (s1 : DeliverAPI.State) (s2 : MailboxTmpAbsAPI.State) :=
+  Definition absR (s1 : DeliverRestrictedAPI.State) (s2 : MailboxTmpAbsAPI.State) :=
     s1 = s2.
 
   Definition compile_ts := Compile.compile_ts compile_op.
@@ -254,8 +263,8 @@ Module AtomicDeliver <: LayerImpl DeliverAPI MailboxTmpAbsAPI.
     forall ts2,
       no_atomics_ts ts2 ->
       traces_match_abs absR
-        DeliverAPI.initP
-        DeliverAPI.step
+        DeliverRestrictedAPI.initP
+        DeliverRestrictedAPI.step
         MailboxTmpAbsAPI.step (compile_ts ts2) ts2.
   Proof.
     unfold traces_match_abs; intros.
@@ -266,11 +275,221 @@ Module AtomicDeliver <: LayerImpl DeliverAPI MailboxTmpAbsAPI.
 
   Theorem absInitP :
     forall s1 s2,
-      DeliverAPI.initP s1 ->
+      DeliverRestrictedAPI.initP s1 ->
       absR s1 s2 ->
       MailboxTmpAbsAPI.initP s2.
   Proof.
     eauto.
   Qed.
 
-End AtomicDeliver.
+
+  Lemma list_follows_protocol : forall tid s,
+    follows_protocol_proc
+      DeliverAPI.step
+      DeliverRestrictedAPI.step_allow
+      DeliverTmpExistenceRule.loopInv tid s list_core.
+  Proof.
+    intros.
+    constructor; intros.
+      constructor; intros. eauto.
+    constructor; intros.
+  Qed.
+
+
+  Ltac exec_propagate :=
+    match goal with
+    | s : DeliverAPI.State |- _ =>
+      destruct s
+    | H : exec_any _ _ _ (Op _) _ _ |- _ =>
+      eapply exec_any_op in H; repeat deex
+    end.
+
+  Lemma createwritetmp_follows_protocol : forall tid s data,
+    follows_protocol_proc
+      DeliverAPI.step
+      DeliverRestrictedAPI.step_allow
+      DeliverTmpExistenceRule.loopInv tid s (deliver_core data).
+  Proof.
+    unfold DeliverTmpExistenceRule.loopInv.
+    destruct s; simpl.
+    intros.
+
+    constructor; intros.
+      constructor; intros. eauto.
+
+    repeat exec_propagate.
+      unfold restricted_step in *; intuition idtac; repeat step_inv.
+    constructor; intros.
+      constructor; intros. econstructor. eapply FMap.add_in.
+
+    constructor; intros.
+      constructor; intros. eauto.
+    eauto.
+  Qed.
+
+  Lemma unlinktmp_follows_protocol : forall tid s fn,
+    follows_protocol_proc
+      DeliverAPI.step
+      DeliverRestrictedAPI.step_allow
+      DeliverTmpExistenceRule.loopInv tid s (read_core fn).
+  Proof.
+    intros.
+    constructor; intros.
+      constructor; intros. eauto.
+    constructor; intros.
+  Qed.
+
+  Lemma getrequest_follows_protocol : forall tid s,
+    follows_protocol_proc
+      DeliverAPI.step
+      DeliverRestrictedAPI.step_allow
+      DeliverTmpExistenceRule.loopInv tid s (getrequest_core).
+  Proof.
+    intros.
+    constructor; intros.
+      constructor; intros. eauto.
+    constructor; intros.
+  Qed.
+
+  Lemma respond_follows_protocol : forall tid s T (r : T),
+    follows_protocol_proc
+      DeliverAPI.step
+      DeliverRestrictedAPI.step_allow
+      DeliverTmpExistenceRule.loopInv tid s (respond_core r).
+  Proof.
+    intros.
+    constructor; intros.
+      constructor; intros. eauto.
+    constructor; intros.
+  Qed.
+
+  Hint Resolve list_follows_protocol.
+  Hint Resolve createwritetmp_follows_protocol.
+  Hint Resolve unlinktmp_follows_protocol.
+  Hint Resolve getrequest_follows_protocol.
+  Hint Resolve respond_follows_protocol.
+
+  Theorem compile_ts_follows_protocol :
+    forall ts,
+      no_atomics_ts ts ->
+      DeliverTmpExistenceRule.follows_protocol (compile_ts ts).
+  Proof.
+    unfold compile_ts.
+    unfold DeliverTmpExistenceRule.follows_protocol.
+    unfold follows_protocol_s.
+    intros.
+
+    edestruct proc_match_pick with (tid := tid).
+      eapply Compile.compile_ts_ok with (compile_op := compile_op); eauto.
+    unfold DeliverAPI.opT, DeliverRestrictedAPI.opT in *.
+      intuition congruence.
+    unfold DeliverAPI.opT, DeliverRestrictedAPI.opT in *.
+      repeat deex.
+    match goal with
+    | H1 : _ [[ tid ]] = Proc _,
+      H2 : _ [[ tid ]] = Proc _ |- _ =>
+      rewrite H1 in H2; clear H1; inversion H2; clear H2;
+        subst; repeat sigT_eq
+    end.
+
+    clear dependent ts.
+    generalize dependent s.
+
+    match goal with
+    | H : Compile.compile_ok _ _ _ |- _ =>
+      induction H; intros; eauto
+    end.
+
+    destruct op; simpl; eauto.
+
+    unfold DeliverTmpExistenceRule.loopInv.
+    econstructor; eauto.
+  Qed.
+
+End AtomicDeliverRestricted.
+
+
+Module AtomicDeliverUnrestricted <: LayerImplRequiresRule DeliverAPI DeliverRestrictedAPI DeliverTmpExistenceRule.
+
+  Import DeliverTmpExistenceRule.
+
+  Definition absR (s1 : DeliverAPI.State) (s2 : DeliverRestrictedAPI.State) :=
+    s1 = s2.
+
+  Ltac step_inv :=
+    match goal with
+    | H : DeliverAPI.step _ _ _ _ _ _ |- _ =>
+      inversion H; clear H; subst; repeat sigT_eq
+    | H : DeliverRestrictedAPI.step_allow _ _ _ |- _ =>
+      inversion H; clear H; subst; repeat sigT_eq
+    | H : DeliverRestrictedAPI.step _ _ _ _ _ _ |- _ =>
+      destruct H; intuition idtac
+    end.
+
+  Theorem allowed_stable :
+    forall `(op : DeliverRestrictedAPI.opT T) `(op' : DeliverRestrictedAPI.opT T') tid tid' s s' r evs,
+      tid <> tid' ->
+      DeliverRestrictedAPI.step_allow op tid s ->
+      DeliverRestrictedAPI.step op' tid' s r s' evs ->
+      DeliverRestrictedAPI.step_allow op tid s'.
+  Proof.
+    intros.
+    destruct op; destruct op'; repeat step_inv; subst; eauto.
+  Qed.
+
+  Definition compile_ts (ts : @threads_state DeliverRestrictedAPI.opT) := ts.
+
+  Theorem compile_ts_no_atomics :
+    forall ts,
+      no_atomics_ts ts ->
+      no_atomics_ts (compile_ts ts).
+  Proof.
+    unfold compile_ts; eauto.
+  Qed.
+
+  Theorem absInitP :
+    forall s1 s2,
+      DeliverAPI.initP s1 ->
+      absR s1 s2 ->
+      DeliverRestrictedAPI.initP s2.
+  Proof.
+    firstorder.
+  Qed.
+
+  Theorem compile_traces_match :
+    forall ts,
+      follows_protocol ts ->
+      no_atomics_ts ts ->
+      traces_match_abs absR
+        DeliverAPI.initP
+        DeliverAPI.step
+        DeliverRestrictedAPI.step (compile_ts ts) ts.
+  Proof.
+    unfold compile_ts, follows_protocol, absR.
+    unfold traces_match_abs; intros; subst.
+    clear H1.
+    specialize (H sm).
+    destruct H2.
+    induction H1; eauto.
+    specialize (H tid _ p) as Htid.
+    intuition idtac; repeat deex.
+
+    edestruct IHexec.
+      eapply follows_protocol_s_exec_tid_upd; eauto.
+      intros; eapply allowed_stable; eauto.
+      destruct result; eauto.
+
+    eexists; intuition idtac.
+    eapply ExecPrefixOne.
+      eauto.
+      eapply follows_protocol_preserves_exec_tid'; eauto.
+      eauto.
+    eauto.
+  Qed.
+
+End AtomicDeliverUnrestricted.
+
+
+Module AtomicDeliver :=
+  LinkWithRule DeliverAPI DeliverRestrictedAPI MailboxTmpAbsAPI DeliverTmpExistenceRule
+               AtomicDeliverUnrestricted AtomicDeliverRestricted.

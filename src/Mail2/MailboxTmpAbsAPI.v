@@ -20,12 +20,12 @@ Module MailboxTmpAbsAPI <: Layer.
   Definition initP (s : State) := True.
 
   Inductive xstep : forall T, opT T -> nat -> State -> T -> State -> list event -> Prop :=
-  | StepDeliver : forall m tmp mbox tid fn,
+  | StepDeliver : forall m tmp tmp' mbox tid fn,
     ~ FMap.In fn mbox ->
     xstep (Deliver m) tid
       (mk_state tmp mbox)
       tt
-      (mk_state tmp (FMap.add fn m mbox))
+      (mk_state tmp' (FMap.add fn m mbox))
       nil
   | StepList : forall tmp mbox tid r,
     FMap.is_permutation_key r mbox ->
