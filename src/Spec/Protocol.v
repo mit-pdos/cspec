@@ -2,6 +2,7 @@ Require Import ConcurProc.
 Require Import Helpers.
 Require Import Relation_Operators.
 Require Import Compile.
+Require Import Equiv.
 
 Global Set Implicit Arguments.
 Global Generalizable All Variables.
@@ -204,6 +205,39 @@ Section Protocol.
       eapply follows_protocol_preserves_exec_tid' in H1; eauto.
       specialize (H _ _ _ H3).
       eapply exec_tid'_preserves_follows_protocol; eauto.
+  Qed.
+
+  Variable opMidT : Type -> Type.
+  Variable compile_op : forall T, opMidT T -> proc opT T.
+  Variable compile_op_follows_protocol :
+    forall tid s T (op : opMidT T), follows_protocol_proc tid s (compile_op op).
+
+  Theorem compile_ts_follows_protocol_proc :
+    forall ts tid `(p : proc _ T) s,
+      no_atomics_ts ts ->
+      (compile_ts compile_op ts) [[ tid ]] = Proc p ->
+      follows_protocol_proc tid s p.
+  Proof.
+    intros.
+
+    edestruct proc_match_pick with (tid := tid).
+      eapply Compile.compile_ts_ok with (compile_op := compile_op); eauto.
+    intuition congruence.
+    repeat deex.
+    match goal with
+    | H1 : _ [[ tid ]] = Proc _,
+      H2 : _ [[ tid ]] = Proc _ |- _ =>
+      rewrite H1 in H2; clear H1; inversion H2; clear H2;
+        subst; repeat sigT_eq
+    end.
+
+    clear dependent ts.
+    generalize dependent s.
+
+    match goal with
+    | H : Compile.compile_ok _ _ _ |- _ =>
+      induction H; intros; eauto
+    end.
   Qed.
 
 End Protocol.

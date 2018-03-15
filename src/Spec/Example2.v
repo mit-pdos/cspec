@@ -478,27 +478,8 @@ Module LockingCounter <: LayerImplFollowsRule LockAPI LockedCounterAPI LockingRu
     unfold LockingRule.follows_protocol.
     unfold follows_protocol_s.
     intros.
-
-    edestruct proc_match_pick with (tid := tid).
-      eapply Compile.compile_ts_ok with (compile_op := compile_op); eauto.
-    unfold LockAPI.opT, RawLockAPI.opT in *.
-      intuition congruence.
-    unfold LockAPI.opT, RawLockAPI.opT in *.
-      repeat deex.
-    match goal with
-    | H1 : _ [[ tid ]] = Proc _,
-      H2 : _ [[ tid ]] = Proc _ |- _ =>
-      rewrite H1 in H2; clear H1; inversion H2; clear H2;
-        subst; repeat sigT_eq
-    end.
-
-    clear dependent ts.
-    generalize dependent s.
-
-    match goal with
-    | H : Compile.compile_ok _ _ _ |- _ =>
-      induction H; intros; eauto
-    end.
+    eapply compile_ts_follows_protocol_proc; try eassumption.
+    intros.
 
     destruct op; simpl; eauto.
   Qed.
