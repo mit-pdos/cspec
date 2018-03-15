@@ -11,7 +11,7 @@ Module DeliverAPI <: Layer.
 
   Inductive xopT : Type -> Type :=
   | CreateWriteTmp : forall (data : string), xopT unit
-  | LinkMail : xopT unit
+  | LinkMail : xopT bool
   | UnlinkTmp : xopT unit
 
   | List : xopT (list (nat * nat))
@@ -37,19 +37,19 @@ Module DeliverAPI <: Layer.
       tt
       (mk_state (FMap.remove (tid, 0) tmp) mbox)
       nil
-  | StepLinkMailOK : forall tmp mbox tid mailfn data,
+  | StepLinkMailOK : forall tmp mbox tid mailfn data r,
     FMap.MapsTo (tid, 0) data tmp ->
     ~ FMap.In (tid, mailfn) mbox ->
     xstep (LinkMail) tid
       (mk_state tmp mbox)
-      tt
+      r
       (mk_state tmp (FMap.add (tid, mailfn) data mbox))
       nil
-  | StepLinkMailErr : forall tmp mbox tid,
+  | StepLinkMailErr : forall tmp mbox tid r,
     ~ FMap.In (tid, 0) tmp ->
     xstep (LinkMail) tid
       (mk_state tmp mbox)
-      tt
+      r
       (mk_state tmp mbox)
       nil
 

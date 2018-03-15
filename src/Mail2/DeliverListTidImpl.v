@@ -53,7 +53,7 @@ Module DeliverListTidRestrictedImpl <: LayerImplFollowsRule DeliverListTidRestri
     files <- Op DeliverListTidAPI.ListTid;
     let newname := nextfn files 0 in
     _ <- Op (DeliverListTidAPI.LinkMail newname);
-    Ret tt.
+    Ret true.
 
   Definition createwritetmp_core data :=
     r <- Op (DeliverListTidAPI.CreateWriteTmp data);
