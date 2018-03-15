@@ -12,39 +12,15 @@ Module TryDeliverImpl <: LayerImpl MailFSAPI TryDeliverAPI.
     ok <- Op (MailFSAPI.LinkMail ts);
     Ret ok.
 
-  Definition createwritetmp_core data :=
-    r <- Op (MailFSAPI.CreateWriteTmp data);
-    Ret r.
-
-  Definition unlinktmp_core :=
-    r <- Op (MailFSAPI.UnlinkTmp);
-    Ret r.
-
-  Definition list_core :=
-    l <- Op (MailFSAPI.List);
-    Ret l.
-
-  Definition read_core fn :=
-    r <- Op (MailFSAPI.Read fn);
-    Ret r.
-
-  Definition getrequest_core :=
-    r <- Op (MailFSAPI.GetRequest);
-    Ret r.
-
-  Definition respond_core T (r : T) :=
-    r <- Op (MailFSAPI.Respond r);
-    Ret r.
-
   Definition compile_op T (op : TryDeliverAPI.opT T) : proc _ T :=
     match op with
-    | TryDeliverAPI.CreateWriteTmp data => createwritetmp_core data
+    | TryDeliverAPI.CreateWriteTmp data => Op (MailFSAPI.CreateWriteTmp data)
     | TryDeliverAPI.LinkMail => linkmail_core
-    | TryDeliverAPI.UnlinkTmp => unlinktmp_core
-    | TryDeliverAPI.List => list_core
-    | TryDeliverAPI.Read fn => read_core fn
-    | TryDeliverAPI.GetRequest => getrequest_core
-    | TryDeliverAPI.Respond r => respond_core r
+    | TryDeliverAPI.UnlinkTmp => Op (MailFSAPI.UnlinkTmp)
+    | TryDeliverAPI.List => Op (MailFSAPI.List)
+    | TryDeliverAPI.Read fn => Op (MailFSAPI.Read fn)
+    | TryDeliverAPI.GetRequest => Op (MailFSAPI.GetRequest)
+    | TryDeliverAPI.Respond r => Op (MailFSAPI.Respond r)
     end.
 
   Ltac step_inv :=
@@ -81,78 +57,6 @@ Module TryDeliverImpl <: LayerImpl MailFSAPI TryDeliverAPI.
     eauto 20.
   Qed.
 
-  Theorem list_atomic : forall `(rx : _ -> proc _ T),
-    trace_incl MailFSAPI.step
-      (Bind (compile_op (TryDeliverAPI.List)) rx)
-      (Bind (atomize compile_op (TryDeliverAPI.List)) rx).
-  Proof.
-    intros.
-    eapply trace_incl_atomize_ysa.
-    simpl.
-    unfold list_core, ysa_movers.
-    eauto 20.
-  Qed.
-
-  Theorem read_atomic : forall `(rx : _ -> proc _ T) fn,
-    trace_incl MailFSAPI.step
-      (Bind (compile_op (TryDeliverAPI.Read fn)) rx)
-      (Bind (atomize compile_op (TryDeliverAPI.Read fn)) rx).
-  Proof.
-    intros.
-    eapply trace_incl_atomize_ysa.
-    simpl.
-    unfold read_core, ysa_movers.
-    eauto 20.
-  Qed.
-
-  Theorem createwritetmp_atomic : forall `(rx : _ -> proc _ T) data,
-    trace_incl MailFSAPI.step
-      (Bind (compile_op (TryDeliverAPI.CreateWriteTmp data)) rx)
-      (Bind (atomize compile_op (TryDeliverAPI.CreateWriteTmp data)) rx).
-  Proof.
-    intros.
-    eapply trace_incl_atomize_ysa.
-    simpl.
-    unfold createwritetmp_core, ysa_movers.
-    eauto 20.
-  Qed.
-
-  Theorem unlinktmp_atomic : forall `(rx : _ -> proc _ T),
-    trace_incl MailFSAPI.step
-      (Bind (compile_op (TryDeliverAPI.UnlinkTmp)) rx)
-      (Bind (atomize compile_op (TryDeliverAPI.UnlinkTmp)) rx).
-  Proof.
-    intros.
-    eapply trace_incl_atomize_ysa.
-    simpl.
-    unfold unlinktmp_core, ysa_movers.
-    eauto 20.
-  Qed.
-
-  Theorem getrequest_atomic : forall `(rx : _ -> proc _ T),
-    trace_incl MailFSAPI.step
-      (Bind (compile_op (TryDeliverAPI.GetRequest)) rx)
-      (Bind (atomize compile_op (TryDeliverAPI.GetRequest)) rx).
-  Proof.
-    intros.
-    eapply trace_incl_atomize_ysa.
-    simpl.
-    unfold getrequest_core, ysa_movers.
-    eauto 20.
-  Qed.
-
-  Theorem respond_atomic : forall `(rx : _ -> proc _ T) Tr (r : Tr),
-    trace_incl MailFSAPI.step
-      (Bind (compile_op (TryDeliverAPI.Respond r)) rx)
-      (Bind (atomize compile_op (TryDeliverAPI.Respond r)) rx).
-  Proof.
-    intros.
-    eapply trace_incl_atomize_ysa.
-    simpl.
-    unfold respond_core, ysa_movers.
-    eauto 20.
-  Qed.
-
   Theorem my_compile_correct :
     compile_correct compile_op MailFSAPI.step TryDeliverAPI.step.
   Proof.
@@ -166,21 +70,10 @@ Module TryDeliverImpl <: LayerImpl MailFSAPI TryDeliverAPI.
     atomize_correct compile_op MailFSAPI.step.
   Proof.
     unfold atomize_correct; intros.
-    destruct op.
-    + rewrite createwritetmp_atomic.
-      eapply trace_incl_bind_a; eauto.
-    + rewrite linkmail_atomic.
-      eapply trace_incl_bind_a; eauto.
-    + rewrite unlinktmp_atomic.
-      eapply trace_incl_bind_a; eauto.
-    + rewrite list_atomic.
-      eapply trace_incl_bind_a; eauto.
-    + rewrite read_atomic.
-      eapply trace_incl_bind_a; eauto.
-    + rewrite getrequest_atomic.
-      eapply trace_incl_bind_a; eauto.
-    + rewrite respond_atomic.
-      eapply trace_incl_bind_a; eauto.
+    destruct op; try trace_incl_simple.
+
+    rewrite linkmail_atomic.
+    eapply trace_incl_bind_a; eauto.
   Qed.
 
   Hint Resolve my_compile_correct.

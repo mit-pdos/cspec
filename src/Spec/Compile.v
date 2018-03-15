@@ -532,3 +532,7 @@ Proof.
   rewrite atomize_ok_trace_incl_ts; eauto.
   eapply atomic_compile_ok_traces_match_ts; eauto.
 Qed.
+
+Ltac trace_incl_simple :=
+  solve [ unfold atomize; simpl; rewrite trace_incl_op;
+          eapply trace_incl_bind_a; eauto ].

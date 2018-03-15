@@ -24,20 +24,12 @@ Module AtomicReader <: LayerImpl MailboxAPI MailServerDirAPI.
     l <- Op MailboxAPI.List;
     read_list l nil.
 
-  Definition getrequest_core :=
-    r <- Op MailboxAPI.GetRequest;
-    Ret r.
-
-  Definition respond_core T (r : T) :=
-    r <- Op (MailboxAPI.Respond r);
-    Ret r.
-
   Definition compile_op T (op : MailServerAPI.opT T) : proc _ T :=
     match op with
     | MailServerAPI.Deliver m => deliver_core m
     | MailServerAPI.ReadAll => readall_core
-    | MailServerAPI.GetRequest => getrequest_core
-    | MailServerAPI.Respond r => respond_core r
+    | MailServerAPI.GetRequest => Op (MailboxAPI.GetRequest)
+    | MailServerAPI.Respond r => Op (MailboxAPI.Respond r)
     end.
 
   Ltac step_inv :=
@@ -157,30 +149,6 @@ Module AtomicReader <: LayerImpl MailboxAPI MailServerDirAPI.
     eapply mailbox_fn_monotonic; eauto.
   Qed.
 
-  Theorem getrequest_atomic : forall `(rx : _ -> proc _ T),
-    trace_incl MailboxAPI.step
-      (Bind (compile_op (MailServerAPI.GetRequest)) rx)
-      (Bind (atomize compile_op (MailServerAPI.GetRequest)) rx).
-  Proof.
-    intros.
-    eapply trace_incl_atomize_ysa.
-    simpl.
-    unfold getrequest_core, ysa_movers.
-    eauto.
-  Qed.
-
-  Theorem respond_atomic : forall `(rx : _ -> proc _ T) Tr (r : Tr),
-    trace_incl MailboxAPI.step
-      (Bind (compile_op (MailServerAPI.Respond r)) rx)
-      (Bind (atomize compile_op (MailServerAPI.Respond r)) rx).
-  Proof.
-    intros.
-    eapply trace_incl_atomize_ysa.
-    simpl.
-    unfold respond_core, ysa_movers.
-    eauto.
-  Qed.
-
   Lemma read_list_exec : forall l l0 r s s' evs v tid,
     List.Forall (fun fn => FMap.In fn s) l ->
     Forall2 (fun fn m => FMap.MapsTo fn m s) l0 r ->
@@ -248,17 +216,12 @@ Module AtomicReader <: LayerImpl MailboxAPI MailServerDirAPI.
     atomize_correct compile_op MailboxAPI.step.
   Proof.
     unfold atomize_correct; intros.
-    destruct op.
+    destruct op; try trace_incl_simple.
+
     + rewrite deliver_atomic.
       eapply trace_incl_bind_a.
       eauto.
     + rewrite readall_atomic.
-      eapply trace_incl_bind_a.
-      eauto.
-    + rewrite getrequest_atomic.
-      eapply trace_incl_bind_a.
-      eauto.
-    + rewrite respond_atomic.
       eapply trace_incl_bind_a.
       eauto.
   Qed.

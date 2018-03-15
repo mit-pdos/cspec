@@ -8,53 +8,17 @@ Require Import MailFSPathAPI.
 
 Module MailFSPathImpl <: LayerImpl MailFSPathAPI MailFSPathAbsAPI.
 
-  Definition createwritetmp_core fn data :=
-    r <- Op (MailFSPathAPI.CreateWrite ("tmp"%string, fn) data);
-    Ret r.
-
-  Definition linkmail_core tmpfn mboxfn :=
-    v <- Op (MailFSPathAPI.Link ("tmp"%string, tmpfn) ("mail"%string, mboxfn));
-    Ret v.
-
-  Definition unlinktmp_core tmpfn :=
-    r <- Op (MailFSPathAPI.Unlink ("tmp"%string, tmpfn));
-    Ret r.
-
-  Definition gettid_core :=
-    r <- Op (MailFSPathAPI.GetTID);
-    Ret r.
-
-  Definition random_core :=
-    r <- Op (MailFSPathAPI.Random);
-    Ret r.
-
-  Definition list_core :=
-    l <- Op (MailFSPathAPI.List "mail"%string);
-    Ret l.
-
-  Definition read_core (fn : string) :=
-    r <- Op (MailFSPathAPI.Read ("mail"%string, fn));
-    Ret r.
-
-  Definition getrequest_core :=
-    r <- Op (MailFSPathAPI.GetRequest);
-    Ret r.
-
-  Definition respond_core T (r : T) :=
-    r <- Op (MailFSPathAPI.Respond r);
-    Ret r.
-
   Definition compile_op T (op : MailFSPathAbsAPI.opT T) : proc _ T :=
     match op with
-    | MailFSStringAPI.LinkMail tmpfn mailfn => linkmail_core tmpfn mailfn
-    | MailFSStringAPI.List => list_core
-    | MailFSStringAPI.Read fn => read_core fn
-    | MailFSStringAPI.CreateWriteTmp tmpfn data => createwritetmp_core tmpfn data
-    | MailFSStringAPI.UnlinkTmp tmpfn => unlinktmp_core tmpfn
-    | MailFSStringAPI.GetRequest => getrequest_core
-    | MailFSStringAPI.Respond r => respond_core r
-    | MailFSStringAPI.GetTID => gettid_core
-    | MailFSStringAPI.Random => random_core
+    | MailFSStringAPI.LinkMail tmpfn mailfn => Op (MailFSPathAPI.Link ("tmp"%string, tmpfn) ("mail"%string, mailfn))
+    | MailFSStringAPI.List => Op (MailFSPathAPI.List "mail"%string)
+    | MailFSStringAPI.Read fn => Op (MailFSPathAPI.Read ("mail"%string, fn))
+    | MailFSStringAPI.CreateWriteTmp tmpfn data => Op (MailFSPathAPI.CreateWrite ("tmp"%string, tmpfn) data)
+    | MailFSStringAPI.UnlinkTmp tmpfn => Op (MailFSPathAPI.Unlink ("tmp"%string, tmpfn))
+    | MailFSStringAPI.GetRequest => Op (MailFSPathAPI.GetRequest)
+    | MailFSStringAPI.Respond r => Op (MailFSPathAPI.Respond r)
+    | MailFSStringAPI.GetTID => Op (MailFSPathAPI.GetTID)
+    | MailFSStringAPI.Random => Op (MailFSPathAPI.Random)
     end.
 
   Ltac step_inv :=
@@ -67,114 +31,6 @@ Module MailFSPathImpl <: LayerImpl MailFSPathAPI MailFSPathAbsAPI.
 
   Hint Extern 1 (MailFSPathAbsAPI.step _ _ _ _ _ _) => econstructor.
   Hint Extern 1 (MailFSPathAPI.step _ _ _ _ _ _) => econstructor.
-
-  Theorem linkmail_atomic : forall `(rx : _ -> proc _ T) fn m,
-    trace_incl MailFSPathAPI.step
-      (Bind (compile_op (MailFSStringAPI.LinkMail fn m)) rx)
-      (Bind (atomize compile_op (MailFSStringAPI.LinkMail fn m)) rx).
-  Proof.
-    intros.
-    eapply trace_incl_atomize_ysa.
-    simpl.
-    unfold linkmail_core, ysa_movers.
-    eauto 20.
-  Qed.
-
-  Theorem list_atomic : forall `(rx : _ -> proc _ T),
-    trace_incl MailFSPathAPI.step
-      (Bind (compile_op (MailFSStringAPI.List)) rx)
-      (Bind (atomize compile_op (MailFSStringAPI.List)) rx).
-  Proof.
-    intros.
-    eapply trace_incl_atomize_ysa.
-    simpl.
-    unfold list_core, ysa_movers.
-    eauto 20.
-  Qed.
-
-  Theorem read_atomic : forall `(rx : _ -> proc _ T) fn,
-    trace_incl MailFSPathAPI.step
-      (Bind (compile_op (MailFSStringAPI.Read fn)) rx)
-      (Bind (atomize compile_op (MailFSStringAPI.Read fn)) rx).
-  Proof.
-    intros.
-    eapply trace_incl_atomize_ysa.
-    simpl.
-    unfold read_core, ysa_movers.
-    eauto 20.
-  Qed.
-
-  Theorem createwritetmp_atomic : forall `(rx : _ -> proc _ T) tmpfn data,
-    trace_incl MailFSPathAPI.step
-      (Bind (compile_op (MailFSStringAPI.CreateWriteTmp tmpfn data)) rx)
-      (Bind (atomize compile_op (MailFSStringAPI.CreateWriteTmp tmpfn data)) rx).
-  Proof.
-    intros.
-    eapply trace_incl_atomize_ysa.
-    simpl.
-    unfold createwritetmp_core, ysa_movers.
-    eauto 20.
-  Qed.
-
-  Theorem unlinktmp_atomic : forall `(rx : _ -> proc _ T) fn,
-    trace_incl MailFSPathAPI.step
-      (Bind (compile_op (MailFSStringAPI.UnlinkTmp fn)) rx)
-      (Bind (atomize compile_op (MailFSStringAPI.UnlinkTmp fn)) rx).
-  Proof.
-    intros.
-    eapply trace_incl_atomize_ysa.
-    simpl.
-    unfold unlinktmp_core, ysa_movers.
-    eauto 20.
-  Qed.
-
-  Theorem gettid_atomic : forall `(rx : _ -> proc _ T),
-    trace_incl MailFSPathAPI.step
-      (Bind (compile_op (MailFSStringAPI.GetTID)) rx)
-      (Bind (atomize compile_op (MailFSStringAPI.GetTID)) rx).
-  Proof.
-    intros.
-    eapply trace_incl_atomize_ysa.
-    simpl.
-    unfold gettid_core, ysa_movers.
-    eauto 20.
-  Qed.
-
-  Theorem random_atomic : forall `(rx : _ -> proc _ T),
-    trace_incl MailFSPathAPI.step
-      (Bind (compile_op (MailFSStringAPI.Random)) rx)
-      (Bind (atomize compile_op (MailFSStringAPI.Random)) rx).
-  Proof.
-    intros.
-    eapply trace_incl_atomize_ysa.
-    simpl.
-    unfold random_core, ysa_movers.
-    eauto 20.
-  Qed.
-
-  Theorem getrequest_atomic : forall `(rx : _ -> proc _ T),
-    trace_incl MailFSPathAPI.step
-      (Bind (compile_op (MailFSStringAPI.GetRequest)) rx)
-      (Bind (atomize compile_op (MailFSStringAPI.GetRequest)) rx).
-  Proof.
-    intros.
-    eapply trace_incl_atomize_ysa.
-    simpl.
-    unfold getrequest_core, ysa_movers.
-    eauto 20.
-  Qed.
-
-  Theorem respond_atomic : forall `(rx : _ -> proc _ T) Tr (r : Tr),
-    trace_incl MailFSPathAPI.step
-      (Bind (compile_op (MailFSStringAPI.Respond r)) rx)
-      (Bind (atomize compile_op (MailFSStringAPI.Respond r)) rx).
-  Proof.
-    intros.
-    eapply trace_incl_atomize_ysa.
-    simpl.
-    unfold respond_core, ysa_movers.
-    eauto 20.
-  Qed.
 
   Theorem my_compile_correct :
     compile_correct compile_op MailFSPathAPI.step MailFSPathAbsAPI.step.
@@ -189,25 +45,7 @@ Module MailFSPathImpl <: LayerImpl MailFSPathAPI MailFSPathAbsAPI.
     atomize_correct compile_op MailFSPathAPI.step.
   Proof.
     unfold atomize_correct; intros.
-    destruct op.
-    + rewrite createwritetmp_atomic.
-      eapply trace_incl_bind_a; eauto.
-    + rewrite linkmail_atomic.
-      eapply trace_incl_bind_a; eauto.
-    + rewrite unlinktmp_atomic.
-      eapply trace_incl_bind_a; eauto.
-    + rewrite gettid_atomic.
-      eapply trace_incl_bind_a; eauto.
-    + rewrite random_atomic.
-      eapply trace_incl_bind_a; eauto.
-    + rewrite list_atomic.
-      eapply trace_incl_bind_a; eauto.
-    + rewrite read_atomic.
-      eapply trace_incl_bind_a; eauto.
-    + rewrite getrequest_atomic.
-      eapply trace_incl_bind_a; eauto.
-    + rewrite respond_atomic.
-      eapply trace_incl_bind_a; eauto.
+    destruct op; trace_incl_simple.
   Qed.
 
   Hint Resolve my_compile_correct.

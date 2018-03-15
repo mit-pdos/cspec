@@ -13,29 +13,13 @@ Module AtomicDeliverRestricted <: LayerImplFollowsRule DeliverRestrictedAPI Mail
     _ <- Op (DeliverAPI.UnlinkTmp);
     Ret tt.
 
-  Definition list_core :=
-    l <- Op (DeliverAPI.List);
-    Ret l.
-
-  Definition read_core fn :=
-    r <- Op (DeliverAPI.Read fn);
-    Ret r.
-
-  Definition getrequest_core :=
-    r <- Op (DeliverAPI.GetRequest);
-    Ret r.
-
-  Definition respond_core T (v : T) :=
-    r <- Op (DeliverAPI.Respond v);
-    Ret r.
-
   Definition compile_op T (op : MailboxAPI.opT T) : proc _ T :=
     match op with
     | MailboxAPI.Deliver m => deliver_core m
-    | MailboxAPI.List => list_core
-    | MailboxAPI.Read fn => read_core fn
-    | MailboxAPI.GetRequest => getrequest_core
-    | MailboxAPI.Respond r => respond_core r
+    | MailboxAPI.List => Op (DeliverAPI.List)
+    | MailboxAPI.Read fn => Op (DeliverAPI.Read fn)
+    | MailboxAPI.GetRequest => Op (DeliverAPI.GetRequest)
+    | MailboxAPI.Respond r => Op (DeliverAPI.Respond r)
     end.
 
   Ltac step_inv :=
@@ -142,95 +126,28 @@ Module AtomicDeliverRestricted <: LayerImplFollowsRule DeliverRestrictedAPI Mail
     eauto 20.
   Qed.
 
-  Theorem list_atomic : forall `(rx : _ -> proc _ T),
-    trace_incl DeliverRestrictedAPI.step
-      (Bind (compile_op (MailboxAPI.List)) rx)
-      (Bind (atomize compile_op (MailboxAPI.List)) rx).
-  Proof.
-    intros.
-    eapply trace_incl_atomize_ysa.
-    simpl.
-    unfold list_core, ysa_movers.
-    eauto 20.
-  Qed.
-
-  Theorem read_atomic : forall `(rx : _ -> proc _ T) fn,
-    trace_incl DeliverRestrictedAPI.step
-      (Bind (compile_op (MailboxAPI.Read fn)) rx)
-      (Bind (atomize compile_op (MailboxAPI.Read fn)) rx).
-  Proof.
-    intros.
-    eapply trace_incl_atomize_ysa.
-    simpl.
-    unfold read_core, ysa_movers.
-    eauto 20.
-  Qed.
-
-  Theorem getrequest_atomic : forall `(rx : _ -> proc _ T),
-    trace_incl DeliverRestrictedAPI.step
-      (Bind (compile_op (MailboxAPI.GetRequest)) rx)
-      (Bind (atomize compile_op (MailboxAPI.GetRequest)) rx).
-  Proof.
-    intros.
-    eapply trace_incl_atomize_ysa.
-    simpl.
-    unfold getrequest_core, ysa_movers.
-    eauto 20.
-  Qed.
-
-  Theorem respond_atomic : forall `(rx : _ -> proc _ T) Tr (r : Tr),
-    trace_incl DeliverRestrictedAPI.step
-      (Bind (compile_op (MailboxAPI.Respond r)) rx)
-      (Bind (atomize compile_op (MailboxAPI.Respond r)) rx).
-  Proof.
-    intros.
-    eapply trace_incl_atomize_ysa.
-    simpl.
-    unfold respond_core, ysa_movers.
-    eauto 20.
-  Qed.
-
   Theorem my_compile_correct :
     compile_correct compile_op DeliverRestrictedAPI.step MailboxTmpAbsAPI.step.
   Proof.
     unfold compile_correct; intros.
     destruct op.
 
-    + repeat atomic_exec_inv.
-      repeat step_inv; eauto.
-      simpl.
-      eapply FMap.mapsto_add in H7; subst.
-      eauto.
-    + repeat atomic_exec_inv.
-      repeat step_inv; eauto.
-    + repeat atomic_exec_inv.
-      repeat step_inv; eauto.
-    + repeat atomic_exec_inv.
-      repeat step_inv; eauto.
-    + repeat atomic_exec_inv.
-      repeat step_inv; eauto.
+    all: repeat atomic_exec_inv; repeat step_inv; eauto.
+
+    simpl.
+    eapply FMap.mapsto_add in H7; subst.
+    eauto.
   Qed.
 
   Theorem my_atomize_correct :
     atomize_correct compile_op DeliverRestrictedAPI.step.
   Proof.
     unfold atomize_correct; intros.
-    destruct op.
-    + rewrite deliver_atomic.
-      eapply trace_incl_bind_a.
-      eauto.
-    + rewrite list_atomic.
-      eapply trace_incl_bind_a.
-      eauto.
-    + rewrite read_atomic.
-      eapply trace_incl_bind_a.
-      eauto.
-    + rewrite getrequest_atomic.
-      eapply trace_incl_bind_a.
-      eauto.
-    + rewrite respond_atomic.
-      eapply trace_incl_bind_a.
-      eauto.
+    destruct op; try trace_incl_simple.
+
+    rewrite deliver_atomic.
+    eapply trace_incl_bind_a.
+    eauto.
   Qed.
 
   Hint Resolve my_compile_correct.
@@ -283,19 +200,6 @@ Module AtomicDeliverRestricted <: LayerImplFollowsRule DeliverRestrictedAPI Mail
   Qed.
 
 
-  Lemma list_follows_protocol : forall tid s,
-    follows_protocol_proc
-      DeliverAPI.step
-      DeliverRestrictedAPI.step_allow
-      DeliverTmpExistenceRule.loopInv tid s list_core.
-  Proof.
-    intros.
-    constructor; intros.
-      constructor; intros. eauto.
-    constructor; intros.
-  Qed.
-
-
   Ltac exec_propagate :=
     match goal with
     | s : DeliverAPI.State |- _ =>
@@ -327,47 +231,7 @@ Module AtomicDeliverRestricted <: LayerImplFollowsRule DeliverRestrictedAPI Mail
     eauto.
   Qed.
 
-  Lemma unlinktmp_follows_protocol : forall tid s fn,
-    follows_protocol_proc
-      DeliverAPI.step
-      DeliverRestrictedAPI.step_allow
-      DeliverTmpExistenceRule.loopInv tid s (read_core fn).
-  Proof.
-    intros.
-    constructor; intros.
-      constructor; intros. eauto.
-    constructor; intros.
-  Qed.
-
-  Lemma getrequest_follows_protocol : forall tid s,
-    follows_protocol_proc
-      DeliverAPI.step
-      DeliverRestrictedAPI.step_allow
-      DeliverTmpExistenceRule.loopInv tid s (getrequest_core).
-  Proof.
-    intros.
-    constructor; intros.
-      constructor; intros. eauto.
-    constructor; intros.
-  Qed.
-
-  Lemma respond_follows_protocol : forall tid s T (r : T),
-    follows_protocol_proc
-      DeliverAPI.step
-      DeliverRestrictedAPI.step_allow
-      DeliverTmpExistenceRule.loopInv tid s (respond_core r).
-  Proof.
-    intros.
-    constructor; intros.
-      constructor; intros. eauto.
-    constructor; intros.
-  Qed.
-
-  Hint Resolve list_follows_protocol.
   Hint Resolve createwritetmp_follows_protocol.
-  Hint Resolve unlinktmp_follows_protocol.
-  Hint Resolve getrequest_follows_protocol.
-  Hint Resolve respond_follows_protocol.
 
   Theorem compile_ts_follows_protocol :
     forall ts,
