@@ -29,7 +29,6 @@ Module MailFSPathAPI <: Layer.
 
   Inductive xstep : forall T, opT T -> nat -> State -> T -> State -> list event -> Prop :=
   | StepCreateWrite : forall fs tid tmpfn data,
-    ~ FMap.In tmpfn fs ->
     xstep (CreateWrite tmpfn data) tid
       fs
       tt

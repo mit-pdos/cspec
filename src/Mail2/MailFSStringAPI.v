@@ -31,7 +31,6 @@ Module MailFSStringAPI <: Layer.
 
   Inductive xstep : forall T, opT T -> nat -> State -> T -> State -> list event -> Prop :=
   | StepCreateWriteTmp : forall tmp mbox tid tmpfn data,
-    ~ FMap.In tmpfn tmp ->
     xstep (CreateWriteTmp tmpfn data) tid
       (mk_state tmp mbox)
       tt
