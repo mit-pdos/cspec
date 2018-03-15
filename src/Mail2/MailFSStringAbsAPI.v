@@ -86,6 +86,12 @@ Module MailFSStringAbsAPI <: Layer.
       tid
       (mk_state tmp mbox)
       nil
+  | StepRandom : forall tmp mbox tid r,
+    xstep Random tid
+      (mk_state tmp mbox)
+      r
+      (mk_state tmp mbox)
+      nil
 
   | StepRead : forall fntid fn tmp mbox tid m,
     FMap.MapsTo (encode_tid_fn fntid fn) m mbox ->

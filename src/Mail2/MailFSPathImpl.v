@@ -24,6 +24,10 @@ Module MailFSPathImpl <: LayerImpl MailFSPathAPI MailFSPathAbsAPI.
     r <- Op (MailFSPathAPI.GetTID);
     Ret r.
 
+  Definition random_core :=
+    r <- Op (MailFSPathAPI.Random);
+    Ret r.
+
   Definition list_core :=
     l <- Op (MailFSPathAPI.List "mail"%string);
     Ret l.
@@ -50,6 +54,7 @@ Module MailFSPathImpl <: LayerImpl MailFSPathAPI MailFSPathAbsAPI.
     | MailFSStringAPI.GetRequest => getrequest_core
     | MailFSStringAPI.Respond r => respond_core r
     | MailFSStringAPI.GetTID => gettid_core
+    | MailFSStringAPI.Random => random_core
     end.
 
   Ltac step_inv :=
@@ -135,6 +140,18 @@ Module MailFSPathImpl <: LayerImpl MailFSPathAPI MailFSPathAbsAPI.
     eauto 20.
   Qed.
 
+  Theorem random_atomic : forall `(rx : _ -> proc _ T),
+    trace_incl MailFSPathAPI.step
+      (Bind (compile_op (MailFSStringAPI.Random)) rx)
+      (Bind (atomize compile_op (MailFSStringAPI.Random)) rx).
+  Proof.
+    intros.
+    eapply trace_incl_atomize_ysa.
+    simpl.
+    unfold random_core, ysa_movers.
+    eauto 20.
+  Qed.
+
   Theorem getrequest_atomic : forall `(rx : _ -> proc _ T),
     trace_incl MailFSPathAPI.step
       (Bind (compile_op (MailFSStringAPI.GetRequest)) rx)
@@ -180,6 +197,8 @@ Module MailFSPathImpl <: LayerImpl MailFSPathAPI MailFSPathAbsAPI.
     + rewrite unlinktmp_atomic.
       eapply trace_incl_bind_a; eauto.
     + rewrite gettid_atomic.
+      eapply trace_incl_bind_a; eauto.
+    + rewrite random_atomic.
       eapply trace_incl_bind_a; eauto.
     + rewrite list_atomic.
       eapply trace_incl_bind_a; eauto.

@@ -117,6 +117,12 @@ Module MailFSPathAbsAPI <: Layer.
       tid
       fs
       nil
+  | StepRandom : forall fs tid r,
+    xstep Random tid
+      fs
+      r
+      fs
+      nil
 
   | StepRead : forall fn fs tid m,
     FMap.MapsTo ("mail"%string, fn) m fs ->

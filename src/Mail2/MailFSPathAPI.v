@@ -15,6 +15,8 @@ Module MailFSPathAPI <: Layer.
   | Unlink : forall (tmpfn : string * string), xopT unit
 
   | GetTID : xopT nat
+  | Random : xopT nat
+
   | List : forall (dir : string), xopT (list string)
   | Read : forall (fn : string * string), xopT string
   | GetRequest : xopT request
@@ -59,6 +61,12 @@ Module MailFSPathAPI <: Layer.
     xstep GetTID tid
       fs
       tid
+      fs
+      nil
+  | StepRandom : forall fs tid r,
+    xstep Random tid
+      fs
+      r
       fs
       nil
 

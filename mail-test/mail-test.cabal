@@ -15,6 +15,7 @@ executable mail-test
                      , unix
                      , directory
                      , random
+                     , rdtsc
   other-modules:       Interpreter
                      , Compile
                      , ConcurProc

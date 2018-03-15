@@ -16,6 +16,8 @@ Module MailFSStringAPI <: Layer.
   | UnlinkTmp : forall (tmpfn : string), xopT unit
 
   | GetTID : xopT nat
+  | Random : xopT nat
+
   | List : xopT (list string)
   | Read : forall (fn : string), xopT string
   | GetRequest : xopT request
@@ -61,6 +63,12 @@ Module MailFSStringAPI <: Layer.
     xstep GetTID tid
       (mk_state tmp mbox)
       tid
+      (mk_state tmp mbox)
+      nil
+  | StepRandom : forall tmp mbox tid r,
+    xstep Random tid
+      (mk_state tmp mbox)
+      r
       (mk_state tmp mbox)
       nil
 

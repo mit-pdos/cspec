@@ -10,6 +10,7 @@ import System.Posix.Files
 import System.Directory
 import System.Random
 import System.IO
+import System.CPUTime.Rdtsc
 
 -- Extracted code
 import ConcurProc
@@ -68,6 +69,10 @@ run_proc _ (Op MailFSPathAPI__GetTID) = do
   -- it back to Integer using [read].
   let (_, tidstr) = splitAt 9 (show tid) in do
     return $ unsafeCoerce (read tidstr :: Integer)
+
+run_proc _ (Op MailFSPathAPI__Random) = do
+  ts <- rdtsc
+  return $ unsafeCoerce (fromIntegral ts :: Integer)
 
 run_proc _ (Op MailFSPathAPI__GetRequest) = do
   debugmsg $ "GetRequest"
