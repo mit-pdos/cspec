@@ -63,12 +63,21 @@ Module MailFSStringAbsAPI <: Layer.
       tt
       (mk_state (FMap.remove (encode_tid_fn tid 0) tmp) mbox)
       nil
-  | StepLinkMail : forall tmp mbox tid mailfn data,
+  | StepLinkMailOK : forall tmp mbox tid mailfn data,
     FMap.MapsTo (encode_tid_fn tid 0) data tmp ->
+    ~ FMap.In (encode_tid_fn tid mailfn) mbox ->
     xstep (LinkMail mailfn) tid
       (mk_state tmp mbox)
-      tt
+      true
       (mk_state tmp (FMap.add (encode_tid_fn tid mailfn) data mbox))
+      nil
+  | StepLinkMail : forall tmp mbox tid mailfn,
+    ((~ FMap.In (encode_tid_fn tid 0) tmp) \/
+     (FMap.In (encode_tid_fn tid mailfn) mbox)) ->
+    xstep (LinkMail mailfn) tid
+      (mk_state tmp mbox)
+      false
+      (mk_state tmp mbox)
       nil
 
   | StepList : forall tmp mbox tid r,

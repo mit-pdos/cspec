@@ -94,12 +94,21 @@ Module MailFSPathAbsAPI <: Layer.
       tt
       (FMap.remove ("tmp"%string, tmpfn) fs)
       nil
-  | StepLinkMail : forall fs tid mailfn data tmpfn,
+  | StepLinkMailOK : forall fs tid mailfn data tmpfn,
     FMap.MapsTo ("tmp"%string, tmpfn) data fs ->
+    ~ FMap.In ("mail"%string, mailfn) fs ->
     xstep (LinkMail tmpfn mailfn) tid
       fs
-      tt
+      true
       (FMap.add ("mail"%string, mailfn) data fs)
+      nil
+  | StepLinkMailErr : forall fs tid mailfn tmpfn,
+    ((~ FMap.In ("tmp"%string, tmpfn) fs) \/
+     (FMap.In ("mail"%string, mailfn) fs)) ->
+    xstep (LinkMail tmpfn mailfn) tid
+      fs
+      false
+      fs
       nil
 
   | StepList : forall fs tid r,

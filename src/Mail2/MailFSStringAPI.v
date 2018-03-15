@@ -12,7 +12,7 @@ Module MailFSStringAPI <: Layer.
 
   Inductive xopT : Type -> Type :=
   | CreateWriteTmp : forall (tmpfn : string) (data : string), xopT unit
-  | LinkMail : forall (tmpfn : string) (mboxfn : string), xopT unit
+  | LinkMail : forall (tmpfn : string) (mboxfn : string), xopT bool
   | UnlinkTmp : forall (tmpfn : string), xopT unit
 
   | GetTID : xopT nat
@@ -42,12 +42,21 @@ Module MailFSStringAPI <: Layer.
       tt
       (mk_state (FMap.remove tmpfn tmp) mbox)
       nil
-  | StepLinkMail : forall tmp mbox tid mailfn data tmpfn,
+  | StepLinkMailOK : forall tmp mbox tid mailfn data tmpfn,
     FMap.MapsTo tmpfn data tmp ->
+    ~ FMap.In mailfn mbox ->
     xstep (LinkMail tmpfn mailfn) tid
       (mk_state tmp mbox)
-      tt
+      true
       (mk_state tmp (FMap.add mailfn data mbox))
+      nil
+  | StepLinkMailErr : forall tmp mbox tid mailfn tmpfn,
+    ((~ FMap.In tmpfn tmp) \/
+     (FMap.In mailfn mbox)) ->
+    xstep (LinkMail tmpfn mailfn) tid
+      (mk_state tmp mbox)
+      false
+      (mk_state tmp mbox)
       nil
 
   | StepList : forall tmp mbox tid r,

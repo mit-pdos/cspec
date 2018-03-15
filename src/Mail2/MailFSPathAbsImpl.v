@@ -87,7 +87,7 @@ Module MailFSPathAbsImpl <: LayerImpl MailFSPathAbsAPI MailFSStringAPI.
         -- eapply FMap.remove_mapsto; eauto.
            intro. inversion H0.
   Qed.
-      
+
   Lemma absR_add_mail :
     forall fs tmp mail fn data,
       absR fs (MailFSStringAbsAPI.mk_state tmp mail) ->
@@ -154,6 +154,18 @@ Module MailFSPathAbsImpl <: LayerImpl MailFSPathAbsAPI MailFSStringAPI.
     eapply H in H0; intuition congruence.
   Qed.
 
+  Lemma absR_in_mail' :
+    forall fs tmp mail fn,
+      absR fs (MailFSStringAbsAPI.mk_state tmp mail) ->
+      FMap.In ("mail"%string, fn) fs ->
+      FMap.In fn mail.
+  Proof.
+    intros.
+    eapply FMap.in_mapsto_exists in H0; deex.
+    eapply FMap.mapsto_in.
+    eapply absR_mapsto_mail; eauto.
+  Qed.
+
   Lemma absR_is_permutation_key :
     forall r fs tmp mail,
       absR fs (MailFSStringAbsAPI.mk_state tmp mail) ->
@@ -194,6 +206,7 @@ Module MailFSPathAbsImpl <: LayerImpl MailFSPathAbsAPI MailFSStringAPI.
   Hint Resolve absR_in_tmp.
   Hint Resolve absR_mapsto_tmp.
   Hint Resolve absR_in_mail.
+  Hint Resolve absR_in_mail'.
   Hint Resolve absR_mapsto_mail.
   Hint Resolve absR_is_permutation_key.
 
@@ -206,7 +219,7 @@ Module MailFSPathAbsImpl <: LayerImpl MailFSPathAbsAPI MailFSStringAPI.
     all: eexists.
     all: split; [ | econstructor ].
     all: simpl.
-    all: eauto 10.
+    all: intuition eauto 10.
   Qed.
 
   Hint Resolve absR_ok.

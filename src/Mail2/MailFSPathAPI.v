@@ -11,7 +11,7 @@ Module MailFSPathAPI <: Layer.
 
   Inductive xopT : Type -> Type :=
   | CreateWrite : forall (tmpfn : string * string) (data : string), xopT unit
-  | Link : forall (tmpfn : string * string) (mboxfn : string * string), xopT unit
+  | Link : forall (tmpfn : string * string) (mboxfn : string * string), xopT bool
   | Unlink : forall (tmpfn : string * string), xopT unit
 
   | GetTID : xopT nat
@@ -40,12 +40,21 @@ Module MailFSPathAPI <: Layer.
       tt
       (FMap.remove tmpfn fs)
       nil
-  | StepLink : forall fs tid mailfn data tmpfn,
+  | StepLinkOK : forall fs tid mailfn data tmpfn,
     FMap.MapsTo tmpfn data fs ->
+    ~ FMap.In mailfn fs ->
     xstep (Link tmpfn mailfn) tid
       fs
-      tt
+      true
       (FMap.add mailfn data fs)
+      nil
+  | StepLinkErr : forall fs tid mailfn tmpfn,
+    ((~ FMap.In tmpfn fs) \/
+     (FMap.In mailfn fs)) ->
+    xstep (Link tmpfn mailfn) tid
+      fs
+      false
+      fs
       nil
 
   | StepList : forall fs tid r dirname,
