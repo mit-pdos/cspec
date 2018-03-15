@@ -94,7 +94,7 @@ run_proc _ (Op (MailFSPathAPI__CreateWrite (dir, fn) contents)) = do
 run_proc _ (Op (MailFSPathAPI__Link (srcdir, srcfn) (dstdir, dstfn))) = do
   debugmsg $ "Link " ++ srcdir ++ "/" ++ srcfn ++ " to " ++ dstdir ++ "/" ++ dstfn
   createLink (filePath srcdir srcfn) (filePath dstdir dstfn)
-  return $ unsafeCoerce ()
+  return $ unsafeCoerce True
 
 run_proc _ (Op (MailFSPathAPI__Unlink (dir, fn))) = do
   debugmsg $ "Unlink " ++ dir ++ "/" ++ (fn)

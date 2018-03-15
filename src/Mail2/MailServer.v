@@ -31,6 +31,11 @@ Require Import MailFSPathAbsImpl.
 Require Import MailFSPathAPI.
 Require Import MailFSPathImpl.
 
+Require Import LinkRetryImpl.
+
+Require Import TryDeliverAPI.
+Require Import TryDeliverImpl.
+
 
 Import MailServerAPI.
 
@@ -58,12 +63,24 @@ Module c2 := Link MailboxTmpAbsAPI MailboxAPI MailServerAPI
                   MailboxTmpAbs c1.
 Module c3 := Link DeliverAPI MailboxTmpAbsAPI MailServerAPI
                   AtomicDeliver c2.
+
 Module c4 := Link DeliverListTidAPI DeliverAPI MailServerAPI
                   DeliverListTidImpl c3.
 Module c5 := Link MailFSAPI DeliverListTidAPI MailServerAPI
                   MailFSImpl c4.
+
+Module c4' := Link TryDeliverAPI DeliverAPI MailServerAPI
+                  LinkRetryImpl c3.
+Module c5' := Link MailFSAPI TryDeliverAPI MailServerAPI
+                  TryDeliverImpl c4'.
+
+(*
 Module c6 := Link MailFSStringAbsAPI MailFSAPI MailServerAPI
                   MailFSStringAbsImpl c5.
+*)
+Module c6 := Link MailFSStringAbsAPI MailFSAPI MailServerAPI
+                  MailFSStringAbsImpl c5'.
+
 Module c7 := Link MailFSStringAPI MailFSStringAbsAPI MailServerAPI
                   MailFSStringImpl c6.
 Module c8 := Link MailFSPathAbsAPI MailFSStringAPI MailServerAPI
