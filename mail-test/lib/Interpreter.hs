@@ -2,6 +2,7 @@ module Interpreter where
 
 -- Haskell libraries
 import Control.Concurrent
+import Control.Exception
 import Data.Atomics
 import Data.IORef
 import Data.Maybe
@@ -10,6 +11,7 @@ import System.Posix.Files
 import System.Directory
 import System.Random
 import System.IO
+import System.IO.Error
 import System.CPUTime.Rdtsc
 
 -- Extracted code
@@ -108,5 +110,15 @@ run_proc _ (Op (MailFSPathAPI__List dir)) = do
 
 run_proc _ (Op (MailFSPathAPI__Read (dir, fn))) = do
   debugmsg $ "Read " ++ dir ++ "/" ++ fn
-  contents <- withFile (filePath dir fn) ReadMode hGetContents
-  return $ unsafeCoerce contents
+  catch (do
+           h <- openFile (filePath dir fn) ReadMode
+           contents <- hGetContents h
+           hClose h
+           return $ unsafeCoerce (Just contents))
+        (\e -> case e of
+               _ | isDoesNotExistError e -> do
+                 debugmsg "Reading a non-existant file"
+                 return $ unsafeCoerce Nothing
+               _ -> do
+                 debugmsg "Unknown exception on read"
+                 return $ unsafeCoerce Nothing)
