@@ -22,5 +22,4 @@ executable mail-test
                      , List
                      , Datatypes
                      , MailServer
-                     , Helpers
   default-language:    Haskell2010
