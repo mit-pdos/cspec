@@ -1237,8 +1237,12 @@ Module FMap.
      - apply in_add_or in H.
        intuition; subst.
        apply in_eq.
-  Qed.
-   
+    Qed.
+
+    Definition is_permutation_kv (l : list (A*V)) (m : t) : Prop :=
+      forall k v,
+        List.In (k, v) l <-> MapsTo k v m.
+
   End Maps.
 
   Arguments t A V {Acmp}.
