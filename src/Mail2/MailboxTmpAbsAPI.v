@@ -1,19 +1,18 @@
 Require Import POCS.
 Require Import String.
 Require Import MailboxAPI.
-Require Import MailServerDirAPI.
+Require Import MailServerAPI.
 
 
 Module MailboxTmpAbsAPI <: Layer.
 
   Import MailboxAPI.
-  Import MailServerDirAPI.
 
   Definition opT := xopT.
 
   Record state_rec := mk_state {
-    tmpdir : dir_contents;
-    maildir : dir_contents;
+    tmpdir : MailServerAPI.dir_contents;
+    maildir : MailServerAPI.dir_contents;
   }.
 
   Definition State := state_rec.

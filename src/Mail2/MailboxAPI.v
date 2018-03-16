@@ -1,13 +1,11 @@
 Require Import POCS.
 Require Import String.
 Require Import MailServerAPI.
-Require Import MailServerDirAPI.
 
 
 Module MailboxAPI <: Layer.
 
   Import MailServerAPI.
-  Import MailServerDirAPI.
 
   Inductive xopT : Type -> Type :=
   | Deliver : forall (m : string), xopT unit
@@ -44,7 +42,6 @@ Module MailboxAPI <: Layer.
       (Some m)
       mbox
       nil
-
   | StepReadNone : forall fn mbox tid,
     ~ FMap.In fn mbox ->
     xstep (Read fn) tid

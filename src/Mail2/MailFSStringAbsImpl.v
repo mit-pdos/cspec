@@ -2,14 +2,14 @@ Require Import POCS.
 Require Import MailboxAPI.
 Require Import MailFSAPI.
 Require Import MailFSStringAbsAPI.
-Require Import MailServerDirAPI.
+Require Import MailServerAPI.
 Require Import MailboxTmpAbsAPI.
 
 
 Module MailFSStringAbsImpl <: LayerImpl MailFSStringAbsAPI MailFSAPI.
 
   Definition dirR (d1 : MailFSStringAbsAPI.dir_contents)
-                  (d2 : MailServerDirAPI.dir_contents) : Prop :=
+                  (d2 : MailServerAPI.dir_contents) : Prop :=
     d1 = FMap.map_keys (fun '(tid, fn) => encode_tid_fn tid fn) d2.
 
   Definition absR (s1 : MailFSStringAbsAPI.State) (s2 : MailFSAPI.State) :=

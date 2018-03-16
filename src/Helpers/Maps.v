@@ -1087,6 +1087,31 @@ Module FMap.
         constructor; eauto.
     Qed.
 
+    Definition is_permutation_kv (l : list (A*V)) (m : t) : Prop :=
+      forall k v,
+        List.In (k, v) l <-> MapsTo k v m.
+
+    Theorem is_permutation_key_to_kv:
+      forall m kvl,
+        is_permutation_key (map fst kvl) m ->
+        Forall (fun '(k, v) => MapsTo k v m) kvl ->
+        is_permutation_kv kvl m.
+    Proof.
+      unfold is_permutation_key.
+      unfold is_permutation_kv.
+      split; intros.
+      - eapply Forall_forall in H0; eauto.
+        simpl in *; eauto.
+      - eapply mapsto_in in H1 as H1'.
+        eapply H in H1'.
+        eapply in_map_iff in H1'; destruct H1'.
+        intuition subst.
+        eapply Forall_forall in H0; eauto.
+        destruct x; simpl in *.
+        eapply mapsto_unique in H1; eauto.
+        subst; eauto.
+    Qed.
+
    Definition is_permutation (T:Type) (l1 : list T) (l2: list T) : Prop :=
       forall x, List.In x l1 <-> List.In x l2.
 
@@ -1238,10 +1263,6 @@ Module FMap.
        intuition; subst.
        apply in_eq.
     Qed.
-
-    Definition is_permutation_kv (l : list (A*V)) (m : t) : Prop :=
-      forall k v,
-        List.In (k, v) l <-> MapsTo k v m.
 
   End Maps.
 

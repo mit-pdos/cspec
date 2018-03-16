@@ -1,9 +1,6 @@
 Require Import POCS.
 Require Import MailServerAPI.
 
-Require Import MailServerDirAPI.
-Require Import MailServerDirImpl.
-
 Require Import MailboxAPI.
 Require Import MailboxImpl.
 
@@ -46,7 +43,7 @@ Definition do_mail_req : proc opT unit :=
     _ <- Op (Deliver msg);
     Op (Respond tt)
   | ReqRead =>
-    msgs <- Op ReadAll;
+    msgs <- Op Pickup;
     Op (Respond msgs)
   end.
 
@@ -57,8 +54,7 @@ Definition mail_server :=
   repeat (Proc mail_server_thread) 4.
 
 
-Module c1 := Link MailboxAPI MailServerDirAPI MailServerAPI
-                  AtomicReader MailServerDir.
+Module c1 := AtomicReader.
 Module c2 := Link MailboxTmpAbsAPI MailboxAPI MailServerAPI
                   MailboxTmpAbs c1.
 Module c3 := Link DeliverAPI MailboxTmpAbsAPI MailServerAPI
@@ -90,6 +86,5 @@ Module c9 := Link MailFSPathAPI MailFSPathAbsAPI MailServerAPI
 
 
 Definition ms_bottom := c9.compile_ts mail_server.
-Check ms_bottom.
 
 Print Assumptions c9.compile_traces_match.

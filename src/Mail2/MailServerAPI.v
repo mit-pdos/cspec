@@ -4,7 +4,7 @@ Require Import String.
 
 Module MailServerAPI <: Layer.
 
-  Definition mbox_contents := FSet.t string.
+  Definition dir_contents := FMap.t (nat*nat) string.
 
   Inductive request :=
   | ReqDeliver (msg : string)
@@ -13,25 +13,26 @@ Module MailServerAPI <: Layer.
 
   Inductive xopT : Type -> Type :=
   | Deliver : forall (m : string), xopT unit
-  | ReadAll : xopT (list string)
+  | Pickup : xopT (list ((nat*nat) * string))
   | GetRequest : xopT request
   | Respond : forall (T : Type) (v : T), xopT unit
   .
 
   Definition opT := xopT.
-  Definition State := mbox_contents.
+  Definition State := dir_contents.
   Definition initP (s : State) := True.
 
   Inductive xstep : forall T, opT T -> nat -> State -> T -> State -> list event -> Prop :=
-  | StepDeliver : forall m mbox tid,
+  | StepDeliver : forall m mbox fn tid,
+    ~ FMap.In fn mbox ->
     xstep (Deliver m) tid
       mbox
       tt
-      (FSet.add m mbox)
+      (FMap.add fn m mbox)
       nil
-  | StepList : forall mbox tid r,
-    FSet.is_permutation r mbox ->
-    xstep ReadAll tid
+  | StepPickup : forall mbox tid r,
+    FMap.is_permutation_kv r mbox ->
+    xstep Pickup tid
       mbox
       r
       mbox
