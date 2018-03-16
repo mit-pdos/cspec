@@ -14,6 +14,7 @@ Module MailServerAPI <: Layer.
   Inductive xopT : Type -> Type :=
   | Deliver : forall (m : string), xopT unit
   | Pickup : xopT (list ((nat*nat) * string))
+  | Delete : forall (id : nat*nat), xopT unit
   | GetRequest : xopT request
   | Respond : forall (T : Type) (v : T), xopT unit
   .
@@ -36,6 +37,12 @@ Module MailServerAPI <: Layer.
       mbox
       r
       mbox
+      nil
+  | StepDelete : forall mbox tid id,
+    xstep (Delete id) tid
+      mbox
+      tt
+      (FMap.remove id mbox)
       nil
   | StepGetRequest : forall mbox tid r,
     xstep GetRequest tid
