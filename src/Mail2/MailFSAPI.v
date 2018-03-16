@@ -19,7 +19,7 @@ Module MailFSAPI <: Layer.
   | Random : xopT nat
 
   | List : xopT (list (nat * nat))
-  | Read : forall (fn : nat * nat), xopT string
+  | Read : forall (fn : nat * nat), xopT (option string)
   | GetRequest : xopT request
   | Respond : forall (T : Type) (v : T), xopT unit
   .
@@ -79,13 +79,22 @@ Module MailFSAPI <: Layer.
       (mk_state tmp mbox)
       nil
 
-  | StepRead : forall fn tmp mbox tid m,
+  | StepReadOK : forall fn tmp mbox tid m,
     FMap.MapsTo fn m mbox ->
     xstep (Read fn) tid
       (mk_state tmp mbox)
-      m
+      (Some m)
       (mk_state tmp mbox)
       nil
+      
+  | StepReadNone : forall fn tmp mbox tid m,
+    ~FMap.MapsTo fn m mbox ->
+    xstep (Read fn) tid
+      (mk_state tmp mbox)
+      None
+      (mk_state tmp mbox)
+      nil
+      
   | StepGetRequest : forall s tid r,
     xstep GetRequest tid
       s

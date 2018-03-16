@@ -220,7 +220,7 @@ Module MailFSPathAbsImpl <: LayerImpl MailFSPathAbsAPI MailFSStringAPI.
     all: split; [ | econstructor ].
     all: simpl.
     all: intuition eauto 10.
-  Qed.
+  Admitted.
 
   Hint Resolve absR_ok.
 

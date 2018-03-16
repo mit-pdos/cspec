@@ -12,7 +12,7 @@ Module MailboxAPI <: Layer.
   Inductive xopT : Type -> Type :=
   | Deliver : forall (m : string), xopT unit
   | List : xopT (list (nat*nat))
-  | Read : forall (fn : nat*nat), xopT string
+  | Read : forall (fn : nat*nat), xopT (option string)
   | GetRequest : xopT request
   | Respond : forall (T : Type) (v : T), xopT unit
   .
@@ -36,13 +36,23 @@ Module MailboxAPI <: Layer.
       r
       mbox
       nil
-  | StepRead : forall fn mbox tid m,
+      
+  | StepReadOK : forall fn mbox tid m,
     FMap.MapsTo fn m mbox ->
     xstep (Read fn) tid
       mbox
-      m
+      (Some m)
       mbox
       nil
+
+  | StepReadNone : forall fn mbox tid m,
+    ~FMap.MapsTo fn m mbox ->
+    xstep (Read fn) tid
+      mbox
+      None
+      mbox
+      nil
+
   | StepGetRequest : forall mbox tid r,
     xstep GetRequest tid
       mbox

@@ -135,7 +135,9 @@ Module MailFSStringAbsImpl <: LayerImpl MailFSStringAbsAPI MailFSAPI.
     inversion H0; clear H0; subst; repeat sigT_eq; simpl in *.
     all: eexists; split; [ split | econstructor ]; simpl.
     all: intuition eauto.
-  Qed.
+    apply H12.
+    unfold dirR in H1.
+  Admitted.
 
   Hint Resolve absR_ok.
 

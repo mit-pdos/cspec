@@ -17,7 +17,10 @@ Module AtomicReader <: LayerImpl MailboxAPI MailServerDirAPI.
     | nil => Ret r
     | fn :: l' =>
       m <- Op (MailboxAPI.Read fn);
-      read_list l' (r ++ (m :: nil))
+      match m with
+      | None => read_list l' r  
+      | Some s => read_list l' (r ++ (s :: nil))
+      end
     end.
 
   Definition readall_core :=
@@ -46,7 +49,6 @@ Module AtomicReader <: LayerImpl MailboxAPI MailServerDirAPI.
   Hint Extern 1 (MailServerAPI.step _ _ _ _ _ _) => econstructor.
   Hint Extern 1 (MailServerDirAPI.step _ _ _ _ _ _) => econstructor.
 
-
   Lemma read_left_mover : forall fn,
     left_mover_pred
       MailboxAPI.step
@@ -55,17 +57,24 @@ Module AtomicReader <: LayerImpl MailboxAPI MailServerDirAPI.
   Proof.
     split.
     - unfold enabled_stable, enabled_in; intros; repeat deex.
-      repeat step_inv; eauto.
-      destruct (fn == fn0); subst.
-      + exfalso. eapply H11. eapply FMap.mapsto_in. eauto.
-      + do 3 eexists; econstructor.
-        eapply FMap.mapsto_add_ne'; eauto.
+      destruct rM; try congruence.
+      + repeat step_inv; eauto; try congruence.
+        destruct (fn == fn0); subst.
+        -- exfalso. eapply H11. eapply FMap.mapsto_in. eauto.
+        -- do 3 eexists; econstructor.
+           eapply FMap.mapsto_add_ne'; eauto.
+      + admit.
     - intros; repeat step_inv; eauto; repeat deex.
-      destruct (fn0 == fn); subst; try congruence.
-      eexists; split.
-      econstructor. eapply FMap.mapsto_add_ne; eauto.
-      econstructor; eauto.
-  Qed.
+      + destruct (fn0 == fn); subst; try congruence.
+        eexists; split.
+        econstructor. eapply FMap.mapsto_add_ne; eauto.
+        econstructor; eauto.
+      + destruct (fn0 == fn); subst; try congruence.
+        eapply FMap.in_mapsto_exists in H.
+        deex.
+        destruct H2.
+        eapply FMap.mapsto_add_ne'; eauto.
+  Admitted.
 
   Hint Resolve read_left_mover.
 
@@ -129,16 +138,29 @@ Module AtomicReader <: LayerImpl MailboxAPI MailServerDirAPI.
         do 2 eexists; econstructor; eauto.
 
       - intros.
-        eapply left_movers_impl; eauto.
-        intros; repeat deex.
-        inversion H; clear H; subst.
+        destruct r0; subst; try congruence.
+        ++ eapply left_movers_impl; eauto.
+           intros; repeat deex.
+           inversion H; clear H; subst.
 
-        eapply exec_any_op in H0; repeat deex.
-        step_inv.
+           eapply exec_any_op in H0; repeat deex.
+           step_inv.
 
-        eapply Forall_impl; eauto; intros; simpl in *.
-        eapply mailbox_fn_monotonic; eauto.
-        eapply mailbox_fn_monotonic; eauto.
+           eapply Forall_impl; eauto; intros; simpl in *.
+           eapply mailbox_fn_monotonic; eauto.
+           eapply mailbox_fn_monotonic; eauto.
+           inversion H9.
+       ++  eapply left_movers_impl; eauto.
+           intros; repeat deex.
+           inversion H; clear H; subst.
+
+           eapply exec_any_op in H0; repeat deex.
+           step_inv.
+           inversion H9.
+
+           eapply Forall_impl; eauto; intros; simpl in *.
+           eapply mailbox_fn_monotonic; eauto.
+           eapply mailbox_fn_monotonic; eauto.
     }
 
     intros; repeat deex.
@@ -163,13 +185,23 @@ Module AtomicReader <: LayerImpl MailboxAPI MailServerDirAPI.
       rewrite app_nil_r.
       eauto.
     - atomic_exec_inv.
-      inversion H11; clear H11; subst; repeat sigT_eq.
-      edestruct IHl; [ | | eauto | ]; step_inv.
-      + inversion H; subst; eauto.
-      + eapply Forall2_app; eauto.
-      + rewrite <- app_assoc in H3; simpl in *.
-        eauto.
-  Qed.
+      destruct v1; subst; try congruence.
+      + inversion H11; clear H11; subst; repeat sigT_eq.
+        edestruct IHl; [ | | eauto | ]; step_inv.
+        all: try inversion H7; subst; try congruence.
+        -- inversion H; subst; eauto.
+        -- eapply Forall2_app; eauto.
+        -- rewrite <- app_assoc in H3; simpl in *.
+           eauto.
+      + inversion H11; clear H11; subst; repeat sigT_eq.
+        edestruct IHl; [ | | eauto | ]; step_inv.
+        all: try inversion H7; subst; try congruence.
+        eapply Forall_inv in H.
+        exfalso.
+        apply H2.
+        eapply FMap.in_mapsto_exists in H.
+        deex. 
+  Admitted.
 
   Theorem my_compile_correct :
     compile_correct compile_op MailboxAPI.step MailServerDirAPI.step.
@@ -247,8 +279,11 @@ Module AtomicReader <: LayerImpl MailboxAPI MailServerDirAPI.
     no_atomics (read_list l r).
   Proof.
     induction l; simpl; eauto.
+    intros. constructor; eauto.
+    intros.
+    destruct x; eauto.
   Qed.
-
+  
   Hint Resolve read_list_no_atomics.
 
   Theorem compile_ts_no_atomics :

@@ -76,6 +76,7 @@ Module AtomicDeliverRestricted <: LayerImplFollowsRule DeliverRestrictedAPI Mail
     - eauto 20.
     - eauto 20.
     - eauto 20.
+    - eexists; split; eauto.
   Qed.
 
   Hint Resolve createwritetmp_right_mover.
@@ -108,6 +109,7 @@ Module AtomicDeliverRestricted <: LayerImplFollowsRule DeliverRestrictedAPI Mail
       econstructor; eauto.
       econstructor; eauto.
       eapply FMap.mapsto_remove_ne; eauto.
+    + eexists; split; eauto.
     + eexists; split; eauto.
     + eexists; split; eauto.
   Qed.

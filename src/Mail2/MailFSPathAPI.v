@@ -18,7 +18,7 @@ Module MailFSPathAPI <: Layer.
   | Random : xopT nat
 
   | List : forall (dir : string), xopT (list string)
-  | Read : forall (fn : string * string), xopT string
+  | Read : forall (fn : string * string), xopT (option string)
   | GetRequest : xopT request
   | Respond : forall (T : Type) (v : T), xopT unit
   .
@@ -78,11 +78,19 @@ Module MailFSPathAPI <: Layer.
       fs
       nil
 
-  | StepRead : forall fn fs tid m,
+  | StepReadOK : forall fn fs tid m,
     FMap.MapsTo fn m fs ->
     xstep (Read fn) tid
       fs
-      m
+      (Some m)
+      fs
+      nil
+
+  | StepReadNone : forall fn fs tid m,
+    ~ FMap.MapsTo fn m fs ->
+    xstep (Read fn) tid
+      fs
+      None
       fs
       nil
   | StepGetRequest : forall s tid r,

@@ -17,7 +17,7 @@ Module LinkRetryImpl <: LayerImpl TryDeliverAPI DeliverAPI.
     | DeliverAPI.LinkMail => (fun _ => TryDeliverAPI.LinkMail, retry_cond, false)
     | DeliverAPI.UnlinkTmp => (fun _ => TryDeliverAPI.UnlinkTmp, once_cond, tt)
     | DeliverAPI.List => (fun _ => TryDeliverAPI.List, once_cond, nil)
-    | DeliverAPI.Read fn => (fun _ => TryDeliverAPI.Read fn, once_cond, ""%string)
+    | DeliverAPI.Read fn => (fun _ => TryDeliverAPI.Read fn, once_cond, (Some ""%string))
     | DeliverAPI.GetRequest => (fun _ => TryDeliverAPI.GetRequest, once_cond, MailServerAPI.ReqRead)
     | DeliverAPI.Respond r => (fun _ => TryDeliverAPI.Respond r, once_cond, tt)
     end.

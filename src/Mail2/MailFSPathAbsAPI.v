@@ -132,13 +132,22 @@ Module MailFSPathAbsAPI <: Layer.
       fs
       nil
 
-  | StepRead : forall fn fs tid m,
+  | StepReadOK : forall fn fs tid m,
     FMap.MapsTo ("mail"%string, fn) m fs ->
     xstep (Read fn) tid
       fs
-      m
+      (Some m)
       fs
       nil
+
+  | StepReadNone : forall fn fs tid m,
+    ~FMap.MapsTo ("mail"%string, fn) m fs ->
+    xstep (Read fn) tid
+      fs
+      None
+      fs
+      nil
+
   | StepGetRequest : forall s tid r,
     xstep GetRequest tid
       s
