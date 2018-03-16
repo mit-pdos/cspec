@@ -123,7 +123,10 @@ Module MailFSStringImpl <: LayerImpl MailFSStringAPI MailFSStringAbsAPI.
 
     destruct fn; simpl in *.
     eauto.
-  Admitted.
+
+    destruct fn; simpl in *.
+    eauto.
+  Qed.
 
   Theorem my_atomize_correct :
     atomize_correct compile_op MailFSStringAPI.step.
