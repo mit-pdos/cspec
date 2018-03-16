@@ -108,13 +108,14 @@ Module MailFSStringAbsAPI <: Layer.
       (Some m)
       (mk_state tmp mbox)
       nil
-  | StepReadNone : forall fntid fn tmp mbox tid m,
-    ~FMap.MapsTo (encode_tid_fn fntid fn) m mbox ->
+  | StepReadNone : forall fntid fn tmp mbox tid,
+    ~ FMap.In (encode_tid_fn fntid fn) mbox ->
     xstep (Read (fntid, fn)) tid
       (mk_state tmp mbox)
       None
       (mk_state tmp mbox)
       nil
+
   | StepGetRequest : forall s tid r,
     xstep GetRequest tid
       s

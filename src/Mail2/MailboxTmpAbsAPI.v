@@ -41,8 +41,8 @@ Module MailboxTmpAbsAPI <: Layer.
       (Some m)
       (mk_state tmp mbox)
       nil
-  | StepReadNone : forall fn tmp mbox tid m,
-    ~FMap.MapsTo fn m mbox ->
+  | StepReadNone : forall fn tmp mbox tid,
+    ~ FMap.In fn mbox ->
     xstep (Read fn) tid
       (mk_state tmp mbox)
       None

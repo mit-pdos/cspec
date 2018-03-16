@@ -48,6 +48,14 @@ Module AtomicReader <: LayerImpl MailboxAPI MailServerDirAPI.
   Hint Extern 1 (MailboxAPI.step _ _ _ _ _ _) => econstructor.
   Hint Extern 1 (MailServerAPI.step _ _ _ _ _ _) => econstructor.
   Hint Extern 1 (MailServerDirAPI.step _ _ _ _ _ _) => econstructor.
+  Hint Constructors MailboxAPI.xstep.
+
+  Hint Resolve FMap.mapsto_in.
+  Hint Resolve FMap.mapsto_add_ne'.
+  Hint Resolve FMap.mapsto_add_ne.
+  Hint Resolve FMap.add_incr.
+  Hint Resolve FMap.add_mapsto.
+  Hint Resolve FMap.in_add_ne.
 
   Lemma read_left_mover : forall fn,
     left_mover_pred
@@ -57,24 +65,18 @@ Module AtomicReader <: LayerImpl MailboxAPI MailServerDirAPI.
   Proof.
     split.
     - unfold enabled_stable, enabled_in; intros; repeat deex.
+      unfold MailboxAPI.step.
       destruct rM; try congruence.
       + repeat step_inv; eauto; try congruence.
-        destruct (fn == fn0); subst.
-        -- exfalso. eapply H11. eapply FMap.mapsto_in. eauto.
-        -- do 3 eexists; econstructor.
-           eapply FMap.mapsto_add_ne'; eauto.
-      + admit.
+        destruct (fn == fn0); subst; eauto 10.
+      + repeat step_inv; eauto; try congruence.
+        destruct (fn0 == fn); subst; eauto 10.
     - intros; repeat step_inv; eauto; repeat deex.
       + destruct (fn0 == fn); subst; try congruence.
-        eexists; split.
-        econstructor. eapply FMap.mapsto_add_ne; eauto.
-        econstructor; eauto.
+        eauto 10.
       + destruct (fn0 == fn); subst; try congruence.
-        eapply FMap.in_mapsto_exists in H.
-        deex.
-        destruct H2.
-        eapply FMap.mapsto_add_ne'; eauto.
-  Admitted.
+        eauto 10.
+  Qed.
 
   Hint Resolve read_left_mover.
 
@@ -193,15 +195,12 @@ Module AtomicReader <: LayerImpl MailboxAPI MailServerDirAPI.
         -- eapply Forall2_app; eauto.
         -- rewrite <- app_assoc in H3; simpl in *.
            eauto.
-      + inversion H11; clear H11; subst; repeat sigT_eq.
-        edestruct IHl; [ | | eauto | ]; step_inv.
-        all: try inversion H7; subst; try congruence.
+      + exfalso.
+        inversion H11; clear H11; subst; repeat sigT_eq.
         eapply Forall_inv in H.
-        exfalso.
-        apply H2.
-        eapply FMap.in_mapsto_exists in H.
-        deex. 
-  Admitted.
+        step_inv.
+        congruence.
+  Qed.
 
   Theorem my_compile_correct :
     compile_correct compile_op MailboxAPI.step MailServerDirAPI.step.

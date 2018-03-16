@@ -120,7 +120,6 @@ Module MailFSStringImpl <: LayerImpl MailFSStringAPI MailFSStringAbsAPI.
 
     repeat atomic_exec_inv.
     repeat step_inv; eauto.
-    simpl.
 
     destruct fn; simpl in *.
     eauto.

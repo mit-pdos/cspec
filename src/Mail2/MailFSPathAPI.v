@@ -85,14 +85,14 @@ Module MailFSPathAPI <: Layer.
       (Some m)
       fs
       nil
-
-  | StepReadNone : forall fn fs tid m,
-    ~ FMap.MapsTo fn m fs ->
+  | StepReadNone : forall fn fs tid,
+    ~ FMap.In fn fs ->
     xstep (Read fn) tid
       fs
       None
       fs
       nil
+
   | StepGetRequest : forall s tid r,
     xstep GetRequest tid
       s

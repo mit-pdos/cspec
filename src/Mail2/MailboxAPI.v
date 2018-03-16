@@ -36,7 +36,7 @@ Module MailboxAPI <: Layer.
       r
       mbox
       nil
-      
+
   | StepReadOK : forall fn mbox tid m,
     FMap.MapsTo fn m mbox ->
     xstep (Read fn) tid
@@ -45,8 +45,8 @@ Module MailboxAPI <: Layer.
       mbox
       nil
 
-  | StepReadNone : forall fn mbox tid m,
-    ~FMap.MapsTo fn m mbox ->
+  | StepReadNone : forall fn mbox tid,
+    ~ FMap.In fn mbox ->
     xstep (Read fn) tid
       mbox
       None
