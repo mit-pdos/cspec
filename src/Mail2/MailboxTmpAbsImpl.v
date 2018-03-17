@@ -1,12 +1,14 @@
 Require Import POCS.
 Require Import MailboxAPI.
 Require Import MailboxTmpAbsAPI.
+Require Import MailServerLockAbsAPI.
 
 
 Module MailboxTmpAbs <: LayerImpl MailboxTmpAbsAPI MailboxAPI.
 
   Definition absR (s1 : MailboxTmpAbsAPI.State) (s2 : MailboxAPI.State) :=
-    MailboxTmpAbsAPI.maildir s1 = s2.
+    MailboxTmpAbsAPI.maildir s1 = MailServerLockAbsAPI.maildir s2 /\
+    (MailboxTmpAbsAPI.locked s1 = false <-> MailServerLockAbsAPI.locked s2 = None).
 
   Definition compile_ts (ts : @threads_state MailboxAPI.opT) := ts.
 
@@ -24,9 +26,19 @@ Module MailboxTmpAbs <: LayerImpl MailboxTmpAbsAPI MailboxAPI.
     op_abs absR MailboxTmpAbsAPI.step MailboxAPI.step.
   Proof.
     unfold op_abs, absR; intros.
-    destruct s1; simpl in *; subst.
+    destruct s1.
+    destruct s2.
+    intuition idtac.
+    simpl in *; subst.
     inversion H0; clear H0; subst; repeat sigT_eq.
-    all: eauto 10.
+    all: simpl.
+    all: eexists; split; [ | eauto ].
+    all: simpl.
+    all: try intuition congruence.
+    all: try ( destruct locked0; try intuition congruence ).
+    all: eauto.
+    simpl.
+    intuition congruence.
   Qed.
 
   Hint Resolve absR_ok.
