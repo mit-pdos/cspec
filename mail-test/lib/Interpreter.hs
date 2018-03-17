@@ -8,11 +8,13 @@ import Data.IORef
 import Data.Maybe
 import GHC.Prim
 import System.Posix.Files
+import System.Posix.IO
 import System.Directory
 import System.Random
 import System.IO
 import System.IO.Error
 import System.CPUTime.Rdtsc
+import System.Lock.FLock
 
 -- Extracted code
 import ConcurProc
@@ -21,11 +23,12 @@ import MailServer
 import MailServerAPI
 
 data State =
-  S
+  S !(MVar Lock)
 
 mkState :: IO State
 mkState = do
-  return $ S
+  lockvar <- newEmptyMVar
+  return $ S lockvar
 
 verbose :: Bool
 verbose = True
@@ -122,3 +125,17 @@ run_proc _ (Op (MailFSPathAPI__Read (dir, fn))) = do
                _ -> do
                  debugmsg "Unknown exception on read"
                  return $ unsafeCoerce Nothing)
+
+run_proc (S lockvar) (Op (MailFSPathAPI__Lock)) = do
+  debugmsg $ "Lock"
+  mboxfd <- openFd (dirPath "mail") ReadOnly Nothing defaultFileFlags
+  lck <- lockFd mboxfd Exclusive Block
+  closeFd mboxfd
+  putMVar lockvar lck
+  return $ unsafeCoerce ()
+
+run_proc (S lockvar) (Op (MailFSPathAPI__Unlock)) = do
+  debugmsg $ "Unlock"
+  lck <- takeMVar lockvar
+  unlock lck
+  return $ unsafeCoerce ()

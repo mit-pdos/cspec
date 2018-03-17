@@ -16,6 +16,7 @@ executable mail-test
                      , directory
                      , random
                      , rdtsc
+                     , flock
   other-modules:       Interpreter
                      , Compile
                      , ConcurProc
