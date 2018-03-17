@@ -92,10 +92,7 @@ Section Proc.
   | AtomicUntil : forall T (p : T -> proc T) (c : T -> bool) v tid s r s' ev',
     atomic_exec (until1 c p v) tid s r s' ev' ->
     atomic_exec (Until c p v) tid s r s' ev'
-
-  | AtomicAtomic : forall T (p : proc T) tid s r s' ev',
-    atomic_exec p tid s r s' ev' ->
-    atomic_exec (Atomic p) tid s r s' ev'.
+  .
 
 
   Inductive exec_tid : forall T (tid : nat),

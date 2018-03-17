@@ -51,7 +51,6 @@ Section StateAbstraction.
     - eapply op_abs_holds in H; eauto; deex.
       eexists; eauto.
     - edestruct IHatomic_exec; intuition eauto.
-    - edestruct IHatomic_exec; intuition eauto.
   Qed.
 
   Theorem exec_tid_abs : forall `(p : proc opLoT T) s1 s1' s2 tid res evs,
