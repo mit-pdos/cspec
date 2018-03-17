@@ -45,7 +45,7 @@ Section Proc.
   | Op : forall T (op : opT T), proc T
   | Ret : forall T (v : T), proc T
   | Bind : forall T (T1 : Type) (p1 : proc T1) (p2 : T1 -> proc T), proc T
-  | Until : forall T (c : T -> bool) (p : T -> proc T) (v : T), proc T
+  | Until : forall T (c : T -> bool) (p : option T -> proc T) (v : option T), proc T
   | Atomic : forall T (p : proc T), proc T.
 
 
@@ -69,8 +69,10 @@ Section Proc.
     list_upd (pad ts (S tid) NoProc) tid s.
 
 
-  Definition until1 T (c : T -> bool) (p : T -> proc T) (v : T) :=
-    Bind (p v) (fun x => if bool_dec (c x) true then Ret x else Until c p x).
+  Definition until1 T (c : T -> bool)
+                      (p : option T -> proc T)
+                      (v : option T) :=
+    Bind (p v) (fun x => if bool_dec (c x) true then Ret x else Until c p (Some x)).
 
 
   Inductive atomic_exec : forall T, proc T -> nat -> State ->
@@ -89,7 +91,7 @@ Section Proc.
     op_step op tid s v s' evs ->
     atomic_exec (Op op) tid s v s' evs
 
-  | AtomicUntil : forall T (p : T -> proc T) (c : T -> bool) v tid s r s' ev',
+  | AtomicUntil : forall T (p : option T -> proc T) (c : T -> bool) v tid s r s' ev',
     atomic_exec (until1 c p v) tid s r s' ev' ->
     atomic_exec (Until c p v) tid s r s' ev'
   .
@@ -127,7 +129,7 @@ Section Proc.
                      end
                     ) evs
 
-  | ExecTidUntil : forall tid T (p : T -> proc T) (c : T -> bool) v s,
+  | ExecTidUntil : forall tid T (p : option T -> proc T) (c : T -> bool) v s,
     exec_tid tid s (Until c p v)
                  s (inr (until1 c p v))
                  nil.

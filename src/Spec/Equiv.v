@@ -610,7 +610,7 @@ Proof.
   reflexivity.
 Qed.
 
-Theorem exec_equiv_until : forall `(p : T -> proc opT T) (c : T -> bool) v,
+Theorem exec_equiv_until : forall `(p : option T -> proc opT T) (c : T -> bool) v,
   exec_equiv_rx (Until c p v) (until1 c p v).
 Proof.
   intros.
@@ -1854,7 +1854,7 @@ Proof.
 Qed.
 
 Theorem trace_incl_rx_until_helper :
-  forall T opT (p1 p2 : T -> proc opT T)
+  forall T opT (p1 p2 : option T -> proc opT T)
          `(op_step : OpSemantics opT State)
          (c : T -> bool) n v,
     (forall v', trace_incl_rx_N (n-1) op_step (p1 v') (p2 v')) ->
@@ -1943,7 +1943,7 @@ Proof.
 Qed.
 
 Theorem trace_incl_rx_until :
-  forall T opT (p1 p2 : T -> proc opT T)
+  forall T opT (p1 p2 : option T -> proc opT T)
          `(op_step : OpSemantics opT State)
          (c : T -> bool) v,
     (forall v', trace_incl_rx op_step (p1 v') (p2 v')) ->

@@ -24,7 +24,7 @@ Section ProcStructure.
     no_atomics pa ->
     (forall x, no_atomics (pb x)) ->
     no_atomics (Bind pa pb)
-  | NoAtomicsUntil : forall `(p : T -> proc opT T) (c : T -> bool) v,
+  | NoAtomicsUntil : forall `(p : option T -> proc opT T) (c : T -> bool) v,
     (forall v, no_atomics (p v)) ->
     no_atomics (Until c p v)
   .
@@ -147,7 +147,7 @@ Section Compiler.
     compile_ok p1a p2a ->
     (forall x, compile_ok (p1b x) (p2b x)) ->
     compile_ok (Bind p1a p1b) (Bind p2a p2b)
-  | CompileUntil : forall `(p1 : T -> proc opLoT T) (p2 : T -> proc opMidT T) (c : T -> bool) v,
+  | CompileUntil : forall `(p1 : option T -> proc opLoT T) (p2 : option T -> proc opMidT T) (c : T -> bool) v,
     (forall v', compile_ok (p1 v') (p2 v')) ->
     compile_ok (Until c p1 v) (Until c p2 v)
   .
@@ -162,7 +162,7 @@ Section Compiler.
     atomic_compile_ok p1a p2a ->
     (forall x, atomic_compile_ok (p1b x) (p2b x)) ->
     atomic_compile_ok (Bind p1a p1b) (Bind p2a p2b)
-  | ACompileUntil : forall `(p1 : T -> proc opLoT T) (p2 : T -> proc opMidT T) (c : T -> bool) v,
+  | ACompileUntil : forall `(p1 : option T -> proc opLoT T) (p2 : option T -> proc opMidT T) (c : T -> bool) v,
     (forall v', atomic_compile_ok (p1 v') (p2 v')) ->
     atomic_compile_ok (Until c p1 v) (Until c p2 v)
   .
@@ -371,7 +371,7 @@ Section Atomization.
     atomize_ok p1a p2a ->
     (forall x, atomize_ok (p1b x) (p2b x)) ->
     atomize_ok (Bind p1a p1b) (Bind p2a p2b)
-  | AtomizeUntil : forall T (p1 p2 : T -> proc opLoT T) (c : T -> bool) v,
+  | AtomizeUntil : forall T (p1 p2 : option T -> proc opLoT T) (c : T -> bool) v,
     (forall v', atomize_ok (p1 v') (p2 v')) ->
     atomize_ok (Until c p1 v) (Until c p2 v)
   .

@@ -17,7 +17,7 @@ Section Compiler.
   Variable opLoT : Type -> Type.
   Variable opMidT : Type -> Type.
 
-  Variable compile_op : forall T, opMidT T -> ((T -> opLoT T) * (T -> bool) * T).
+  Variable compile_op : forall T, opMidT T -> ((option T -> opLoT T) * (T -> bool) * option T).
 
   Fixpoint compile T (p : proc opMidT T) : proc opLoT T :=
     match p with
@@ -47,7 +47,7 @@ Section Compiler.
     compile_ok p1a p2a ->
     (forall x, compile_ok (p1b x) (p2b x)) ->
     compile_ok (Bind p1a p1b) (Bind p2a p2b)
-  | CompileUntil : forall `(p1 : T -> proc opLoT T) (p2 : T -> proc opMidT T) (c : T -> bool) v,
+  | CompileUntil : forall `(p1 : option T -> proc opLoT T) (p2 : option T -> proc opMidT T) (c : T -> bool) v,
     (forall v', compile_ok (p1 v') (p2 v')) ->
     compile_ok (Until c p1 v) (Until c p2 v)
   .

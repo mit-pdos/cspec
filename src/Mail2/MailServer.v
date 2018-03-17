@@ -54,7 +54,7 @@ Definition do_mail_req : proc opT unit :=
   end.
 
 Definition mail_server_thread : proc MailServerAPI.opT unit :=
-  Until (fun _ => false) (fun _ => do_mail_req) tt.
+  Until (fun _ => false) (fun _ => do_mail_req) None.
 
 Definition mail_server :=
   repeat (Proc mail_server_thread) 4.

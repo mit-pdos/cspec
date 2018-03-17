@@ -11,18 +11,18 @@ Module LinkRetryImpl <: LayerImpl TryDeliverAPI DeliverAPI.
   Definition retry_cond (r : bool) := r.
   Definition once_cond {T} (r : T) := true.
 
-  Definition compile_op T (op : DeliverAPI.opT T) : (T -> TryDeliverAPI.opT T) * (T -> bool) * T :=
+  Definition compile_op T (op : DeliverAPI.opT T) : (option T -> TryDeliverAPI.opT T) * (T -> bool) * option T :=
     match op with
-    | DeliverAPI.CreateWriteTmp data => (fun _ => TryDeliverAPI.CreateWriteTmp data, once_cond, tt)
-    | DeliverAPI.LinkMail => (fun _ => TryDeliverAPI.LinkMail, retry_cond, false)
-    | DeliverAPI.UnlinkTmp => (fun _ => TryDeliverAPI.UnlinkTmp, once_cond, tt)
-    | DeliverAPI.List => (fun _ => TryDeliverAPI.List, once_cond, nil)
-    | DeliverAPI.Read fn => (fun _ => TryDeliverAPI.Read fn, once_cond, (Some ""%string))
-    | DeliverAPI.Delete fn => (fun _ => TryDeliverAPI.Delete fn, once_cond, tt)
-    | DeliverAPI.Lock => (fun _ => TryDeliverAPI.Lock, once_cond, tt)
-    | DeliverAPI.Unlock => (fun _ => TryDeliverAPI.Unlock, once_cond, tt)
-    | DeliverAPI.GetRequest => (fun _ => TryDeliverAPI.GetRequest, once_cond, MailServerAPI.ReqRead)
-    | DeliverAPI.Respond r => (fun _ => TryDeliverAPI.Respond r, once_cond, tt)
+    | DeliverAPI.CreateWriteTmp data => (fun _ => TryDeliverAPI.CreateWriteTmp data, once_cond, None)
+    | DeliverAPI.LinkMail => (fun _ => TryDeliverAPI.LinkMail, retry_cond, None)
+    | DeliverAPI.UnlinkTmp => (fun _ => TryDeliverAPI.UnlinkTmp, once_cond, None)
+    | DeliverAPI.List => (fun _ => TryDeliverAPI.List, once_cond, None)
+    | DeliverAPI.Read fn => (fun _ => TryDeliverAPI.Read fn, once_cond, None)
+    | DeliverAPI.Delete fn => (fun _ => TryDeliverAPI.Delete fn, once_cond, None)
+    | DeliverAPI.Lock => (fun _ => TryDeliverAPI.Lock, once_cond, None)
+    | DeliverAPI.Unlock => (fun _ => TryDeliverAPI.Unlock, once_cond, None)
+    | DeliverAPI.GetRequest => (fun _ => TryDeliverAPI.GetRequest, once_cond, None)
+    | DeliverAPI.Respond r => (fun _ => TryDeliverAPI.Respond r, once_cond, None)
     end.
 
   Definition compile_ts ts :=

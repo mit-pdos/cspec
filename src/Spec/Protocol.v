@@ -45,7 +45,7 @@ Section Protocol.
       follows_protocol_proc tid s' (p2 r)) ->
     follows_protocol_proc tid s (Bind p1 p2)
   | FollowsProtocolProcUntil :
-    forall T (p : T -> proc _ T) c v,
+    forall T (p : option T -> proc _ T) c v,
     (forall s' v',
       follows_protocol_proc tid s' (p v')) ->
     follows_protocol_proc tid s (Until c p v)
