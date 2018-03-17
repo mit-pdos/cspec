@@ -9,6 +9,7 @@ Module MailServerAPI <: Layer.
   Inductive request :=
   | ReqDeliver (msg : string)
   | ReqRead
+  | ReqDelete (id : nat*nat)
   .
 
   Inductive xopT : Type -> Type :=

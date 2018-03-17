@@ -48,6 +48,9 @@ Definition do_mail_req : proc opT unit :=
   | ReqRead =>
     msgs <- Op Pickup;
     Op (Respond msgs)
+  | ReqDelete id =>
+    _ <- Op (Delete id);
+    Op (Respond tt)
   end.
 
 Definition mail_server_thread : proc MailServerAPI.opT unit :=
