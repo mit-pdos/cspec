@@ -13,10 +13,13 @@ Module MailFSPathImpl <: LayerImpl MailFSPathAPI MailFSPathAbsAPI.
     | MailFSStringAPI.LinkMail tmpfn mailfn => Op (MailFSPathAPI.Link ("tmp"%string, tmpfn) ("mail"%string, mailfn))
     | MailFSStringAPI.List => Op (MailFSPathAPI.List "mail"%string)
     | MailFSStringAPI.Read fn => Op (MailFSPathAPI.Read ("mail"%string, fn))
+    | MailFSStringAPI.Delete fn => Op (MailFSPathAPI.Unlink ("mail"%string, fn))
     | MailFSStringAPI.CreateWriteTmp tmpfn data => Op (MailFSPathAPI.CreateWrite ("tmp"%string, tmpfn) data)
     | MailFSStringAPI.UnlinkTmp tmpfn => Op (MailFSPathAPI.Unlink ("tmp"%string, tmpfn))
     | MailFSStringAPI.GetRequest => Op (MailFSPathAPI.GetRequest)
     | MailFSStringAPI.Respond r => Op (MailFSPathAPI.Respond r)
+    | MailFSStringAPI.Lock => Op (MailFSPathAPI.Lock)
+    | MailFSStringAPI.Unlock => Op (MailFSPathAPI.Unlock)
     | MailFSStringAPI.GetTID => Op (MailFSPathAPI.GetTID)
     | MailFSStringAPI.Random => Op (MailFSPathAPI.Random)
     end.

@@ -12,13 +12,17 @@ Module MailFSPathAPI <: Layer.
   Inductive xopT : Type -> Type :=
   | CreateWrite : forall (tmpfn : string * string) (data : string), xopT unit
   | Link : forall (tmpfn : string * string) (mboxfn : string * string), xopT bool
-  | Unlink : forall (tmpfn : string * string), xopT unit
+  | Unlink : forall (fn : string * string), xopT unit
 
   | GetTID : xopT nat
   | Random : xopT nat
 
   | List : forall (dir : string), xopT (list string)
   | Read : forall (fn : string * string), xopT (option string)
+
+  | Lock : xopT unit
+  | Unlock : xopT unit
+
   | GetRequest : xopT request
   | Respond : forall (T : Type) (v : T), xopT unit
   .
@@ -28,69 +32,82 @@ Module MailFSPathAPI <: Layer.
   Definition initP (s : State) := True.
 
   Inductive xstep : forall T, opT T -> nat -> State -> T -> State -> list event -> Prop :=
-  | StepCreateWrite : forall fs tid tmpfn data,
+  | StepCreateWrite : forall fs tid tmpfn data lock,
     xstep (CreateWrite tmpfn data) tid
-      fs
+      (mk_state fs lock)
       tt
-      (FMap.add tmpfn data fs)
+      (mk_state (FMap.add tmpfn data fs) lock)
       nil
-  | StepUnlink : forall fs tid tmpfn,
-    xstep (Unlink tmpfn) tid
-      fs
+  | StepUnlink : forall fs tid fn lock,
+    xstep (Unlink fn) tid
+      (mk_state fs lock)
       tt
-      (FMap.remove tmpfn fs)
+      (mk_state (FMap.remove fn fs) lock)
       nil
-  | StepLinkOK : forall fs tid mailfn data tmpfn,
+  | StepLinkOK : forall fs tid mailfn data tmpfn lock,
     FMap.MapsTo tmpfn data fs ->
     ~ FMap.In mailfn fs ->
     xstep (Link tmpfn mailfn) tid
-      fs
+      (mk_state fs lock)
       true
-      (FMap.add mailfn data fs)
+      (mk_state (FMap.add mailfn data fs) lock)
       nil
-  | StepLinkErr : forall fs tid mailfn tmpfn,
+  | StepLinkErr : forall fs tid mailfn tmpfn lock,
     ((~ FMap.In tmpfn fs) \/
      (FMap.In mailfn fs)) ->
     xstep (Link tmpfn mailfn) tid
-      fs
+      (mk_state fs lock)
       false
-      fs
+      (mk_state fs lock)
       nil
 
-  | StepList : forall fs tid r dirname,
+  | StepList : forall fs tid r dirname lock,
     FMap.is_permutation_key r (drop_dirname (filter_dir dirname fs)) ->
     xstep (List dirname) tid
-      fs
+      (mk_state fs lock)
       r
-      fs
+      (mk_state fs lock)
       nil
 
-  | StepGetTID : forall fs tid,
+  | StepGetTID : forall s tid,
     xstep GetTID tid
-      fs
+      s
       tid
-      fs
+      s
       nil
-  | StepRandom : forall fs tid r,
+  | StepRandom : forall s tid r,
     xstep Random tid
-      fs
+      s
       r
-      fs
+      s
       nil
 
-  | StepReadOK : forall fn fs tid m,
+  | StepReadOK : forall fn fs tid m lock,
     FMap.MapsTo fn m fs ->
     xstep (Read fn) tid
-      fs
+      (mk_state fs lock)
       (Some m)
-      fs
+      (mk_state fs lock)
       nil
-  | StepReadNone : forall fn fs tid,
+  | StepReadNone : forall fn fs tid lock,
     ~ FMap.In fn fs ->
     xstep (Read fn) tid
-      fs
+      (mk_state fs lock)
       None
-      fs
+      (mk_state fs lock)
+      nil
+
+  | StepLock : forall fs tid,
+    xstep Lock tid
+      (mk_state fs false)
+      tt
+      (mk_state fs true)
+      nil
+  | StepUnlock : forall fs tid lock,
+    xstep Unlock tid
+      (mk_state fs lock)
+      tt
+      (mk_state fs false)
       nil
 
   | StepGetRequest : forall s tid r,

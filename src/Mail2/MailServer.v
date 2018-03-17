@@ -1,6 +1,9 @@
 Require Import POCS.
 Require Import MailServerAPI.
 
+Require Import MailServerLockAbsAPI.
+Require Import MailServerLockAbsImpl.
+
 Require Import MailboxAPI.
 Require Import MailboxImpl.
 
@@ -54,7 +57,8 @@ Definition mail_server :=
   repeat (Proc mail_server_thread) 4.
 
 
-Module c1 := AtomicReader.
+Module c1 := Link MailboxAPI MailServerLockAbsAPI MailServerAPI
+                  AtomicReader MailServerLockAbsImpl.
 Module c2 := Link MailboxTmpAbsAPI MailboxAPI MailServerAPI
                   MailboxTmpAbs c1.
 Module c3 := Link DeliverAPI MailboxTmpAbsAPI MailServerAPI
@@ -64,15 +68,16 @@ Module c4 := Link DeliverListTidAPI DeliverAPI MailServerAPI
                   DeliverListTidImpl c3.
 Module c5 := Link MailFSAPI DeliverListTidAPI MailServerAPI
                   MailFSImpl c4.
-(*
-Module c6 := Link MailFSStringAbsAPI MailFSAPI MailServerAPI
-                  MailFSStringAbsImpl c5.
-*)
 
 Module c4' := Link TryDeliverAPI DeliverAPI MailServerAPI
                   LinkRetryImpl c3.
 Module c5' := Link MailFSAPI TryDeliverAPI MailServerAPI
                   TryDeliverImpl c4'.
+
+(*
+Module c6 := Link MailFSStringAbsAPI MailFSAPI MailServerAPI
+                  MailFSStringAbsImpl c5.
+*)
 Module c6 := Link MailFSStringAbsAPI MailFSAPI MailServerAPI
                   MailFSStringAbsImpl c5'.
 

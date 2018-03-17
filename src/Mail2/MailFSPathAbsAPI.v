@@ -13,13 +13,18 @@ Module MailFSPathAbsAPI <: Layer.
 
   Definition fs_contents := FMap.t (string * string) string.
 
-  Definition State := fs_contents.
+  Record state_rec := mk_state {
+    fs : fs_contents;
+    locked : bool;
+  }.
+
+  Definition State := state_rec.
   Definition initP (s : State) := True.
 
-  Definition filter_dir (dirname : string) (fs : State) :=
+  Definition filter_dir (dirname : string) (fs : fs_contents) :=
     FMap.filter (fun '(dn, fn) => if string_dec dn dirname then true else false) fs.
 
-  Definition drop_dirname (fs : State) :=
+  Definition drop_dirname (fs : fs_contents) :=
     FMap.map_keys (fun '(dn, fn) => fn) fs.
 
   Lemma in_filter_dir_eq: forall dirname k s,
@@ -82,69 +87,89 @@ Module MailFSPathAbsAPI <: Layer.
   Qed.
 
   Inductive xstep : forall T, opT T -> nat -> State -> T -> State -> list event -> Prop :=
-  | StepCreateWriteTmp : forall fs tid tmpfn data,
+  | StepCreateWriteTmp : forall fs tid tmpfn data lock,
     xstep (CreateWriteTmp tmpfn data) tid
-      fs
+      (mk_state fs lock)
       tt
-      (FMap.add ("tmp"%string, tmpfn) data fs)
+      (mk_state (FMap.add ("tmp"%string, tmpfn) data fs) lock)
       nil
-  | StepUnlinkTmp : forall fs tid tmpfn,
+  | StepUnlinkTmp : forall fs tid tmpfn lock,
     xstep (UnlinkTmp tmpfn) tid
-      fs
+      (mk_state fs lock)
       tt
-      (FMap.remove ("tmp"%string, tmpfn) fs)
+      (mk_state (FMap.remove ("tmp"%string, tmpfn) fs) lock)
       nil
-  | StepLinkMailOK : forall fs tid mailfn data tmpfn,
+  | StepLinkMailOK : forall fs tid mailfn data tmpfn lock,
     FMap.MapsTo ("tmp"%string, tmpfn) data fs ->
     ~ FMap.In ("mail"%string, mailfn) fs ->
     xstep (LinkMail tmpfn mailfn) tid
-      fs
+      (mk_state fs lock)
       true
-      (FMap.add ("mail"%string, mailfn) data fs)
+      (mk_state (FMap.add ("mail"%string, mailfn) data fs) lock)
       nil
-  | StepLinkMailErr : forall fs tid mailfn tmpfn,
+  | StepLinkMailErr : forall fs tid mailfn tmpfn lock,
     ((~ FMap.In ("tmp"%string, tmpfn) fs) \/
      (FMap.In ("mail"%string, mailfn) fs)) ->
     xstep (LinkMail tmpfn mailfn) tid
-      fs
+      (mk_state fs lock)
       false
-      fs
+      (mk_state fs lock)
       nil
 
-  | StepList : forall fs tid r,
+  | StepList : forall fs tid r lock,
     FMap.is_permutation_key r (drop_dirname (filter_dir "mail"%string fs)) ->
     xstep List tid
-      fs
+      (mk_state fs lock)
       r
-      fs
+      (mk_state fs lock)
       nil
 
-  | StepGetTID : forall fs tid,
+  | StepGetTID : forall s tid,
     xstep GetTID tid
-      fs
+      s
       tid
-      fs
+      s
       nil
-  | StepRandom : forall fs tid r,
+  | StepRandom : forall s tid r,
     xstep Random tid
-      fs
+      s
       r
-      fs
+      s
       nil
 
-  | StepReadOK : forall fn fs tid m,
+  | StepReadOK : forall fn fs tid m lock,
     FMap.MapsTo ("mail"%string, fn) m fs ->
     xstep (Read fn) tid
-      fs
+      (mk_state fs lock)
       (Some m)
-      fs
+      (mk_state fs lock)
       nil
-  | StepReadNone : forall fn fs tid,
+  | StepReadNone : forall fn fs tid lock,
     ~ FMap.In ("mail"%string, fn) fs ->
     xstep (Read fn) tid
-      fs
+      (mk_state fs lock)
       None
-      fs
+      (mk_state fs lock)
+      nil
+
+  | StepDelete : forall fn fs tid lock,
+    xstep (Delete fn) tid
+      (mk_state fs lock)
+      tt
+      (mk_state (FMap.remove ("mail"%string, fn) fs) lock)
+      nil
+
+  | StepLock : forall fs tid,
+    xstep Lock tid
+      (mk_state fs false)
+      tt
+      (mk_state fs true)
+      nil
+  | StepUnlock : forall fs tid lock,
+    xstep Unlock tid
+      (mk_state fs lock)
+      tt
+      (mk_state fs false)
       nil
 
   | StepGetRequest : forall s tid r,
