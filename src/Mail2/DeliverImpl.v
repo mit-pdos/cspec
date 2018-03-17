@@ -18,6 +18,9 @@ Module AtomicDeliverRestricted <: LayerImplFollowsRule DeliverRestrictedAPI Mail
     | MailboxAPI.Deliver m => deliver_core m
     | MailboxAPI.List => Op (DeliverAPI.List)
     | MailboxAPI.Read fn => Op (DeliverAPI.Read fn)
+    | MailboxAPI.Delete fn => Op (DeliverAPI.Delete fn)
+    | MailboxAPI.Lock => Op (DeliverAPI.Lock)
+    | MailboxAPI.Unlock => Op (DeliverAPI.Unlock)
     | MailboxAPI.GetRequest => Op (DeliverAPI.GetRequest)
     | MailboxAPI.Respond r => Op (DeliverAPI.Respond r)
     end.
@@ -76,7 +79,10 @@ Module AtomicDeliverRestricted <: LayerImplFollowsRule DeliverRestrictedAPI Mail
     - eauto 20.
     - eauto 20.
     - eauto 20.
-    - eexists; split; eauto.
+    - eauto 20.
+    - eauto 20.
+    - eauto 20.
+    - eauto 20.
   Qed.
 
   Hint Resolve createwritetmp_right_mover.
@@ -137,7 +143,7 @@ Module AtomicDeliverRestricted <: LayerImplFollowsRule DeliverRestrictedAPI Mail
     all: repeat atomic_exec_inv; repeat step_inv; eauto.
 
     simpl.
-    eapply FMap.mapsto_add in H7; subst.
+    eapply FMap.mapsto_add in H10; subst.
     eauto.
   Qed.
 

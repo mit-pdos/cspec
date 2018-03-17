@@ -19,6 +19,9 @@ Module TryDeliverImpl <: LayerImpl MailFSAPI TryDeliverAPI.
     | TryDeliverAPI.UnlinkTmp => Op (MailFSAPI.UnlinkTmp)
     | TryDeliverAPI.List => Op (MailFSAPI.List)
     | TryDeliverAPI.Read fn => Op (MailFSAPI.Read fn)
+    | TryDeliverAPI.Delete fn => Op (MailFSAPI.Delete fn)
+    | TryDeliverAPI.Lock => Op (MailFSAPI.Lock)
+    | TryDeliverAPI.Unlock => Op (MailFSAPI.Unlock)
     | TryDeliverAPI.GetRequest => Op (MailFSAPI.GetRequest)
     | TryDeliverAPI.Respond r => Op (MailFSAPI.Respond r)
     end.

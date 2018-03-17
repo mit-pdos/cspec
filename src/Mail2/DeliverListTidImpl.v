@@ -40,7 +40,7 @@ Module DeliverListTidRestrictedImpl <: LayerImplFollowsRule DeliverListTidRestri
   Qed.
 
   Lemma nextfn_ok : forall (tid : nat) `(s : FMap.t _ V) r n,
-    ( forall fn, In fn r <-> FMap.In (tid, fn) s ) ->
+    ( forall fn, FMap.In (tid, fn) s -> In fn r ) ->
     ~ FMap.In (tid, nextfn r n) s.
   Proof.
     intros.
@@ -62,6 +62,9 @@ Module DeliverListTidRestrictedImpl <: LayerImplFollowsRule DeliverListTidRestri
     | DeliverAPI.UnlinkTmp => Op (DeliverListTidAPI.UnlinkTmp)
     | DeliverAPI.List => Op (DeliverListTidAPI.List)
     | DeliverAPI.Read fn => Op (DeliverListTidAPI.Read fn)
+    | DeliverAPI.Delete fn => Op (DeliverListTidAPI.Delete fn)
+    | DeliverAPI.Lock => Op (DeliverListTidAPI.Lock)
+    | DeliverAPI.Unlock => Op (DeliverListTidAPI.Unlock)
     | DeliverAPI.GetRequest => Op (DeliverListTidAPI.GetRequest)
     | DeliverAPI.Respond r => Op (DeliverListTidAPI.Respond r)
     end.
@@ -90,16 +93,19 @@ Module DeliverListTidRestrictedImpl <: LayerImplFollowsRule DeliverListTidRestri
   Proof.
     unfold right_mover; intros.
     repeat step_inv; eauto 10.
-    eexists; split.
-    econstructor; eauto.
-    econstructor; intros; eauto.
-    econstructor; intros; eauto.
-    split; intros.
-    - eapply H4 in H0.
-      eapply FMap.in_add; eauto.
-    - eapply H4.
+    + eexists; split.
+      econstructor; eauto.
+      econstructor; intros; eauto.
+      econstructor; intros; eauto.
+      eapply H4.
       eapply FMap.in_add_ne; eauto.
       congruence.
+    + eexists; split.
+      econstructor; eauto.
+      econstructor; intros; eauto.
+      econstructor; intros; eauto.
+      eapply H4.
+      eapply FMap.in_remove; eauto.
   Qed.
 
   Hint Resolve listtid_right_mover.
@@ -256,11 +262,15 @@ Module DeliverListTidImpl' <: LayerImplRequiresRule DeliverListTidAPI DeliverLis
   Proof.
     intros.
     destruct op; destruct op'; repeat step_inv; subst; eauto.
-    constructor.
-    contradict H3.
-    eapply FMap.in_add_ne; eauto.
-    congruence.
+    - constructor.
+      contradict H3.
+      eapply FMap.in_add_ne; eauto.
+      congruence.
+    - constructor.
+      contradict H3.
+      eapply FMap.in_remove; eauto.
   Qed.
+
 
   Definition compile_ts (ts : @threads_state DeliverListTidRestrictedAPI.opT) := ts.
 

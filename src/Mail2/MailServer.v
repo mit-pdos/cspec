@@ -64,16 +64,15 @@ Module c4 := Link DeliverListTidAPI DeliverAPI MailServerAPI
                   DeliverListTidImpl c3.
 Module c5 := Link MailFSAPI DeliverListTidAPI MailServerAPI
                   MailFSImpl c4.
+(*
+Module c6 := Link MailFSStringAbsAPI MailFSAPI MailServerAPI
+                  MailFSStringAbsImpl c5.
+*)
 
 Module c4' := Link TryDeliverAPI DeliverAPI MailServerAPI
                   LinkRetryImpl c3.
 Module c5' := Link MailFSAPI TryDeliverAPI MailServerAPI
                   TryDeliverImpl c4'.
-
-(*
-Module c6 := Link MailFSStringAbsAPI MailFSAPI MailServerAPI
-                  MailFSStringAbsImpl c5.
-*)
 Module c6 := Link MailFSStringAbsAPI MailFSAPI MailServerAPI
                   MailFSStringAbsImpl c5'.
 
