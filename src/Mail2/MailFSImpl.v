@@ -24,8 +24,11 @@ Module MailFSImpl <: LayerImpl MailFSAPI DeliverListTidAPI.
     | DeliverListTidAPI.List => Op (MailFSAPI.List)
     | DeliverListTidAPI.ListTid => listtid_core
     | DeliverListTidAPI.Read fn => Op (MailFSAPI.Read fn)
+    | DeliverListTidAPI.Delete fn => Op (MailFSAPI.Delete fn)
     | DeliverListTidAPI.CreateWriteTmp data => Op (MailFSAPI.CreateWriteTmp data)
     | DeliverListTidAPI.UnlinkTmp => Op (MailFSAPI.UnlinkTmp)
+    | DeliverListTidAPI.Lock => Op (MailFSAPI.Lock)
+    | DeliverListTidAPI.Unlock => Op (MailFSAPI.Unlock)
     | DeliverListTidAPI.GetRequest => Op (MailFSAPI.GetRequest)
     | DeliverListTidAPI.Respond r => Op (MailFSAPI.Respond r)
     end.
@@ -76,19 +79,12 @@ Module MailFSImpl <: LayerImpl MailFSAPI DeliverListTidAPI.
     repeat step_inv; eauto.
     econstructor; intros.
 
-    split; intros.
-    * eapply in_map_iff in H; deex. destruct x.
-      eapply filter_In in H0; intuition idtac.
-      unfold same_tid in *; simpl in *.
-      destruct (v1 == n); try congruence.
-      subst; eauto.
-      eapply FMap.is_permutation_in; eauto.
-    * eapply in_map_iff.
-      exists (v1, fn); intuition eauto.
-      eapply filter_In; intuition eauto.
-      eapply FMap.is_permutation_in'; eauto.
-      unfold same_tid; simpl.
-      destruct (v1 == v1); congruence.
+    eapply in_map_iff.
+    exists (v1, fn); intuition eauto.
+    eapply filter_In; intuition eauto.
+    eapply FMap.is_permutation_in'; eauto.
+    unfold same_tid; simpl.
+    destruct (v1 == v1); congruence.
   Qed.
 
   Theorem my_atomize_correct :

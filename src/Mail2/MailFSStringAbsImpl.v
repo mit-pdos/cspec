@@ -14,7 +14,8 @@ Module MailFSStringAbsImpl <: LayerImpl MailFSStringAbsAPI MailFSAPI.
 
   Definition absR (s1 : MailFSStringAbsAPI.State) (s2 : MailFSAPI.State) :=
     dirR (MailFSStringAbsAPI.maildir s1) (MailboxTmpAbsAPI.maildir s2) /\
-    dirR (MailFSStringAbsAPI.tmpdir  s1) (MailboxTmpAbsAPI.tmpdir  s2).
+    dirR (MailFSStringAbsAPI.tmpdir  s1) (MailboxTmpAbsAPI.tmpdir  s2) /\
+    MailFSStringAbsAPI.locked s1 = MailboxTmpAbsAPI.locked s2.
 
   Definition compile_ts (ts : @threads_state MailFSAPI.opT) := ts.
 

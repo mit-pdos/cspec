@@ -32,10 +32,13 @@ Module MailFSStringImpl <: LayerImpl MailFSStringAPI MailFSStringAbsAPI.
     | MailFSAPI.LinkMail m => linkmail_core m
     | MailFSAPI.List => list_core
     | MailFSAPI.Read fn => Op (MailFSStringAPI.Read (encode_tid_fn (fst fn) (snd fn)))
+    | MailFSAPI.Delete fn => Op (MailFSStringAPI.Delete (encode_tid_fn (fst fn) (snd fn)))
     | MailFSAPI.CreateWriteTmp data => createwritetmp_core data
     | MailFSAPI.UnlinkTmp => unlinktmp_core
     | MailFSAPI.GetRequest => Op (MailFSStringAPI.GetRequest)
     | MailFSAPI.Respond r => Op (MailFSStringAPI.Respond r)
+    | MailFSAPI.Lock => Op (MailFSStringAPI.Lock)
+    | MailFSAPI.Unlock => Op (MailFSStringAPI.Unlock)
     | MailFSAPI.GetTID => Op (MailFSStringAPI.GetTID)
     | MailFSAPI.Random => Op (MailFSStringAPI.Random)
     end.

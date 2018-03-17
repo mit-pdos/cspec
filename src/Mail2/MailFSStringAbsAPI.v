@@ -45,75 +45,96 @@ Module MailFSStringAbsAPI <: Layer.
   Record state_rec := mk_state {
     tmpdir : dir_contents;
     maildir : dir_contents;
+    locked : bool;
   }.
 
   Definition State := state_rec.
   Definition initP (s : State) := True.
 
   Inductive xstep : forall T, opT T -> nat -> State -> T -> State -> list event -> Prop :=
-  | StepCreateWriteTmp : forall tmp mbox tid data,
+  | StepCreateWriteTmp : forall tmp mbox tid data lock,
     xstep (CreateWriteTmp data) tid
-      (mk_state tmp mbox)
+      (mk_state tmp mbox lock)
       tt
-      (mk_state (FMap.add (encode_tid_fn tid 0) data tmp) mbox)
+      (mk_state (FMap.add (encode_tid_fn tid 0) data tmp) mbox lock)
       nil
-  | StepUnlinkTmp : forall tmp mbox tid,
+  | StepUnlinkTmp : forall tmp mbox tid lock,
     xstep (UnlinkTmp) tid
-      (mk_state tmp mbox)
+      (mk_state tmp mbox lock)
       tt
-      (mk_state (FMap.remove (encode_tid_fn tid 0) tmp) mbox)
+      (mk_state (FMap.remove (encode_tid_fn tid 0) tmp) mbox lock)
       nil
-  | StepLinkMailOK : forall tmp mbox tid mailfn data,
+  | StepLinkMailOK : forall tmp mbox tid mailfn data lock,
     FMap.MapsTo (encode_tid_fn tid 0) data tmp ->
     ~ FMap.In (encode_tid_fn tid mailfn) mbox ->
     xstep (LinkMail mailfn) tid
-      (mk_state tmp mbox)
+      (mk_state tmp mbox lock)
       true
-      (mk_state tmp (FMap.add (encode_tid_fn tid mailfn) data mbox))
+      (mk_state tmp (FMap.add (encode_tid_fn tid mailfn) data mbox) lock)
       nil
-  | StepLinkMail : forall tmp mbox tid mailfn,
+  | StepLinkMail : forall tmp mbox tid mailfn lock,
     ((~ FMap.In (encode_tid_fn tid 0) tmp) \/
      (FMap.In (encode_tid_fn tid mailfn) mbox)) ->
     xstep (LinkMail mailfn) tid
-      (mk_state tmp mbox)
+      (mk_state tmp mbox lock)
       false
-      (mk_state tmp mbox)
+      (mk_state tmp mbox lock)
       nil
 
-  | StepList : forall tmp mbox tid r,
+  | StepList : forall tmp mbox tid r lock,
     FMap.is_permutation_key r mbox ->
     xstep List tid
-      (mk_state tmp mbox)
+      (mk_state tmp mbox lock)
       (map decode_tid_fn r)
-      (mk_state tmp mbox)
+      (mk_state tmp mbox lock)
       nil
 
-  | StepGetTID : forall tmp mbox tid,
+  | StepGetTID : forall tmp mbox tid lock,
     xstep GetTID tid
-      (mk_state tmp mbox)
+      (mk_state tmp mbox lock)
       tid
-      (mk_state tmp mbox)
+      (mk_state tmp mbox lock)
       nil
-  | StepRandom : forall tmp mbox tid r,
+  | StepRandom : forall tmp mbox tid r lock,
     xstep Random tid
-      (mk_state tmp mbox)
+      (mk_state tmp mbox lock)
       r
-      (mk_state tmp mbox)
+      (mk_state tmp mbox lock)
       nil
 
-  | StepReadOK : forall fntid fn tmp mbox tid m,
+  | StepReadOK : forall fntid fn tmp mbox tid m lock,
     FMap.MapsTo (encode_tid_fn fntid fn) m mbox ->
     xstep (Read (fntid, fn)) tid
-      (mk_state tmp mbox)
+      (mk_state tmp mbox lock)
       (Some m)
-      (mk_state tmp mbox)
+      (mk_state tmp mbox lock)
       nil
-  | StepReadNone : forall fntid fn tmp mbox tid,
+  | StepReadNone : forall fntid fn tmp mbox tid lock,
     ~ FMap.In (encode_tid_fn fntid fn) mbox ->
     xstep (Read (fntid, fn)) tid
-      (mk_state tmp mbox)
+      (mk_state tmp mbox lock)
       None
-      (mk_state tmp mbox)
+      (mk_state tmp mbox lock)
+      nil
+
+  | StepDelete : forall fntid fn tmp mbox tid lock,
+    xstep (Delete (fntid, fn)) tid
+      (mk_state tmp mbox lock)
+      tt
+      (mk_state tmp (FMap.remove (encode_tid_fn fntid fn) mbox) lock)
+      nil
+
+  | StepLock : forall tmp mbox tid,
+    xstep Lock tid
+      (mk_state tmp mbox false)
+      tt
+      (mk_state tmp mbox true)
+      nil
+  | StepUnlock : forall tmp mbox tid lock,
+    xstep Unlock tid
+      (mk_state tmp mbox lock)
+      tt
+      (mk_state tmp mbox false)
       nil
 
   | StepGetRequest : forall s tid r,
