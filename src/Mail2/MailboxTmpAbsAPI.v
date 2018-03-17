@@ -66,18 +66,13 @@ Module MailboxTmpAbsAPI <: Layer.
       tt
       (mk_state tmp mbox false)
       nil
-  | StepGetRequest : forall s tid r,
-    xstep GetRequest tid
+
+  | StepExt : forall s tid `(extop : _ T) r,
+    xstep (Ext extop) tid
       s
       r
       s
-      (Event r :: nil)
-  | StepRespond : forall s tid T (v : T),
-    xstep (Respond v) tid
-      s
-      tt
-      s
-      (Event v :: nil)
+      (Event (extop, r) :: nil)
   .
 
   Definition step := xstep.

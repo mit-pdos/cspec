@@ -16,8 +16,7 @@ Module MailboxAPI <: Layer.
   | Delete : forall (fn : nat*nat), xopT unit
   | Lock : xopT unit
   | Unlock : xopT unit
-  | GetRequest : xopT request
-  | Respond : forall (T : Type) (v : T), xopT unit
+  | Ext : forall `(op : extopT T), xopT T
   .
 
   Definition opT := xopT.
@@ -75,18 +74,12 @@ Module MailboxAPI <: Layer.
       (mk_state mbox None)
       nil
 
-  | StepGetRequest : forall st tid r,
-    xstep GetRequest tid
-      st
+  | StepExt : forall s tid `(extop : _ T) r,
+    xstep (Ext extop) tid
+      s
       r
-      st
-      (Event r :: nil)
-  | StepRespond : forall st tid T (v : T),
-    xstep (Respond v) tid
-      st
-      tt
-      st
-      (Event v :: nil)
+      s
+      (Event (extop, r) :: nil)
   .
 
   Definition step := xstep.
@@ -119,10 +112,8 @@ Module MailboxRestrictedAPI <: Layer.
   | AllowUnlock : forall tid s,
     locked s = Some tid ->
     step_allow Unlock tid s
-  | AllowGetRequest : forall tid s,
-    step_allow GetRequest tid s
-  | AllowRespond : forall `(r : T) tid s,
-    step_allow (Respond r) tid s
+  | AllowExt : forall tid s `(extop : _ T),
+    step_allow (Ext extop) tid s
   .
 
   Definition step :=

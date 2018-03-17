@@ -37,18 +37,13 @@ Module MailServerLockAbsAPI <: Layer.
       tt
       (mk_state (FMap.remove id mbox) lock)
       nil
-  | StepGetRequest : forall mbox tid r lock,
-    xstep GetRequest tid
-      (mk_state mbox lock)
+
+  | StepExt : forall s tid `(extop : extopT T) r,
+    xstep (Ext extop) tid
+      s
       r
-      (mk_state mbox lock)
-      (Event r :: nil)
-  | StepRespond : forall mbox tid T (v : T) lock,
-    xstep (Respond v) tid
-      (mk_state mbox lock)
-      tt
-      (mk_state mbox lock)
-      (Event v :: nil)
+      s
+      (Event (extop, r) :: nil)
   .
 
   Definition step := xstep.

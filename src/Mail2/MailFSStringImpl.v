@@ -35,8 +35,7 @@ Module MailFSStringImpl <: LayerImpl MailFSStringAPI MailFSStringAbsAPI.
     | MailFSAPI.Delete fn => Op (MailFSStringAPI.Delete (encode_tid_fn (fst fn) (snd fn)))
     | MailFSAPI.CreateWriteTmp data => createwritetmp_core data
     | MailFSAPI.UnlinkTmp => unlinktmp_core
-    | MailFSAPI.GetRequest => Op (MailFSStringAPI.GetRequest)
-    | MailFSAPI.Respond r => Op (MailFSStringAPI.Respond r)
+    | MailFSAPI.Ext extop => Op (MailFSStringAPI.Ext extop)
     | MailFSAPI.Lock => Op (MailFSStringAPI.Lock)
     | MailFSAPI.Unlock => Op (MailFSStringAPI.Unlock)
     | MailFSAPI.GetTID => Op (MailFSStringAPI.GetTID)

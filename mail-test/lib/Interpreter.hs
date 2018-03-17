@@ -79,7 +79,7 @@ run_proc _ (Op MailFSPathAPI__Random) = do
   ts <- rdtsc
   return $ unsafeCoerce (fromIntegral ts :: Integer)
 
-run_proc _ (Op MailFSPathAPI__GetRequest) = do
+run_proc _ (Op (MailFSPathAPI__Ext (MailServerAPI__GetRequest))) = do
   debugmsg $ "GetRequest"
   rnd <- randomIO
   if (rnd :: Integer) `mod` 100 == 0 then
@@ -87,7 +87,7 @@ run_proc _ (Op MailFSPathAPI__GetRequest) = do
   else
     return $ unsafeCoerce (MailServerAPI__ReqDeliver "Test message")
 
-run_proc _ (Op (MailFSPathAPI__Respond _)) = do
+run_proc _ (Op (MailFSPathAPI__Ext (MailServerAPI__Respond _))) = do
   debugmsg $ "Respond"
   return $ unsafeCoerce ()
 

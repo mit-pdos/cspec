@@ -37,8 +37,7 @@ Module AtomicReaderRestricted <: LayerImplFollowsRule MailboxRestrictedAPI MailS
     | MailServerAPI.Deliver m => Op (MailboxAPI.Deliver m)
     | MailServerAPI.Pickup => pickup_core
     | MailServerAPI.Delete fn => delete_core fn
-    | MailServerAPI.GetRequest => Op (MailboxAPI.GetRequest)
-    | MailServerAPI.Respond r => Op (MailboxAPI.Respond r)
+    | MailServerAPI.Ext extop => Op (MailboxAPI.Ext extop)
     end.
 
   Ltac step_inv :=
@@ -346,10 +345,6 @@ Module AtomicReaderRestricted <: LayerImplFollowsRule MailboxRestrictedAPI MailS
     + repeat atomic_exec_inv.
       repeat step_inv.
       destruct s'; eauto.
-
-    + repeat atomic_exec_inv.
-      repeat step_inv.
-      destruct s'; eauto.
   Qed.
 
   Theorem my_atomize_correct :
@@ -390,7 +385,7 @@ Module AtomicReaderRestricted <: LayerImplFollowsRule MailboxRestrictedAPI MailS
     intros.
     destruct x; eauto.
   Qed.
-  
+
   Hint Resolve read_list_no_atomics.
 
   Theorem compile_ts_no_atomics :

@@ -12,12 +12,16 @@ Module MailServerAPI <: Layer.
   | ReqDelete (id : nat*nat)
   .
 
+  Inductive extopT : Type -> Type :=
+  | GetRequest : extopT request
+  | Respond : forall (T : Type) (v : T), extopT unit
+  .
+
   Inductive xopT : Type -> Type :=
   | Deliver : forall (m : string), xopT unit
   | Pickup : xopT (list ((nat*nat) * string))
   | Delete : forall (id : nat*nat), xopT unit
-  | GetRequest : xopT request
-  | Respond : forall (T : Type) (v : T), xopT unit
+  | Ext : forall `(op : extopT T), xopT T
   .
 
   Definition opT := xopT.
@@ -45,18 +49,13 @@ Module MailServerAPI <: Layer.
       tt
       (FMap.remove id mbox)
       nil
-  | StepGetRequest : forall mbox tid r,
-    xstep GetRequest tid
-      mbox
+
+  | StepExt : forall s tid `(extop : _ T) r,
+    xstep (Ext extop) tid
+      s
       r
-      mbox
-      (Event r :: nil)
-  | StepRespond : forall mbox tid T (v : T),
-    xstep (Respond v) tid
-      mbox
-      tt
-      mbox
-      (Event v :: nil)
+      s
+      (Event (extop, r) :: nil)
   .
 
   Definition step := xstep.

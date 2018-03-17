@@ -22,8 +22,7 @@ Module TryDeliverImpl <: LayerImpl MailFSAPI TryDeliverAPI.
     | TryDeliverAPI.Delete fn => Op (MailFSAPI.Delete fn)
     | TryDeliverAPI.Lock => Op (MailFSAPI.Lock)
     | TryDeliverAPI.Unlock => Op (MailFSAPI.Unlock)
-    | TryDeliverAPI.GetRequest => Op (MailFSAPI.GetRequest)
-    | TryDeliverAPI.Respond r => Op (MailFSAPI.Respond r)
+    | TryDeliverAPI.Ext extop => Op (MailFSAPI.Ext extop)
     end.
 
   Ltac step_inv :=

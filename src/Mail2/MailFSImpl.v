@@ -29,8 +29,7 @@ Module MailFSImpl <: LayerImpl MailFSAPI DeliverListTidAPI.
     | DeliverListTidAPI.UnlinkTmp => Op (MailFSAPI.UnlinkTmp)
     | DeliverListTidAPI.Lock => Op (MailFSAPI.Lock)
     | DeliverListTidAPI.Unlock => Op (MailFSAPI.Unlock)
-    | DeliverListTidAPI.GetRequest => Op (MailFSAPI.GetRequest)
-    | DeliverListTidAPI.Respond r => Op (MailFSAPI.Respond r)
+    | DeliverListTidAPI.Ext extop => Op (MailFSAPI.Ext extop)
     end.
 
   Ltac step_inv :=

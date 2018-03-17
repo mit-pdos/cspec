@@ -65,8 +65,7 @@ Module DeliverListTidRestrictedImpl <: LayerImplFollowsRule DeliverListTidRestri
     | DeliverAPI.Delete fn => Op (DeliverListTidAPI.Delete fn)
     | DeliverAPI.Lock => Op (DeliverListTidAPI.Lock)
     | DeliverAPI.Unlock => Op (DeliverListTidAPI.Unlock)
-    | DeliverAPI.GetRequest => Op (DeliverListTidAPI.GetRequest)
-    | DeliverAPI.Respond r => Op (DeliverListTidAPI.Respond r)
+    | DeliverAPI.Ext extop => Op (DeliverListTidAPI.Ext extop)
     end.
 
   Ltac step_inv :=

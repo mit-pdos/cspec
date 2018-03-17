@@ -40,17 +40,17 @@ Require Import TryDeliverImpl.
 Import MailServerAPI.
 
 Definition do_mail_req : proc opT unit :=
-  req <- Op GetRequest;
+  req <- Op (Ext GetRequest);
   match req with
   | ReqDeliver msg =>
     _ <- Op (Deliver msg);
-    Op (Respond tt)
+    Op (Ext (Respond tt))
   | ReqRead =>
     msgs <- Op Pickup;
-    Op (Respond msgs)
+    Op (Ext (Respond msgs))
   | ReqDelete id =>
     _ <- Op (Delete id);
-    Op (Respond tt)
+    Op (Ext (Respond tt))
   end.
 
 Definition mail_server_thread : proc MailServerAPI.opT unit :=

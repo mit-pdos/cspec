@@ -172,18 +172,12 @@ Module MailFSPathAbsAPI <: Layer.
       (mk_state fs false)
       nil
 
-  | StepGetRequest : forall s tid r,
-    xstep GetRequest tid
+  | StepExt : forall s tid `(extop : extopT T) r,
+    xstep (Ext extop) tid
       s
       r
       s
-      (Event r :: nil)
-  | StepRespond : forall s tid T (v : T),
-    xstep (Respond v) tid
-      s
-      tt
-      s
-      (Event v :: nil)
+      (Event (extop, r) :: nil)
   .
 
   Definition step := xstep.

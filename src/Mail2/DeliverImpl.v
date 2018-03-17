@@ -21,8 +21,7 @@ Module AtomicDeliverRestricted <: LayerImplFollowsRule DeliverRestrictedAPI Mail
     | MailboxAPI.Delete fn => Op (DeliverAPI.Delete fn)
     | MailboxAPI.Lock => Op (DeliverAPI.Lock)
     | MailboxAPI.Unlock => Op (DeliverAPI.Unlock)
-    | MailboxAPI.GetRequest => Op (DeliverAPI.GetRequest)
-    | MailboxAPI.Respond r => Op (DeliverAPI.Respond r)
+    | MailboxAPI.Ext extop => Op (DeliverAPI.Ext extop)
     end.
 
   Ltac step_inv :=
@@ -75,7 +74,6 @@ Module AtomicDeliverRestricted <: LayerImplFollowsRule DeliverRestrictedAPI Mail
       econstructor; eauto.
       econstructor; eauto.
       eapply FMap.mapsto_add_ne; eauto.
-    - eauto 20.
     - eauto 20.
     - eauto 20.
     - eauto 20.

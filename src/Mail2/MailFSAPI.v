@@ -24,8 +24,7 @@ Module MailFSAPI <: Layer.
   | Lock : xopT unit
   | Unlock : xopT unit
 
-  | GetRequest : xopT request
-  | Respond : forall (T : Type) (v : T), xopT unit
+  | Ext : forall `(op : extopT T), xopT T
   .
 
   Definition opT := xopT.
@@ -119,18 +118,12 @@ Module MailFSAPI <: Layer.
       (mk_state tmp mbox false)
       nil
 
-  | StepGetRequest : forall s tid r,
-    xstep GetRequest tid
+  | StepExt : forall s tid `(extop : extopT T) r,
+    xstep (Ext extop) tid
       s
       r
       s
-      (Event r :: nil)
-  | StepRespond : forall s tid T (v : T),
-    xstep (Respond v) tid
-      s
-      tt
-      s
-      (Event v :: nil)
+      (Event (extop, r) :: nil)
   .
 
   Definition step := xstep.

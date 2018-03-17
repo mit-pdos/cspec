@@ -21,8 +21,7 @@ Module LinkRetryImpl <: LayerImpl TryDeliverAPI DeliverAPI.
     | DeliverAPI.Delete fn => (fun _ => TryDeliverAPI.Delete fn, once_cond, None)
     | DeliverAPI.Lock => (fun _ => TryDeliverAPI.Lock, once_cond, None)
     | DeliverAPI.Unlock => (fun _ => TryDeliverAPI.Unlock, once_cond, None)
-    | DeliverAPI.GetRequest => (fun _ => TryDeliverAPI.GetRequest, once_cond, None)
-    | DeliverAPI.Respond r => (fun _ => TryDeliverAPI.Respond r, once_cond, None)
+    | DeliverAPI.Ext extop => (fun _ => TryDeliverAPI.Ext extop, once_cond, None)
     end.
 
   Definition compile_ts ts :=
