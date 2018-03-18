@@ -13,24 +13,25 @@ import MailFSPathAPI
 import MailServer
 
 
-run_thread :: State -> Coq_maybe_proc (MailFSPathAPI__Coq_xopT a) -> IO ()
-run_thread _ NoProc = return ()
-run_thread s (Proc p) = do
+run_thread :: Coq_maybe_proc (MailFSPathAPI__Coq_xopT a) -> IO ()
+run_thread NoProc = return ()
+run_thread (Proc p) = do
   tid <- myThreadId
   putStrLn $ "Running " ++ (show tid)
+
+  s <- mkState
   run_proc s p
   return ()
 
-spawn_thread :: State -> Coq_maybe_proc (MailFSPathAPI__Coq_xopT a) -> IO ()
-spawn_thread s p = do
+spawn_thread :: Coq_maybe_proc (MailFSPathAPI__Coq_xopT a) -> IO ()
+spawn_thread p = do
   putStrLn $ "Spawning.."
-  tid <- forkIO (run_thread s p)
+  tid <- forkIO (run_thread p)
   putStrLn $ "Spawned " ++ (show tid)
   return ()
 
 main :: IO ()
 main = do
-  s <- mkState
-  mapM_ (spawn_thread s) ms_bottom
+  mapM_ spawn_thread (ms_bottom 4)
   putStrLn "Started all threads"
   threadDelay $ 60 * 1000000

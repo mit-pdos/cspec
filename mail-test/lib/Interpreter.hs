@@ -16,12 +16,16 @@ import System.IO.Error
 import System.CPUTime.Rdtsc
 import System.Lock.FLock
 
+-- Our own libraries
+import Support
+
 -- Extracted code
 import ConcurProc
 import MailFSPathAPI
 import MailServer
 import MailServerAPI
 
+-- State for each process/thread
 data State =
   S !(MVar Lock)
 
@@ -79,16 +83,39 @@ run_proc _ (Op MailFSPathAPI__Random) = do
   ts <- rdtsc
   return $ unsafeCoerce (fromIntegral ts :: Integer)
 
-run_proc _ (Op (MailFSPathAPI__Ext (MailServerAPI__GetRequest))) = do
-  debugmsg $ "GetRequest"
+run_proc _ (Op (MailFSPathAPI__Ext (MailServerAPI__AcceptConn))) = do
+  debugmsg $ "AcceptConn"
   rnd <- randomIO
-  if (rnd :: Integer) `mod` 100 == 0 then
-    return $ unsafeCoerce (MailServerAPI__ReqRead)
+  if (rnd :: Integer) `mod` 100 == 0 then do
+    msgref <- newIORef []
+    return $ unsafeCoerce (MailServerAPI__POP3Conn (POP3Conn msgref))
   else
-    return $ unsafeCoerce (MailServerAPI__ReqDeliver "Test message")
+    return $ unsafeCoerce (MailServerAPI__SMTPConn SMTPConn)
 
-run_proc _ (Op (MailFSPathAPI__Ext (MailServerAPI__Respond _))) = do
-  debugmsg $ "Respond"
+run_proc _ (Op (MailFSPathAPI__Ext (MailServerAPI__SMTPGetMessage conn))) = do
+  debugmsg $ "SMTPGetMessage"
+  return $ unsafeCoerce "Test message"
+
+run_proc _ (Op (MailFSPathAPI__Ext (MailServerAPI__SMTPRespond conn))) = do
+  debugmsg $ "SMTPRespond"
+  return $ unsafeCoerce ()
+
+run_proc _ (Op (MailFSPathAPI__Ext (MailServerAPI__POP3ListMessages (POP3Conn msgref) msgs))) = do
+  debugmsg $ "POP3ListMessages"
+  writeIORef msgref (map fst msgs)
+  return $ unsafeCoerce ()
+
+run_proc _ (Op (MailFSPathAPI__Ext (MailServerAPI__POP3GetRequest (POP3Conn msgref)))) = do
+  debugmsg $ "POP3GetRequest"
+  msgs <- readIORef msgref
+  case msgs of
+    [] -> return $ unsafeCoerce MailServerAPI__POP3Closed
+    id:rest -> do
+      writeIORef msgref rest
+      return $ unsafeCoerce (MailServerAPI__POP3Delete id)
+
+run_proc _ (Op (MailFSPathAPI__Ext (MailServerAPI__POP3Ack (POP3Conn msgref)))) = do
+  debugmsg $ "POP3Ack"
   return $ unsafeCoerce ()
 
 run_proc _ (Op (MailFSPathAPI__CreateWrite (dir, fn) contents)) = do
@@ -103,7 +130,14 @@ run_proc _ (Op (MailFSPathAPI__Link (srcdir, srcfn) (dstdir, dstfn))) = do
 
 run_proc _ (Op (MailFSPathAPI__Unlink (dir, fn))) = do
   debugmsg $ "Unlink " ++ dir ++ "/" ++ (fn)
-  removeLink (filePath dir fn)
+  catch (removeLink (filePath dir fn))
+        (\e -> case e of
+           _ | isDoesNotExistError e -> do
+             debugmsg "removeLink does not exist"
+             return ()
+           _ -> do
+             debugmsg "removeLink error"
+             return ())
   return $ unsafeCoerce ()
 
 run_proc _ (Op (MailFSPathAPI__List dir)) = do

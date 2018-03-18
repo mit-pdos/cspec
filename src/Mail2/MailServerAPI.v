@@ -2,19 +2,30 @@ Require Import POCS.
 Require Import String.
 
 
+Parameter smtpconn : Type.
+Parameter pop3conn : Type.
+
 Module MailServerAPI <: Layer.
 
   Definition dir_contents := FMap.t (nat*nat) string.
 
-  Inductive request :=
-  | ReqDeliver (msg : string)
-  | ReqRead
-  | ReqDelete (id : nat*nat)
+  Inductive newconn :=
+  | SMTPConn : smtpconn -> newconn
+  | POP3Conn : pop3conn -> newconn
+  .
+
+  Inductive pop3req :=
+  | POP3Delete : nat*nat -> pop3req
+  | POP3Closed : pop3req
   .
 
   Inductive extopT : Type -> Type :=
-  | GetRequest : extopT request
-  | Respond : forall (T : Type) (v : T), extopT unit
+  | AcceptConn : extopT newconn
+  | SMTPGetMessage : smtpconn -> extopT string
+  | SMTPRespond : smtpconn -> extopT unit
+  | POP3ListMessages : pop3conn -> list ((nat*nat) * string) -> extopT unit
+  | POP3GetRequest : pop3conn -> extopT pop3req
+  | POP3Ack : pop3conn -> extopT unit
   .
 
   Inductive xopT : Type -> Type :=

@@ -10,6 +10,8 @@ import_modules = {
     "import qualified Support":
     [
         "MailFSStringImpl",
+        "MailServerAPI",
+        "MailServer",
     ],
 }
 
