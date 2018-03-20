@@ -96,8 +96,8 @@ run_proc _ (Op (MailFSPathAPI__Ext (MailServerAPI__SMTPGetMessage conn))) = do
   debugmsg $ "SMTPGetMessage"
   return $ unsafeCoerce "Test message"
 
-run_proc _ (Op (MailFSPathAPI__Ext (MailServerAPI__SMTPRespond conn))) = do
-  debugmsg $ "SMTPRespond"
+run_proc _ (Op (MailFSPathAPI__Ext (MailServerAPI__SMTPRespond conn ok))) = do
+  debugmsg $ "SMTPRespond" ++ " " ++ (show ok)
   return $ unsafeCoerce ()
 
 run_proc _ (Op (MailFSPathAPI__Ext (MailServerAPI__POP3ListMessages (POP3Conn msgref) msgs))) = do

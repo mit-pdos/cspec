@@ -41,8 +41,8 @@ Import MailServerAPI.
 
 Definition handle_smtp conn :=
   msg <- Op (Ext (SMTPGetMessage conn));
-  _ <- Op (Deliver msg);
-  _ <- Op (Ext (SMTPRespond conn));
+  ok <- Op (Deliver msg);
+  _ <- Op (Ext (SMTPRespond conn ok));
   Ret tt.
 
 Definition handle_pop3_one conn :=

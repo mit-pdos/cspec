@@ -22,7 +22,7 @@ Module MailServerAPI <: Layer.
   Inductive extopT : Type -> Type :=
   | AcceptConn : extopT newconn
   | SMTPGetMessage : smtpconn -> extopT string
-  | SMTPRespond : smtpconn -> extopT unit
+  | SMTPRespond : smtpconn -> bool-> extopT unit
   | POP3ListMessages : pop3conn -> list ((nat*nat) * string) -> extopT unit
   | POP3GetRequest : pop3conn -> extopT pop3req
   | POP3Ack : pop3conn -> extopT unit
