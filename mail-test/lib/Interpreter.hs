@@ -18,6 +18,7 @@ import System.Lock.FLock
 
 -- Our own libraries
 import Support
+import SMTP
 
 -- Extracted code
 import ConcurProc
@@ -27,12 +28,12 @@ import MailServerAPI
 
 -- State for each process/thread
 data State =
-  S !(MVar Lock)
+  S SMTPServer !(MVar Lock)
 
-mkState :: IO State
-mkState = do
+mkState :: SMTPServer -> IO State
+mkState smtp = do
   lockvar <- newEmptyMVar
-  return $ S lockvar
+  return $ S smtp lockvar
 
 verbose :: Bool
 verbose = True
@@ -83,21 +84,24 @@ run_proc _ (Op MailFSPathAPI__Random) = do
   ts <- rdtsc
   return $ unsafeCoerce (fromIntegral ts :: Integer)
 
-run_proc _ (Op (MailFSPathAPI__Ext (MailServerAPI__AcceptConn))) = do
+run_proc (S smtpserver _) (Op (MailFSPathAPI__Ext (MailServerAPI__AcceptConn))) = do
   debugmsg $ "AcceptConn"
   rnd <- randomIO
   if (rnd :: Integer) `mod` 100 == 0 then do
     msgref <- newIORef []
     return $ unsafeCoerce (MailServerAPI__POP3Conn (POP3Conn msgref))
-  else
-    return $ unsafeCoerce (MailServerAPI__SMTPConn SMTPConn)
+  else do
+    conn <- smtpAccept smtpserver
+    return $ unsafeCoerce (MailServerAPI__SMTPConn conn)
 
 run_proc _ (Op (MailFSPathAPI__Ext (MailServerAPI__SMTPGetMessage conn))) = do
   debugmsg $ "SMTPGetMessage"
-  return $ unsafeCoerce "Test message"
+  msg <- smtpGetMessage conn
+  return $ unsafeCoerce msg
 
 run_proc _ (Op (MailFSPathAPI__Ext (MailServerAPI__SMTPRespond conn ok))) = do
   debugmsg $ "SMTPRespond" ++ " " ++ (show ok)
+  smtpDone conn ok
   return $ unsafeCoerce ()
 
 run_proc _ (Op (MailFSPathAPI__Ext (MailServerAPI__POP3ListMessages (POP3Conn msgref) msgs))) = do
@@ -176,7 +180,7 @@ run_proc _ (Op (MailFSPathAPI__Read (dir, fn))) = do
                  debugmsg "Unknown exception on read"
                  return $ unsafeCoerce Nothing)
 
-run_proc (S lockvar) (Op (MailFSPathAPI__Lock)) = do
+run_proc (S _ lockvar) (Op (MailFSPathAPI__Lock)) = do
   debugmsg $ "Lock"
   mboxfd <- openFd (dirPath "mail") ReadOnly Nothing defaultFileFlags
   lck <- lockFd mboxfd Exclusive Block
@@ -184,7 +188,7 @@ run_proc (S lockvar) (Op (MailFSPathAPI__Lock)) = do
   putMVar lockvar lck
   return $ unsafeCoerce ()
 
-run_proc (S lockvar) (Op (MailFSPathAPI__Unlock)) = do
+run_proc (S _ lockvar) (Op (MailFSPathAPI__Unlock)) = do
   debugmsg $ "Unlock"
   lck <- takeMVar lockvar
   unlock lck

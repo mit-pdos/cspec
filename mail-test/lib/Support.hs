@@ -13,8 +13,5 @@ decode_tid_fn fn =
     Just i -> let (tidstr, fnstr) = splitAt i fn in
       (read tidstr, read (tail fnstr))
 
-data SMTPConn =
-  SMTPConn
-
 data POP3Conn =
   POP3Conn (IORef [(Integer, Integer)])

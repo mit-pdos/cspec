@@ -40,10 +40,14 @@ Require Import TryDeliverImpl.
 Import MailServerAPI.
 
 Definition handle_smtp conn :=
-  msg <- Op (Ext (SMTPGetMessage conn));
-  ok <- Op (Deliver msg);
-  _ <- Op (Ext (SMTPRespond conn ok));
-  Ret tt.
+  omsg <- Op (Ext (SMTPGetMessage conn));
+  match omsg with
+  | None => Ret tt
+  | Some msg =>
+    ok <- Op (Deliver msg);
+    _ <- Op (Ext (SMTPRespond conn ok));
+    Ret tt
+  end.
 
 Definition handle_pop3_one conn :=
   req <- Op (Ext (POP3GetRequest conn));
