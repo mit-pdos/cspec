@@ -120,8 +120,16 @@ run_proc _ (Op (MailFSPathAPI__Ext (MailServerAPI__POP3Ack (POP3Conn msgref)))) 
 
 run_proc _ (Op (MailFSPathAPI__CreateWrite (dir, fn) contents)) = do
   debugmsg $ "CreateWrite " ++ dir ++ "/" ++ fn ++ ", " ++ (show contents)
-  writeFile (filePath dir fn) contents
-  return $ unsafeCoerce ()
+  catch (do
+           writeFile (filePath dir fn) contents
+           return $ unsafeCoerce True)
+        (\e -> case e of
+               _ | isFullError e -> do
+                 debugmsg "Out of space on createwrite"
+                 return $ unsafeCoerce False
+               _ -> do
+                 debugmsg "Unknown exception on createwrite"
+                 return $ unsafeCoerce False)
 
 run_proc _ (Op (MailFSPathAPI__Link (srcdir, srcfn) (dstdir, dstfn))) = do
   debugmsg $ "Link " ++ srcdir ++ "/" ++ srcfn ++ " to " ++ dstdir ++ "/" ++ dstfn
