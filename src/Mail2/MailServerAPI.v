@@ -29,7 +29,7 @@ Module MailServerAPI <: Layer.
   .
 
   Inductive xopT : Type -> Type :=
-  | Deliver : forall (m : string), xopT unit
+  | Deliver : forall (m : string), xopT bool
   | Pickup : xopT (list ((nat*nat) * string))
   | Delete : forall (id : nat*nat), xopT unit
   | Ext : forall `(op : extopT T), xopT T
@@ -40,12 +40,18 @@ Module MailServerAPI <: Layer.
   Definition initP (s : State) := True.
 
   Inductive xstep : forall T, opT T -> nat -> State -> T -> State -> list event -> Prop :=
-  | StepDeliver : forall m mbox fn tid,
+  | StepDeliverOK : forall m mbox fn tid,
     ~ FMap.In fn mbox ->
     xstep (Deliver m) tid
       mbox
-      tt
+      true
       (FMap.add fn m mbox)
+      nil
+  | StepDeliverErr : forall m mbox tid,
+    xstep (Deliver m) tid
+      mbox
+      false
+      mbox
       nil
   | StepPickup : forall mbox tid r,
     FMap.is_permutation_kv r mbox ->

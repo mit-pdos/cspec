@@ -17,12 +17,18 @@ Module MailServerLockAbsAPI <: Layer.
   Definition initP (s : State) := True.
 
   Inductive xstep : forall T, opT T -> nat -> State -> T -> State -> list event -> Prop :=
-  | StepDeliver : forall m mbox fn tid lock,
+  | StepDeliverOK : forall m mbox fn tid lock,
     ~ FMap.In fn mbox ->
     xstep (Deliver m) tid
       (mk_state mbox lock)
-      tt
+      true
       (mk_state (FMap.add fn m mbox) lock)
+      nil
+  | StepDeliverErr : forall m mbox tid lock,
+    xstep (Deliver m) tid
+      (mk_state mbox lock)
+      false
+      (mk_state mbox lock)
       nil
   | StepPickup : forall mbox tid r lock,
     FMap.is_permutation_kv r mbox ->

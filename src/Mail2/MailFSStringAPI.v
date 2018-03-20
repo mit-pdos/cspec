@@ -11,7 +11,7 @@ Module MailFSStringAPI <: Layer.
   Import MailFSStringAbsAPI.
 
   Inductive xopT : Type -> Type :=
-  | CreateWriteTmp : forall (tmpfn : string) (data : string), xopT unit
+  | CreateWriteTmp : forall (tmpfn : string) (data : string), xopT bool
   | LinkMail : forall (tmpfn : string) (mboxfn : string), xopT bool
   | UnlinkTmp : forall (tmpfn : string), xopT unit
 
@@ -33,11 +33,17 @@ Module MailFSStringAPI <: Layer.
   Definition initP (s : State) := True.
 
   Inductive xstep : forall T, opT T -> nat -> State -> T -> State -> list event -> Prop :=
-  | StepCreateWriteTmp : forall tmp mbox tid tmpfn data lock,
+  | StepCreateWriteTmpOK : forall tmp mbox tid tmpfn data lock,
     xstep (CreateWriteTmp tmpfn data) tid
       (mk_state tmp mbox lock)
-      tt
+      true
       (mk_state (FMap.add tmpfn data tmp) mbox lock)
+      nil
+  | StepCreateWriteTmpErr : forall tmp mbox tid tmpfn data lock,
+    xstep (CreateWriteTmp tmpfn data) tid
+      (mk_state tmp mbox lock)
+      false
+      (mk_state tmp mbox lock)
       nil
   | StepUnlinkTmp : forall tmp mbox tid tmpfn lock,
     xstep (UnlinkTmp tmpfn) tid

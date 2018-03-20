@@ -8,10 +8,14 @@ Require Import MailboxTmpAbsAPI.
 Module AtomicDeliverRestricted <: LayerImplFollowsRule DeliverRestrictedAPI MailboxTmpAbsAPI DeliverTmpExistenceRule.
 
   Definition deliver_core (m : string) :=
-    _ <- Op (DeliverAPI.CreateWriteTmp m);
-    _ <- Op (DeliverAPI.LinkMail);
-    _ <- Op (DeliverAPI.UnlinkTmp);
-    Ret tt.
+    ok <- Op (DeliverAPI.CreateWriteTmp m);
+    match ok with
+      | true => _ <- Op (DeliverAPI.LinkMail);
+               _ <- Op (DeliverAPI.UnlinkTmp);
+              Ret true
+
+      | false => Ret false
+   end.
 
   Definition compile_op T (op : MailboxAPI.opT T) : proc _ T :=
     match op with
@@ -63,11 +67,11 @@ Module AtomicDeliverRestricted <: LayerImplFollowsRule DeliverRestrictedAPI Mail
       (DeliverAPI.CreateWriteTmp data).
   Proof.
     unfold right_mover; intros.
-    repeat step_inv.
+    repeat step_inv; eauto 5.
     - eexists; split; eauto 10.
       rewrite FMap.add_add_ne by congruence.
       eauto 10.
-    - eexists; split; eauto.
+    - eexists; split; eauto 10.
       rewrite <- FMap.add_remove_ne by congruence.
       eauto 10.
     - eexists; split; eauto.
@@ -129,7 +133,10 @@ Module AtomicDeliverRestricted <: LayerImplFollowsRule DeliverRestrictedAPI Mail
     eapply trace_incl_atomize_ysa.
     simpl.
     unfold deliver_core, ysa_movers.
+    constructor.
     eauto 20.
+    intros.
+    destruct r; eauto 20.
   Qed.
 
   Theorem my_compile_correct :
@@ -138,11 +145,17 @@ Module AtomicDeliverRestricted <: LayerImplFollowsRule DeliverRestrictedAPI Mail
     unfold compile_correct; intros.
     destruct op.
 
-    all: repeat atomic_exec_inv; repeat step_inv; eauto.
-
-    simpl.
-    eapply FMap.mapsto_add in H10; subst.
-    eauto.
+    + atomic_exec_inv.
+      destruct v1.
+      repeat atomic_exec_inv; repeat step_inv; eauto; simpl; try congruence.
+      eapply FMap.mapsto_add in H10; subst. eauto.
+      repeat atomic_exec_inv; repeat step_inv; eauto; simpl; try congruence.
+    + atomic_exec_inv; repeat step_inv; eauto.
+    + atomic_exec_inv; repeat step_inv; eauto.
+    + atomic_exec_inv; repeat step_inv; eauto.
+    + atomic_exec_inv; repeat step_inv; eauto.
+    + atomic_exec_inv; repeat step_inv; eauto.
+    + atomic_exec_inv; repeat step_inv; eauto.
   Qed.
 
   Theorem my_atomize_correct :
@@ -180,6 +193,10 @@ Module AtomicDeliverRestricted <: LayerImplFollowsRule DeliverRestrictedAPI Mail
   Proof.
     eapply Compile.compile_ts_no_atomics.
     destruct op; compute; eauto.
+    constructor.
+    compute; eauto.
+    intros.
+    destruct x; compute; eauto.
   Qed.
 
   Theorem compile_traces_match :
@@ -233,7 +250,8 @@ Module AtomicDeliverRestricted <: LayerImplFollowsRule DeliverRestrictedAPI Mail
 
     constructor; intros.
       constructor; intros. eauto.
-    eauto.
+      eauto.
+    constructor; intros.
   Qed.
 
   Hint Resolve createwritetmp_follows_protocol.

@@ -87,12 +87,20 @@ Module MailFSPathAbsAPI <: Layer.
   Qed.
 
   Inductive xstep : forall T, opT T -> nat -> State -> T -> State -> list event -> Prop :=
-  | StepCreateWriteTmp : forall fs tid tmpfn data lock,
+  | StepCreateWriteTmpOk : forall fs tid tmpfn data lock,
     xstep (CreateWriteTmp tmpfn data) tid
       (mk_state fs lock)
-      tt
+      true
       (mk_state (FMap.add ("tmp"%string, tmpfn) data fs) lock)
       nil
+
+  | StepCreateWriteTmpErr : forall fs tid tmpfn data lock,
+    xstep (CreateWriteTmp tmpfn data) tid
+      (mk_state fs lock)
+      false
+      (mk_state fs lock)
+      nil
+      
   | StepUnlinkTmp : forall fs tid tmpfn lock,
     xstep (UnlinkTmp tmpfn) tid
       (mk_state fs lock)

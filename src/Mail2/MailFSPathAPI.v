@@ -10,7 +10,7 @@ Module MailFSPathAPI <: Layer.
   Import MailFSPathAbsAPI.
 
   Inductive xopT : Type -> Type :=
-  | CreateWrite : forall (tmpfn : string * string) (data : string), xopT unit
+  | CreateWrite : forall (tmpfn : string * string) (data : string), xopT bool
   | Link : forall (tmpfn : string * string) (mboxfn : string * string), xopT bool
   | Unlink : forall (fn : string * string), xopT unit
 
@@ -31,11 +31,17 @@ Module MailFSPathAPI <: Layer.
   Definition initP (s : State) := True.
 
   Inductive xstep : forall T, opT T -> nat -> State -> T -> State -> list event -> Prop :=
-  | StepCreateWrite : forall fs tid tmpfn data lock,
+  | StepCreateWriteOK : forall fs tid tmpfn data lock,
     xstep (CreateWrite tmpfn data) tid
       (mk_state fs lock)
-      tt
+      true
       (mk_state (FMap.add tmpfn data fs) lock)
+      nil
+  | StepCreateWriteErr : forall fs tid tmpfn data lock,
+    xstep (CreateWrite tmpfn data) tid
+      (mk_state fs lock)
+      false
+      (mk_state fs lock)
       nil
   | StepUnlink : forall fs tid fn lock,
     xstep (Unlink fn) tid

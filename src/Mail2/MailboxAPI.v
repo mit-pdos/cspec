@@ -10,7 +10,7 @@ Module MailboxAPI <: Layer.
   Import MailServerLockAbsAPI.
 
   Inductive xopT : Type -> Type :=
-  | Deliver : forall (m : string), xopT unit
+  | Deliver : forall (m : string), xopT bool
   | List : xopT (list (nat*nat))
   | Read : forall (fn : nat*nat), xopT (option string)
   | Delete : forall (fn : nat*nat), xopT unit
@@ -24,12 +24,18 @@ Module MailboxAPI <: Layer.
   Definition initP (s : State) := True.
 
   Inductive xstep : forall T, opT T -> nat -> State -> T -> State -> list event -> Prop :=
-  | StepDeliver : forall m mbox tid fn lock,
+  | StepDeliverOK : forall m mbox tid fn lock,
     ~ FMap.In fn mbox ->
     xstep (Deliver m) tid
       (mk_state mbox lock)
-      tt
+      true
       (mk_state (FMap.add fn m mbox) lock)
+      nil
+  | StepDeliverErr : forall m mbox tid lock,
+    xstep (Deliver m) tid
+      (mk_state mbox lock)
+      false
+      (mk_state mbox lock)
       nil
   | StepList : forall mbox tid r lock,
     FMap.is_permutation_key r mbox ->

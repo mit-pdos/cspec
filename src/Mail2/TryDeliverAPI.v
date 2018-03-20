@@ -10,7 +10,7 @@ Module TryDeliverAPI <: Layer.
   Import MailboxTmpAbsAPI.
 
   Inductive xopT : Type -> Type :=
-  | CreateWriteTmp : forall (data : string), xopT unit
+  | CreateWriteTmp : forall (data : string), xopT bool
   | LinkMail : xopT bool
   | UnlinkTmp : xopT unit
 
@@ -28,11 +28,17 @@ Module TryDeliverAPI <: Layer.
   Definition initP (s : State) := True.
 
   Inductive xstep : forall T, opT T -> nat -> State -> T -> State -> list event -> Prop :=
-  | StepCreateWriteTmp : forall tmp mbox tid data lock,
+  | StepCreateWriteTmpOK : forall tmp mbox tid data lock,
     xstep (CreateWriteTmp data) tid
       (mk_state tmp mbox lock)
-      tt
+      true
       (mk_state (FMap.add (tid, 0) data tmp) mbox lock)
+      nil
+  | StepCreateWriteTmpErr : forall tmp mbox tid data lock,
+    xstep (CreateWriteTmp data) tid
+      (mk_state tmp mbox lock)
+      false
+      (mk_state tmp mbox lock)
       nil
   | StepUnlinkTmp : forall tmp mbox tid lock,
     xstep (UnlinkTmp) tid

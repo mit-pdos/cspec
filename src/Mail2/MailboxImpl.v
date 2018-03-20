@@ -313,7 +313,6 @@ Module AtomicReaderRestricted <: LayerImplFollowsRule MailboxRestrictedAPI MailS
 
     + repeat atomic_exec_inv.
       repeat step_inv; eauto 10.
-
     + atomic_exec_inv.
       atomic_exec_inv.
       eapply read_list_exec in H11.
