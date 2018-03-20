@@ -27,11 +27,11 @@ Module MailboxTmpAbsAPI <: Layer.
       true
       (mk_state tmp' (FMap.add fn m mbox) lock)
       nil
-  | StepDeliverErr : forall m tmp mbox tid lock,
+  | StepDeliverErr : forall m tmp tmp' mbox tid lock,
     xstep (Deliver m) tid
       (mk_state tmp mbox lock)
       false
-      (mk_state tmp mbox lock)
+      (mk_state tmp' mbox lock)
       nil
   | StepList : forall tmp mbox tid r lock,
     FMap.is_permutation_key r mbox ->

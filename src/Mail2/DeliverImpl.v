@@ -10,12 +10,14 @@ Module AtomicDeliverRestricted <: LayerImplFollowsRule DeliverRestrictedAPI Mail
   Definition deliver_core (m : string) :=
     ok <- Op (DeliverAPI.CreateWriteTmp m);
     match ok with
-      | true => _ <- Op (DeliverAPI.LinkMail);
-               _ <- Op (DeliverAPI.UnlinkTmp);
-              Ret true
-
-      | false => Ret false
-   end.
+    | true =>
+      ok <- Op (DeliverAPI.LinkMail);
+      _ <- Op (DeliverAPI.UnlinkTmp);
+      Ret ok
+    | false =>
+      _ <- Op (DeliverAPI.UnlinkTmp);
+      Ret false
+    end.
 
   Definition compile_op T (op : MailboxAPI.opT T) : proc _ T :=
     match op with
@@ -67,9 +69,28 @@ Module AtomicDeliverRestricted <: LayerImplFollowsRule DeliverRestrictedAPI Mail
       (DeliverAPI.CreateWriteTmp data).
   Proof.
     unfold right_mover; intros.
-    repeat step_inv; eauto 5.
+    repeat step_inv; eauto 10.
     - eexists; split; eauto 10.
       rewrite FMap.add_add_ne by congruence.
+      eauto 10.
+    - eexists; split; eauto 10.
+      rewrite FMap.add_add_ne by congruence.
+      eauto 10.
+    - eexists.
+      rewrite FMap.add_add_ne by congruence.
+      split.
+      2: eauto.
+      eauto.
+    - eexists; split.
+      2: eauto 10.
+      eauto.
+    - eexists.
+      rewrite FMap.add_add_ne by congruence.
+      split; ( constructor; [ eauto | ] ).
+      eapply DeliverAPI.StepCreateWriteTmpErr2.
+      eapply DeliverAPI.StepCreateWriteTmpErr2.
+    - eexists; split; eauto 10.
+      rewrite <- FMap.add_remove_ne by congruence.
       eauto 10.
     - eexists; split; eauto 10.
       rewrite <- FMap.add_remove_ne by congruence.
@@ -78,13 +99,10 @@ Module AtomicDeliverRestricted <: LayerImplFollowsRule DeliverRestrictedAPI Mail
       econstructor; eauto.
       econstructor; eauto.
       eapply FMap.mapsto_add_ne; eauto.
-    - eauto 20.
-    - eauto 20.
-    - eauto 20.
-    - eauto 20.
-    - eauto 20.
-    - eauto 20.
-    - eauto 20.
+    - eapply FMap.mapsto_add_ne in H13; try congruence.
+      eexists; split.
+      eauto 8.
+      eauto.
   Qed.
 
   Hint Resolve createwritetmp_right_mover.
@@ -111,12 +129,16 @@ Module AtomicDeliverRestricted <: LayerImplFollowsRule DeliverRestrictedAPI Mail
       rewrite <- FMap.add_remove_ne by congruence.
       eauto 10.
     + eexists; split; eauto.
+      rewrite <- FMap.add_remove_ne by congruence.
+      eauto 10.
+    + eexists; split; eauto.
       rewrite FMap.remove_remove.
       eauto.
     + eexists; split; eauto.
       econstructor; eauto.
       econstructor; eauto.
       eapply FMap.mapsto_remove_ne; eauto.
+    + eexists; split; eauto.
     + eexists; split; eauto.
     + eexists; split; eauto.
     + eexists; split; eauto.
@@ -135,7 +157,6 @@ Module AtomicDeliverRestricted <: LayerImplFollowsRule DeliverRestrictedAPI Mail
     unfold deliver_core, ysa_movers.
     constructor.
     eauto 20.
-    intros.
     destruct r; eauto 20.
   Qed.
 
@@ -147,9 +168,9 @@ Module AtomicDeliverRestricted <: LayerImplFollowsRule DeliverRestrictedAPI Mail
 
     + atomic_exec_inv.
       destruct v1.
-      repeat atomic_exec_inv; repeat step_inv; eauto; simpl; try congruence.
-      eapply FMap.mapsto_add in H10; subst. eauto.
-      repeat atomic_exec_inv; repeat step_inv; eauto; simpl; try congruence.
+      - repeat atomic_exec_inv; repeat step_inv; eauto; simpl; try congruence.
+        eapply FMap.mapsto_add in H10; subst; eauto.
+      - repeat atomic_exec_inv; repeat step_inv; eauto; simpl; try congruence.
     + atomic_exec_inv; repeat step_inv; eauto.
     + atomic_exec_inv; repeat step_inv; eauto.
     + atomic_exec_inv; repeat step_inv; eauto.
@@ -231,7 +252,7 @@ Module AtomicDeliverRestricted <: LayerImplFollowsRule DeliverRestrictedAPI Mail
       eapply exec_any_op in H; repeat deex
     end.
 
-  Lemma createwritetmp_follows_protocol : forall tid s data,
+  Lemma deliver_follows_protocol : forall tid s data,
     follows_protocol_proc
       DeliverAPI.step
       DeliverRestrictedAPI.step_allow
@@ -251,10 +272,13 @@ Module AtomicDeliverRestricted <: LayerImplFollowsRule DeliverRestrictedAPI Mail
     constructor; intros.
       constructor; intros. eauto.
       eauto.
+
     constructor; intros.
+      constructor; intros. eauto.
+      constructor; intros. eauto.
   Qed.
 
-  Hint Resolve createwritetmp_follows_protocol.
+  Hint Resolve deliver_follows_protocol.
 
   Theorem compile_ts_follows_protocol :
     forall ts,

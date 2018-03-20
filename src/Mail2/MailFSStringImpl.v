@@ -60,6 +60,8 @@ Module MailFSStringImpl <: LayerImpl MailFSStringAPI MailFSStringAbsAPI.
   Proof.
     unfold right_mover; intros.
     repeat step_inv; eauto.
+
+    eexists; split; econstructor.
   Qed.
 
   Hint Resolve gettid_right_mover.

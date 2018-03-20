@@ -39,11 +39,17 @@ Module MailFSStringAPI <: Layer.
       true
       (mk_state (FMap.add tmpfn data tmp) mbox lock)
       nil
-  | StepCreateWriteTmpErr : forall tmp mbox tid tmpfn data lock,
+  | StepCreateWriteTmpErr1 : forall tmp mbox tid tmpfn data lock,
     xstep (CreateWriteTmp tmpfn data) tid
       (mk_state tmp mbox lock)
       false
       (mk_state tmp mbox lock)
+      nil
+  | StepCreateWriteTmpErr2 : forall tmp mbox tid tmpfn data data' lock,
+    xstep (CreateWriteTmp tmpfn data) tid
+      (mk_state tmp mbox lock)
+      false
+      (mk_state (FMap.add tmpfn data' tmp) mbox lock)
       nil
   | StepUnlinkTmp : forall tmp mbox tid tmpfn lock,
     xstep (UnlinkTmp tmpfn) tid
@@ -60,8 +66,6 @@ Module MailFSStringAPI <: Layer.
       (mk_state tmp (FMap.add mailfn data mbox) lock)
       nil
   | StepLinkMailErr : forall tmp mbox tid mailfn tmpfn lock,
-    ((~ FMap.In tmpfn tmp) \/
-     (FMap.In mailfn mbox)) ->
     xstep (LinkMail tmpfn mailfn) tid
       (mk_state tmp mbox lock)
       false

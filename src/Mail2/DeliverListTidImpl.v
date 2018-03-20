@@ -52,8 +52,8 @@ Module DeliverListTidRestrictedImpl <: LayerImplFollowsRule DeliverListTidRestri
   Definition linkmail_core :=
     files <- Op DeliverListTidAPI.ListTid;
     let newname := nextfn files 0 in
-    _ <- Op (DeliverListTidAPI.LinkMail newname);
-    Ret true.
+    ok <- Op (DeliverListTidAPI.LinkMail newname);
+    Ret ok.
 
   Definition compile_op T (op : DeliverAPI.opT T) : proc _ T :=
     match op with
@@ -92,6 +92,10 @@ Module DeliverListTidRestrictedImpl <: LayerImplFollowsRule DeliverListTidRestri
   Proof.
     unfold right_mover; intros.
     repeat step_inv; eauto 10.
+    + eexists; split.
+      econstructor. eauto.
+        eapply DeliverListTidAPI.StepCreateWriteTmpErr2.
+      econstructor; eauto.
     + eexists; split.
       econstructor; eauto.
       econstructor; intros; eauto.

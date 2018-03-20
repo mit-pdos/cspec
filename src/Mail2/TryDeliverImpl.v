@@ -43,6 +43,8 @@ Module TryDeliverImpl <: LayerImpl MailFSAPI TryDeliverAPI.
   Proof.
     unfold right_mover; intros.
     repeat step_inv; eauto 10.
+
+    eexists; split; econstructor.
   Qed.
 
   Hint Resolve random_right_mover.

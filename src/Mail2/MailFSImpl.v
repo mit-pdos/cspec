@@ -36,6 +36,8 @@ Module MailFSImpl <: LayerImpl MailFSAPI DeliverListTidAPI.
     match goal with
     | H : MailFSAPI.step _ _ _ _ _ _ |- _ =>
       inversion H; clear H; subst; repeat sigT_eq
+    | H : MailFSAPI.xstep _ _ _ _ _ _ |- _ =>
+      inversion H; clear H; subst; repeat sigT_eq
     | H : DeliverListTidAPI.step _ _ _ _ _ _ |- _ =>
       inversion H; clear H; subst; repeat sigT_eq
     end; intuition idtac.
@@ -49,7 +51,9 @@ Module MailFSImpl <: LayerImpl MailFSAPI DeliverListTidAPI.
       (MailFSAPI.GetTID).
   Proof.
     unfold right_mover; intros.
-    repeat step_inv; eauto.
+    repeat step_inv; eauto 10.
+
+    eexists; split; econstructor.
   Qed.
 
   Hint Resolve gettid_right_mover.

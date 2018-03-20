@@ -35,32 +35,37 @@ Module DeliverAPI <: Layer.
       (mk_state (FMap.add (tid, 0) data tmp) mbox lock)
       nil
 
-  | StepCreateWriteTmpErr : forall tmp mbox tid data lock,
+  | StepCreateWriteTmpErr1 : forall tmp mbox tid data lock,
     xstep (CreateWriteTmp data) tid
       (mk_state tmp mbox lock)
       false
       (mk_state tmp mbox lock)
       nil
-      
+  | StepCreateWriteTmpErr2 : forall tmp mbox tid data data' lock,
+    xstep (CreateWriteTmp data) tid
+      (mk_state tmp mbox lock)
+      false
+      (mk_state (FMap.add (tid, 0) data' tmp) mbox lock)
+      nil
+
   | StepUnlinkTmp : forall tmp mbox tid lock,
     xstep (UnlinkTmp) tid
       (mk_state tmp mbox lock)
       tt
       (mk_state (FMap.remove (tid, 0) tmp) mbox lock)
       nil
-  | StepLinkMailOK : forall tmp mbox tid mailfn data r lock,
+  | StepLinkMailOK : forall tmp mbox tid mailfn data lock,
     FMap.MapsTo (tid, 0) data tmp ->
     ~ FMap.In (tid, mailfn) mbox ->
     xstep (LinkMail) tid
       (mk_state tmp mbox lock)
-      r
+      true
       (mk_state tmp (FMap.add (tid, mailfn) data mbox) lock)
       nil
-  | StepLinkMailErr : forall tmp mbox tid r lock,
-    ~ FMap.In (tid, 0) tmp ->
+  | StepLinkMailErr : forall tmp mbox tid lock,
     xstep (LinkMail) tid
       (mk_state tmp mbox lock)
-      r
+      false
       (mk_state tmp mbox lock)
       nil
 

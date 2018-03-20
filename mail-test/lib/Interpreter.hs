@@ -133,8 +133,16 @@ run_proc _ (Op (MailFSPathAPI__CreateWrite (dir, fn) contents)) = do
 
 run_proc _ (Op (MailFSPathAPI__Link (srcdir, srcfn) (dstdir, dstfn))) = do
   debugmsg $ "Link " ++ srcdir ++ "/" ++ srcfn ++ " to " ++ dstdir ++ "/" ++ dstfn
-  createLink (filePath srcdir srcfn) (filePath dstdir dstfn)
-  return $ unsafeCoerce True
+  catch (do
+           createLink (filePath srcdir srcfn) (filePath dstdir dstfn)
+           return $ unsafeCoerce True)
+        (\e -> case e of
+               _ | isAlreadyExistsError e -> do
+                 debugmsg "createLink already exists"
+                 return $ unsafeCoerce False
+               _ -> do
+                 debugmsg "createLink unknown error"
+                 return $ unsafeCoerce False)
 
 run_proc _ (Op (MailFSPathAPI__Unlink (dir, fn))) = do
   debugmsg $ "Unlink " ++ dir ++ "/" ++ (fn)

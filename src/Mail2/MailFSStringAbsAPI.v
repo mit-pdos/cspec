@@ -58,11 +58,17 @@ Module MailFSStringAbsAPI <: Layer.
       true
       (mk_state (FMap.add (encode_tid_fn tid 0) data tmp) mbox lock)
       nil
-  | StepCreateWriteTmpErr : forall tmp mbox tid data lock,
+  | StepCreateWriteTmpErr1 : forall tmp mbox tid data lock,
     xstep (CreateWriteTmp data) tid
       (mk_state tmp mbox lock)
       false
       (mk_state tmp mbox lock)
+      nil
+  | StepCreateWriteTmpErr2 : forall tmp mbox tid data data' lock,
+    xstep (CreateWriteTmp data) tid
+      (mk_state tmp mbox lock)
+      false
+      (mk_state (FMap.add (encode_tid_fn tid 0) data' tmp) mbox lock)
       nil
   | StepUnlinkTmp : forall tmp mbox tid lock,
     xstep (UnlinkTmp) tid
@@ -79,8 +85,6 @@ Module MailFSStringAbsAPI <: Layer.
       (mk_state tmp (FMap.add (encode_tid_fn tid mailfn) data mbox) lock)
       nil
   | StepLinkMail : forall tmp mbox tid mailfn lock,
-    ((~ FMap.In (encode_tid_fn tid 0) tmp) \/
-     (FMap.In (encode_tid_fn tid mailfn) mbox)) ->
     xstep (LinkMail mailfn) tid
       (mk_state tmp mbox lock)
       false

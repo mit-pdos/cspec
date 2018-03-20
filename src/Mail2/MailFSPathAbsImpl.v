@@ -257,13 +257,11 @@ Module MailFSPathAbsImpl <: LayerImpl MailFSPathAbsAPI MailFSStringAPI.
     unfold op_abs; intros.
     destruct s2; simpl in *; subst.
     inversion H0; clear H0; subst; repeat sigT_eq.
-    all: eexists.
-    all: split; [ | try econstructor ].
-    all: simpl.
-    all: intuition eauto 10.
+    all:
+      try solve [ eexists; split; [ | try econstructor ]; simpl; intuition eauto 10 ].
 
     inversion H; simpl in *; subst.
-    eauto.
+    eexists; split; eauto.
   Qed.
 
   Hint Resolve absR_ok.

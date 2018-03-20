@@ -94,13 +94,19 @@ Module MailFSPathAbsAPI <: Layer.
       (mk_state (FMap.add ("tmp"%string, tmpfn) data fs) lock)
       nil
 
-  | StepCreateWriteTmpErr : forall fs tid tmpfn data lock,
+  | StepCreateWriteTmpErr1 : forall fs tid tmpfn data lock,
     xstep (CreateWriteTmp tmpfn data) tid
       (mk_state fs lock)
       false
       (mk_state fs lock)
       nil
-      
+  | StepCreateWriteTmpErr2 : forall fs tid tmpfn data data' lock,
+    xstep (CreateWriteTmp tmpfn data) tid
+      (mk_state fs lock)
+      false
+      (mk_state (FMap.add ("tmp"%string, tmpfn) data' fs) lock)
+      nil
+
   | StepUnlinkTmp : forall fs tid tmpfn lock,
     xstep (UnlinkTmp tmpfn) tid
       (mk_state fs lock)
@@ -116,8 +122,6 @@ Module MailFSPathAbsAPI <: Layer.
       (mk_state (FMap.add ("mail"%string, mailfn) data fs) lock)
       nil
   | StepLinkMailErr : forall fs tid mailfn tmpfn lock,
-    ((~ FMap.In ("tmp"%string, tmpfn) fs) \/
-     (FMap.In ("mail"%string, mailfn) fs)) ->
     xstep (LinkMail tmpfn mailfn) tid
       (mk_state fs lock)
       false
