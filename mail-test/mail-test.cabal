@@ -18,6 +18,7 @@ executable mail-test
                      , rdtsc
                      , flock
                      , network
+                     , deepseq
   other-modules:       Interpreter
                      , Compile
                      , ConcurProc

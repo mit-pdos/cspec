@@ -2,6 +2,7 @@ module Interpreter where
 
 -- Haskell libraries
 import Control.Concurrent
+import Control.DeepSeq
 import Control.Exception
 import Data.Atomics
 import Data.IORef
@@ -178,6 +179,7 @@ run_proc _ (Op (MailFSPathAPI__Read (dir, fn))) = do
   catch (do
            h <- openFile (filePath dir fn) ReadMode
            contents <- hGetContents h
+           evaluate (rnf contents)
            hClose h
            return $ unsafeCoerce (Just contents))
         (\e -> case e of
