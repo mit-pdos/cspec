@@ -9,23 +9,25 @@ Module MailServerAPI <: Layer.
 
   Definition dir_contents := FMap.t (nat*nat) string.
 
-  Inductive newconn :=
-  | SMTPConn : smtpconn -> newconn
-  | POP3Conn : pop3conn -> newconn
-  .
-
   Inductive pop3req :=
-  | POP3Delete : nat*nat -> pop3req
-  | POP3Closed : pop3req
+  | POP3Stat
+  | POP3List
+  | POP3Retr : nat -> pop3req
+  | POP3Delete : nat -> pop3req
+  | POP3Closed
   .
 
   Inductive extopT : Type -> Type :=
-  | AcceptConn : extopT newconn
+  | AcceptSMTP : extopT smtpconn
   | SMTPGetMessage : smtpconn -> extopT (option string)
   | SMTPRespond : smtpconn -> bool -> extopT unit
-  | POP3ListMessages : pop3conn -> list ((nat*nat) * string) -> extopT unit
+
+  | AcceptPOP3 : extopT pop3conn
   | POP3GetRequest : pop3conn -> extopT pop3req
-  | POP3Ack : pop3conn -> extopT unit
+  | POP3RespondStat : pop3conn -> nat -> nat -> extopT unit
+  | POP3RespondList : pop3conn -> list nat -> extopT unit
+  | POP3RespondRetr : pop3conn -> string -> extopT unit
+  | POP3RespondDelete : pop3conn -> extopT unit
   .
 
   Inductive xopT : Type -> Type :=

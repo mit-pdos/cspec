@@ -13,12 +13,6 @@ import_modules = {
         "MailServerAPI",
         "MailServer",
     ],
-
-    "import qualified SMTP":
-    [
-        "MailServerAPI",
-        "MailServer",
-    ],
 }
 
 module_imports = {}

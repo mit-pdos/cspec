@@ -1,18 +1,23 @@
 module POP3 where
 
+-- Haskell libraries
+
 import Control.Monad
 import Network
 import System.IO
 
+-- Extracted code
+
+import MailServerAPI
+
+-- Our libraries
+
+import Support
+
+-- POP3 implementation
+
 data POP3Server =
   POP3Server Socket
-
-data POP3Conn =
-  POP3Conn Handle
-
-data POP3Command =
-    POP3Delete (Integer, Integer)
-  | POP3Closed
 
 pop3Listen :: Int -> IO POP3Server
 pop3Listen portnum = do
@@ -23,6 +28,7 @@ pop3Accept :: POP3Server -> IO POP3Conn
 pop3Accept (POP3Server sock) = do
   (conn, _, _) <- accept sock
   hSetBuffering conn NoBuffering
+  pop3RespondOK conn
   return $ POP3Conn conn
 
 pop3Respond :: Handle -> Bool -> String -> IO ()
@@ -35,49 +41,58 @@ pop3RespondOK :: Handle -> IO ()
 pop3RespondOK h =
   pop3Respond h True ""
 
-pop3ProcessCommands :: Handle -> [((Integer, Integer), String)] -> IO POP3Command
-pop3ProcessCommands h msgs = do
+pop3ProcessCommands :: Handle -> IO MailServerAPI__Coq_pop3req
+pop3ProcessCommands h = do
   line <- hGetLine h
   let cmd = words line
   case cmd of
     "APOP" : _ -> do
       pop3RespondOK h
-      pop3ProcessCommands h msgs
+      pop3ProcessCommands h
     "USER" : _ -> do
       pop3RespondOK h
-      pop3ProcessCommands h msgs
+      pop3ProcessCommands h
     "PASS" : _ -> do
       pop3RespondOK h
-      pop3ProcessCommands h msgs
+      pop3ProcessCommands h
     "STAT" : _ -> do
-      pop3Respond h True $ (show $ length msgs) ++ " " ++ (show $ sum $ map length $ map snd msgs)
-      pop3ProcessCommands h msgs
+      return $ MailServerAPI__POP3Stat
     "LIST" : _ -> do
-      pop3RespondOK h
-      foldM (\idx msg -> do
-        hPutStrLn h $ (show idx) ++ " " ++ (show $ length $ snd msg)
-        return $ idx + 1) 1 msgs
-      pop3ProcessCommands h msgs
+      return $ MailServerAPI__POP3List
     ["RETR", id] -> do
-      pop3RespondOK h
-      hPutStr h $ snd (msgs !! (read id - 1))
-      hPutStrLn h "."
-      pop3ProcessCommands h msgs
+      return $ MailServerAPI__POP3Retr $ read id - 1
     ["DELE", id] -> do
-      return $ POP3Delete $ fst (msgs !! (read id - 1))
+      return $ MailServerAPI__POP3Delete $ read id - 1
     "QUIT" : _ -> do
       pop3RespondOK h
       hClose h
-      return POP3Closed
+      return MailServerAPI__POP3Closed
     _ -> do
       pop3Respond h False "unrecognized command"
-      pop3ProcessCommands h msgs
+      pop3ProcessCommands h
 
-pop3GetRequest :: POP3Conn -> [((Integer, Integer), String)] -> IO POP3Command
-pop3GetRequest (POP3Conn h) msgs = do
+pop3GetRequest :: POP3Conn -> IO MailServerAPI__Coq_pop3req
+pop3GetRequest (POP3Conn h) = do
+  pop3ProcessCommands h
+
+pop3RespondStat :: POP3Conn -> Integer -> Integer -> IO ()
+pop3RespondStat (POP3Conn h) count size = do
+  pop3Respond h True $ (show count) ++ " " ++ (show size)
+
+pop3RespondList :: POP3Conn -> [Integer] -> IO ()
+pop3RespondList (POP3Conn h) msglens = do
   pop3RespondOK h
-  pop3ProcessCommands h msgs
+  foldM (\idx msglen -> do
+    hPutStrLn h $ (show idx) ++ " " ++ (show msglen)
+    return $ idx + 1) 1 msglens
+  hPutStrLn h "."
 
-pop3AckDelete :: POP3Conn -> IO ()
-pop3AckDelete (POP3Conn h) = do
-  return ()
+pop3RespondRetr :: POP3Conn -> String -> IO ()
+pop3RespondRetr (POP3Conn h) body = do
+  pop3RespondOK h
+  hPutStrLn h body
+  hPutStrLn h "."
+
+pop3RespondDelete :: POP3Conn -> IO ()
+pop3RespondDelete (POP3Conn h) = do
+  pop3RespondOK h

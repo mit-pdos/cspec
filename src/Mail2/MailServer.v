@@ -1,4 +1,6 @@
 Require Import POCS.
+Require Import String.
+
 Require Import MailServerAPI.
 
 Require Import MailServerLockAbsAPI.
@@ -39,7 +41,8 @@ Require Import TryDeliverImpl.
 
 Import MailServerAPI.
 
-Definition handle_smtp conn :=
+Definition do_smtp_req : proc opT unit :=
+  conn <- Op (Ext AcceptSMTP);
   omsg <- Op (Ext (SMTPGetMessage conn));
   match omsg with
   | None => Ret tt
@@ -49,37 +52,44 @@ Definition handle_smtp conn :=
     Ret tt
   end.
 
-Definition handle_pop3_one conn :=
+Definition handle_pop3_one conn (msgs : list ((nat*nat) * string)) :=
   req <- Op (Ext (POP3GetRequest conn));
   match req with
-  | POP3Delete id =>
-    _ <- Op (Delete id);
-    _ <- Op (Ext (POP3Ack conn));
+  | POP3Stat =>
+    _ <- Op (Ext (POP3RespondStat conn (Datatypes.length msgs)
+                 (fold_left plus (map String.length (map snd msgs)) 0)));
+    Ret false
+  | POP3List =>
+    _ <- Op (Ext (POP3RespondList conn (map String.length (map snd msgs))));
+    Ret false
+  | POP3Retr n =>
+    _ <- Op (Ext (POP3RespondRetr conn (nth n (map snd msgs) ""%string)));
+    Ret false
+  | POP3Delete n =>
+    _ <- Op (Delete (nth n (map fst msgs) (0, 0)));
+    _ <- Op (Ext (POP3RespondDelete conn));
     Ret false
   | POP3Closed =>
     Ret true
   end.
 
-Definition handle_pop3 conn :=
+Definition do_pop3_req : proc opT unit :=
+  conn <- Op (Ext AcceptPOP3);
   msgs <- Op (Pickup);
-  _ <- Op (Ext (POP3ListMessages conn msgs));
   _ <- Until (fun done => done)
-             (fun _ => handle_pop3_one conn)
+             (fun _ => handle_pop3_one conn msgs)
              None;
   Ret tt.
 
-Definition do_mail_req : proc opT unit :=
-  newconn <- Op (Ext AcceptConn);
-  match newconn with
-  | SMTPConn c => handle_smtp c
-  | POP3Conn c => handle_pop3 c
-  end.
+Definition smtp_server_thread : proc MailServerAPI.opT unit :=
+  Until (fun _ => false) (fun _ => do_smtp_req) None.
 
-Definition mail_server_thread : proc MailServerAPI.opT unit :=
-  Until (fun _ => false) (fun _ => do_mail_req) None.
+Definition pop3_server_thread : proc MailServerAPI.opT unit :=
+  Until (fun _ => false) (fun _ => do_pop3_req) None.
 
-Definition mail_server nproc :=
-  repeat (Proc mail_server_thread) nproc.
+Definition mail_server nsmtp npop3 :=
+  repeat (Proc smtp_server_thread) nsmtp ++
+  repeat (Proc pop3_server_thread) npop3.
 
 
 Module c1 := Link MailboxAPI MailServerLockAbsAPI MailServerAPI
@@ -114,7 +124,7 @@ Module c9 := Link MailFSPathAPI MailFSPathAbsAPI MailServerAPI
                   MailFSPathImpl c8.
 
 
-Definition ms_bottom nproc :=
-  c9.compile_ts (mail_server nproc).
+Definition ms_bottom nsmtp npop3 :=
+  c9.compile_ts (mail_server nsmtp npop3).
 
 Print Assumptions c9.compile_traces_match.

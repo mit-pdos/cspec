@@ -4,12 +4,10 @@ module SMTP where
 
 import Network
 import System.IO
+import Support
 
 data SMTPServer =
   SMTPServer Socket
-
-data SMTPConn =
-  SMTPConn Handle
 
 data Message =
   Message

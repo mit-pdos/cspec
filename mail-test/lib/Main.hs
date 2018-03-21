@@ -7,6 +7,7 @@ import Control.Concurrent
 -- Our library code
 import Interpreter
 import SMTP
+import POP3
 
 -- Extracted code
 import ConcurProc
@@ -14,26 +15,27 @@ import MailFSPathAPI
 import MailServer
 
 
-run_thread :: SMTPServer -> Coq_maybe_proc (MailFSPathAPI__Coq_xopT a) -> IO ()
-run_thread _ NoProc = return ()
-run_thread smtp (Proc p) = do
+run_thread :: SMTPServer -> POP3Server -> Coq_maybe_proc (MailFSPathAPI__Coq_xopT a) -> IO ()
+run_thread _ _ NoProc = return ()
+run_thread smtp pop3 (Proc p) = do
   tid <- myThreadId
   putStrLn $ "Running " ++ (show tid)
 
-  s <- mkState smtp
+  s <- mkState smtp pop3
   run_proc s p
   return ()
 
-spawn_thread :: SMTPServer -> Coq_maybe_proc (MailFSPathAPI__Coq_xopT a) -> IO ()
-spawn_thread smtp p = do
+spawn_thread :: SMTPServer -> POP3Server -> Coq_maybe_proc (MailFSPathAPI__Coq_xopT a) -> IO ()
+spawn_thread smtp pop3 p = do
   putStrLn $ "Spawning.."
-  tid <- forkIO (run_thread smtp p)
+  tid <- forkIO (run_thread smtp pop3 p)
   putStrLn $ "Spawned " ++ (show tid)
   return ()
 
 main :: IO ()
 main = do
   smtp <- smtpListen 2525
-  mapM_ (spawn_thread smtp) (ms_bottom 4)
+  pop3 <- pop3Listen 2110
+  mapM_ (spawn_thread smtp pop3) (ms_bottom 4 4)
   putStrLn "Started all threads"
   threadDelay $ 60 * 1000000

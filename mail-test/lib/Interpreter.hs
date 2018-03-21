@@ -19,6 +19,7 @@ import System.Lock.FLock
 -- Our own libraries
 import Support
 import SMTP
+import POP3
 
 -- Extracted code
 import ConcurProc
@@ -28,12 +29,12 @@ import MailServerAPI
 
 -- State for each process/thread
 data State =
-  S SMTPServer !(MVar Lock)
+  S SMTPServer POP3Server !(MVar Lock)
 
-mkState :: SMTPServer -> IO State
-mkState smtp = do
+mkState :: SMTPServer -> POP3Server -> IO State
+mkState smtp pop3 = do
   lockvar <- newEmptyMVar
-  return $ S smtp lockvar
+  return $ S smtp pop3 lockvar
 
 verbose :: Bool
 verbose = True
@@ -84,15 +85,15 @@ run_proc _ (Op MailFSPathAPI__Random) = do
   ts <- rdtsc
   return $ unsafeCoerce (fromIntegral ts :: Integer)
 
-run_proc (S smtpserver _) (Op (MailFSPathAPI__Ext (MailServerAPI__AcceptConn))) = do
-  debugmsg $ "AcceptConn"
-  rnd <- randomIO
-  if (rnd :: Integer) `mod` 100 == 0 then do
-    msgref <- newIORef []
-    return $ unsafeCoerce (MailServerAPI__POP3Conn (POP3Conn msgref))
-  else do
-    conn <- smtpAccept smtpserver
-    return $ unsafeCoerce (MailServerAPI__SMTPConn conn)
+run_proc (S smtpserver _ _) (Op (MailFSPathAPI__Ext (MailServerAPI__AcceptSMTP))) = do
+  debugmsg $ "AcceptSMTP"
+  conn <- smtpAccept smtpserver
+  return $ unsafeCoerce conn
+
+run_proc (S _ pop3server _) (Op (MailFSPathAPI__Ext (MailServerAPI__AcceptPOP3))) = do
+  debugmsg $ "AcceptPOP3"
+  conn <- pop3Accept pop3server
+  return $ unsafeCoerce conn
 
 run_proc _ (Op (MailFSPathAPI__Ext (MailServerAPI__SMTPGetMessage conn))) = do
   debugmsg $ "SMTPGetMessage"
@@ -104,22 +105,29 @@ run_proc _ (Op (MailFSPathAPI__Ext (MailServerAPI__SMTPRespond conn ok))) = do
   smtpDone conn ok
   return $ unsafeCoerce ()
 
-run_proc _ (Op (MailFSPathAPI__Ext (MailServerAPI__POP3ListMessages (POP3Conn msgref) msgs))) = do
-  debugmsg $ "POP3ListMessages"
-  writeIORef msgref (map fst msgs)
+run_proc _ (Op (MailFSPathAPI__Ext (MailServerAPI__POP3GetRequest conn))) = do
+  debugmsg $ "POP3GetRequest"
+  req <- pop3GetRequest conn
+  return $ unsafeCoerce req
+
+run_proc _ (Op (MailFSPathAPI__Ext (MailServerAPI__POP3RespondStat conn count bytes))) = do
+  debugmsg $ "POP3RespondStat"
+  pop3RespondStat conn count bytes
   return $ unsafeCoerce ()
 
-run_proc _ (Op (MailFSPathAPI__Ext (MailServerAPI__POP3GetRequest (POP3Conn msgref)))) = do
-  debugmsg $ "POP3GetRequest"
-  msgs <- readIORef msgref
-  case msgs of
-    [] -> return $ unsafeCoerce MailServerAPI__POP3Closed
-    id:rest -> do
-      writeIORef msgref rest
-      return $ unsafeCoerce (MailServerAPI__POP3Delete id)
+run_proc _ (Op (MailFSPathAPI__Ext (MailServerAPI__POP3RespondList conn msglens))) = do
+  debugmsg $ "POP3RespondList"
+  pop3RespondList conn msglens
+  return $ unsafeCoerce ()
 
-run_proc _ (Op (MailFSPathAPI__Ext (MailServerAPI__POP3Ack (POP3Conn msgref)))) = do
-  debugmsg $ "POP3Ack"
+run_proc _ (Op (MailFSPathAPI__Ext (MailServerAPI__POP3RespondRetr conn body))) = do
+  debugmsg $ "POP3RespondRetr"
+  pop3RespondRetr conn body
+  return $ unsafeCoerce ()
+
+run_proc _ (Op (MailFSPathAPI__Ext (MailServerAPI__POP3RespondDelete conn))) = do
+  debugmsg $ "POP3RespondDelete"
+  pop3RespondDelete conn
   return $ unsafeCoerce ()
 
 run_proc _ (Op (MailFSPathAPI__CreateWrite (dir, fn) contents)) = do
@@ -180,7 +188,7 @@ run_proc _ (Op (MailFSPathAPI__Read (dir, fn))) = do
                  debugmsg "Unknown exception on read"
                  return $ unsafeCoerce Nothing)
 
-run_proc (S _ lockvar) (Op (MailFSPathAPI__Lock)) = do
+run_proc (S _ _ lockvar) (Op (MailFSPathAPI__Lock)) = do
   debugmsg $ "Lock"
   mboxfd <- openFd (dirPath "mail") ReadOnly Nothing defaultFileFlags
   lck <- lockFd mboxfd Exclusive Block
@@ -188,7 +196,7 @@ run_proc (S _ lockvar) (Op (MailFSPathAPI__Lock)) = do
   putMVar lockvar lck
   return $ unsafeCoerce ()
 
-run_proc (S _ lockvar) (Op (MailFSPathAPI__Unlock)) = do
+run_proc (S _ _ lockvar) (Op (MailFSPathAPI__Unlock)) = do
   debugmsg $ "Unlock"
   lck <- takeMVar lockvar
   unlock lck
