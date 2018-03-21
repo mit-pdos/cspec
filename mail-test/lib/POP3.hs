@@ -101,7 +101,7 @@ pop3RespondRetr :: POP3Conn -> String -> IO ()
 pop3RespondRetr (POP3Conn h) body = do
   pop3RespondOK h
   hPutStr h body
-  hPutStr h "\r\n.\r\n"
+  hPutStr h ".\r\n"
 
 pop3RespondDelete :: POP3Conn -> IO ()
 pop3RespondDelete (POP3Conn h) = do
