@@ -3,6 +3,7 @@ module POP3 where
 -- Haskell libraries
 
 import Control.Monad
+import Data.Char
 import Network
 import System.IO
 
@@ -44,29 +45,38 @@ pop3RespondOK h =
 pop3ProcessCommands :: Handle -> IO MailServerAPI__Coq_pop3req
 pop3ProcessCommands h = do
   line <- hGetLine h
-  let cmd = words line
-  case cmd of
-    "APOP" : _ -> do
-      pop3RespondOK h
-      pop3ProcessCommands h
-    "USER" : _ -> do
-      pop3RespondOK h
-      pop3ProcessCommands h
-    "PASS" : _ -> do
-      pop3RespondOK h
-      pop3ProcessCommands h
-    "STAT" : _ -> do
-      return $ MailServerAPI__POP3Stat
-    "LIST" : _ -> do
-      return $ MailServerAPI__POP3List
-    ["RETR", id] -> do
-      return $ MailServerAPI__POP3Retr $ read id - 1
-    ["DELE", id] -> do
-      return $ MailServerAPI__POP3Delete $ read id - 1
-    "QUIT" : _ -> do
-      pop3RespondOK h
-      hClose h
-      return MailServerAPI__POP3Closed
+  let cmdparts = words line
+  case cmdparts of
+    cmd : rest ->
+      case (map toUpper cmd) : rest of
+        "APOP" : _ -> do
+          pop3RespondOK h
+          pop3ProcessCommands h
+        "USER" : _ -> do
+          pop3RespondOK h
+          pop3ProcessCommands h
+        "PASS" : _ -> do
+          pop3RespondOK h
+          pop3ProcessCommands h
+        "CAPA" : _ -> do
+          pop3RespondOK h
+          hPutStrLn h "."
+          pop3ProcessCommands h
+        "STAT" : _ -> do
+          return $ MailServerAPI__POP3Stat
+        "LIST" : _ -> do
+          return $ MailServerAPI__POP3List
+        ["RETR", id] -> do
+          return $ MailServerAPI__POP3Retr $ read id - 1
+        ["DELE", id] -> do
+          return $ MailServerAPI__POP3Delete $ read id - 1
+        "QUIT" : _ -> do
+          pop3RespondOK h
+          hClose h
+          return MailServerAPI__POP3Closed
+        _ -> do
+          pop3Respond h False "unrecognized command"
+          pop3ProcessCommands h
     _ -> do
       pop3Respond h False "unrecognized command"
       pop3ProcessCommands h
