@@ -34,9 +34,9 @@ pop3Accept (POP3Server sock) = do
 
 pop3Respond :: Handle -> Bool -> String -> IO ()
 pop3Respond h True text =
-  hPutStrLn h $ "+OK " ++ text
+  hPutStr h $ "+OK " ++ text ++ "\r\n"
 pop3Respond h False text =
-  hPutStrLn h $ "-ERR " ++ text
+  hPutStr h $ "-ERR " ++ text ++ "\r\n"
 
 pop3RespondOK :: Handle -> IO ()
 pop3RespondOK h =
@@ -60,7 +60,7 @@ pop3ProcessCommands h = do
           pop3ProcessCommands h
         "CAPA" : _ -> do
           pop3RespondOK h
-          hPutStrLn h "."
+          hPutStr h ".\r\n"
           pop3ProcessCommands h
         "STAT" : _ -> do
           return $ MailServerAPI__POP3Stat
@@ -93,15 +93,15 @@ pop3RespondList :: POP3Conn -> [Integer] -> IO ()
 pop3RespondList (POP3Conn h) msglens = do
   pop3RespondOK h
   foldM (\idx msglen -> do
-    hPutStrLn h $ (show idx) ++ " " ++ (show msglen)
+    hPutStr h $ (show idx) ++ " " ++ (show msglen) ++ "\r\n"
     return $ idx + 1) 1 msglens
-  hPutStrLn h "."
+  hPutStr h ".\r\n"
 
 pop3RespondRetr :: POP3Conn -> String -> IO ()
 pop3RespondRetr (POP3Conn h) body = do
   pop3RespondOK h
-  hPutStrLn h body
-  hPutStrLn h "."
+  hPutStr h body
+  hPutStr h "\r\n.\r\n"
 
 pop3RespondDelete :: POP3Conn -> IO ()
 pop3RespondDelete (POP3Conn h) = do
