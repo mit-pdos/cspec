@@ -49,6 +49,9 @@ smtpProcessCommands h msg = do
     "HELO" : client -> do
       smtpRespondOK h
       smtpProcessCommands h $ msg { mail_client = client }
+    "EHLO" : client -> do
+      smtpRespondOK h
+      smtpProcessCommands h $ msg { mail_client = client }
     "MAIL" : from -> do
       smtpRespondOK h
       smtpProcessCommands h $ msg { mail_from = from }
