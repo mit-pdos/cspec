@@ -3,6 +3,7 @@ module Main where
 
 -- Haskell libraries
 import Control.Concurrent
+import Control.Monad
 
 -- Our library code
 import Interpreter
@@ -38,4 +39,4 @@ main = do
   pop3 <- pop3Listen 2110
   mapM_ (spawn_thread smtp pop3) (ms_bottom 4 4)
   putStrLn "Started all threads"
-  threadDelay $ 60 * 1000000
+  forever $ threadDelay 1000000
