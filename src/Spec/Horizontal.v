@@ -50,27 +50,27 @@ Section HorizontalComposition.
 
 End HorizontalComposition.
 
+Arguments horizState indexT {cmp} sliceState.
+Arguments horizStep indexT {cmp sliceOpT sliceState} sliceStep.
+
 
 Section HorizontalCompositionAbs.
 
   Variable indexT : Type.
   Context {cmp : Ordering indexT}.
-  Variable indexValid : indexT -> Prop.
 
   Variable sliceOpT : Type -> Type.
 
   Variable sliceState1 : Type.
   Variable sliceStep1 : OpSemantics sliceOpT sliceState1.
-  Variable initP1 : sliceState1 -> Prop.
 
   Variable sliceState2 : Type.
   Variable sliceStep2 : OpSemantics sliceOpT sliceState2.
-  Variable initP2 : sliceState2 -> Prop.
 
 
   Variable absR : sliceState1 -> sliceState2 -> Prop.
 
-  Definition horizAbsR (S1 : horizState sliceState1) (S2 : horizState sliceState2) : Prop :=
+  Definition horizAbsR (S1 : horizState indexT sliceState1) (S2 : horizState indexT sliceState2) : Prop :=
     forall (i : indexT),
       ( forall s1,
           FMap.MapsTo i s1 S1 ->
@@ -84,7 +84,7 @@ Section HorizontalCompositionAbs.
 
   Theorem horizAbsR_ok :
     op_abs absR sliceStep1 sliceStep2 ->
-    op_abs horizAbsR (horizStep sliceStep1) (horizStep sliceStep2).
+    op_abs horizAbsR (horizStep indexT sliceStep1) (horizStep indexT sliceStep2).
   Proof.
     unfold op_abs, horizAbsR; intros.
     inversion H1; clear H1; subst; repeat sigT_eq.
@@ -103,4 +103,29 @@ Section HorizontalCompositionAbs.
         specialize (H6 _ H0); deex; eauto.
   Qed.
 
+
+  Variable indexValid : indexT -> Prop.
+  Variable initP1 : sliceState1 -> Prop.
+  Variable initP2 : sliceState2 -> Prop.
+
+  Variable initP_ok :
+    forall s1 s2,
+      initP1 s1 ->
+      absR s1 s2 ->
+      initP2 s2.
+
+  Theorem horizAbsR_initP_ok :
+    forall s1 s2,
+      horizInitP indexValid initP1 s1 ->
+      horizAbsR s1 s2 ->
+      horizInitP indexValid initP2 s2.
+  Proof.
+    unfold horizInitP, horizAbsR; intros.
+    specialize (H _ H1); deex.
+    eapply H0 in H; deex.
+    eapply initP_ok in H2; eauto.
+  Qed.
+
 End HorizontalCompositionAbs.
+
+Arguments horizAbsR indexT {cmp sliceState1 sliceState2} absR.
