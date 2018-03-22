@@ -1,6 +1,7 @@
 Require Import List.
 Require Import Ordering.
 Require Import ProofIrrelevance.
+Require Import Helpers.
 
 Set Implicit Arguments.
 
@@ -1447,3 +1448,13 @@ Module FMap.
   End MapKeys.
 
 End FMap.
+
+
+Instance cmp_equal_dec : forall {T} {_ : Ordering T}, EqualDec T.
+Proof.
+  unfold EqualDec; intros.
+  destruct (cmp x y) eqn:He.
+  eapply cmp_eq1 in He; eauto.
+  eapply FMap.cmp_lt_neq2 in He; eauto.
+  eapply FMap.cmp_lt_neq1 in He; eauto.
+Defined.
