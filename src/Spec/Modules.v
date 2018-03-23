@@ -285,16 +285,179 @@ End LayerImplMovers.
 
 Module Type LayerImplMoversProtocolT
   (s : State)
-  (o1 : Ops) (l1 : Layer o1 s)
+  (o1 : Ops) (l1raw : Layer o1 s) (l1 : Layer o1 s)
   (o2 : Ops) (l2 : Layer o2 s)
-  (r : Protocol o1 s).
+  (p : Protocol o1 s).
 
   Include (LayerImplMoversT s o1 l1 o2 l2).
 
   Axiom op_follows_protocol : forall tid s `(op : o2.opT T),
-    follows_protocol_proc l1.step r.step_allow tid s (compile_op op).
+    follows_protocol_proc l1raw.step p.step_allow tid s (compile_op op).
+
+  Axiom allowed_stable :
+    forall `(op : o1.opT T) `(op' : o1.opT T') tid tid' s s' r evs,
+      tid <> tid' ->
+      p.step_allow op tid s ->
+      l1.step op' tid' s r s' evs ->
+      p.step_allow op tid s'.
+
+  (* This means that l1.step is either restricted_step or nilpotent_step *)
+  Axiom raw_step_ok :
+    forall `(op : o1.opT T) tid s r s' evs,
+      restricted_step l1raw.step p.step_allow op tid s r s' evs ->
+      l1.step op tid s r s' evs.
 
 End LayerImplMoversProtocolT.
+
+
+Module LayerImplMoversProtocol
+  (s : State)
+  (o1 : Ops) (l1raw : Layer o1 s) (l1 : Layer o1 s)
+  (o2 : Ops) (l2 : Layer o2 s)
+  (p : Protocol o1 s)
+  (a : LayerImplMoversProtocolT s o1 l1raw l1 o2 l2 p) <: LayerImpl o1 s l1raw o2 s l2.
+
+  Definition absR (s1 : s.State) (s2 : s.State) := s1 = s2.
+
+  Theorem absInitP :
+    forall s1 s2,
+      s.initP s1 ->
+      absR s1 s2 ->
+      s.initP s2.
+  Proof.
+    congruence.
+  Qed.
+
+
+  Definition compile_ts := Compile.compile_ts a.compile_op.
+
+  Theorem compile_ts_no_atomics :
+    forall ts,
+      no_atomics_ts ts ->
+      no_atomics_ts (compile_ts ts).
+  Proof.
+    eapply Compile.compile_ts_no_atomics.
+    eapply a.compile_op_no_atomics.
+  Qed.
+
+  Theorem op_atomic : forall `(op : o2.opT T) `(rx : _ -> proc _ R),
+    trace_incl l1.step
+      (Bind (a.compile_op op) rx)
+      (Bind (atomize a.compile_op op) rx).
+  Proof.
+    intros.
+    eapply trace_incl_atomize_ysa.
+    eapply a.ysa_movers.
+  Qed.
+
+  Theorem atomize_correct :
+    atomize_correct a.compile_op l1.step.
+  Proof.
+    unfold atomize_correct; intros.
+    rewrite op_atomic.
+    eapply trace_incl_bind_a.
+    eauto.
+  Qed.
+
+  Hint Resolve a.compile_correct.
+  Hint Resolve atomize_correct.
+
+  Theorem all_traces_match :
+    forall ts1 ts2,
+      proc_match (Compile.compile_ok a.compile_op) ts1 ts2 ->
+      traces_match_ts l1.step l2.step ts1 ts2.
+  Proof.
+    intros.
+    eapply Compile.compile_traces_match_ts; eauto.
+  Qed.
+
+  Theorem compile_traces_match_l1 :
+    forall ts2,
+      no_atomics_ts ts2 ->
+      traces_match_abs absR s.initP l1.step l2.step (compile_ts ts2) ts2.
+  Proof.
+    unfold traces_match_abs; intros.
+    rewrite H2 in *; clear H2.
+    eapply all_traces_match; eauto.
+    eapply Compile.compile_ts_ok; eauto.
+  Qed.
+
+  Definition follows_protocol (ts : @threads_state o1.opT) :=
+    forall s,
+      follows_protocol_s l1raw.step p.step_allow ts s.
+
+  Theorem compile_ts_follows_protocol :
+    forall ts,
+      no_atomics_ts ts ->
+      follows_protocol (Compile.compile_ts a.compile_op ts).
+  Proof.
+    unfold follows_protocol.
+    unfold follows_protocol_s.
+    intros.
+    eapply compile_ts_follows_protocol_proc; try eassumption.
+    intros.
+
+    eapply a.op_follows_protocol.
+  Qed.
+
+  Theorem compile_traces_match_l1raw :
+    forall ts,
+      follows_protocol ts ->
+      no_atomics_ts ts ->
+      traces_match_abs absR s.initP l1raw.step l1.step ts ts.
+  Proof.
+    unfold compile_ts, follows_protocol, absR.
+    unfold traces_match_abs; intros; subst.
+    clear H1.
+    specialize (H sm).
+    destruct H2.
+    induction H1; eauto.
+    specialize (H tid _ p) as Htid.
+    intuition idtac; repeat deex.
+
+    edestruct IHexec.
+      eapply follows_protocol_s_exec_tid_upd; eauto.
+      intros; eapply a.allowed_stable; eauto.
+      eapply a.raw_step_ok; eauto.
+      destruct result; eauto.
+
+    eexists; intuition idtac.
+    eapply ExecPrefixOne.
+      eauto.
+      eapply exec_tid_step_impl.
+      intros; apply a.raw_step_ok; eauto.
+      eapply follows_protocol_preserves_exec_tid'; eauto.
+      eauto.
+    eauto.
+  Qed.
+
+  Theorem compile_traces_match :
+    forall ts,
+      no_atomics_ts ts ->
+      traces_match_abs absR s.initP l1raw.step l2.step (compile_ts ts) ts.
+  Proof.
+    unfold traces_match_abs; intros.
+    rewrite H2 in *; clear H2.
+    edestruct compile_traces_match_l1raw.
+      eapply compile_ts_follows_protocol.
+      eassumption.
+      eapply Compile.compile_ts_no_atomics.
+      eapply a.compile_op_no_atomics.
+      eassumption.
+      eassumption.
+      eassumption.
+      reflexivity.
+    intuition idtac.
+    edestruct compile_traces_match_l1.
+      eassumption.
+      eassumption.
+      eassumption.
+      reflexivity.
+    eexists; intuition eauto.
+    etransitivity; eauto.
+  Qed.
+
+End LayerImplMoversProtocol.
 
 
 (** General layer transformers. *)

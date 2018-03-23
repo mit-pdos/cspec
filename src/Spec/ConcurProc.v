@@ -304,6 +304,43 @@ Notation "ts [[ tid := p ]]" := (thread_upd ts tid p)
   (at level 8, left associativity).
 
 
+Section StepImpl.
+
+  Hint Constructors exec_tid.
+  Hint Constructors atomic_exec.
+
+  Variable opT : Type -> Type.
+  Variable State : Type.
+  Variable op_step1 : OpSemantics opT State.
+  Variable op_step2 : OpSemantics opT State.
+
+  Variable StepImpl :
+    forall `(op : opT TT) tid s r s' evs,
+      op_step1 op tid s r s' evs ->
+      op_step2 op tid s r s' evs.
+
+  Theorem atomic_exec_step_impl :
+    forall tid s `(p : proc _ T) s' r evs,
+      atomic_exec op_step1 p tid s s' r evs ->
+      atomic_exec op_step2 p tid s s' r evs.
+  Proof.
+    intros.
+    induction H; eauto.
+  Qed.
+
+  Theorem exec_tid_step_impl :
+    forall tid s `(p : proc _ T) s' r evs,
+      exec_tid op_step1 tid s p s' r evs ->
+      exec_tid op_step2 tid s p s' r evs.
+  Proof.
+    intros.
+    induction H; eauto.
+    eapply atomic_exec_step_impl in H; eauto.
+  Qed.
+
+End StepImpl.
+
+
 Definition threads_empty {opT} : @threads_state opT := nil.
 
 
