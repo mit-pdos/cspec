@@ -6,7 +6,7 @@ Require Import MailServerLockAbsAPI.
 Module MailboxOp <: Ops.
 
   Definition extopT := MailServerAPI.MailServerOp.extopT.
-    
+
   Inductive xopT : Type -> Type :=
   | Deliver : forall (m : string), xopT bool
   | List : xopT (list (nat*nat))
@@ -96,43 +96,39 @@ Module MailboxAPI <: Layer MailboxOp MailServerLockAbsState.
 End MailboxAPI.
 
 
-Module MailboxRestrictedAPI <: Layer MailboxOp MailServerLockAbsState.
+Module MailboxProtocol <: Protocol MailboxOp MailServerLockAbsState.
 
   Import MailboxOp.
   Import MailServerLockAbsState.
 
-  Inductive step_allow : forall T, opT T -> nat -> State -> Prop :=
+  Inductive xstep_allow : forall T, opT T -> nat -> State -> Prop :=
   | AllowDeliver : forall m tid s,
-    step_allow (Deliver m) tid s
+    xstep_allow (Deliver m) tid s
   | AllowList : forall tid s,
-    step_allow List tid s
+    xstep_allow List tid s
   | AllowRead : forall fn tid s,
     locked s = Some tid ->
-    step_allow (Read fn) tid s
+    xstep_allow (Read fn) tid s
   | AllowDelete : forall fn tid s,
     locked s = Some tid ->
-    step_allow (Delete fn) tid s
+    xstep_allow (Delete fn) tid s
   | AllowLock : forall tid s,
-    step_allow Lock tid s
+    xstep_allow Lock tid s
   | AllowUnlock : forall tid s,
     locked s = Some tid ->
-    step_allow Unlock tid s
+    xstep_allow Unlock tid s
   | AllowExt : forall tid s `(extop : _ T),
-    step_allow (Ext extop) tid s
+    xstep_allow (Ext extop) tid s
   .
 
+  Definition step_allow := xstep_allow.
+
+End MailboxProtocol.
+
+
+Module MailboxRestrictedAPI <: Layer MailboxOp MailServerLockAbsState.
+
   Definition step :=
-    restricted_step MailboxAPI.step step_allow.
+    restricted_step MailboxAPI.step MailboxProtocol.step_allow.
 
 End MailboxRestrictedAPI.
-
-
-Module MailboxLockingRule <: ProcRule MailboxOp.
-
-  Import MailboxOp.
-
-  Definition follows_protocol (ts : @threads_state opT) :=
-    forall s,
-      follows_protocol_s MailboxAPI.step MailboxRestrictedAPI.step_allow ts s.
-
-End MailboxLockingRule.

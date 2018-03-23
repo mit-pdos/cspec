@@ -6,11 +6,12 @@ Require Import MailServerLockAbsAPI.
 Require Import FMapFacts.
 
 
-Module AtomicReaderRestricted <:
-  LayerImplFollowsRule
-    MailboxOp MailServerLockAbsState MailboxRestrictedAPI
-    MailServerOp MailServerLockAbsState MailServerLockAbsAPI
-    MailboxLockingRule.
+Module AtomicReader' <:
+  LayerImplMoversProtocolT
+    MailServerLockAbsState
+    MailboxOp    MailboxAPI MailboxRestrictedAPI
+    MailServerOp MailServerLockAbsAPI
+    MailboxProtocol.
 
   Fixpoint read_list (l : list (nat*nat)) (r : list ((nat*nat) * string)) :=
     match l with
@@ -44,13 +45,32 @@ Module AtomicReaderRestricted <:
     | MailServerOp.Ext extop => Op (MailboxOp.Ext extop)
     end.
 
+  Lemma read_list_no_atomics : forall l r,
+    no_atomics (read_list l r).
+  Proof.
+    induction l; simpl; eauto.
+    intros. constructor; eauto.
+    intros.
+    destruct x; eauto.
+  Qed.
+
+  Hint Resolve read_list_no_atomics.
+
+  Theorem compile_op_no_atomics :
+    forall `(op : _ T),
+      no_atomics (compile_op op).
+  Proof.
+    destruct op; compute; eauto.
+  Qed.
+
+
   Ltac step_inv :=
     match goal with
     | H : MailboxAPI.step _ _ _ _ _ _ |- _ =>
       inversion H; clear H; subst; repeat sigT_eq
     | H : MailboxRestrictedAPI.step _ _ _ _ _ _ |- _ =>
       inversion H; clear H; subst; repeat sigT_eq
-    | H : MailboxRestrictedAPI.step_allow _ _ _ |- _ =>
+    | H : MailboxProtocol.step_allow _ _ _ |- _ =>
       inversion H; clear H; subst; repeat sigT_eq
     | H : MailServerLockAbsAPI.step _ _ _ _ _ _ |- _ =>
       inversion H; clear H; subst; repeat sigT_eq
@@ -59,8 +79,9 @@ Module AtomicReaderRestricted <:
   Hint Extern 1 (MailboxAPI.step _ _ _ _ _ _) => econstructor.
   Hint Extern 1 (MailServerLockAbsAPI.step _ _ _ _ _ _) => econstructor.
   Hint Extern 1 (MailboxRestrictedAPI.step _ _ _ _ _ _) => econstructor.
+  Hint Extern 1 (MailboxProtocol.step_allow _ _ _) => econstructor.
   Hint Constructors MailboxAPI.xstep.
-  Hint Constructors MailboxRestrictedAPI.step_allow.
+  Hint Constructors MailboxProtocol.xstep_allow.
 
   Hint Resolve FMap.mapsto_in.
   Hint Resolve FMap.mapsto_add_ne'.
@@ -148,16 +169,9 @@ Module AtomicReaderRestricted <:
 
   Hint Resolve FMap.is_permutation_in.
 
-  Theorem pickup_atomic : forall `(rx : _ -> proc _ T),
-    trace_incl MailboxRestrictedAPI.step
-      (Bind (compile_op MailServerOp.Pickup) rx)
-      (Bind (atomize compile_op MailServerOp.Pickup) rx).
+  Theorem ysa_movers_pickup_core :
+    ysa_movers MailboxRestrictedAPI.step pickup_core.
   Proof.
-    intros.
-    eapply trace_incl_atomize_ysa.
-    simpl.
-    unfold pickup_core, ysa_movers.
-
     eapply RightMoversOne; eauto; intros.
     destruct r.
 
@@ -240,15 +254,10 @@ Module AtomicReaderRestricted <:
     eapply mailbox_fn_monotonic in H1; intuition eauto.
   Qed.
 
-  Theorem delete_atomic : forall `(rx : _ -> proc _ T) fn,
-    trace_incl MailboxRestrictedAPI.step
-      (Bind (compile_op (MailServerOp.Delete fn)) rx)
-      (Bind (atomize compile_op (MailServerOp.Delete fn)) rx).
+  Theorem ysa_movers_delete_core : forall fn,
+    ysa_movers MailboxRestrictedAPI.step (delete_core fn).
   Proof.
     intros.
-    eapply trace_incl_atomize_ysa.
-    simpl.
-    unfold delete_core, ysa_movers.
 
     eapply RightMoversOne; eauto; intros.
     eapply RightMoversDone.
@@ -268,6 +277,17 @@ Module AtomicReaderRestricted <:
     destruct s.
     do 3 eexists. eauto.
   Qed.
+
+  Hint Resolve ysa_movers_pickup_core.
+  Hint Resolve ysa_movers_delete_core.
+
+  Theorem ysa_movers : forall `(op : _ T),
+    ysa_movers MailboxRestrictedAPI.step (compile_op op).
+  Proof.
+    destruct op; simpl; eauto 20.
+    admit.
+    admit.
+  Admitted.
 
   Lemma read_list_exec : forall l r s s' evs v tid,
     List.Forall (fun fn => FMap.In fn (MailServerLockAbsState.maildir s)) l ->
@@ -309,7 +329,7 @@ Module AtomicReaderRestricted <:
         congruence.
   Qed.
 
-  Theorem my_compile_correct :
+  Theorem compile_correct :
     compile_correct compile_op MailboxRestrictedAPI.step MailServerLockAbsAPI.step.
   Proof.
     unfold compile_correct; intros.
@@ -350,80 +370,10 @@ Module AtomicReaderRestricted <:
       destruct s'; eauto.
   Qed.
 
-  Theorem my_atomize_correct :
-    atomize_correct compile_op MailboxRestrictedAPI.step.
-  Proof.
-    unfold atomize_correct; intros.
-    destruct op; try trace_incl_simple.
-
-    rewrite pickup_atomic.
-    eapply trace_incl_bind_a; eauto.
-
-    rewrite delete_atomic.
-    eapply trace_incl_bind_a; eauto.
-  Qed.
-
-  Hint Resolve my_compile_correct.
-  Hint Resolve my_atomize_correct.
-
-  Theorem all_traces_match :
-    forall ts1 ts2,
-      proc_match (Compile.compile_ok compile_op) ts1 ts2 ->
-      traces_match_ts MailboxRestrictedAPI.step MailServerLockAbsAPI.step ts1 ts2.
-  Proof.
-    intros.
-    eapply Compile.compile_traces_match_ts; eauto.
-  Qed.
-
-  Definition absR (s1 : MailServerLockAbsState.State) (s2 : MailServerLockAbsState.State) :=
-    s1 = s2.
-
-  Definition compile_ts := Compile.compile_ts compile_op.
-
-  Lemma read_list_no_atomics : forall l r,
-    no_atomics (read_list l r).
-  Proof.
-    induction l; simpl; eauto.
-    intros. constructor; eauto.
-    intros.
-    destruct x; eauto.
-  Qed.
-
-  Hint Resolve read_list_no_atomics.
-
-  Theorem compile_ts_no_atomics :
-    forall ts,
-      no_atomics_ts ts ->
-      no_atomics_ts (compile_ts ts).
-  Proof.
-    eapply Compile.compile_ts_no_atomics.
-    destruct op; compute; eauto.
-  Qed.
-
-  Theorem compile_traces_match :
-    forall ts2,
-      no_atomics_ts ts2 ->
-      traces_match_abs absR MailServerLockAbsState.initP MailboxRestrictedAPI.step MailServerLockAbsAPI.step (compile_ts ts2) ts2.
-  Proof.
-    unfold traces_match_abs; intros.
-    rewrite H2 in *; clear H2.
-    eapply all_traces_match; eauto.
-    eapply Compile.compile_ts_ok; eauto.
-  Qed.
-
-  Theorem absInitP :
-    forall s1 s2,
-      MailServerLockAbsState.initP s1 ->
-      absR s1 s2 ->
-      MailServerLockAbsState.initP s2.
-  Proof.
-    eauto.
-  Qed.
-
   Lemma delete_follows_protocol : forall tid s fn,
     follows_protocol_proc
       MailboxAPI.step
-      MailboxRestrictedAPI.step_allow
+      MailboxProtocol.step_allow
       tid s (delete_core fn).
   Proof.
     intros.
@@ -452,7 +402,7 @@ Module AtomicReaderRestricted <:
   Lemma pickup_follows_protocol : forall tid s,
     follows_protocol_proc
       MailboxAPI.step
-      MailboxRestrictedAPI.step_allow
+      MailboxProtocol.step_allow
       tid s (pickup_core).
   Proof.
     intros.
@@ -494,114 +444,43 @@ Module AtomicReaderRestricted <:
   Hint Resolve delete_follows_protocol.
   Hint Resolve pickup_follows_protocol.
 
-
-  Theorem compile_ts_follows_protocol :
-    forall ts,
-      no_atomics_ts ts ->
-      MailboxLockingRule.follows_protocol (compile_ts ts).
+  Theorem op_follows_protocol : forall tid s `(op : _ T),
+    follows_protocol_proc
+      MailboxAPI.step
+      MailboxProtocol.step_allow
+      tid s (compile_op op).
   Proof.
-    unfold compile_ts.
-    unfold MailboxLockingRule.follows_protocol.
-    unfold follows_protocol_s.
-    intros.
-    eapply compile_ts_follows_protocol_proc; try eassumption.
-    intros.
-
     destruct op; simpl; eauto.
   Qed.
 
-End AtomicReaderRestricted.
-
-
-Module AtomicReaderRestricted' <:
-  LayerImplRequiresRule
-    MailboxOp MailServerLockAbsState MailboxAPI
-    MailboxOp MailServerLockAbsState MailboxRestrictedAPI
-    MailboxLockingRule.
-
-  Import MailboxLockingRule.
-
-  Definition absR (s1 : MailServerLockAbsState.State) (s2 : MailServerLockAbsState.State) :=
-    s1 = s2.
-
-  Ltac step_inv :=
-    match goal with
-    | H : MailboxAPI.step _ _ _ _ _ _ |- _ =>
-      inversion H; clear H; subst; repeat sigT_eq
-    | H : MailboxRestrictedAPI.step_allow _ _ _ |- _ =>
-      inversion H; clear H; subst; repeat sigT_eq
-    | H : MailboxRestrictedAPI.step _ _ _ _ _ _ |- _ =>
-      destruct H; intuition idtac
-    end.
 
   Theorem allowed_stable :
     forall `(op : MailboxOp.opT T) `(op' : MailboxOp.opT T') tid tid' s s' r evs,
       tid <> tid' ->
-      MailboxRestrictedAPI.step_allow op tid s ->
+      MailboxProtocol.step_allow op tid s ->
       MailboxRestrictedAPI.step op' tid' s r s' evs ->
-      MailboxRestrictedAPI.step_allow op tid s'.
+      MailboxProtocol.step_allow op tid s'.
   Proof.
     intros.
     destruct op; destruct op'; repeat step_inv; subst; eauto.
     all: simpl in *; try congruence.
   Qed.
 
-  Definition compile_ts (ts : @threads_state MailboxOp.opT) := ts.
-
-  Theorem compile_ts_no_atomics :
-    forall ts,
-      no_atomics_ts ts ->
-      no_atomics_ts (compile_ts ts).
-  Proof.
-    unfold compile_ts; eauto.
-  Qed.
-
-  Theorem absInitP :
-    forall s1 s2,
-      MailServerLockAbsState.initP s1 ->
-      absR s1 s2 ->
-      MailServerLockAbsState.initP s2.
+  Theorem raw_step_ok :
+    forall `(op : _ T) tid s r s' evs,
+      restricted_step MailboxAPI.step MailboxProtocol.step_allow op tid s r s' evs ->
+      MailboxRestrictedAPI.step op tid s r s' evs.
   Proof.
     eauto.
   Qed.
 
-  Theorem compile_traces_match :
-    forall ts,
-      follows_protocol ts ->
-      no_atomics_ts ts ->
-      traces_match_abs absR
-        MailServerLockAbsState.initP
-        MailboxAPI.step
-        MailboxRestrictedAPI.step (compile_ts ts) ts.
-  Proof.
-    unfold compile_ts, follows_protocol, absR.
-    unfold traces_match_abs; intros; subst.
-    clear H1.
-    specialize (H sm).
-    destruct H2.
-    induction H1; eauto.
-    specialize (H tid _ p) as Htid.
-    intuition idtac; repeat deex.
-
-    edestruct IHexec.
-      eapply follows_protocol_s_exec_tid_upd; eauto.
-      intros; eapply allowed_stable; eauto.
-      destruct result; eauto.
-
-    eexists; intuition idtac.
-    eapply ExecPrefixOne.
-      eauto.
-      eapply follows_protocol_preserves_exec_tid'; eauto.
-      eauto.
-    eauto.
-  Qed.
-
-End AtomicReaderRestricted'.
+End AtomicReader'.
 
 
 Module AtomicReader :=
-  LinkWithRule
-    MailboxOp MailServerLockAbsState MailboxAPI
-    MailboxOp MailServerLockAbsState MailboxRestrictedAPI
-    MailServerOp MailServerLockAbsState MailServerLockAbsAPI
-    MailboxLockingRule AtomicReaderRestricted' AtomicReaderRestricted.
+  LayerImplMoversProtocol
+    MailServerLockAbsState
+    MailboxOp    MailboxAPI MailboxRestrictedAPI
+    MailServerOp MailServerLockAbsAPI
+    MailboxProtocol
+    AtomicReader'.
