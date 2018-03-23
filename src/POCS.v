@@ -39,3 +39,4 @@ Require Export Spec.Modules.
 Require Export Spec.Movers.
 Require Export Spec.Protocol.
 Require Export Spec.CompileLoop.
+Require Export Spec.Horizontal.
