@@ -568,10 +568,11 @@ Module AbsLock :=
 
 (** Implement [Acquire] on top of test-and-set *)
 
-Module LockImpl <:
-  LayerImpl
-    TASOp LockState TASLockAPI
-    LockOp LockState RawLockAPI.
+Module LockImpl' <:
+  LayerImplLoopT
+    LockState
+    TASOp  TASLockAPI
+    LockOp RawLockAPI.
 
   Definition acquire_cond (r : bool) :=
     if r == false then true else false.
@@ -589,20 +590,6 @@ Module LockImpl <:
     | Read => (fun _ => ReadTAS, once_cond, None)
     | Write v => (fun _ => WriteTAS v, once_cond, None)
     end.
-
-  Definition compile_ts ts :=
-    CompileLoop.compile_ts compile_op ts.
-
-  Theorem compile_ts_no_atomics :
-    forall ts,
-      no_atomics_ts ts ->
-      no_atomics_ts (compile_ts ts).
-  Proof.
-    eapply CompileLoop.compile_ts_no_atomics.
-  Qed.
-
-  Definition absR (s1 : LockState.State) (s2 : LockState.State) :=
-    s1 = s2.
 
   Ltac step_inv :=
     match goal with
@@ -628,27 +615,14 @@ Module LockImpl <:
     destruct opM; simpl; intros; pair_inv; step_inv; eauto.
   Qed.
 
-  Theorem compile_traces_match :
-    forall ts,
-      no_atomics_ts ts ->
-      traces_match_abs absR LockState.initP TASLockAPI.step RawLockAPI.step (compile_ts ts) ts.
-  Proof.
-    unfold traces_match_abs, absR; intros; subst.
-    eapply CompileLoop.compile_traces_match_ts; eauto.
-    eapply noop_or_success.
-    eapply CompileLoop.compile_ts_ok; eauto.
-  Qed.
+End LockImpl'.
 
-  Theorem absInitP :
-    forall s1 s2,
-      LockState.initP s1 ->
-      absR s1 s2 ->
-      LockState.initP s2.
-  Proof.
-    congruence.
-  Qed.
-
-End LockImpl.
+Module LockImpl :=
+  LayerImplLoop
+    LockState
+    TASOp  TASLockAPI
+    LockOp RawLockAPI
+    LockImpl'.
 
 
 (** Linking *)

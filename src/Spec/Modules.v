@@ -4,6 +4,7 @@ Require Import Compile.
 Require Import Abstraction.
 Require Import Movers.
 Require Import Protocol.
+Require Import CompileLoop.
 Require Import Helpers.Helpers.
 
 
@@ -458,6 +459,60 @@ Module LayerImplMoversProtocol
   Qed.
 
 End LayerImplMoversProtocol.
+
+
+Module Type LayerImplLoopT
+  (s : State)
+  (o1 : Ops) (l1 : Layer o1 s)
+  (o2 : Ops) (l2 : Layer o2 s).
+
+  Axiom compile_op : forall T, o2.opT T -> (option T -> o1.opT T) * (T -> bool) * option T.
+  Axiom noop_or_success :
+    noop_or_success compile_op l1.step l2.step.
+
+End LayerImplLoopT.
+
+
+Module LayerImplLoop
+  (s : State)
+  (o1 : Ops) (l1 : Layer o1 s)
+  (o2 : Ops) (l2 : Layer o2 s)
+  (a : LayerImplLoopT s o1 l1 o2 l2) <: LayerImpl o1 s l1 o2 s l2.
+
+  Definition absR (s1 : s.State) (s2 : s.State) := s1 = s2.
+
+  Definition compile_ts ts :=
+    CompileLoop.compile_ts a.compile_op ts.
+
+  Theorem compile_ts_no_atomics :
+    forall ts,
+      no_atomics_ts ts ->
+      no_atomics_ts (compile_ts ts).
+  Proof.
+    eapply CompileLoop.compile_ts_no_atomics.
+  Qed.
+
+  Theorem absInitP :
+    forall s1 s2,
+      s.initP s1 ->
+      absR s1 s2 ->
+      s.initP s2.
+  Proof.
+    congruence.
+  Qed.
+
+  Theorem compile_traces_match :
+    forall ts,
+      no_atomics_ts ts ->
+      traces_match_abs absR s.initP l1.step l2.step (compile_ts ts) ts.
+  Proof.
+    unfold traces_match_abs, absR; intros; subst.
+    eapply CompileLoop.compile_traces_match_ts; eauto.
+    eapply a.noop_or_success.
+    eapply CompileLoop.compile_ts_ok; eauto.
+  Qed.
+
+End LayerImplLoop.
 
 
 (** General layer transformers. *)
