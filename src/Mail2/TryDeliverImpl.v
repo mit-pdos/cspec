@@ -8,15 +8,15 @@ Require Import MailboxTmpAbsAPI.
 
 Module TryDeliverImpl <:
   LayerImpl
-    TryDeliverOp MailboxTmpAbsState TryDeliverAPI
-    MailFSOp MailboxTmpAbsState MailFSAPI.
+    MailFSOp MailboxTmpAbsState MailFSAPI
+    TryDeliverOp MailboxTmpAbsState TryDeliverAPI.
 
   Definition linkmail_core :=
     ts <- Op MailFSOp.Random;
     ok <- Op (MailFSOp.LinkMail ts);
     Ret ok.
 
-  Definition compile_op T (op : TryDeliverOp.opT T) : proc _ T :=
+  Definition compile_op T (op : TryDeliverOp.opT T) : proc MailFSOp.opT T :=
     match op with
     | TryDeliverOp.CreateWriteTmp data => Op (MailFSOp.CreateWriteTmp data)
     | TryDeliverOp.LinkMail => linkmail_core
@@ -133,6 +133,4 @@ Module TryDeliverImpl <:
     eauto.
   Qed.
 
-  Set Printing Implicit.
-  
 End TryDeliverImpl.
