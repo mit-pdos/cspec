@@ -10,6 +10,7 @@ Require Import Ordering.
 Require Import Abstraction.
 Require Import Movers.
 Require Import Compile.
+Require Import Protocol.
 
 Import ListNotations.
 
@@ -478,6 +479,18 @@ Module HLayer (o : Ops) (s : State) (l : Layer o s) (i : HIndex).
   Definition step := @horizStep i.indexT i.indexCmp _ _ l.step.
 End HLayer.
 
+Module HProtocol (o : Ops) (s : State) (p : Protocol o s) (i : HIndex).
+  Module ho := HOps o i.
+  Module hs := HState s i.
+  Definition step_allow T (hop : ho.opT T) (tid : nat) (S : hs.State) : Prop :=
+    match hop with
+    | Slice i op =>
+      exists s,
+        FMap.MapsTo i s S /\
+        p.step_allow op tid s
+    end.
+End HProtocol.
+
 
 Module LayerImplAbsHT
   (o : Ops)
@@ -513,3 +526,70 @@ Module LayerImplAbsHT
   Qed.
 
 End LayerImplAbsHT.
+
+
+Module LayerImplMoversProtocolHT
+  (s : State)
+  (o1 : Ops) (l1raw : Layer o1 s) (l1 : Layer o1 s)
+  (o2 : Ops) (l2 : Layer o2 s)
+  (p : Protocol o1 s)
+  (a : LayerImplMoversProtocolT s o1 l1raw l1 o2 l2 p)
+  (i : HIndex).
+
+  Module hs := HState s i.
+  Module ho1 := HOps o1 i.
+  Module ho2 := HOps o2 i.
+  Module hl1raw := HLayer o1 s l1raw i.
+  Module hl1 := HLayer o1 s l1 i.
+  Module hl2 := HLayer o2 s l2 i.
+  Module hp := HProtocol o1 s p i.
+
+  Definition compile_op T (op : ho2.opT T) : proc ho1.opT T :=
+    match op with
+    | Slice i op => SliceProc i (a.compile_op op)
+    end.
+
+  Theorem compile_op_no_atomics : forall T (op : ho2.opT T),
+    no_atomics (compile_op op).
+  Proof.
+    destruct op; simpl.
+    admit.
+  Admitted.
+
+  Theorem ysa_movers : forall T (op : ho2.opT T),
+    ysa_movers hl1.step (compile_op op).
+  Proof.
+    destruct op; simpl.
+    eapply horiz_ysa_movers.
+    eapply a.ysa_movers.
+  Qed.
+
+  Theorem compile_correct :
+    compile_correct compile_op hl1.step hl2.step.
+  Proof.
+    admit.
+  Admitted.
+
+  Theorem op_follows_protocol : forall tid s `(op : ho2.opT T),
+    follows_protocol_proc hl1raw.step hp.step_allow tid s (compile_op op).
+  Proof.
+    admit.
+  Admitted.
+
+  Theorem allowed_stable :
+    forall `(op : ho1.opT T) `(op' : ho1.opT T') tid tid' s s' r evs,
+      tid <> tid' ->
+      hp.step_allow op tid s ->
+      hl1.step op' tid' s r s' evs ->
+      hp.step_allow op tid s'.
+  Proof.
+    admit.
+  Admitted.
+
+  Theorem raw_step_ok :
+    forall `(op : ho1.opT T) tid s r s' evs,
+      restricted_step hl1raw.step hp.step_allow op tid s r s' evs ->
+      hl1.step op tid s r s' evs.
+  Admitted.
+
+End LayerImplMoversProtocolHT.

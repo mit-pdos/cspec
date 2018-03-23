@@ -34,3 +34,33 @@ Module MailServerLockAbsImplH :=
     MailServerLockAbsHState MailServerLockAbsHAPI
     MailServerHState        MailServerHAPI
     MailServerLockAbsImplH'.
+
+
+Module AtomicReaderH' :=
+  LayerImplMoversProtocolHT
+    MailServerLockAbsState
+    MailboxOp    MailboxAPI MailboxRestrictedAPI
+    MailServerOp MailServerLockAbsAPI
+    MailboxProtocol
+    AtomicReader'
+    StringIdx.
+
+Module MailboxHOp := HOps MailboxOp StringIdx.
+Module MailboxHAPI := HLayer MailboxOp MailServerLockAbsState MailboxAPI StringIdx.
+Module MailboxRestrictedHAPI := HLayer MailboxOp MailServerLockAbsState MailboxRestrictedAPI StringIdx.
+Module MailboxHProtocol := HProtocol MailboxOp MailServerLockAbsState MailboxProtocol StringIdx.
+
+Module AtomicReaderH :=
+  LayerImplMoversProtocol
+    MailServerLockAbsHState
+    MailboxHOp    MailboxHAPI MailboxRestrictedHAPI
+    MailServerHOp MailServerLockAbsHAPI
+    MailboxHProtocol
+    AtomicReaderH'.
+
+Module xx :=
+  Link
+    MailboxHOp    MailServerLockAbsHState MailboxHAPI
+    MailServerHOp MailServerLockAbsHState MailServerLockAbsHAPI
+    MailServerHOp MailServerHState        MailServerHAPI
+    AtomicReaderH MailServerLockAbsImplH.
