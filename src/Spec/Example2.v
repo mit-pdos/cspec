@@ -577,10 +577,10 @@ Module AbsCounter :=
 
 (** Adding ghost state to the test-and-set bit. *)
 
-Module AbsLock <:
-  LayerImpl
-    TASOp TASState TASAPI
-    TASOp LockState TASLockAPI.
+Module AbsLock' <:
+  LayerImplAbsT TASOp
+    TASState TASAPI
+    LockState TASLockAPI.
 
   Import TASState.
   Import LockState.
@@ -590,16 +590,6 @@ Module AbsLock <:
     (TASLock s1 = false /\ Lock s2 = None \/
      exists tid,
      TASLock s1 = true /\ Lock s2 = Some tid).
-
-  Definition compile_ts (ts : @threads_state TASOp.opT) := ts.
-
-  Theorem compile_ts_no_atomics :
-    forall (ts : @threads_state TASOp.opT),
-      no_atomics_ts ts ->
-      no_atomics_ts (compile_ts ts).
-  Proof.
-    unfold compile_ts; eauto.
-  Qed.
 
   Hint Constructors TASLockAPI.xstep.
 
@@ -618,19 +608,6 @@ Module AbsLock <:
       all: simpl; eauto.
   Qed.
 
-  Hint Resolve absR_ok.
-
-  Theorem compile_traces_match :
-    forall ts,
-      no_atomics_ts ts ->
-      traces_match_abs absR TASState.initP TASAPI.step TASLockAPI.step (compile_ts ts) ts.
-  Proof.
-    unfold compile_ts, traces_match_abs; intros.
-    eexists; intuition idtac.
-    eapply trace_incl_abs; eauto.
-    eauto.
-  Qed.
-
   Theorem absInitP :
     forall s1 s2,
       TASState.initP s1 ->
@@ -642,7 +619,13 @@ Module AbsLock <:
     deex; congruence.
   Qed.
 
-End AbsLock.
+End AbsLock'.
+
+Module AbsLock :=
+  LayerImplAbs TASOp
+    TASState TASAPI
+    LockState TASLockAPI
+    AbsLock'.
 
 
 (** Implement [Acquire] on top of test-and-set *)
