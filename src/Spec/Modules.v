@@ -64,6 +64,13 @@ Module Type ProcRule (o : Ops).
 End ProcRule.
 
 
+Module NoRule (o : Ops) <: ProcRule o.
+
+  Definition follows_protocol (ts : @threads_state o.opT) := True.
+
+End NoRule.
+
+
 Module Type LayerImpl
   (o1 : Ops) (s1 : State) (l1 : Layer o1 s1)
   (o2 : Ops) (s2 : State) (l2 : Layer o2 s2).
@@ -121,27 +128,12 @@ Module Type LayerImplFollowsRule
   (o2 : Ops) (s2 : State) (l2 : Layer o2 s2)
   (r : ProcRule o1).
 
-  Axiom absR : s1.State -> s2.State -> Prop.
-  Axiom compile_ts : @threads_state o2.opT -> @threads_state o1.opT.
-  Axiom compile_ts_no_atomics :
-    forall ts,
-      no_atomics_ts ts ->
-      no_atomics_ts (compile_ts ts).
+  Include (LayerImpl o1 s1 l1 o2 s2 l2).
+
   Axiom compile_ts_follows_protocol :
     forall ts,
       no_atomics_ts ts ->
       r.follows_protocol (compile_ts ts).
-  Axiom absInitP :
-    forall s1 s2,
-      s1.initP s1 ->
-      absR s1 s2 ->
-      s2.initP s2.
-  Axiom compile_traces_match :
-    forall ts,
-      no_atomics_ts ts ->
-      traces_match_abs absR s1.initP l1.step l2.step (compile_ts ts) ts.
-
-  Hint Resolve absInitP.
 
 End LayerImplFollowsRule.
 
