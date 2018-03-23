@@ -3,6 +3,7 @@ Require Import Equiv.
 Require Import Compile.
 Require Import Abstraction.
 Require Import Movers.
+Require Import Protocol.
 Require Import Helpers.Helpers.
 
 
@@ -64,11 +65,11 @@ Module Type ProcRule (o : Ops).
 End ProcRule.
 
 
-Module NoRule (o : Ops) <: ProcRule o.
+Module Type Protocol (o : Ops) (s : State).
 
-  Definition follows_protocol (ts : @threads_state o.opT) := True.
+  Axiom step_allow : forall T, o.opT T -> nat -> s.State -> Prop.
 
-End NoRule.
+End Protocol.
 
 
 Module Type LayerImpl
@@ -280,6 +281,20 @@ Module LayerImplMovers
   Qed.
 
 End LayerImplMovers.
+
+
+Module Type LayerImplMoversProtocolT
+  (s : State)
+  (o1 : Ops) (l1 : Layer o1 s)
+  (o2 : Ops) (l2 : Layer o2 s)
+  (r : Protocol o1 s).
+
+  Include (LayerImplMoversT s o1 l1 o2 l2).
+
+  Axiom op_follows_protocol : forall tid s `(op : o2.opT T),
+    follows_protocol_proc l1.step r.step_allow tid s (compile_op op).
+
+End LayerImplMoversProtocolT.
 
 
 (** General layer transformers. *)

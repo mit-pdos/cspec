@@ -163,21 +163,29 @@ Module RawLockAPI <: Layer LockOp LockState.
 End RawLockAPI.
 
 
-Module LockAPI <: Layer LockOp LockState.
+Module LockProtocol <: Protocol LockOp LockState.
 
   Import LockOp.
   Import LockState.
 
-  Inductive step_allow : forall T, opT T -> nat -> State -> Prop :=
+  Inductive xstep_allow : forall T, opT T -> nat -> State -> Prop :=
   | StepAcquire : forall tid s,
-    step_allow Acquire tid s
+    xstep_allow Acquire tid s
   | StepRelease : forall tid v,
-    step_allow Release tid (mkState v (Some tid))
+    xstep_allow Release tid (mkState v (Some tid))
   | StepRead : forall tid v,
-    step_allow Read tid (mkState v (Some tid))
+    xstep_allow Read tid (mkState v (Some tid))
   | StepWrite : forall tid v0 v,
-    step_allow (Write v) tid (mkState v0 (Some tid)).
+    xstep_allow (Write v) tid (mkState v0 (Some tid)).
 
+  Definition step_allow := xstep_allow.
+
+End LockProtocol.
+
+
+Module LockAPI <: Layer LockOp LockState.
+
+  Definition step_allow := LockProtocol.step_allow.
   Definition step :=
     nilpotent_step RawLockAPI.step step_allow.
 
@@ -715,7 +723,7 @@ End LockImpl.
 
 (** Locking discipline *)
 
-Module LockProtocol <:
+Module LockProtocolOK <:
   LayerImplRequiresRule
     LockOp LockState RawLockAPI
     LockOp LockState LockAPI
@@ -795,7 +803,7 @@ Module LockProtocol <:
     congruence.
   Qed.
 
-End LockProtocol.
+End LockProtocolOK.
 
 
 (** Linking *)
@@ -826,7 +834,7 @@ Module c2 :=
     LockOp    LockState RawLockAPI
     LockOp    LockState LockAPI
     CounterOp LockState LockedCounterAPI
-    LockingRule LockProtocol LockingCounter.
+    LockingRule LockProtocolOK LockingCounter.
 Module c3 :=
   Link
     LockOp    LockState    RawLockAPI
