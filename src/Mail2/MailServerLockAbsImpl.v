@@ -40,4 +40,3 @@ Module MailServerLockAbsImpl :=
     MailServerLockAbsState MailServerLockAbsAPI
     MailServerState MailServerAPI
     MailServerLockAbsImpl'.
-    

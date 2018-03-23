@@ -41,10 +41,7 @@ Require Import TryDeliverAPI.
 Require Import TryDeliverImpl.
 
 
-Import MailServerAPI.
-
-
-Print MailServerHAPI.opT.
+Import MailServerOp.
 
 
 Definition do_smtp_req : proc opT unit :=
@@ -87,10 +84,10 @@ Definition do_pop3_req : proc opT unit :=
              None;
   Ret tt.
 
-Definition smtp_server_thread : proc MailServerAPI.opT unit :=
+Definition smtp_server_thread : proc MailServerOp.opT unit :=
   Until (fun _ => false) (fun _ => do_smtp_req) None.
 
-Definition pop3_server_thread : proc MailServerAPI.opT unit :=
+Definition pop3_server_thread : proc MailServerOp.opT unit :=
   Until (fun _ => false) (fun _ => do_pop3_req) None.
 
 Definition mail_server nsmtp npop3 :=

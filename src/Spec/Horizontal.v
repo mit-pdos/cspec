@@ -9,6 +9,7 @@ Require Import Modules.
 Require Import Ordering.
 Require Import Abstraction.
 Require Import Movers.
+Require Import Compile.
 
 Import ListNotations.
 
@@ -453,3 +454,62 @@ Section HorizontalCompositionMovers.
   Qed.
 
 End HorizontalCompositionMovers.
+
+
+(** Module structures for horizontal composition *)
+
+Module Type HIndex.
+  Axiom indexT : Type.
+  Axiom indexValid : indexT -> Prop.
+  Axiom indexCmp : Ordering indexT.
+End HIndex.
+
+Module HOps (o : Ops) (i : HIndex) <: Ops.
+  Definition opT := horizOpT i.indexT o.opT.
+End HOps.
+
+Module HState (s : State) (i : HIndex) <: State.
+  Definition State := @horizState i.indexT i.indexCmp s.State.
+  Definition initP : State -> Prop :=
+    horizInitP i.indexValid s.initP.
+End HState.
+
+Module HLayer (o : Ops) (s : State) (l : Layer o s) (i : HIndex).
+  Definition step := @horizStep i.indexT i.indexCmp _ _ l.step.
+End HLayer.
+
+
+Module LayerImplAbsHT
+  (o : Ops)
+  (s1 : State) (l1 : Layer o s1)
+  (s2 : State) (l2 : Layer o s2)
+  (a : LayerImplAbsT o s1 l1 s2 l2)
+  (i : HIndex).
+
+  Module ho := HOps o i.
+  Module hs1 := HState s1 i.
+  Module hs2 := HState s2 i.
+  Module hl1 := HLayer o s1 l1 i.
+  Module hl2 := HLayer o s2 l2 i.
+
+  Definition absR :=
+    @horizAbsR i.indexT i.indexCmp _ _ a.absR.
+
+  Theorem absInitP :
+    forall s1 s2,
+      hs1.initP s1 ->
+      absR s1 s2 ->
+      hs2.initP s2.
+  Proof.
+    eapply horizAbsR_initP_ok.
+    eapply a.absInitP.
+  Qed.
+
+  Theorem absR_ok :
+    op_abs absR hl1.step hl2.step.
+  Proof.
+    eapply horizAbsR_ok.
+    apply a.absR_ok.
+  Qed.
+
+End LayerImplAbsHT.
