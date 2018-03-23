@@ -2,6 +2,7 @@ Require Import ConcurProc.
 Require Import Equiv.
 Require Import Compile.
 Require Import Abstraction.
+Require Import Movers.
 Require Import Helpers.Helpers.
 
 
@@ -194,6 +195,99 @@ Module LayerImplAbs
   Qed.
 
 End LayerImplAbs.
+
+
+Module Type LayerImplMoversT
+  (s : State)
+  (o1 : Ops) (l1 : Layer o1 s)
+  (o2 : Ops) (l2 : Layer o2 s).
+
+  Axiom compile_op : forall T, o2.opT T -> proc o1.opT T.
+
+  Axiom compile_op_no_atomics : forall T (op : o2.opT T),
+    no_atomics (compile_op op).
+
+  Axiom ysa_movers : forall T (op : o2.opT T),
+    ysa_movers l1.step (compile_op op).
+
+  Axiom compile_correct :
+    compile_correct compile_op l1.step l2.step.
+
+End LayerImplMoversT.
+
+
+Module LayerImplMovers
+  (s : State)
+  (o1 : Ops) (l1 : Layer o1 s)
+  (o2 : Ops) (l2 : Layer o2 s)
+  (a : LayerImplMoversT s o1 l1 o2 l2) <: LayerImpl o1 s l1 o2 s l2.
+
+  Definition absR (s1 : s.State) (s2 : s.State) := s1 = s2.
+
+  Theorem absInitP :
+    forall s1 s2,
+      s.initP s1 ->
+      absR s1 s2 ->
+      s.initP s2.
+  Proof.
+    congruence.
+  Qed.
+
+
+  Definition compile_ts := Compile.compile_ts a.compile_op.
+
+  Theorem compile_ts_no_atomics :
+    forall ts,
+      no_atomics_ts ts ->
+      no_atomics_ts (compile_ts ts).
+  Proof.
+    eapply Compile.compile_ts_no_atomics.
+    eapply a.compile_op_no_atomics.
+  Qed.
+
+  Theorem op_atomic : forall `(op : o2.opT T) `(rx : _ -> proc _ R),
+    trace_incl l1.step
+      (Bind (a.compile_op op) rx)
+      (Bind (atomize a.compile_op op) rx).
+  Proof.
+    intros.
+    eapply trace_incl_atomize_ysa.
+    eapply a.ysa_movers.
+  Qed.
+
+  Theorem atomize_correct :
+    atomize_correct a.compile_op l1.step.
+  Proof.
+    unfold atomize_correct; intros.
+    rewrite op_atomic.
+    eapply trace_incl_bind_a.
+    eauto.
+  Qed.
+
+  Hint Resolve a.compile_correct.
+  Hint Resolve atomize_correct.
+
+  Theorem all_traces_match :
+    forall ts1 ts2,
+      proc_match (Compile.compile_ok a.compile_op) ts1 ts2 ->
+      traces_match_ts l1.step l2.step ts1 ts2.
+  Proof.
+    intros.
+    eapply Compile.compile_traces_match_ts; eauto.
+  Qed.
+
+  Theorem compile_traces_match :
+    forall ts2,
+      no_atomics_ts ts2 ->
+      traces_match_abs absR s.initP l1.step l2.step (compile_ts ts2) ts2.
+  Proof.
+    unfold traces_match_abs; intros.
+    rewrite H2 in *; clear H2.
+    eapply all_traces_match; eauto.
+    eapply Compile.compile_ts_ok; eauto.
+  Qed.
+
+End LayerImplMovers.
 
 
 (** General layer transformers. *)
