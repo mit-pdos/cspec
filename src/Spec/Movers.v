@@ -582,6 +582,37 @@ Section YSA.
     - econstructor.
   Qed.
 
+  Theorem at_most_one_non_mover_impl :
+    forall (P1 : nat -> State -> Prop) `(p : proc _ T),
+      at_most_one_non_mover P1 p ->
+      forall (P2 : nat -> State -> Prop),
+        (forall tid s, P2 tid s -> P1 tid s) ->
+        at_most_one_non_mover P2 p.
+  Proof.
+    destruct 1; intros.
+    - econstructor.
+      eapply left_movers_impl; eauto.
+    - eapply OneNonMover; intros.
+      eapply left_movers_impl; eauto.
+      intros; repeat deex.
+      eauto 10.
+  Qed.
+
+  Theorem right_movers_impl :
+    forall (P1 : nat -> State -> Prop) `(p : proc _ T),
+      right_movers P1 p ->
+      forall (P2 : nat -> State -> Prop),
+        (forall tid s, P2 tid s -> P1 tid s) ->
+        right_movers P2 p.
+  Proof.
+    induction 1; intros.
+    - econstructor; eauto; intros.
+      eapply H1; intros.
+      repeat deex; eauto 10.
+    - econstructor.
+      eapply at_most_one_non_mover_impl; eauto.
+  Qed.
+
 
   Theorem trace_incl_atomize_ysa_left_movers :
     forall T L R (p : proc _ T) (l : _ -> proc _ L) (rx : _ -> proc _ R) P s tid,
