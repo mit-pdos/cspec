@@ -23,41 +23,85 @@ Global Generalizable All Variables.
 
 (** Opcodes and states *)
 
-Inductive TASOpT : Type -> Type :=
-| TestAndSet :TASOpT bool
-| Clear : TASOpT unit
-| ReadTAS : TASOpT nat
-| WriteTAS : nat -> TASOpT unit.
+Module TASOp <: Ops.
 
-Inductive LockOpT : Type -> Type :=
-| Acquire : LockOpT bool
-| Release : LockOpT unit
-| Read : LockOpT nat
-| Write : nat -> LockOpT unit.
+  Inductive xopT : Type -> Type :=
+  | TestAndSet : xopT bool
+  | Clear : xopT unit
+  | ReadTAS : xopT nat
+  | WriteTAS : nat -> xopT unit.
 
-Inductive CounterOpT : Type -> Type :=
-| Inc : CounterOpT nat
-| Dec : CounterOpT nat.
+  Definition opT := xopT.
 
-Record TASState := mkTASState {
-  TASValue : nat;
-  TASLock : bool;
-}.
+End TASOp.
 
-Record LockState := mkState {
-  Value : nat;
-  Lock : option nat;
-}.
 
-Definition CounterState := nat.
+Module LockOp <: Ops.
+
+  Inductive xopT : Type -> Type :=
+  | Acquire : xopT bool
+  | Release : xopT unit
+  | Read : xopT nat
+  | Write : nat -> xopT unit.
+
+  Definition opT := xopT.
+
+End LockOp.
+
+
+Module CounterOp <: Ops.
+
+  Inductive xopT : Type -> Type :=
+  | Inc : xopT nat
+  | Dec : xopT nat.
+
+  Definition opT := xopT.
+
+End CounterOp.
+
+
+Module TASState <: State.
+
+  Record s := mkTASState {
+    TASValue : nat;
+    TASLock : bool;
+  }.
+
+  Definition State := s.
+  Definition initP s :=
+    TASLock s = false.
+
+End TASState.
+
+
+Module LockState <: State.
+
+  Record s := mkState {
+    Value : nat;
+    Lock : option nat;
+  }.
+
+  Definition State := s.
+  Definition initP s :=
+    Lock s = None.
+
+End LockState.
+
+
+Module CounterState <: State.
+
+  Definition State := nat.
+  Definition initP (s : State) := True.
+
+End CounterState.
 
 
 (** Layer definitions *)
 
-Module TASAPI <: Layer.
+Module TASAPI <: Layer TASOp TASState.
 
-  Definition opT := TASOpT.
-  Definition State := TASState.
+  Import TASOp.
+  Import TASState.
 
   Inductive xstep : forall T, opT T -> nat -> State -> T -> State -> list event -> Prop :=
   | StepTAS : forall tid v l,
@@ -72,16 +116,13 @@ Module TASAPI <: Layer.
 
   Definition step := xstep.
 
-  Definition initP s :=
-    TASLock s = false.
-
 End TASAPI.
 
 
-Module TASLockAPI <: Layer.
+Module TASLockAPI <: Layer TASOp LockState.
 
-  Definition opT := TASOpT.
-  Definition State := LockState.
+  Import TASOp.
+  Import LockState.
 
   Inductive xstep : forall T, opT T -> nat -> State -> T -> State -> list event -> Prop :=
   | StepTAS0 : forall tid v,
@@ -98,16 +139,13 @@ Module TASLockAPI <: Layer.
 
   Definition step := xstep.
 
-  Definition initP s :=
-    Lock s = None.
-
 End TASLockAPI.
 
 
-Module RawLockAPI <: Layer.
+Module RawLockAPI <: Layer LockOp LockState.
 
-  Definition opT := LockOpT.
-  Definition State := LockState.
+  Import LockOp.
+  Import LockState.
 
   Inductive xstep : forall T, opT T -> nat -> State -> T -> State -> list event -> Prop :=
   | StepAcquire : forall tid v r,
@@ -122,16 +160,13 @@ Module RawLockAPI <: Layer.
 
   Definition step := xstep.
 
-  Definition initP s :=
-    Lock s = None.
-
 End RawLockAPI.
 
 
-Module LockAPI <: Layer.
+Module LockAPI <: Layer LockOp LockState.
 
-  Definition opT := LockOpT.
-  Definition State := LockState.
+  Import LockOp.
+  Import LockState.
 
   Inductive step_allow : forall T, opT T -> nat -> State -> Prop :=
   | StepAcquire : forall tid s,
@@ -146,16 +181,13 @@ Module LockAPI <: Layer.
   Definition step :=
     nilpotent_step RawLockAPI.step step_allow.
 
-  Definition initP s :=
-    Lock s = None.
-
 End LockAPI.
 
 
-Module LockedCounterAPI <: Layer.
+Module LockedCounterAPI <: Layer CounterOp LockState.
 
-  Definition opT := CounterOpT.
-  Definition State := LockState.
+  Import CounterOp.
+  Import LockState.
 
   Inductive xstep : forall T, opT T -> nat -> State -> T -> State -> list event -> Prop :=
   | StepInc : forall tid v,
@@ -165,16 +197,13 @@ Module LockedCounterAPI <: Layer.
 
   Definition step := xstep.
 
-  Definition initP s :=
-    Lock s = None.
-
 End LockedCounterAPI.
 
 
-Module CounterAPI <: Layer.
+Module CounterAPI <: Layer CounterOp CounterState.
 
-  Definition opT := CounterOpT.
-  Definition State := CounterState.
+  Import CounterOp.
+  Import CounterState.
 
   Inductive xstep : forall T, opT T -> nat -> State -> T -> State -> list event -> Prop :=
   | StepInc : forall tid v,
@@ -184,17 +213,16 @@ Module CounterAPI <: Layer.
 
   Definition step := xstep.
 
-  Definition initP (s : State) :=
-    True.
-
 End CounterAPI.
 
 
 (** Locking discipline *)
 
-Module LockingRule <: ProcRule LockAPI.
+Module LockingRule <: ProcRule LockOp.
 
-  Definition follows_protocol (ts : @threads_state LockAPI.opT) :=
+  Import LockOp.
+
+  Definition follows_protocol (ts : @threads_state opT) :=
     forall s,
       follows_protocol_s RawLockAPI.step LockAPI.step_allow ts s.
 
@@ -203,24 +231,31 @@ End LockingRule.
 
 (** Using locks to get atomicity. *)
 
-Module LockingCounter <: LayerImplFollowsRule LockAPI LockedCounterAPI LockingRule.
+Module LockingCounter <:
+  LayerImplFollowsRule
+    LockOp LockState LockAPI
+    CounterOp LockState LockedCounterAPI
+    LockingRule.
 
-  Definition inc_core : proc LockAPI.opT _ :=
+  Import LockOp.
+  Import CounterOp.
+
+  Definition inc_core : proc LockOp.opT _ :=
     _ <- Op Acquire;
     v <- Op Read;
     _ <- Op (Write (v + 1));
     _ <- Op Release;
     Ret v.
 
-  Definition dec_core : proc LockAPI.opT _ :=
+  Definition dec_core : proc LockOp.opT _ :=
     _ <- Op Acquire;
     v <- Op Read;
     _ <- Op (Write (v - 1));
     _ <- Op Release;
     Ret v.
 
-  Definition compile_op T (op : LockedCounterAPI.opT T)
-                        : proc LockAPI.opT T :=
+  Definition compile_op T (op : CounterOp.opT T)
+                        : proc LockOp.opT T :=
     match op with
     | Inc => inc_core
     | Dec => dec_core
@@ -265,7 +300,7 @@ Module LockingCounter <: LayerImplFollowsRule LockAPI LockedCounterAPI LockingRu
     split.
     - eapply always_enabled_to_stable.
       unfold always_enabled, enabled_in; intros.
-      destruct s. destruct Lock0. destruct (n == tid); subst.
+      destruct s. destruct Lock. destruct (n == tid); subst.
       all: eauto 10.
     - unfold left_mover; intros.
       repeat step_inv; try congruence; subst; eauto 10.
@@ -358,7 +393,7 @@ Module LockingCounter <: LayerImplFollowsRule LockAPI LockedCounterAPI LockingRu
     eapply Compile.compile_traces_match_ts; eauto.
   Qed.
 
-  Definition absR (s1 : LockAPI.State) (s2 : LockedCounterAPI.State) :=
+  Definition absR (s1 : LockState.State) (s2 : LockState.State) :=
     s1 = s2.
 
   Definition compile_ts := Compile.compile_ts compile_op.
@@ -375,7 +410,7 @@ Module LockingCounter <: LayerImplFollowsRule LockAPI LockedCounterAPI LockingRu
   Theorem compile_traces_match :
     forall ts2,
       no_atomics_ts ts2 ->
-      traces_match_abs absR LockAPI.initP LockAPI.step LockedCounterAPI.step (compile_ts ts2) ts2.
+      traces_match_abs absR LockState.initP LockAPI.step LockedCounterAPI.step (compile_ts ts2) ts2.
   Proof.
     unfold traces_match_abs; intros.
     rewrite H2 in *; clear H2.
@@ -383,6 +418,8 @@ Module LockingCounter <: LayerImplFollowsRule LockAPI LockedCounterAPI LockingRu
     eapply Compile.compile_ts_ok; eauto.
   Qed.
 
+
+  Import LockState.
 
   Theorem exec_others_preserves_lock :
     forall tid s s',
@@ -404,7 +441,7 @@ Module LockingCounter <: LayerImplFollowsRule LockAPI LockedCounterAPI LockingRu
 
   Ltac exec_propagate :=
     match goal with
-    | s : RawLockAPI.State |- _ =>
+    | s : LockState.State |- _ =>
       destruct s
     | H : exec_any _ _ _ (Op _) _ _ |- _ =>
       eapply exec_any_op in H; repeat deex
@@ -486,9 +523,9 @@ Module LockingCounter <: LayerImplFollowsRule LockAPI LockedCounterAPI LockingRu
 
   Theorem absInitP :
     forall s1 s2,
-      LockAPI.initP s1 ->
+      LockState.initP s1 ->
       absR s1 s2 ->
-      LockedCounterAPI.initP s2.
+      LockState.initP s2.
   Proof.
     congruence.
   Qed.
@@ -498,16 +535,21 @@ End LockingCounter.
 
 (** Abstracting away the lock details. *)
 
-Module AbsCounter <: LayerImpl LockedCounterAPI CounterAPI.
+Module AbsCounter <:
+  LayerImpl
+    CounterOp LockState LockedCounterAPI
+    CounterOp CounterState CounterAPI.
 
-  Definition absR (s1 : LockedCounterAPI.State) (s2 : CounterAPI.State) :=
+  Import LockState.
+
+  Definition absR (s1 : LockState.State) (s2 : CounterState.State) :=
     Lock s1 = None /\
     Value s1 = s2.
 
-  Definition compile_ts (ts : @threads_state CounterAPI.opT) := ts.
+  Definition compile_ts (ts : @threads_state CounterOp.opT) := ts.
 
   Theorem compile_ts_no_atomics :
-    forall (ts : @threads_state CounterAPI.opT),
+    forall (ts : @threads_state CounterOp.opT),
       no_atomics_ts ts ->
       no_atomics_ts (compile_ts ts).
   Proof.
@@ -530,7 +572,7 @@ Module AbsCounter <: LayerImpl LockedCounterAPI CounterAPI.
   Theorem compile_traces_match :
     forall ts,
       no_atomics_ts ts ->
-      traces_match_abs absR LockedCounterAPI.initP LockedCounterAPI.step CounterAPI.step (compile_ts ts) ts.
+      traces_match_abs absR LockState.initP LockedCounterAPI.step CounterAPI.step (compile_ts ts) ts.
   Proof.
     unfold compile_ts, traces_match_abs; intros.
     eexists; intuition idtac.
@@ -540,9 +582,9 @@ Module AbsCounter <: LayerImpl LockedCounterAPI CounterAPI.
 
   Theorem absInitP :
     forall s1 s2,
-      LockedCounterAPI.initP s1 ->
+      LockState.initP s1 ->
       absR s1 s2 ->
-      CounterAPI.initP s2.
+      CounterState.initP s2.
   Proof.
     firstorder.
   Qed.
@@ -552,18 +594,24 @@ End AbsCounter.
 
 (** Adding ghost state to the test-and-set bit. *)
 
-Module AbsLock <: LayerImpl TASAPI TASLockAPI.
+Module AbsLock <:
+  LayerImpl
+    TASOp TASState TASAPI
+    TASOp LockState TASLockAPI.
 
-  Definition absR (s1 : TASAPI.State) (s2 : TASLockAPI.State) :=
+  Import TASState.
+  Import LockState.
+
+  Definition absR (s1 : TASState.State) (s2 : LockState.State) :=
     TASValue s1 = Value s2 /\
     (TASLock s1 = false /\ Lock s2 = None \/
      exists tid,
      TASLock s1 = true /\ Lock s2 = Some tid).
 
-  Definition compile_ts (ts : @threads_state TASLockAPI.opT) := ts.
+  Definition compile_ts (ts : @threads_state TASOp.opT) := ts.
 
   Theorem compile_ts_no_atomics :
-    forall (ts : @threads_state TASLockAPI.opT),
+    forall (ts : @threads_state TASOp.opT),
       no_atomics_ts ts ->
       no_atomics_ts (compile_ts ts).
   Proof.
@@ -592,7 +640,7 @@ Module AbsLock <: LayerImpl TASAPI TASLockAPI.
   Theorem compile_traces_match :
     forall ts,
       no_atomics_ts ts ->
-      traces_match_abs absR TASAPI.initP TASAPI.step TASLockAPI.step (compile_ts ts) ts.
+      traces_match_abs absR TASState.initP TASAPI.step TASLockAPI.step (compile_ts ts) ts.
   Proof.
     unfold compile_ts, traces_match_abs; intros.
     eexists; intuition idtac.
@@ -602,11 +650,11 @@ Module AbsLock <: LayerImpl TASAPI TASLockAPI.
 
   Theorem absInitP :
     forall s1 s2,
-      TASAPI.initP s1 ->
+      TASState.initP s1 ->
       absR s1 s2 ->
-      TASLockAPI.initP s2.
+      LockState.initP s2.
   Proof.
-    unfold absR, TASAPI.initP, TASLockAPI.initP.
+    unfold absR, TASState.initP, LockState.initP.
     intuition eauto.
     deex; congruence.
   Qed.
@@ -616,7 +664,10 @@ End AbsLock.
 
 (** Implement [Acquire] on top of test-and-set *)
 
-Module LockImpl <: LayerImpl TASLockAPI RawLockAPI.
+Module LockImpl <:
+  LayerImpl
+    TASOp LockState TASLockAPI
+    LockOp LockState RawLockAPI.
 
   Definition acquire_cond (r : bool) :=
     if r == false then true else false.
@@ -624,7 +675,10 @@ Module LockImpl <: LayerImpl TASLockAPI RawLockAPI.
   Definition once_cond {T} (r : T) :=
     true.
 
-  Definition compile_op T (op : RawLockAPI.opT T) : (option T -> TASLockAPI.opT T) * (T -> bool) * option T :=
+  Import TASOp.
+  Import LockOp.
+
+  Definition compile_op T (op : LockOp.opT T) : (option T -> TASOp.opT T) * (T -> bool) * option T :=
     match op with
     | Acquire => (fun _ => TestAndSet, acquire_cond, None)
     | Release => (fun _ => Clear, once_cond, None)
@@ -643,7 +697,7 @@ Module LockImpl <: LayerImpl TASLockAPI RawLockAPI.
     eapply CompileLoop.compile_ts_no_atomics.
   Qed.
 
-  Definition absR (s1 : TASLockAPI.State) (s2 : RawLockAPI.State) :=
+  Definition absR (s1 : LockState.State) (s2 : LockState.State) :=
     s1 = s2.
 
   Ltac step_inv :=
@@ -673,7 +727,7 @@ Module LockImpl <: LayerImpl TASLockAPI RawLockAPI.
   Theorem compile_traces_match :
     forall ts,
       no_atomics_ts ts ->
-      traces_match_abs absR TASLockAPI.initP TASLockAPI.step RawLockAPI.step (compile_ts ts) ts.
+      traces_match_abs absR LockState.initP TASLockAPI.step RawLockAPI.step (compile_ts ts) ts.
   Proof.
     unfold traces_match_abs, absR; intros; subst.
     eapply CompileLoop.compile_traces_match_ts; eauto.
@@ -683,9 +737,9 @@ Module LockImpl <: LayerImpl TASLockAPI RawLockAPI.
 
   Theorem absInitP :
     forall s1 s2,
-      TASLockAPI.initP s1 ->
+      LockState.initP s1 ->
       absR s1 s2 ->
-      RawLockAPI.initP s2.
+      LockState.initP s2.
   Proof.
     congruence.
   Qed.
@@ -695,11 +749,15 @@ End LockImpl.
 
 (** Locking discipline *)
 
-Module LockProtocol <: LayerImplRequiresRule RawLockAPI LockAPI LockingRule.
+Module LockProtocol <:
+  LayerImplRequiresRule
+    LockOp LockState RawLockAPI
+    LockOp LockState LockAPI
+    LockingRule.
 
   Import LockingRule.
 
-  Definition absR (s1 : RawLockAPI.State) (s2 : LockAPI.State) :=
+  Definition absR (s1 : LockState.State) (s2 : LockState.State) :=
     s1 = s2.
 
   Ltac step_inv :=
@@ -713,7 +771,7 @@ Module LockProtocol <: LayerImplRequiresRule RawLockAPI LockAPI LockingRule.
     end.
 
   Theorem allowed_stable :
-    forall `(op : LockAPI.opT T) `(op' : LockAPI.opT T') tid tid' s s' r evs,
+    forall `(op : LockOp.opT T) `(op' : LockOp.opT T') tid tid' s s' r evs,
       tid <> tid' ->
       LockAPI.step_allow op tid s ->
       LockAPI.step op' tid' s r s' evs ->
@@ -724,7 +782,7 @@ Module LockProtocol <: LayerImplRequiresRule RawLockAPI LockAPI LockingRule.
     all: congruence.
   Qed.
 
-  Definition compile_ts (ts : @threads_state LockAPI.opT) := ts.
+  Definition compile_ts (ts : @threads_state LockOp.opT) := ts.
 
   Theorem compile_ts_no_atomics :
     forall ts,
@@ -738,7 +796,7 @@ Module LockProtocol <: LayerImplRequiresRule RawLockAPI LockAPI LockingRule.
     forall ts,
       follows_protocol ts ->
       no_atomics_ts ts ->
-      traces_match_abs absR RawLockAPI.initP RawLockAPI.step LockAPI.step (compile_ts ts) ts.
+      traces_match_abs absR LockState.initP RawLockAPI.step LockAPI.step (compile_ts ts) ts.
   Proof.
     unfold compile_ts, follows_protocol, absR.
     unfold traces_match_abs; intros; subst.
@@ -764,9 +822,9 @@ Module LockProtocol <: LayerImplRequiresRule RawLockAPI LockAPI LockingRule.
 
   Theorem absInitP :
     forall s1 s2,
-      RawLockAPI.initP s1 ->
+      LockState.initP s1 ->
       absR s1 s2 ->
-      LockAPI.initP s2.
+      LockState.initP s2.
   Proof.
     congruence.
   Qed.
@@ -791,13 +849,35 @@ End LockProtocol.
   CounterAPI ---------------------+----+
  *)
 
-Module c1 := Link TASAPI TASLockAPI RawLockAPI AbsLock LockImpl.
-Module c2 := LinkWithRule RawLockAPI LockAPI LockedCounterAPI LockingRule LockProtocol LockingCounter.
-Module c3 := Link RawLockAPI LockedCounterAPI CounterAPI c2 AbsCounter.
-Module c := Link TASAPI RawLockAPI CounterAPI c1 c3.
+Module c1 :=
+  Link
+    TASOp  TASState  TASAPI
+    TASOp  LockState TASLockAPI
+    LockOp LockState RawLockAPI
+    AbsLock LockImpl.
+Module c2 :=
+  LinkWithRule
+    LockOp    LockState RawLockAPI
+    LockOp    LockState LockAPI
+    CounterOp LockState LockedCounterAPI
+    LockingRule LockProtocol LockingCounter.
+Module c3 :=
+  Link
+    LockOp    LockState    RawLockAPI
+    CounterOp LockState    LockedCounterAPI
+    CounterOp CounterState CounterAPI
+    c2 AbsCounter.
+Module c :=
+  Link
+    TASOp     TASState     TASAPI
+    LockOp    LockState    RawLockAPI
+    CounterOp CounterState CounterAPI
+    c1 c3.
 
 Print Assumptions c.compile_traces_match.
 
+
+Import CounterOp.
 
 Definition test_thread :=
   Until

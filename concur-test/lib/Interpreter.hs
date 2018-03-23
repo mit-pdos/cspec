@@ -31,7 +31,7 @@ debugmsg s =
   else
     return ()
 
-run_proc :: State -> Coq_proc (TASOpT a) GHC.Prim.Any -> IO a
+run_proc :: State -> Coq_proc (TASOp__Coq_xopT a) GHC.Prim.Any -> IO a
 run_proc s (Ret v) = do
   -- debugmsg $ "Ret"
   return $ unsafeCoerce v
@@ -50,15 +50,15 @@ run_proc s (Until c p v0) = do
     return v
   else
     run_proc s (Until c p (unsafeCoerce v))
-run_proc (S lck val) (Op ReadTAS) = do
+run_proc (S lck val) (Op TASOp__ReadTAS) = do
   v <- readIORef val
   -- debugmsg $ "ReadTAS " ++ (show v)
   return $ unsafeCoerce v
-run_proc (S lck val) (Op (WriteTAS v)) = do
+run_proc (S lck val) (Op (TASOp__WriteTAS v)) = do
   debugmsg $ "WriteTAS " ++ (show v)
   writeIORef val v
   return $ unsafeCoerce ()
-run_proc (S lck val) (Op TestAndSet) = do
+run_proc (S lck val) (Op TASOp__TestAndSet) = do
   ok <- tryTakeMVar lck
   -- debugmsg $ "TestAndSet " ++ (show ok)
   if isJust ok then
@@ -66,7 +66,7 @@ run_proc (S lck val) (Op TestAndSet) = do
   else do
     yield
     return $ unsafeCoerce True
-run_proc (S lck val) (Op Clear) = do
+run_proc (S lck val) (Op TASOp__Clear) = do
   -- debugmsg $ "Clear"
   tryPutMVar lck ()
   return $ unsafeCoerce ()

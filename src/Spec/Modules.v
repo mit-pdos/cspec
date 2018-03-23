@@ -34,74 +34,94 @@ Section TraceAbs.
 End TraceAbs.
 
 
-Module Type Layer.
+Module Type Ops.
 
   Axiom opT : Type -> Type.
+
+End Ops.
+
+
+Module Type State.
+
   Axiom State : Type.
   Axiom initP : State -> Prop.
-  Axiom step : OpSemantics opT State.
+
+End State.
+
+
+Module Type Layer (o : Ops) (s : State).
+
+  Axiom step : OpSemantics o.opT s.State.
 
 End Layer.
 
 
-Module Type ProcRule (l : Layer).
+Module Type ProcRule (o : Ops).
 
-  Axiom follows_protocol : @threads_state l.opT -> Prop.
+  Axiom follows_protocol : @threads_state o.opT -> Prop.
 
 End ProcRule.
 
 
-Module Type LayerImpl (l1 : Layer) (l2 : Layer).
+Module Type LayerImpl
+  (o1 : Ops) (s1 : State) (l1 : Layer o1 s1)
+  (o2 : Ops) (s2 : State) (l2 : Layer o2 s2).
 
-  Axiom absR : l1.State -> l2.State -> Prop.
-  Axiom compile_ts : @threads_state l2.opT -> @threads_state l1.opT.
+  Axiom absR : s1.State -> s2.State -> Prop.
+  Axiom compile_ts : @threads_state o2.opT -> @threads_state o1.opT.
   Axiom compile_ts_no_atomics :
     forall ts,
       no_atomics_ts ts ->
       no_atomics_ts (compile_ts ts).
   Axiom absInitP :
     forall s1 s2,
-      l1.initP s1 ->
+      s1.initP s1 ->
       absR s1 s2 ->
-      l2.initP s2.
+      s2.initP s2.
   Axiom compile_traces_match :
     forall ts,
       no_atomics_ts ts ->
-      traces_match_abs absR l1.initP l1.step l2.step (compile_ts ts) ts.
+      traces_match_abs absR s1.initP l1.step l2.step (compile_ts ts) ts.
 
   Hint Resolve absInitP.
 
 End LayerImpl.
 
 
-Module Type LayerImplRequiresRule (l1 : Layer) (l2 : Layer) (r : ProcRule l2).
+Module Type LayerImplRequiresRule
+  (o1 : Ops) (s1 : State) (l1 : Layer o1 s1)
+  (o2 : Ops) (s2 : State) (l2 : Layer o2 s2)
+  (r : ProcRule o2).
 
-  Axiom absR : l1.State -> l2.State -> Prop.
-  Axiom compile_ts : @threads_state l2.opT -> @threads_state l1.opT.
+  Axiom absR : s1.State -> s2.State -> Prop.
+  Axiom compile_ts : @threads_state o2.opT -> @threads_state o1.opT.
   Axiom compile_ts_no_atomics :
     forall ts,
       no_atomics_ts ts ->
       no_atomics_ts (compile_ts ts).
   Axiom absInitP :
     forall s1 s2,
-      l1.initP s1 ->
+      s1.initP s1 ->
       absR s1 s2 ->
-      l2.initP s2.
+      s2.initP s2.
   Axiom compile_traces_match :
     forall ts,
       r.follows_protocol ts ->
       no_atomics_ts ts ->
-      traces_match_abs absR l1.initP l1.step l2.step (compile_ts ts) ts.
+      traces_match_abs absR s1.initP l1.step l2.step (compile_ts ts) ts.
 
   Hint Resolve absInitP.
 
 End LayerImplRequiresRule.
 
 
-Module Type LayerImplFollowsRule (l1 : Layer) (l2 : Layer) (r : ProcRule l1).
+Module Type LayerImplFollowsRule
+  (o1 : Ops) (s1 : State) (l1 : Layer o1 s1)
+  (o2 : Ops) (s2 : State) (l2 : Layer o2 s2)
+  (r : ProcRule o1).
 
-  Axiom absR : l1.State -> l2.State -> Prop.
-  Axiom compile_ts : @threads_state l2.opT -> @threads_state l1.opT.
+  Axiom absR : s1.State -> s2.State -> Prop.
+  Axiom compile_ts : @threads_state o2.opT -> @threads_state o1.opT.
   Axiom compile_ts_no_atomics :
     forall ts,
       no_atomics_ts ts ->
@@ -112,26 +132,80 @@ Module Type LayerImplFollowsRule (l1 : Layer) (l2 : Layer) (r : ProcRule l1).
       r.follows_protocol (compile_ts ts).
   Axiom absInitP :
     forall s1 s2,
-      l1.initP s1 ->
+      s1.initP s1 ->
       absR s1 s2 ->
-      l2.initP s2.
+      s2.initP s2.
   Axiom compile_traces_match :
     forall ts,
       no_atomics_ts ts ->
-      traces_match_abs absR l1.initP l1.step l2.step (compile_ts ts) ts.
+      traces_match_abs absR s1.initP l1.step l2.step (compile_ts ts) ts.
 
   Hint Resolve absInitP.
 
 End LayerImplFollowsRule.
 
 
+Module Type LayerImplAbsT
+  (o : Ops)
+  (s1 : State) (l1 : Layer o s1)
+  (s2 : State) (l2 : Layer o s2).
+
+  Axiom absR : s1.State -> s2.State -> Prop.
+  Axiom absR_ok : op_abs absR l1.step l2.step.
+  Axiom absInitP :
+    forall s1 s2,
+      s1.initP s1 ->
+      absR s1 s2 ->
+      s2.initP s2.
+
+End LayerImplAbsT.
+
+
+Module LayerImplAbs
+  (o : Ops)
+  (s1 : State) (l1 : Layer o s1)
+  (s2 : State) (l2 : Layer o s2)
+  (a : LayerImplAbsT o s1 l1 s2 l2) <: LayerImpl o s1 l1 o s2 l2.
+
+  Definition absR := a.absR.
+  Definition absInitP := a.absInitP.
+
+  Definition compile_ts (ts : @threads_state o.opT) := ts.
+
+  Theorem compile_ts_no_atomics :
+    forall (ts : @threads_state o.opT),
+      no_atomics_ts ts ->
+      no_atomics_ts (compile_ts ts).
+  Proof.
+    unfold compile_ts; eauto.
+  Qed.
+
+  Hint Resolve a.absR_ok.
+
+  Theorem compile_traces_match :
+    forall ts,
+      no_atomics_ts ts ->
+      traces_match_abs absR s1.initP l1.step l2.step (compile_ts ts) ts.
+  Proof.
+    unfold compile_ts, traces_match_abs; intros.
+    eexists; intuition idtac.
+    eapply trace_incl_abs; eauto.
+    eauto.
+  Qed.
+
+End LayerImplAbs.
+
+
 (** General layer transformers. *)
 
 Module Link
-  (a : Layer) (b : Layer) (c : Layer)
-  (x : LayerImpl a b) (y : LayerImpl b c) <: LayerImpl a c.
+  (oA : Ops) (sA : State) (a : Layer oA sA)
+  (oB : Ops) (sB : State) (b : Layer oB sB)
+  (oC : Ops) (sC : State) (c : Layer oC sC)
+  (x : LayerImpl oA sA a oB sB b)
+  (y : LayerImpl oB sB b oC sC c) <: LayerImpl oA sA a oC sC c.
 
-  Definition absR (s1 : a.State) (s3 : c.State) :=
+  Definition absR (s1 : sA.State) (s3 : sC.State) :=
     exists s2, x.absR s1 s2 /\ y.absR s2 s3.
 
   Definition compile_ts ts :=
@@ -150,9 +224,9 @@ Module Link
 
   Theorem absInitP :
     forall s1 s2,
-      a.initP s1 ->
+      sA.initP s1 ->
       absR s1 s2 ->
-      c.initP s2.
+      sC.initP s2.
   Proof.
     unfold absR; intros; deex.
     eauto.
@@ -161,7 +235,7 @@ Module Link
   Theorem compile_traces_match :
     forall ts,
       no_atomics_ts ts ->
-      traces_match_abs absR a.initP a.step c.step (compile_ts ts) ts.
+      traces_match_abs absR sA.initP a.step c.step (compile_ts ts) ts.
   Proof.
     unfold traces_match_abs; intros.
     inversion H2; clear H2; intuition idtac.
@@ -176,10 +250,14 @@ End Link.
 
 
 Module LinkWithRule
-  (a : Layer) (b : Layer) (c : Layer) (r : ProcRule b)
-  (x : LayerImplRequiresRule a b r) (y : LayerImplFollowsRule b c r) <: LayerImpl a c.
+  (oA : Ops) (sA : State) (a : Layer oA sA)
+  (oB : Ops) (sB : State) (b : Layer oB sB)
+  (oC : Ops) (sC : State) (c : Layer oC sC)
+  (r : ProcRule oB)
+  (x : LayerImplRequiresRule oA sA a oB sB b r)
+  (y : LayerImplFollowsRule oB sB b oC sC c r) <: LayerImpl oA sA a oC sC c.
 
-  Definition absR (s1 : a.State) (s3 : c.State) :=
+  Definition absR (s1 : sA.State) (s3 : sC.State) :=
     exists s2, x.absR s1 s2 /\ y.absR s2 s3.
 
   Definition compile_ts ts :=
@@ -198,9 +276,9 @@ Module LinkWithRule
 
   Theorem absInitP :
     forall s1 s2,
-      a.initP s1 ->
+      sA.initP s1 ->
       absR s1 s2 ->
-      c.initP s2.
+      sC.initP s2.
   Proof.
     unfold absR; intros; deex.
     eauto.
@@ -209,7 +287,7 @@ Module LinkWithRule
   Theorem compile_traces_match :
     forall ts,
       no_atomics_ts ts ->
-      traces_match_abs absR a.initP a.step c.step (compile_ts ts) ts.
+      traces_match_abs absR sA.initP a.step c.step (compile_ts ts) ts.
   Proof.
     unfold traces_match_abs; intros.
     inversion H2; clear H2; intuition idtac.
