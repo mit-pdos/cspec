@@ -224,26 +224,14 @@ Module CounterAPI <: Layer CounterOp CounterState.
 End CounterAPI.
 
 
-(** Locking discipline *)
-
-Module LockingRule <: ProcRule LockOp.
-
-  Import LockOp.
-
-  Definition follows_protocol (ts : @threads_state opT) :=
-    forall s,
-      follows_protocol_s RawLockAPI.step LockAPI.step_allow ts s.
-
-End LockingRule.
-
-
 (** Using locks to get atomicity. *)
 
-Module LockingCounter <:
-  LayerImplFollowsRule
-    LockOp LockState LockAPI
-    CounterOp LockState LockedCounterAPI
-    LockingRule.
+Module LockingCounter' <:
+  LayerImplMoversProtocolT
+    LockState
+    LockOp    RawLockAPI LockAPI
+    CounterOp LockedCounterAPI
+    LockProtocol.
 
   Import LockOp.
   Import CounterOp.
@@ -268,6 +256,13 @@ Module LockingCounter <:
     | Inc => inc_core
     | Dec => dec_core
     end.
+
+  Theorem compile_op_no_atomics : forall T (op : CounterOp.opT T),
+    no_atomics (compile_op op).
+  Proof.
+    destruct op; econstructor; eauto.
+  Qed.
+
 
   Ltac step_inv :=
     match goal with
@@ -337,30 +332,15 @@ Module LockingCounter <:
   Hint Resolve read_right_mover.
   Hint Resolve write_right_mover.
 
-
-  Theorem inc_atomic : forall `(rx : _ -> proc _ T),
-    trace_incl LockAPI.step
-      (Bind (compile_op Inc) rx)
-      (Bind (atomize compile_op Inc) rx).
+  Theorem ysa_movers : forall T (op : CounterOp.opT T),
+    ysa_movers LockAPI.step (compile_op op).
   Proof.
-    intros.
-    eapply trace_incl_atomize_ysa.
-    simpl.
-    unfold inc_core, ysa_movers; eauto 20.
+    destruct op; unfold ysa_movers; simpl.
+    - unfold inc_core; eauto 20.
+    - unfold dec_core; eauto 20.
   Qed.
 
-  Theorem dec_atomic : forall `(rx : _ -> proc _ T),
-    trace_incl LockAPI.step
-      (Bind (compile_op Dec) rx)
-      (Bind (atomize compile_op Dec) rx).
-  Proof.
-    intros.
-    eapply trace_incl_atomize_ysa.
-    simpl.
-    unfold dec_core, ysa_movers; eauto 20.
-  Qed.
-
-  Theorem my_compile_correct :
+  Theorem compile_correct :
     compile_correct compile_op LockAPI.step LockedCounterAPI.step.
   Proof.
     unfold compile_correct; intros.
@@ -373,57 +353,6 @@ Module LockingCounter <:
     + repeat atomic_exec_inv.
       simpl; intuition eauto.
       repeat step_inv; eauto.
-  Qed.
-
-  Theorem my_atomize_correct :
-    atomize_correct compile_op LockAPI.step.
-  Proof.
-    unfold atomize_correct; intros.
-    destruct op.
-    + rewrite inc_atomic.
-      eapply trace_incl_bind_a.
-      eauto.
-    + rewrite dec_atomic.
-      eapply trace_incl_bind_a.
-      eauto.
-  Qed.
-
-  Hint Resolve my_compile_correct.
-  Hint Resolve my_atomize_correct.
-
-
-  Theorem all_traces_match :
-    forall ts1 ts2,
-      proc_match (Compile.compile_ok compile_op) ts1 ts2 ->
-      traces_match_ts LockAPI.step LockedCounterAPI.step ts1 ts2.
-  Proof.
-    intros.
-    eapply Compile.compile_traces_match_ts; eauto.
-  Qed.
-
-  Definition absR (s1 : LockState.State) (s2 : LockState.State) :=
-    s1 = s2.
-
-  Definition compile_ts := Compile.compile_ts compile_op.
-
-  Theorem compile_ts_no_atomics :
-    forall ts,
-      no_atomics_ts ts ->
-      no_atomics_ts (compile_ts ts).
-  Proof.
-    eapply Compile.compile_ts_no_atomics.
-    destruct op; compute; eauto.
-  Qed.
-
-  Theorem compile_traces_match :
-    forall ts2,
-      no_atomics_ts ts2 ->
-      traces_match_abs absR LockState.initP LockAPI.step LockedCounterAPI.step (compile_ts ts2) ts2.
-  Proof.
-    unfold traces_match_abs; intros.
-    rewrite H2 in *; clear H2.
-    eapply all_traces_match; eauto.
-    eapply Compile.compile_ts_ok; eauto.
   Qed.
 
 
@@ -514,31 +443,32 @@ Module LockingCounter <:
   Hint Resolve inc_follows_protocol.
   Hint Resolve dec_follows_protocol.
 
-  Theorem compile_ts_follows_protocol :
-    forall ts,
-      no_atomics_ts ts ->
-      LockingRule.follows_protocol (compile_ts ts).
+  Theorem op_follows_protocol : forall tid s `(op : CounterOp.opT T),
+    follows_protocol_proc RawLockAPI.step LockProtocol.step_allow tid s (compile_op op).
   Proof.
-    unfold compile_ts.
-    unfold LockingRule.follows_protocol.
-    unfold follows_protocol_s.
-    intros.
-    eapply compile_ts_follows_protocol_proc; try eassumption.
-    intros.
-
-    destruct op; simpl; eauto.
+    destruct op; eauto.
   Qed.
 
-  Theorem absInitP :
-    forall s1 s2,
-      LockState.initP s1 ->
-      absR s1 s2 ->
-      LockState.initP s2.
+  Theorem allowed_stable :
+    forall `(op : LockOp.opT T) `(op' : LockOp.opT T') tid tid' s s' r evs,
+      tid <> tid' ->
+      LockAPI.step_allow op tid s ->
+      LockAPI.step op' tid' s r s' evs ->
+      LockAPI.step_allow op tid s'.
   Proof.
-    congruence.
+    intros.
+    destruct op; destruct op'; repeat step_inv; subst; eauto.
   Qed.
 
-End LockingCounter.
+  Theorem raw_step_ok :
+    forall `(op : _ T) tid s r s' evs,
+      restricted_step RawLockAPI.step LockProtocol.step_allow op tid s r s' evs ->
+      LockAPI.step op tid s r s' evs.
+  Proof.
+    eauto.
+  Qed.
+
+End LockingCounter'.
 
 
 (** Abstracting away the lock details. *)
@@ -721,91 +651,6 @@ Module LockImpl <:
 End LockImpl.
 
 
-(** Locking discipline *)
-
-Module LockProtocolOK <:
-  LayerImplRequiresRule
-    LockOp LockState RawLockAPI
-    LockOp LockState LockAPI
-    LockingRule.
-
-  Import LockingRule.
-
-  Definition absR (s1 : LockState.State) (s2 : LockState.State) :=
-    s1 = s2.
-
-  Ltac step_inv :=
-    match goal with
-    | H : RawLockAPI.step _ _ _ _ _ _ |- _ =>
-      inversion H; clear H; subst; repeat sigT_eq
-    | H : LockAPI.step_allow _ _ _ |- _ =>
-      inversion H; clear H; subst; repeat sigT_eq
-    | H : LockAPI.step _ _ _ _ _ _ |- _ =>
-      destruct H; intuition idtac
-    end.
-
-  Theorem allowed_stable :
-    forall `(op : LockOp.opT T) `(op' : LockOp.opT T') tid tid' s s' r evs,
-      tid <> tid' ->
-      LockAPI.step_allow op tid s ->
-      LockAPI.step op' tid' s r s' evs ->
-      LockAPI.step_allow op tid s'.
-  Proof.
-    intros.
-    destruct op; destruct op'; repeat step_inv; subst; eauto.
-    all: congruence.
-  Qed.
-
-  Definition compile_ts (ts : @threads_state LockOp.opT) := ts.
-
-  Theorem compile_ts_no_atomics :
-    forall ts,
-      no_atomics_ts ts ->
-      no_atomics_ts (compile_ts ts).
-  Proof.
-    unfold compile_ts; eauto.
-  Qed.
-
-  Theorem compile_traces_match :
-    forall ts,
-      follows_protocol ts ->
-      no_atomics_ts ts ->
-      traces_match_abs absR LockState.initP RawLockAPI.step LockAPI.step (compile_ts ts) ts.
-  Proof.
-    unfold compile_ts, follows_protocol, absR.
-    unfold traces_match_abs; intros; subst.
-    clear H1.
-    specialize (H sm).
-    destruct H2.
-    induction H1; eauto.
-    specialize (H tid _ p) as Htid.
-    intuition idtac; repeat deex.
-
-    edestruct IHexec.
-      eapply follows_protocol_s_exec_tid_upd; eauto.
-      intros; eapply allowed_stable; eauto.
-      destruct result; eauto.
-
-    eexists; intuition idtac.
-    eapply ExecPrefixOne.
-      eauto.
-      eapply follows_protocol_preserves_exec_tid; eauto.
-      eauto.
-    eauto.
-  Qed.
-
-  Theorem absInitP :
-    forall s1 s2,
-      LockState.initP s1 ->
-      absR s1 s2 ->
-      LockState.initP s2.
-  Proof.
-    congruence.
-  Qed.
-
-End LockProtocolOK.
-
-
 (** Linking *)
 
 (* End-to-end stack:
@@ -830,11 +675,12 @@ Module c1 :=
     LockOp LockState RawLockAPI
     AbsLock LockImpl.
 Module c2 :=
-  LinkWithRule
-    LockOp    LockState RawLockAPI
-    LockOp    LockState LockAPI
-    CounterOp LockState LockedCounterAPI
-    LockingRule LockProtocolOK LockingCounter.
+  LayerImplMoversProtocol
+    LockState
+    LockOp    RawLockAPI LockAPI
+    CounterOp LockedCounterAPI
+    LockProtocol
+    LockingCounter'.
 Module c3 :=
   Link
     LockOp    LockState    RawLockAPI
