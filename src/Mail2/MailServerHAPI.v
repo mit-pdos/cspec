@@ -3,6 +3,9 @@ Require Import String.
 Require Import MailServerAPI.
 Require Import MailServerLockAbsAPI.
 Require Import MailServerLockAbsImpl.
+Require Import MailboxAPI.
+Require Import MailboxImpl.
+
 
 Module HLayer (l : Layer) <: Layer.
 
@@ -17,8 +20,11 @@ Module HLayer (l : Layer) <: Layer.
 
 End HLayer.
 
+
 Module MailServerHAPI := HLayer MailServerAPI.
 Module MailServerLockAbsHAPI := HLayer MailServerLockAbsAPI.
+Module MailboxRestrictedHAPI := HLayer MailboxRestrictedAPI.
+
 
 Module MailServerH <: LayerImpl MailServerLockAbsHAPI MailServerHAPI.
 
@@ -67,3 +73,11 @@ Module MailServerH <: LayerImpl MailServerLockAbsHAPI MailServerHAPI.
 End MailServerH.
 
 
+Module MailboxH <: LayerImpl MailServerLockAbsHAPI MailboxRestrictedHAPI.
+
+  Definition compile_op T (op : MailServerLockAbsHAPI.opT T) : proc MailboxRestrictedHAPI.opT T :=
+    match op with
+    | Slice i op => SliceProc i (AtomicReaderRestricted.compile_op op)
+    end.
+
+  
