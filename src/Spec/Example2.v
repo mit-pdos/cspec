@@ -535,26 +535,16 @@ End LockingCounter.
 
 (** Abstracting away the lock details. *)
 
-Module AbsCounter <:
-  LayerImpl
-    CounterOp LockState LockedCounterAPI
-    CounterOp CounterState CounterAPI.
+Module AbsCounter' <:
+  LayerImplAbsT CounterOp
+    LockState    LockedCounterAPI
+    CounterState CounterAPI.
 
   Import LockState.
 
   Definition absR (s1 : LockState.State) (s2 : CounterState.State) :=
     Lock s1 = None /\
     Value s1 = s2.
-
-  Definition compile_ts (ts : @threads_state CounterOp.opT) := ts.
-
-  Theorem compile_ts_no_atomics :
-    forall (ts : @threads_state CounterOp.opT),
-      no_atomics_ts ts ->
-      no_atomics_ts (compile_ts ts).
-  Proof.
-    unfold compile_ts; eauto.
-  Qed.
 
   Theorem absR_ok :
     op_abs absR LockedCounterAPI.step CounterAPI.step.
@@ -567,19 +557,6 @@ Module AbsCounter <:
     all: eexists; intuition eauto; constructor.
   Qed.
 
-  Hint Resolve absR_ok.
-
-  Theorem compile_traces_match :
-    forall ts,
-      no_atomics_ts ts ->
-      traces_match_abs absR LockState.initP LockedCounterAPI.step CounterAPI.step (compile_ts ts) ts.
-  Proof.
-    unfold compile_ts, traces_match_abs; intros.
-    eexists; intuition idtac.
-    eapply trace_incl_abs; eauto.
-    eauto.
-  Qed.
-
   Theorem absInitP :
     forall s1 s2,
       LockState.initP s1 ->
@@ -589,7 +566,13 @@ Module AbsCounter <:
     firstorder.
   Qed.
 
-End AbsCounter.
+End AbsCounter'.
+
+Module AbsCounter :=
+  LayerImplAbs CounterOp
+    LockState    LockedCounterAPI
+    CounterState CounterAPI
+    AbsCounter'.
 
 
 (** Adding ghost state to the test-and-set bit. *)
