@@ -3,11 +3,9 @@ Require Import String.
 Require Import MailServerAPI.
 Require Import MailFSPathAbsAPI.
 
+Module MailFSPathOp <: Ops.
 
-Module MailFSPathAPI <: Layer.
-
-  Import MailServerAPI.
-  Import MailFSPathAbsAPI.
+  Definition extopT := MailServerAPI.MailServerOp.extopT.
 
   Inductive xopT : Type -> Type :=
   | CreateWrite : forall (tmpfn : string * string) (data : string), xopT bool
@@ -27,8 +25,14 @@ Module MailFSPathAPI <: Layer.
   .
 
   Definition opT := xopT.
-  Definition State := MailFSPathAbsAPI.State.
-  Definition initP (s : State) := True.
+  
+End MailFSPathOp.
+
+Module MailFSPathAPI <: Layer MailFSPathOp MailFSPathAbsState.
+
+  Import MailFSPathOp.
+  Import MailFSPathAbsState.
+  Import MailFSPathAbsAPI.
 
   Inductive xstep : forall T, opT T -> nat -> State -> T -> State -> list event -> Prop :=
   | StepCreateWriteOK : forall fs tid tmpfn data lock,

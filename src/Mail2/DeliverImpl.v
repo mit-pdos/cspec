@@ -5,29 +5,33 @@ Require Import MailboxAPI.
 Require Import MailboxTmpAbsAPI.
 
 
-Module AtomicDeliverRestricted <: LayerImplFollowsRule DeliverRestrictedAPI MailboxTmpAbsAPI DeliverTmpExistenceRule.
+Module AtomicDeliverRestricted <:
+  LayerImplFollowsRule
+    DeliverOp MailboxTmpAbsState DeliverRestrictedAPI
+    MailboxOp MailboxTmpAbsState MailboxTmpAbsAPI
+    DeliverTmpExistenceRule.
 
   Definition deliver_core (m : string) :=
-    ok <- Op (DeliverAPI.CreateWriteTmp m);
+    ok <- Op (DeliverOp.CreateWriteTmp m);
     match ok with
     | true =>
-      ok <- Op (DeliverAPI.LinkMail);
-      _ <- Op (DeliverAPI.UnlinkTmp);
+      ok <- Op (DeliverOp.LinkMail);
+      _ <- Op (DeliverOp.UnlinkTmp);
       Ret ok
     | false =>
-      _ <- Op (DeliverAPI.UnlinkTmp);
+      _ <- Op (DeliverOp.UnlinkTmp);
       Ret false
     end.
 
-  Definition compile_op T (op : MailboxAPI.opT T) : proc _ T :=
+  Definition compile_op T (op : MailboxOp.opT T) : proc _ T :=
     match op with
-    | MailboxAPI.Deliver m => deliver_core m
-    | MailboxAPI.List => Op (DeliverAPI.List)
-    | MailboxAPI.Read fn => Op (DeliverAPI.Read fn)
-    | MailboxAPI.Delete fn => Op (DeliverAPI.Delete fn)
-    | MailboxAPI.Lock => Op (DeliverAPI.Lock)
-    | MailboxAPI.Unlock => Op (DeliverAPI.Unlock)
-    | MailboxAPI.Ext extop => Op (DeliverAPI.Ext extop)
+    | MailboxOp.Deliver m => deliver_core m
+    | MailboxOp.List => Op (DeliverOp.List)
+    | MailboxOp.Read fn => Op (DeliverOp.Read fn)
+    | MailboxOp.Delete fn => Op (DeliverOp.Delete fn)
+    | MailboxOp.Lock => Op (DeliverOp.Lock)
+    | MailboxOp.Unlock => Op (DeliverOp.Unlock)
+    | MailboxOp.Ext extop => Op (DeliverOp.Ext extop)
     end.
 
   Ltac step_inv :=
@@ -66,7 +70,7 @@ Module AtomicDeliverRestricted <: LayerImplFollowsRule DeliverRestrictedAPI Mail
   Lemma createwritetmp_right_mover : forall data,
     right_mover
       DeliverRestrictedAPI.step
-      (DeliverAPI.CreateWriteTmp data).
+      (DeliverOp.CreateWriteTmp data).
   Proof.
     unfold right_mover; intros.
     repeat step_inv; eauto 10.
@@ -110,7 +114,7 @@ Module AtomicDeliverRestricted <: LayerImplFollowsRule DeliverRestrictedAPI Mail
   Lemma unlinktmp_always_enabled :
     always_enabled
       DeliverRestrictedAPI.step
-      (DeliverAPI.UnlinkTmp).
+      (DeliverOp.UnlinkTmp).
   Proof.
     unfold always_enabled, enabled_in; intros.
     destruct s; eauto.
@@ -121,7 +125,7 @@ Module AtomicDeliverRestricted <: LayerImplFollowsRule DeliverRestrictedAPI Mail
   Lemma unlinktmp_left_mover :
     left_mover
       DeliverRestrictedAPI.step
-      (DeliverAPI.UnlinkTmp).
+      (DeliverOp.UnlinkTmp).
   Proof.
     split; eauto.
     intros; repeat step_inv; eauto; repeat deex.
@@ -148,8 +152,8 @@ Module AtomicDeliverRestricted <: LayerImplFollowsRule DeliverRestrictedAPI Mail
 
   Theorem deliver_atomic : forall `(rx : _ -> proc _ T) m,
     trace_incl DeliverRestrictedAPI.step
-      (Bind (compile_op (MailboxAPI.Deliver m)) rx)
-      (Bind (atomize compile_op (MailboxAPI.Deliver m)) rx).
+      (Bind (compile_op (MailboxOp.Deliver m)) rx)
+      (Bind (atomize compile_op (MailboxOp.Deliver m)) rx).
   Proof.
     intros.
     eapply trace_incl_atomize_ysa.
@@ -202,7 +206,7 @@ Module AtomicDeliverRestricted <: LayerImplFollowsRule DeliverRestrictedAPI Mail
     eapply Compile.compile_traces_match_ts; eauto.
   Qed.
 
-  Definition absR (s1 : DeliverRestrictedAPI.State) (s2 : MailboxTmpAbsAPI.State) :=
+  Definition absR (s1 : MailboxTmpAbsState.State) (s2 : MailboxTmpAbsState.State) :=
     s1 = s2.
 
   Definition compile_ts := Compile.compile_ts compile_op.
@@ -224,7 +228,7 @@ Module AtomicDeliverRestricted <: LayerImplFollowsRule DeliverRestrictedAPI Mail
     forall ts2,
       no_atomics_ts ts2 ->
       traces_match_abs absR
-        DeliverRestrictedAPI.initP
+        MailboxTmpAbsState.initP
         DeliverRestrictedAPI.step
         MailboxTmpAbsAPI.step (compile_ts ts2) ts2.
   Proof.
@@ -236,9 +240,9 @@ Module AtomicDeliverRestricted <: LayerImplFollowsRule DeliverRestrictedAPI Mail
 
   Theorem absInitP :
     forall s1 s2,
-      DeliverRestrictedAPI.initP s1 ->
+      MailboxTmpAbsState.initP s1 ->
       absR s1 s2 ->
-      MailboxTmpAbsAPI.initP s2.
+      MailboxTmpAbsState.initP s2.
   Proof.
     eauto.
   Qed.
@@ -246,7 +250,7 @@ Module AtomicDeliverRestricted <: LayerImplFollowsRule DeliverRestrictedAPI Mail
 
   Ltac exec_propagate :=
     match goal with
-    | s : DeliverAPI.State |- _ =>
+    | s : MailboxTmpAbsState.State |- _ =>
       destruct s
     | H : exec_any _ _ _ (Op _) _ _ |- _ =>
       eapply exec_any_op in H; repeat deex
@@ -298,11 +302,15 @@ Module AtomicDeliverRestricted <: LayerImplFollowsRule DeliverRestrictedAPI Mail
 End AtomicDeliverRestricted.
 
 
-Module AtomicDeliverUnrestricted <: LayerImplRequiresRule DeliverAPI DeliverRestrictedAPI DeliverTmpExistenceRule.
+Module AtomicDeliverUnrestricted <:
+  LayerImplRequiresRule
+    DeliverOp MailboxTmpAbsState DeliverAPI
+    DeliverOp MailboxTmpAbsState DeliverRestrictedAPI
+    DeliverTmpExistenceRule.
 
   Import DeliverTmpExistenceRule.
 
-  Definition absR (s1 : DeliverAPI.State) (s2 : DeliverRestrictedAPI.State) :=
+  Definition absR (s1 : MailboxTmpAbsState.State) (s2 :MailboxTmpAbsState.State) :=
     s1 = s2.
 
   Ltac step_inv :=
@@ -316,7 +324,7 @@ Module AtomicDeliverUnrestricted <: LayerImplRequiresRule DeliverAPI DeliverRest
     end.
 
   Theorem allowed_stable :
-    forall `(op : DeliverRestrictedAPI.opT T) `(op' : DeliverRestrictedAPI.opT T') tid tid' s s' r evs,
+    forall `(op : DeliverOp.opT T) `(op' : DeliverOp.opT T') tid tid' s s' r evs,
       tid <> tid' ->
       DeliverRestrictedAPI.step_allow op tid s ->
       DeliverRestrictedAPI.step op' tid' s r s' evs ->
@@ -326,7 +334,7 @@ Module AtomicDeliverUnrestricted <: LayerImplRequiresRule DeliverAPI DeliverRest
     destruct op; destruct op'; repeat step_inv; subst; eauto.
   Qed.
 
-  Definition compile_ts (ts : @threads_state DeliverRestrictedAPI.opT) := ts.
+  Definition compile_ts (ts : @threads_state DeliverOp.opT) := ts.
 
   Theorem compile_ts_no_atomics :
     forall ts,
@@ -338,9 +346,9 @@ Module AtomicDeliverUnrestricted <: LayerImplRequiresRule DeliverAPI DeliverRest
 
   Theorem absInitP :
     forall s1 s2,
-      DeliverAPI.initP s1 ->
+      MailboxTmpAbsState.initP s1 ->
       absR s1 s2 ->
-      DeliverRestrictedAPI.initP s2.
+      MailboxTmpAbsState.initP s2.
   Proof.
     firstorder.
   Qed.
@@ -350,7 +358,7 @@ Module AtomicDeliverUnrestricted <: LayerImplRequiresRule DeliverAPI DeliverRest
       follows_protocol ts ->
       no_atomics_ts ts ->
       traces_match_abs absR
-        DeliverAPI.initP
+        MailboxTmpAbsState.initP
         DeliverAPI.step
         DeliverRestrictedAPI.step (compile_ts ts) ts.
   Proof.
@@ -380,5 +388,8 @@ End AtomicDeliverUnrestricted.
 
 
 Module AtomicDeliver :=
-  LinkWithRule DeliverAPI DeliverRestrictedAPI MailboxTmpAbsAPI DeliverTmpExistenceRule
-               AtomicDeliverUnrestricted AtomicDeliverRestricted.
+  LinkWithRule
+    DeliverOp MailboxTmpAbsState DeliverAPI
+    DeliverOp MailboxTmpAbsState DeliverRestrictedAPI
+    MailboxOp MailboxTmpAbsState MailboxTmpAbsAPI
+    DeliverTmpExistenceRule AtomicDeliverUnrestricted AtomicDeliverRestricted.

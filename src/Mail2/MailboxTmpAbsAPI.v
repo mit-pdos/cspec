@@ -3,21 +3,25 @@ Require Import String.
 Require Import MailboxAPI.
 Require Import MailServerAPI.
 
-
-Module MailboxTmpAbsAPI <: Layer.
-
-  Import MailboxAPI.
-
-  Definition opT := xopT.
+Module MailboxTmpAbsState <: State.
 
   Record state_rec := mk_state {
-    tmpdir : MailServerAPI.dir_contents;
-    maildir : MailServerAPI.dir_contents;
+    tmpdir : MailServerState.dir_contents;
+    maildir : MailServerState.dir_contents;
     locked : bool;
   }.
 
   Definition State := state_rec.
   Definition initP (s : State) := True.
+
+End MailboxTmpAbsState.
+  
+
+Module MailboxTmpAbsAPI <: Layer MailboxOp MailboxTmpAbsState.
+
+  Import MailboxOp.
+  Import MailboxTmpAbsState.
+
 
   Inductive xstep : forall T, opT T -> nat -> State -> T -> State -> list event -> Prop :=
   | StepDeliverOK : forall m tmp tmp' mbox tid fn lock,

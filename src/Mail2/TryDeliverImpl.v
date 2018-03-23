@@ -3,26 +3,30 @@ Require Import String.
 Require Import MailboxAPI.
 Require Import TryDeliverAPI.
 Require Import MailFSAPI.
+Require Import MailboxTmpAbsAPI.
 
 
-Module TryDeliverImpl <: LayerImpl MailFSAPI TryDeliverAPI.
+Module TryDeliverImpl <:
+  LayerImpl
+    TryDeliverOp MailboxTmpAbsState TryDeliverAPI
+    MailFSOp MailboxTmpAbsState MailFSAPI.
 
   Definition linkmail_core :=
-    ts <- Op MailFSAPI.Random;
-    ok <- Op (MailFSAPI.LinkMail ts);
+    ts <- Op MailFSOp.Random;
+    ok <- Op (MailFSOp.LinkMail ts);
     Ret ok.
 
-  Definition compile_op T (op : TryDeliverAPI.opT T) : proc _ T :=
+  Definition compile_op T (op : TryDeliverOp.opT T) : proc _ T :=
     match op with
-    | TryDeliverAPI.CreateWriteTmp data => Op (MailFSAPI.CreateWriteTmp data)
-    | TryDeliverAPI.LinkMail => linkmail_core
-    | TryDeliverAPI.UnlinkTmp => Op (MailFSAPI.UnlinkTmp)
-    | TryDeliverAPI.List => Op (MailFSAPI.List)
-    | TryDeliverAPI.Read fn => Op (MailFSAPI.Read fn)
-    | TryDeliverAPI.Delete fn => Op (MailFSAPI.Delete fn)
-    | TryDeliverAPI.Lock => Op (MailFSAPI.Lock)
-    | TryDeliverAPI.Unlock => Op (MailFSAPI.Unlock)
-    | TryDeliverAPI.Ext extop => Op (MailFSAPI.Ext extop)
+    | TryDeliverOp.CreateWriteTmp data => Op (MailFSOp.CreateWriteTmp data)
+    | TryDeliverOp.LinkMail => linkmail_core
+    | TryDeliverOp.UnlinkTmp => Op (MailFSOp.UnlinkTmp)
+    | TryDeliverOp.List => Op (MailFSOp.List)
+    | TryDeliverOp.Read fn => Op (MailFSOp.Read fn)
+    | TryDeliverOp.Delete fn => Op (MailFSOp.Delete fn)
+    | TryDeliverOp.Lock => Op (MailFSOp.Lock)
+    | TryDeliverOp.Unlock => Op (MailFSOp.Unlock)
+    | TryDeliverOp.Ext extop => Op (MailFSOp.Ext extop)
     end.
 
   Ltac step_inv :=
@@ -39,7 +43,7 @@ Module TryDeliverImpl <: LayerImpl MailFSAPI TryDeliverAPI.
   Lemma random_right_mover :
     right_mover
       MailFSAPI.step
-      (MailFSAPI.Random).
+      (MailFSOp.Random).
   Proof.
     unfold right_mover; intros.
     repeat step_inv; eauto 10.
@@ -51,8 +55,8 @@ Module TryDeliverImpl <: LayerImpl MailFSAPI TryDeliverAPI.
 
   Theorem linkmail_atomic : forall `(rx : _ -> proc _ T),
     trace_incl MailFSAPI.step
-      (Bind (compile_op (TryDeliverAPI.LinkMail)) rx)
-      (Bind (atomize compile_op (TryDeliverAPI.LinkMail)) rx).
+      (Bind (compile_op (TryDeliverOp.LinkMail)) rx)
+      (Bind (atomize compile_op (TryDeliverOp.LinkMail)) rx).
   Proof.
     intros.
     eapply trace_incl_atomize_ysa.
@@ -92,7 +96,7 @@ Module TryDeliverImpl <: LayerImpl MailFSAPI TryDeliverAPI.
     eapply Compile.compile_traces_match_ts; eauto.
   Qed.
 
-  Definition absR (s1 : MailFSAPI.State) (s2 : TryDeliverAPI.State) :=
+  Definition absR (s1 : MailboxTmpAbsState.State) (s2 : MailboxTmpAbsState.State) :=
     s1 = s2.
 
   Definition compile_ts := Compile.compile_ts compile_op.
@@ -110,7 +114,7 @@ Module TryDeliverImpl <: LayerImpl MailFSAPI TryDeliverAPI.
     forall ts2,
       no_atomics_ts ts2 ->
       traces_match_abs absR
-        MailFSAPI.initP
+        MailboxTmpAbsState.initP
         MailFSAPI.step
         TryDeliverAPI.step (compile_ts ts2) ts2.
   Proof.
@@ -122,11 +126,13 @@ Module TryDeliverImpl <: LayerImpl MailFSAPI TryDeliverAPI.
 
   Theorem absInitP :
     forall s1 s2,
-      MailFSAPI.initP s1 ->
+      MailboxTmpAbsState.initP s1 ->
       absR s1 s2 ->
-      TryDeliverAPI.initP s2.
+      MailboxTmpAbsState.initP s2.
   Proof.
     eauto.
   Qed.
 
+  Set Printing Implicit.
+  
 End TryDeliverImpl.

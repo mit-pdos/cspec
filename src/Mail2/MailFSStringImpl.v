@@ -6,40 +6,43 @@ Require Import MailFSStringAPI.
 Require Import MailFSStringAbsAPI.
 
 
-Module MailFSStringImpl <: LayerImpl MailFSStringAPI MailFSStringAbsAPI.
+Module MailFSStringImpl <:
+  LayerImpl
+    MailFSStringOp MailFSStringAbsState MailFSStringAPI
+    MailFSOp MailFSStringAbsState MailFSStringAbsAPI.
 
   Definition createwritetmp_core data :=
-    tid <- Op (MailFSStringAPI.GetTID);
-    r <- Op (MailFSStringAPI.CreateWriteTmp (encode_tid_fn tid 0) data);
+    tid <- Op (MailFSStringOp.GetTID);
+    r <- Op (MailFSStringOp.CreateWriteTmp (encode_tid_fn tid 0) data);
     Ret r.
 
   Definition linkmail_core mboxfn :=
-    tid <- Op (MailFSStringAPI.GetTID);
-    v <- Op (MailFSStringAPI.LinkMail (encode_tid_fn tid 0) (encode_tid_fn tid mboxfn));
+    tid <- Op (MailFSStringOp.GetTID);
+    v <- Op (MailFSStringOp.LinkMail (encode_tid_fn tid 0) (encode_tid_fn tid mboxfn));
     Ret v.
 
   Definition unlinktmp_core :=
-    tid <- Op (MailFSStringAPI.GetTID);
-    r <- Op (MailFSStringAPI.UnlinkTmp (encode_tid_fn tid 0));
+    tid <- Op (MailFSStringOp.GetTID);
+    r <- Op (MailFSStringOp.UnlinkTmp (encode_tid_fn tid 0));
     Ret r.
 
   Definition list_core :=
-    l <- Op (MailFSStringAPI.List);
+    l <- Op (MailFSStringOp.List);
     Ret (map decode_tid_fn l).
 
-  Definition compile_op T (op : MailFSStringAbsAPI.opT T) : proc _ T :=
+  Definition compile_op T (op : MailFSOp.opT T) : proc _ T :=
     match op with
-    | MailFSAPI.LinkMail m => linkmail_core m
-    | MailFSAPI.List => list_core
-    | MailFSAPI.Read fn => Op (MailFSStringAPI.Read (encode_tid_fn (fst fn) (snd fn)))
-    | MailFSAPI.Delete fn => Op (MailFSStringAPI.Delete (encode_tid_fn (fst fn) (snd fn)))
-    | MailFSAPI.CreateWriteTmp data => createwritetmp_core data
-    | MailFSAPI.UnlinkTmp => unlinktmp_core
-    | MailFSAPI.Ext extop => Op (MailFSStringAPI.Ext extop)
-    | MailFSAPI.Lock => Op (MailFSStringAPI.Lock)
-    | MailFSAPI.Unlock => Op (MailFSStringAPI.Unlock)
-    | MailFSAPI.GetTID => Op (MailFSStringAPI.GetTID)
-    | MailFSAPI.Random => Op (MailFSStringAPI.Random)
+    | MailFSOp.LinkMail m => linkmail_core m
+    | MailFSOp.List => list_core
+    | MailFSOp.Read fn => Op (MailFSStringOp.Read (encode_tid_fn (fst fn) (snd fn)))
+    | MailFSOp.Delete fn => Op (MailFSStringOp.Delete (encode_tid_fn (fst fn) (snd fn)))
+    | MailFSOp.CreateWriteTmp data => createwritetmp_core data
+    | MailFSOp.UnlinkTmp => unlinktmp_core
+    | MailFSOp.Ext extop => Op (MailFSStringOp.Ext extop)
+    | MailFSOp.Lock => Op (MailFSStringOp.Lock)
+    | MailFSOp.Unlock => Op (MailFSStringOp.Unlock)
+    | MailFSOp.GetTID => Op (MailFSStringOp.GetTID)
+    | MailFSOp.Random => Op (MailFSStringOp.Random)
     end.
 
   Ltac step_inv :=
@@ -56,7 +59,7 @@ Module MailFSStringImpl <: LayerImpl MailFSStringAPI MailFSStringAbsAPI.
   Lemma gettid_right_mover :
     right_mover
       MailFSStringAPI.step
-      (MailFSStringAPI.GetTID).
+      (MailFSStringOp.GetTID).
   Proof.
     unfold right_mover; intros.
     repeat step_inv; eauto.
@@ -68,8 +71,8 @@ Module MailFSStringImpl <: LayerImpl MailFSStringAPI MailFSStringAbsAPI.
 
   Theorem linkmail_atomic : forall `(rx : _ -> proc _ T) m,
     trace_incl MailFSStringAPI.step
-      (Bind (compile_op (MailFSAPI.LinkMail m)) rx)
-      (Bind (atomize compile_op (MailFSAPI.LinkMail m)) rx).
+      (Bind (compile_op (MailFSOp.LinkMail m)) rx)
+      (Bind (atomize compile_op (MailFSOp.LinkMail m)) rx).
   Proof.
     intros.
     eapply trace_incl_atomize_ysa.
@@ -80,8 +83,8 @@ Module MailFSStringImpl <: LayerImpl MailFSStringAPI MailFSStringAbsAPI.
 
   Theorem list_atomic : forall `(rx : _ -> proc _ T),
     trace_incl MailFSStringAPI.step
-      (Bind (compile_op (MailFSAPI.List)) rx)
-      (Bind (atomize compile_op (MailFSAPI.List)) rx).
+      (Bind (compile_op (MailFSOp.List)) rx)
+      (Bind (atomize compile_op (MailFSOp.List)) rx).
   Proof.
     intros.
     eapply trace_incl_atomize_ysa.
@@ -92,8 +95,8 @@ Module MailFSStringImpl <: LayerImpl MailFSStringAPI MailFSStringAbsAPI.
 
   Theorem createwritetmp_atomic : forall `(rx : _ -> proc _ T) fn,
     trace_incl MailFSStringAPI.step
-      (Bind (compile_op (MailFSAPI.CreateWriteTmp fn)) rx)
-      (Bind (atomize compile_op (MailFSAPI.CreateWriteTmp fn)) rx).
+      (Bind (compile_op (MailFSOp.CreateWriteTmp fn)) rx)
+      (Bind (atomize compile_op (MailFSOp.CreateWriteTmp fn)) rx).
   Proof.
     intros.
     eapply trace_incl_atomize_ysa.
@@ -104,8 +107,8 @@ Module MailFSStringImpl <: LayerImpl MailFSStringAPI MailFSStringAbsAPI.
 
   Theorem unlinktmp_atomic : forall `(rx : _ -> proc _ T),
     trace_incl MailFSStringAPI.step
-      (Bind (compile_op (MailFSAPI.UnlinkTmp)) rx)
-      (Bind (atomize compile_op (MailFSAPI.UnlinkTmp)) rx).
+      (Bind (compile_op (MailFSOp.UnlinkTmp)) rx)
+      (Bind (atomize compile_op (MailFSOp.UnlinkTmp)) rx).
   Proof.
     intros.
     eapply trace_incl_atomize_ysa.
@@ -160,7 +163,7 @@ Module MailFSStringImpl <: LayerImpl MailFSStringAPI MailFSStringAbsAPI.
     eapply Compile.compile_traces_match_ts; eauto.
   Qed.
 
-  Definition absR (s1 : MailFSStringAPI.State) (s2 : MailFSStringAbsAPI.State) :=
+  Definition absR (s1 : MailFSStringAbsState.State) (s2 : MailFSStringAbsState.State) :=
     s1 = s2.
 
   Definition compile_ts := Compile.compile_ts compile_op.
@@ -178,7 +181,7 @@ Module MailFSStringImpl <: LayerImpl MailFSStringAPI MailFSStringAbsAPI.
     forall ts2,
       no_atomics_ts ts2 ->
       traces_match_abs absR
-        MailFSStringAPI.initP
+        MailFSStringAbsState.initP
         MailFSStringAPI.step
         MailFSStringAbsAPI.step (compile_ts ts2) ts2.
   Proof.
@@ -190,9 +193,9 @@ Module MailFSStringImpl <: LayerImpl MailFSStringAPI MailFSStringAbsAPI.
 
   Theorem absInitP :
     forall s1 s2,
-      MailFSStringAPI.initP s1 ->
+      MailFSStringAbsState.initP s1 ->
       absR s1 s2 ->
-      MailFSStringAbsAPI.initP s2.
+      MailFSStringAbsState.initP s2.
   Proof.
     eauto.
   Qed.

@@ -1,11 +1,15 @@
 Require Import POCS.
 Require Import String.
 Require Import MailServerAPI.
+Require Import MailboxTmpAbsAPI.
 Require Import DeliverListTidAPI.
 Require Import MailFSAPI.
 
 
-Module MailFSImpl <: LayerImpl MailFSAPI DeliverListTidAPI.
+Module MailFSImpl <:
+  LayerImpl
+    MailFSOp MailboxTmpAbsState MailFSAPI
+    DeliverListTidOp MailboxTmpAbsState DeliverListTidAPI.
 
   Definition same_tid (tid : nat) (fn : nat * nat) : bool :=
     if tid == fst fn then
@@ -14,22 +18,22 @@ Module MailFSImpl <: LayerImpl MailFSAPI DeliverListTidAPI.
       false.
 
   Definition listtid_core :=
-    tid <- Op (MailFSAPI.GetTID);
-    l <- Op (MailFSAPI.List);
+    tid <- Op (MailFSOp.GetTID);
+    l <- Op (MailFSOp.List);
     Ret (map snd (filter (same_tid tid) l)).
 
-  Definition compile_op T (op : DeliverListTidAPI.opT T) : proc _ T :=
+  Definition compile_op T (op : DeliverListTidOp.opT T) : proc _ T :=
     match op with
-    | DeliverListTidAPI.LinkMail m => Op (MailFSAPI.LinkMail m)
-    | DeliverListTidAPI.List => Op (MailFSAPI.List)
-    | DeliverListTidAPI.ListTid => listtid_core
-    | DeliverListTidAPI.Read fn => Op (MailFSAPI.Read fn)
-    | DeliverListTidAPI.Delete fn => Op (MailFSAPI.Delete fn)
-    | DeliverListTidAPI.CreateWriteTmp data => Op (MailFSAPI.CreateWriteTmp data)
-    | DeliverListTidAPI.UnlinkTmp => Op (MailFSAPI.UnlinkTmp)
-    | DeliverListTidAPI.Lock => Op (MailFSAPI.Lock)
-    | DeliverListTidAPI.Unlock => Op (MailFSAPI.Unlock)
-    | DeliverListTidAPI.Ext extop => Op (MailFSAPI.Ext extop)
+    | DeliverListTidOp.LinkMail m => Op (MailFSOp.LinkMail m)
+    | DeliverListTidOp.List => Op (MailFSOp.List)
+    | DeliverListTidOp.ListTid => listtid_core
+    | DeliverListTidOp.Read fn => Op (MailFSOp.Read fn)
+    | DeliverListTidOp.Delete fn => Op (MailFSOp.Delete fn)
+    | DeliverListTidOp.CreateWriteTmp data => Op (MailFSOp.CreateWriteTmp data)
+    | DeliverListTidOp.UnlinkTmp => Op (MailFSOp.UnlinkTmp)
+    | DeliverListTidOp.Lock => Op (MailFSOp.Lock)
+    | DeliverListTidOp.Unlock => Op (MailFSOp.Unlock)
+    | DeliverListTidOp.Ext extop => Op (MailFSOp.Ext extop)
     end.
 
   Ltac step_inv :=
@@ -48,7 +52,7 @@ Module MailFSImpl <: LayerImpl MailFSAPI DeliverListTidAPI.
   Lemma gettid_right_mover :
     right_mover
       MailFSAPI.step
-      (MailFSAPI.GetTID).
+      (MailFSOp.GetTID).
   Proof.
     unfold right_mover; intros.
     repeat step_inv; eauto 10.
@@ -60,8 +64,8 @@ Module MailFSImpl <: LayerImpl MailFSAPI DeliverListTidAPI.
 
   Theorem listtid_atomic : forall `(rx : _ -> proc _ T),
     trace_incl MailFSAPI.step
-      (Bind (compile_op (DeliverListTidAPI.ListTid)) rx)
-      (Bind (atomize compile_op (DeliverListTidAPI.ListTid)) rx).
+      (Bind (compile_op (DeliverListTidOp.ListTid)) rx)
+      (Bind (atomize compile_op (DeliverListTidOp.ListTid)) rx).
   Proof.
     intros.
     eapply trace_incl_atomize_ysa.
@@ -112,7 +116,7 @@ Module MailFSImpl <: LayerImpl MailFSAPI DeliverListTidAPI.
     eapply Compile.compile_traces_match_ts; eauto.
   Qed.
 
-  Definition absR (s1 : MailFSAPI.State) (s2 : DeliverListTidAPI.State) :=
+  Definition absR (s1 : MailboxTmpAbsState.State) (s2 : MailboxTmpAbsState.State) :=
     s1 = s2.
 
   Definition compile_ts := Compile.compile_ts compile_op.
@@ -130,7 +134,7 @@ Module MailFSImpl <: LayerImpl MailFSAPI DeliverListTidAPI.
     forall ts2,
       no_atomics_ts ts2 ->
       traces_match_abs absR
-        MailFSAPI.initP
+        MailboxTmpAbsState.initP
         MailFSAPI.step
         DeliverListTidAPI.step (compile_ts ts2) ts2.
   Proof.
@@ -142,9 +146,9 @@ Module MailFSImpl <: LayerImpl MailFSAPI DeliverListTidAPI.
 
   Theorem absInitP :
     forall s1 s2,
-      MailFSAPI.initP s1 ->
+      MailboxTmpAbsState.initP s1 ->
       absR s1 s2 ->
-      DeliverListTidAPI.initP s2.
+      MailboxTmpAbsState.initP s2.
   Proof.
     eauto.
   Qed.

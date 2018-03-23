@@ -5,9 +5,7 @@ Require Import String.
 Parameter smtpconn : Type.
 Parameter pop3conn : Type.
 
-Module MailServerAPI <: Layer.
-
-  Definition dir_contents := FMap.t (nat*nat) string.
+Module MailServerOp <: Ops.
 
   Inductive pop3req :=
   | POP3Stat
@@ -38,8 +36,23 @@ Module MailServerAPI <: Layer.
   .
 
   Definition opT := xopT.
+  
+End MailServerOp.
+
+Module MailServerState <: State.
+
+  Definition dir_contents := FMap.t (nat*nat) string.
+
   Definition State := dir_contents.
   Definition initP (s : State) := True.
+  
+End MailServerState.
+
+Module MailServerAPI <: Layer MailServerOp MailServerState.
+
+  Import MailServerOp.
+  Import MailServerState.
+  
 
   Inductive xstep : forall T, opT T -> nat -> State -> T -> State -> list event -> Prop :=
   | StepDeliverOK : forall m mbox fn tid,
@@ -69,7 +82,7 @@ Module MailServerAPI <: Layer.
       (FMap.remove id mbox)
       nil
 
-  | StepExt : forall s tid `(extop : _ T) r,
+  | StepExt : forall s tid `(extop : extopT T) r,
     xstep (Ext extop) tid
       s
       r

@@ -2,26 +2,30 @@ Require Import POCS.
 Require Import String.
 Require Import MailServerAPI.
 Require Import MailboxAPI.
+Require Import MailboxTmpAbsAPI.
 Require Import DeliverAPI.
 Require Import TryDeliverAPI.
 
 
-Module LinkRetryImpl <: LayerImpl TryDeliverAPI DeliverAPI.
+Module LinkRetryImpl <:
+  LayerImpl
+    TryDeliverOp MailboxTmpAbsState TryDeliverAPI
+    DeliverOp  MailboxTmpAbsState DeliverAPI.
 
   Definition retry_cond (r : bool) := r.
   Definition once_cond {T} (r : T) := true.
 
-  Definition compile_op T (op : DeliverAPI.opT T) : (option T -> TryDeliverAPI.opT T) * (T -> bool) * option T :=
+  Definition compile_op T (op : DeliverOp.opT T) : (option T -> TryDeliverOp.opT T) * (T -> bool) * option T :=
     match op with
-    | DeliverAPI.CreateWriteTmp data => (fun _ => TryDeliverAPI.CreateWriteTmp data, once_cond, None)
-    | DeliverAPI.LinkMail => (fun _ => TryDeliverAPI.LinkMail, retry_cond, None)
-    | DeliverAPI.UnlinkTmp => (fun _ => TryDeliverAPI.UnlinkTmp, once_cond, None)
-    | DeliverAPI.List => (fun _ => TryDeliverAPI.List, once_cond, None)
-    | DeliverAPI.Read fn => (fun _ => TryDeliverAPI.Read fn, once_cond, None)
-    | DeliverAPI.Delete fn => (fun _ => TryDeliverAPI.Delete fn, once_cond, None)
-    | DeliverAPI.Lock => (fun _ => TryDeliverAPI.Lock, once_cond, None)
-    | DeliverAPI.Unlock => (fun _ => TryDeliverAPI.Unlock, once_cond, None)
-    | DeliverAPI.Ext extop => (fun _ => TryDeliverAPI.Ext extop, once_cond, None)
+    | DeliverOp.CreateWriteTmp data => (fun _ => TryDeliverOp.CreateWriteTmp data, once_cond, None)
+    | DeliverOp.LinkMail => (fun _ => TryDeliverOp.LinkMail, retry_cond, None)
+    | DeliverOp.UnlinkTmp => (fun _ => TryDeliverOp.UnlinkTmp, once_cond, None)
+    | DeliverOp.List => (fun _ => TryDeliverOp.List, once_cond, None)
+    | DeliverOp.Read fn => (fun _ => TryDeliverOp.Read fn, once_cond, None)
+    | DeliverOp.Delete fn => (fun _ => TryDeliverOp.Delete fn, once_cond, None)
+    | DeliverOp.Lock => (fun _ => TryDeliverOp.Lock, once_cond, None)
+    | DeliverOp.Unlock => (fun _ => TryDeliverOp.Unlock, once_cond, None)
+    | DeliverOp.Ext extop => (fun _ => TryDeliverOp.Ext extop, once_cond, None)
     end.
 
   Definition compile_ts ts :=
@@ -35,7 +39,7 @@ Module LinkRetryImpl <: LayerImpl TryDeliverAPI DeliverAPI.
     eapply CompileLoop.compile_ts_no_atomics.
   Qed.
 
-  Definition absR (s1 : TryDeliverAPI.State) (s2 : DeliverAPI.State) :=
+  Definition absR (s1 : MailboxTmpAbsState.State) (s2 : MailboxTmpAbsState.State) :=
     s1 = s2.
 
   Ltac step_inv :=
@@ -66,7 +70,7 @@ Module LinkRetryImpl <: LayerImpl TryDeliverAPI DeliverAPI.
   Theorem compile_traces_match :
     forall ts,
       no_atomics_ts ts ->
-      traces_match_abs absR TryDeliverAPI.initP TryDeliverAPI.step DeliverAPI.step (compile_ts ts) ts.
+      traces_match_abs absR MailboxTmpAbsState.initP TryDeliverAPI.step DeliverAPI.step (compile_ts ts) ts.
   Proof.
     unfold traces_match_abs, absR; intros; subst.
     eapply CompileLoop.compile_traces_match_ts; eauto.
@@ -76,9 +80,9 @@ Module LinkRetryImpl <: LayerImpl TryDeliverAPI DeliverAPI.
 
   Theorem absInitP :
     forall s1 s2,
-      TryDeliverAPI.initP s1 ->
+      MailboxTmpAbsState.initP s1 ->
       absR s1 s2 ->
-      DeliverAPI.initP s2.
+      MailboxTmpAbsState.initP s2.
   Proof.
     eauto.
   Qed.

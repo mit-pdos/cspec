@@ -6,19 +6,22 @@ Require Import MailFSStringAPI.
 Require Import MailFSPathAbsAPI.
 
 
-Module MailFSPathAbsImpl <: LayerImpl MailFSPathAbsAPI MailFSStringAPI.
+Module MailFSPathAbsImpl' <:
+  LayerImplAbsT MailFSStringOp
+    MailFSPathAbsState MailFSPathAbsAPI
+    MailFSStringAbsState MailFSStringAPI.
 
-  Definition absR (s1 : MailFSPathAbsAPI.State) (s2 : MailFSStringAPI.State) :=
-    MailFSPathAbsAPI.locked s1 = MailFSStringAbsAPI.locked s2 /\
+  Definition absR (s1 : MailFSPathAbsState.State) (s2 : MailFSStringAbsState.State) :=
+    MailFSPathAbsState.locked s1 = MailFSStringAbsState.locked s2 /\
     forall dirname filename contents,
-      FMap.MapsTo (dirname, filename) contents (MailFSPathAbsAPI.fs s1) <->
-      ( dirname = "tmp"%string /\ FMap.MapsTo filename contents (MailFSStringAbsAPI.tmpdir s2) \/
-        dirname = "mail"%string /\ FMap.MapsTo filename contents (MailFSStringAbsAPI.maildir s2) ).
+      FMap.MapsTo (dirname, filename) contents (MailFSPathAbsState.fs s1) <->
+      ( dirname = "tmp"%string /\ FMap.MapsTo filename contents (MailFSStringAbsState.tmpdir s2) \/
+        dirname = "mail"%string /\ FMap.MapsTo filename contents (MailFSStringAbsState.maildir s2) ).
 
-  Definition compile_ts (ts : @threads_state MailFSStringAPI.opT) := ts.
+  Definition compile_ts (ts : @threads_state MailFSStringOp.opT) := ts.
 
   Theorem compile_ts_no_atomics :
-    forall (ts : @threads_state MailFSStringAPI.opT),
+    forall (ts : @threads_state MailFSStringOp.opT),
       no_atomics_ts ts ->
       no_atomics_ts (compile_ts ts).
   Proof.
@@ -40,10 +43,10 @@ Module MailFSPathAbsImpl <: LayerImpl MailFSPathAbsAPI MailFSStringAPI.
 
   Lemma absR_add_tmp :
     forall fs tmp mail fn data lock lock',
-      absR (MailFSPathAbsAPI.mk_state fs lock)
-           (MailFSStringAbsAPI.mk_state tmp mail lock') ->
-      absR (MailFSPathAbsAPI.mk_state (FMap.add ("tmp"%string, fn) data fs) lock)
-           (MailFSStringAbsAPI.mk_state (FMap.add fn data tmp) mail lock').
+      absR (MailFSPathAbsState.mk_state fs lock)
+           (MailFSStringAbsState.mk_state tmp mail lock') ->
+      absR (MailFSPathAbsState.mk_state (FMap.add ("tmp"%string, fn) data fs) lock)
+           (MailFSStringAbsState.mk_state (FMap.add fn data tmp) mail lock').
   Proof.
     unfold absR; simpl; intuition subst.
     - eapply FMap.mapsto_add_or in H; intuition subst.
@@ -62,10 +65,10 @@ Module MailFSPathAbsImpl <: LayerImpl MailFSPathAbsAPI MailFSStringAPI.
 
   Lemma absR_remove_tmp :
     forall fs tmp mail fn lock lock',
-      absR (MailFSPathAbsAPI.mk_state fs lock)
-           (MailFSStringAbsAPI.mk_state tmp mail lock') ->
-      absR (MailFSPathAbsAPI.mk_state (FMap.remove ("tmp"%string, fn) fs) lock)
-           (MailFSStringAbsAPI.mk_state (FMap.remove fn tmp) mail lock').
+      absR (MailFSPathAbsState.mk_state fs lock)
+           (MailFSStringAbsState.mk_state tmp mail lock') ->
+      absR (MailFSPathAbsState.mk_state (FMap.remove ("tmp"%string, fn) fs) lock)
+           (MailFSStringAbsState.mk_state (FMap.remove fn tmp) mail lock').
   Proof.
     unfold absR; simpl; intuition subst.
     - eapply FMap.mapsto_remove in H; intuition subst.
@@ -87,10 +90,10 @@ Module MailFSPathAbsImpl <: LayerImpl MailFSPathAbsAPI MailFSStringAPI.
 
   Lemma absR_add_mail :
     forall fs tmp mail fn data lock lock',
-      absR (MailFSPathAbsAPI.mk_state fs lock)
-           (MailFSStringAbsAPI.mk_state tmp mail lock') ->
-      absR (MailFSPathAbsAPI.mk_state (FMap.add ("mail"%string, fn) data fs) lock)
-           (MailFSStringAbsAPI.mk_state tmp (FMap.add fn data mail) lock').
+      absR (MailFSPathAbsState.mk_state fs lock)
+           (MailFSStringAbsState.mk_state tmp mail lock') ->
+      absR (MailFSPathAbsState.mk_state (FMap.add ("mail"%string, fn) data fs) lock)
+           (MailFSStringAbsState.mk_state tmp (FMap.add fn data mail) lock').
   Proof.
     unfold absR; simpl; intuition subst.
     - eapply FMap.mapsto_add_or in H; intuition subst.
@@ -109,10 +112,10 @@ Module MailFSPathAbsImpl <: LayerImpl MailFSPathAbsAPI MailFSStringAPI.
 
   Lemma absR_remove_mail :
     forall fs tmp mail fn lock lock',
-      absR (MailFSPathAbsAPI.mk_state fs lock)
-           (MailFSStringAbsAPI.mk_state tmp mail lock') ->
-      absR (MailFSPathAbsAPI.mk_state (FMap.remove ("mail"%string, fn) fs) lock)
-           (MailFSStringAbsAPI.mk_state tmp (FMap.remove fn mail) lock').
+      absR (MailFSPathAbsState.mk_state fs lock)
+           (MailFSStringAbsState.mk_state tmp mail lock') ->
+      absR (MailFSPathAbsState.mk_state (FMap.remove ("mail"%string, fn) fs) lock)
+           (MailFSStringAbsState.mk_state tmp (FMap.remove fn mail) lock').
   Proof.
     unfold absR; simpl; intuition subst.
     - eapply FMap.mapsto_remove in H; intuition subst.
@@ -134,8 +137,8 @@ Module MailFSPathAbsImpl <: LayerImpl MailFSPathAbsAPI MailFSStringAPI.
 
   Lemma absR_in_tmp :
     forall fs tmp mail fn lock lock',
-      absR (MailFSPathAbsAPI.mk_state fs lock)
-           (MailFSStringAbsAPI.mk_state tmp mail lock') ->
+      absR (MailFSPathAbsState.mk_state fs lock)
+           (MailFSStringAbsState.mk_state tmp mail lock') ->
       FMap.In fn tmp ->
       FMap.In ("tmp"%string, fn) fs.
   Proof.
@@ -147,8 +150,8 @@ Module MailFSPathAbsImpl <: LayerImpl MailFSPathAbsAPI MailFSStringAPI.
 
   Lemma absR_mapsto_tmp :
     forall fs tmp mail fn data lock lock',
-      absR (MailFSPathAbsAPI.mk_state fs lock)
-           (MailFSStringAbsAPI.mk_state tmp mail lock') ->
+      absR (MailFSPathAbsState.mk_state fs lock)
+           (MailFSStringAbsState.mk_state tmp mail lock') ->
       FMap.MapsTo ("tmp"%string, fn) data fs ->
       FMap.MapsTo fn data tmp.
   Proof.
@@ -158,8 +161,8 @@ Module MailFSPathAbsImpl <: LayerImpl MailFSPathAbsAPI MailFSStringAPI.
 
   Lemma absR_in_mail :
     forall fs tmp mail fn lock lock',
-      absR (MailFSPathAbsAPI.mk_state fs lock)
-           (MailFSStringAbsAPI.mk_state tmp mail lock') ->
+      absR (MailFSPathAbsState.mk_state fs lock)
+           (MailFSStringAbsState.mk_state tmp mail lock') ->
       FMap.In fn mail ->
       FMap.In ("mail"%string, fn) fs.
   Proof.
@@ -171,8 +174,8 @@ Module MailFSPathAbsImpl <: LayerImpl MailFSPathAbsAPI MailFSStringAPI.
 
   Lemma absR_mapsto_mail :
     forall fs tmp mail fn data lock lock',
-      absR (MailFSPathAbsAPI.mk_state fs lock)
-           (MailFSStringAbsAPI.mk_state tmp mail lock') ->
+      absR (MailFSPathAbsState.mk_state fs lock)
+           (MailFSStringAbsState.mk_state tmp mail lock') ->
       FMap.MapsTo ("mail"%string, fn) data fs ->
       FMap.MapsTo fn data mail.
   Proof.
@@ -182,8 +185,8 @@ Module MailFSPathAbsImpl <: LayerImpl MailFSPathAbsAPI MailFSStringAPI.
 
   Lemma absR_in_mail' :
     forall fs tmp mail fn lock lock',
-      absR (MailFSPathAbsAPI.mk_state fs lock)
-           (MailFSStringAbsAPI.mk_state tmp mail lock') ->
+      absR (MailFSPathAbsState.mk_state fs lock)
+           (MailFSStringAbsState.mk_state tmp mail lock') ->
       FMap.In ("mail"%string, fn) fs ->
       FMap.In fn mail.
   Proof.
@@ -195,8 +198,8 @@ Module MailFSPathAbsImpl <: LayerImpl MailFSPathAbsAPI MailFSStringAPI.
 
   Lemma absR_is_permutation_key :
     forall r fs tmp mail lock lock',
-      absR (MailFSPathAbsAPI.mk_state fs lock)
-           (MailFSStringAbsAPI.mk_state tmp mail lock') ->
+      absR (MailFSPathAbsState.mk_state fs lock)
+           (MailFSStringAbsState.mk_state tmp mail lock') ->
       FMap.is_permutation_key r
         (MailFSPathAbsAPI.drop_dirname
            (MailFSPathAbsAPI.filter_dir "mail" fs)) ->
@@ -231,10 +234,10 @@ Module MailFSPathAbsImpl <: LayerImpl MailFSPathAbsAPI MailFSStringAPI.
 
   Lemma absR_change_lock :
     forall fs tmp mail lock0 lock1 lock2,
-      absR (MailFSPathAbsAPI.mk_state fs lock0)
-           (MailFSStringAbsAPI.mk_state tmp mail lock1) ->
-      absR (MailFSPathAbsAPI.mk_state fs lock2)
-           (MailFSStringAbsAPI.mk_state tmp mail lock2).
+      absR (MailFSPathAbsState.mk_state fs lock0)
+           (MailFSStringAbsState.mk_state tmp mail lock1) ->
+      absR (MailFSPathAbsState.mk_state fs lock2)
+           (MailFSStringAbsState.mk_state tmp mail lock2).
   Proof.
     unfold absR; intuition eauto.
   Qed.
@@ -270,7 +273,7 @@ Module MailFSPathAbsImpl <: LayerImpl MailFSPathAbsAPI MailFSStringAPI.
     forall ts,
       no_atomics_ts ts ->
       traces_match_abs absR
-        MailFSPathAbsAPI.initP
+        MailFSPathAbsState.initP
         MailFSPathAbsAPI.step
         MailFSStringAPI.step (compile_ts ts) ts.
   Proof.
@@ -282,11 +285,17 @@ Module MailFSPathAbsImpl <: LayerImpl MailFSPathAbsAPI MailFSStringAPI.
 
   Theorem absInitP :
     forall s1 s2,
-      MailFSPathAbsAPI.initP s1 ->
+      MailFSPathAbsState.initP s1 ->
       absR s1 s2 ->
-      MailFSStringAPI.initP s2.
+      MailFSStringAbsState.initP s2.
   Proof.
     eauto.
   Qed.
 
-End MailFSPathAbsImpl.
+End MailFSPathAbsImpl'.
+
+Module MailFSPathAbsImpl :=
+ LayerImplAbs MailFSStringOp
+    MailFSPathAbsState MailFSPathAbsAPI
+    MailFSStringAbsState MailFSStringAPI
+    MailFSPathAbsImpl'.

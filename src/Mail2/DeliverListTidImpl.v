@@ -1,11 +1,15 @@
 Require Import POCS.
 Require Import String.
-Require Import MailboxAPI.
+Require Import MailboxTmpAbsAPI.
 Require Import DeliverAPI.
 Require Import DeliverListTidAPI.
 
 
-Module DeliverListTidRestrictedImpl <: LayerImplFollowsRule DeliverListTidRestrictedAPI DeliverAPI LinkMailRule.
+Module DeliverListTidRestrictedImpl <:
+  LayerImplFollowsRule
+    DeliverListTidOp MailboxTmpAbsState DeliverListTidRestrictedAPI
+    DeliverOp MailboxTmpAbsState DeliverAPI
+    LinkMailRule.
 
   Fixpoint nextfn (files : list nat) (r : nat) : nat :=
     match files with
@@ -50,22 +54,22 @@ Module DeliverListTidRestrictedImpl <: LayerImplFollowsRule DeliverListTidRestri
   Qed.
 
   Definition linkmail_core :=
-    files <- Op DeliverListTidAPI.ListTid;
+    files <- Op DeliverListTidOp.ListTid;
     let newname := nextfn files 0 in
-    ok <- Op (DeliverListTidAPI.LinkMail newname);
+    ok <- Op (DeliverListTidOp.LinkMail newname);
     Ret ok.
 
-  Definition compile_op T (op : DeliverAPI.opT T) : proc _ T :=
+  Definition compile_op T (op : DeliverOp.opT T) : proc _ T :=
     match op with
-    | DeliverAPI.CreateWriteTmp data => Op (DeliverListTidAPI.CreateWriteTmp data)
-    | DeliverAPI.LinkMail => linkmail_core
-    | DeliverAPI.UnlinkTmp => Op (DeliverListTidAPI.UnlinkTmp)
-    | DeliverAPI.List => Op (DeliverListTidAPI.List)
-    | DeliverAPI.Read fn => Op (DeliverListTidAPI.Read fn)
-    | DeliverAPI.Delete fn => Op (DeliverListTidAPI.Delete fn)
-    | DeliverAPI.Lock => Op (DeliverListTidAPI.Lock)
-    | DeliverAPI.Unlock => Op (DeliverListTidAPI.Unlock)
-    | DeliverAPI.Ext extop => Op (DeliverListTidAPI.Ext extop)
+    | DeliverOp.CreateWriteTmp data => Op (DeliverListTidOp.CreateWriteTmp data)
+    | DeliverOp.LinkMail => linkmail_core
+    | DeliverOp.UnlinkTmp => Op (DeliverListTidOp.UnlinkTmp)
+    | DeliverOp.List => Op (DeliverListTidOp.List)
+    | DeliverOp.Read fn => Op (DeliverListTidOp.Read fn)
+    | DeliverOp.Delete fn => Op (DeliverListTidOp.Delete fn)
+    | DeliverOp.Lock => Op (DeliverListTidOp.Lock)
+    | DeliverOp.Unlock => Op (DeliverListTidOp.Unlock)
+    | DeliverOp.Ext extop => Op (DeliverListTidOp.Ext extop)
     end.
 
   Ltac step_inv :=
@@ -88,7 +92,7 @@ Module DeliverListTidRestrictedImpl <: LayerImplFollowsRule DeliverListTidRestri
   Lemma listtid_right_mover :
     right_mover
       DeliverListTidRestrictedAPI.step
-      (DeliverListTidAPI.ListTid).
+      (DeliverListTidOp.ListTid).
   Proof.
     unfold right_mover; intros.
     repeat step_inv; eauto 10.
@@ -115,8 +119,8 @@ Module DeliverListTidRestrictedImpl <: LayerImplFollowsRule DeliverListTidRestri
 
   Theorem linkmail_atomic : forall `(rx : _ -> proc _ T),
     trace_incl DeliverListTidRestrictedAPI.step
-      (Bind (compile_op (DeliverAPI.LinkMail)) rx)
-      (Bind (atomize compile_op (DeliverAPI.LinkMail)) rx).
+      (Bind (compile_op (DeliverOp.LinkMail)) rx)
+      (Bind (atomize compile_op (DeliverOp.LinkMail)) rx).
   Proof.
     intros.
     eapply trace_incl_atomize_ysa.
@@ -156,7 +160,7 @@ Module DeliverListTidRestrictedImpl <: LayerImplFollowsRule DeliverListTidRestri
     eapply Compile.compile_traces_match_ts; eauto.
   Qed.
 
-  Definition absR (s1 : DeliverListTidRestrictedAPI.State) (s2 : DeliverAPI.State) :=
+  Definition absR (s1 : MailboxTmpAbsState.State) (s2 : MailboxTmpAbsState.State) :=
     s1 = s2.
 
   Definition compile_ts := Compile.compile_ts compile_op.
@@ -174,7 +178,7 @@ Module DeliverListTidRestrictedImpl <: LayerImplFollowsRule DeliverListTidRestri
     forall ts2,
       no_atomics_ts ts2 ->
       traces_match_abs absR
-        DeliverListTidRestrictedAPI.initP
+        MailboxTmpAbsState.initP
         DeliverListTidRestrictedAPI.step
         DeliverAPI.step (compile_ts ts2) ts2.
   Proof.
@@ -186,9 +190,9 @@ Module DeliverListTidRestrictedImpl <: LayerImplFollowsRule DeliverListTidRestri
 
   Theorem absInitP :
     forall s1 s2,
-      DeliverListTidRestrictedAPI.initP s1 ->
+      MailboxTmpAbsState.initP s1 ->
       absR s1 s2 ->
-      DeliverAPI.initP s2.
+      MailboxTmpAbsState.initP s2.
   Proof.
     eauto.
   Qed.
@@ -239,11 +243,15 @@ Module DeliverListTidRestrictedImpl <: LayerImplFollowsRule DeliverListTidRestri
 End DeliverListTidRestrictedImpl.
 
 
-Module DeliverListTidImpl' <: LayerImplRequiresRule DeliverListTidAPI DeliverListTidRestrictedAPI LinkMailRule.
+Module DeliverListTidImpl' <:
+  LayerImplRequiresRule
+    DeliverListTidOp MailboxTmpAbsState DeliverListTidAPI
+    DeliverListTidOp MailboxTmpAbsState DeliverListTidRestrictedAPI
+    LinkMailRule.
 
   Import LinkMailRule.
 
-  Definition absR (s1 : DeliverListTidAPI.State) (s2 : DeliverListTidRestrictedAPI.State) :=
+  Definition absR (s1 : MailboxTmpAbsState.State) (s2 : MailboxTmpAbsState.State) :=
     s1 = s2.
 
   Ltac step_inv :=
@@ -257,7 +265,7 @@ Module DeliverListTidImpl' <: LayerImplRequiresRule DeliverListTidAPI DeliverLis
     end.
 
   Theorem allowed_stable :
-    forall `(op : DeliverListTidRestrictedAPI.opT T) `(op' : DeliverListTidRestrictedAPI.opT T') tid tid' s s' r evs,
+    forall `(op : DeliverListTidOp.opT T) `(op' : DeliverListTidOp.opT T') tid tid' s s' r evs,
       tid <> tid' ->
       DeliverListTidRestrictedAPI.step_allow op tid s ->
       DeliverListTidRestrictedAPI.step op' tid' s r s' evs ->
@@ -275,7 +283,7 @@ Module DeliverListTidImpl' <: LayerImplRequiresRule DeliverListTidAPI DeliverLis
   Qed.
 
 
-  Definition compile_ts (ts : @threads_state DeliverListTidRestrictedAPI.opT) := ts.
+  Definition compile_ts (ts : @threads_state DeliverListTidOp.opT) := ts.
 
   Theorem compile_ts_no_atomics :
     forall ts,
@@ -287,9 +295,9 @@ Module DeliverListTidImpl' <: LayerImplRequiresRule DeliverListTidAPI DeliverLis
 
   Theorem absInitP :
     forall s1 s2,
-      DeliverListTidAPI.initP s1 ->
+      MailboxTmpAbsState.initP s1 ->
       absR s1 s2 ->
-      DeliverListTidRestrictedAPI.initP s2.
+      MailboxTmpAbsState.initP s2.
   Proof.
     eauto.
   Qed.
@@ -299,7 +307,7 @@ Module DeliverListTidImpl' <: LayerImplRequiresRule DeliverListTidAPI DeliverLis
       follows_protocol ts ->
       no_atomics_ts ts ->
       traces_match_abs absR
-        DeliverListTidAPI.initP
+        MailboxTmpAbsState.initP
         DeliverListTidAPI.step
         DeliverListTidRestrictedAPI.step (compile_ts ts) ts.
   Proof.
@@ -329,5 +337,8 @@ End DeliverListTidImpl'.
 
 
 Module DeliverListTidImpl :=
-  LinkWithRule DeliverListTidAPI DeliverListTidRestrictedAPI DeliverAPI LinkMailRule
-               DeliverListTidImpl' DeliverListTidRestrictedImpl.
+  LinkWithRule
+    DeliverListTidOp MailboxTmpAbsState DeliverListTidAPI
+    DeliverListTidOp MailboxTmpAbsState DeliverListTidRestrictedAPI
+    DeliverOp MailboxTmpAbsState DeliverAPI
+    LinkMailRule DeliverListTidImpl' DeliverListTidRestrictedImpl.

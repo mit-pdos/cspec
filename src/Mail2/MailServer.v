@@ -3,6 +3,8 @@ Require Import String.
 
 Require Import MailServerAPI.
 
+Require Import MailServerHAPI.
+
 Require Import MailServerLockAbsAPI.
 Require Import MailServerLockAbsImpl.
 
@@ -40,6 +42,10 @@ Require Import TryDeliverImpl.
 
 
 Import MailServerAPI.
+
+
+Print MailServerHAPI.opT.
+
 
 Definition do_smtp_req : proc opT unit :=
   conn <- Op (Ext AcceptSMTP);

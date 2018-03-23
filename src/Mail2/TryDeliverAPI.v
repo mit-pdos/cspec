@@ -1,14 +1,13 @@
 Require Import POCS.
 Require Import String.
 Require Import MailServerAPI.
+Require Import MailFSStringAbsAPI.
 Require Import MailboxTmpAbsAPI.
 
+Module TryDeliverOp <: Ops.
 
-Module TryDeliverAPI <: Layer.
-
-  Import MailServerAPI.
-  Import MailboxTmpAbsAPI.
-
+  Definition extopT := MailServerAPI.MailServerOp.extopT.
+  
   Inductive xopT : Type -> Type :=
   | CreateWriteTmp : forall (data : string), xopT bool
   | LinkMail : xopT bool
@@ -24,8 +23,13 @@ Module TryDeliverAPI <: Layer.
   .
 
   Definition opT := xopT.
-  Definition State := MailboxTmpAbsAPI.State.
-  Definition initP (s : State) := True.
+
+End TryDeliverOp.
+
+Module TryDeliverAPI <: Layer TryDeliverOp MailboxTmpAbsState.
+
+  Import TryDeliverOp.
+  Import MailboxTmpAbsState.
 
   Inductive xstep : forall T, opT T -> nat -> State -> T -> State -> list event -> Prop :=
   | StepCreateWriteTmpOK : forall tmp mbox tid data lock,

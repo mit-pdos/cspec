@@ -2,20 +2,25 @@ Require Import POCS.
 Require Import String.
 Require Import MailServerAPI.
 
+Module MailServerLockAbsState <: State.
 
-Module MailServerLockAbsAPI <: Layer.
-
-  Import MailServerAPI.
-
+  Definition dir_contents := FMap.t (nat*nat) string.
+  
   Record state_rec := mk_state {
-    maildir : dir_contents;
+    maildir : MailServerState.dir_contents;
     locked : option nat;
   }.
 
-  Definition opT := opT.
   Definition State := state_rec.
   Definition initP (s : State) := True.
+  
+End MailServerLockAbsState.
 
+Module MailServerLockAbsAPI <: Layer MailServerOp MailServerLockAbsState.
+
+  Import MailServerOp.
+  Import MailServerLockAbsState.
+  
   Inductive xstep : forall T, opT T -> nat -> State -> T -> State -> list event -> Prop :=
   | StepDeliverOK : forall m mbox fn tid lock,
     ~ FMap.In fn mbox ->

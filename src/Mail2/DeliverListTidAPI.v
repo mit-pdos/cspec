@@ -4,13 +4,10 @@ Require Import MailServerAPI.
 Require Import MailboxTmpAbsAPI.
 Require Import DeliverAPI.
 
+Module DeliverListTidOp <: Ops.
 
-Module DeliverListTidAPI <: Layer.
-
-  Import MailServerAPI.
-  Import DeliverAPI.
-  Import MailboxTmpAbsAPI.
-
+  Definition extopT := MailServerAPI.MailServerOp.extopT.
+  
   Inductive xopT : Type -> Type :=
   | CreateWriteTmp : forall (data : string), xopT bool
   | LinkMail : forall (mboxfn : nat), xopT bool
@@ -27,8 +24,13 @@ Module DeliverListTidAPI <: Layer.
   .
 
   Definition opT := xopT.
-  Definition State := DeliverAPI.State.
-  Definition initP (s : State) := True.
+
+End DeliverListTidOp.
+
+Module DeliverListTidAPI <: Layer DeliverListTidOp MailboxTmpAbsState.
+
+  Import DeliverListTidOp.
+  Import MailboxTmpAbsState.
 
   Inductive xstep : forall T, opT T -> nat -> State -> T -> State -> list event -> Prop :=
   | StepCreateWriteTmp : forall tmp mbox tid data lock,
@@ -134,14 +136,10 @@ Module DeliverListTidAPI <: Layer.
 End DeliverListTidAPI.
 
 
-Module DeliverListTidRestrictedAPI <: Layer.
+Module DeliverListTidRestrictedAPI <: Layer DeliverListTidOp MailboxTmpAbsState.
 
-  Import DeliverListTidAPI.
-  Import MailboxTmpAbsAPI.
-
-  Definition opT := DeliverListTidAPI.opT.
-  Definition State := DeliverListTidAPI.State.
-  Definition initP (s : State) := True.
+  Import DeliverListTidOp.
+  Import MailboxTmpAbsState.
 
   Inductive step_allow : forall T, opT T -> nat -> State -> Prop :=
   | AllowCreateWriteTmp : forall tid s data,
@@ -172,10 +170,9 @@ Module DeliverListTidRestrictedAPI <: Layer.
 
 End DeliverListTidRestrictedAPI.
 
+Module LinkMailRule <: ProcRule DeliverListTidOp.
 
-Module LinkMailRule <: ProcRule DeliverListTidAPI.
-
-  Definition follows_protocol (ts : @threads_state DeliverListTidAPI.opT) :=
+  Definition follows_protocol (ts : @threads_state DeliverListTidOp.opT) :=
     forall s,
       follows_protocol_s DeliverListTidAPI.step DeliverListTidRestrictedAPI.step_allow ts s.
 

@@ -6,21 +6,24 @@ Require Import MailServerAPI.
 Require Import MailboxTmpAbsAPI.
 
 
-Module MailFSStringAbsImpl <: LayerImpl MailFSStringAbsAPI MailFSAPI.
+Module MailFSStringAbsImpl' <:
+  LayerImplAbsT MailFSOp
+    MailFSStringAbsState MailFSStringAbsAPI
+    MailboxTmpAbsState MailFSAPI.
 
-  Definition dirR (d1 : MailFSStringAbsAPI.dir_contents)
-                  (d2 : MailServerAPI.dir_contents) : Prop :=
+  Definition dirR (d1 : MailFSStringAbsState.dir_contents)
+                  (d2 : MailServerState.dir_contents) : Prop :=
     d1 = FMap.map_keys (fun '(tid, fn) => encode_tid_fn tid fn) d2.
 
-  Definition absR (s1 : MailFSStringAbsAPI.State) (s2 : MailFSAPI.State) :=
-    dirR (MailFSStringAbsAPI.maildir s1) (MailboxTmpAbsAPI.maildir s2) /\
-    dirR (MailFSStringAbsAPI.tmpdir  s1) (MailboxTmpAbsAPI.tmpdir  s2) /\
-    MailFSStringAbsAPI.locked s1 = MailboxTmpAbsAPI.locked s2.
+  Definition absR (s1 : MailFSStringAbsState.State) (s2 : MailboxTmpAbsState.State) :=
+    dirR (MailFSStringAbsState.maildir s1) (MailboxTmpAbsState.maildir s2) /\
+    dirR (MailFSStringAbsState.tmpdir  s1) (MailboxTmpAbsState.tmpdir  s2) /\
+    MailFSStringAbsState.locked s1 = MailboxTmpAbsState.locked s2.
 
-  Definition compile_ts (ts : @threads_state MailFSAPI.opT) := ts.
+  Definition compile_ts (ts : @threads_state MailFSOp.opT) := ts.
 
   Theorem compile_ts_no_atomics :
-    forall (ts : @threads_state MailFSAPI.opT),
+    forall (ts : @threads_state MailFSOp.opT),
       no_atomics_ts ts ->
       no_atomics_ts (compile_ts ts).
   Proof.
@@ -144,7 +147,7 @@ Module MailFSStringAbsImpl <: LayerImpl MailFSStringAbsAPI MailFSAPI.
     forall ts,
       no_atomics_ts ts ->
       traces_match_abs absR
-        MailFSStringAbsAPI.initP
+        MailFSStringAbsState.initP
         MailFSStringAbsAPI.step
         MailFSAPI.step (compile_ts ts) ts.
   Proof.
@@ -156,11 +159,17 @@ Module MailFSStringAbsImpl <: LayerImpl MailFSStringAbsAPI MailFSAPI.
 
   Theorem absInitP :
     forall s1 s2,
-      MailFSStringAbsAPI.initP s1 ->
+      MailFSStringAbsState.initP s1 ->
       absR s1 s2 ->
-      MailFSAPI.initP s2.
+      MailboxTmpAbsState.initP s2.
   Proof.
     eauto.
   Qed.
 
-End MailFSStringAbsImpl.
+End MailFSStringAbsImpl'.
+
+Module MailFSStringAbsImpl :=
+  LayerImplAbs MailFSOp
+    MailFSStringAbsState MailFSStringAbsAPI
+    MailboxTmpAbsState MailFSAPI
+    MailFSStringAbsImpl'.

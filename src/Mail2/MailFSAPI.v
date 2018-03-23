@@ -4,12 +4,10 @@ Require Import MailServerAPI.
 Require Import MailboxTmpAbsAPI.
 Require Import DeliverAPI.
 
+Module MailFSOp <: Ops.
 
-Module MailFSAPI <: Layer.
-
-  Import MailServerAPI.
-  Import MailboxTmpAbsAPI.
-
+  Definition extopT := MailServerAPI.MailServerOp.extopT.
+  
   Inductive xopT : Type -> Type :=
   | CreateWriteTmp : forall (data : string), xopT bool
   | LinkMail : forall (mboxfn : nat), xopT bool
@@ -28,8 +26,14 @@ Module MailFSAPI <: Layer.
   .
 
   Definition opT := xopT.
-  Definition State := DeliverAPI.State.
-  Definition initP (s : State) := True.
+
+End MailFSOp.
+  
+
+Module MailFSAPI <: Layer MailFSOp MailboxTmpAbsState.
+
+  Import MailFSOp.
+  Import MailboxTmpAbsState.
 
   Inductive xstep : forall T, opT T -> nat -> State -> T -> State -> list event -> Prop :=
   | StepCreateWriteTmpOk : forall tmp mbox tid data lock,

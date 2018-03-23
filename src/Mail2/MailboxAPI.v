@@ -3,12 +3,10 @@ Require Import String.
 Require Import MailServerAPI.
 Require Import MailServerLockAbsAPI.
 
+Module MailboxOp <: Ops.
 
-Module MailboxAPI <: Layer.
-
-  Import MailServerAPI.
-  Import MailServerLockAbsAPI.
-
+  Definition extopT := MailServerAPI.MailServerOp.extopT.
+    
   Inductive xopT : Type -> Type :=
   | Deliver : forall (m : string), xopT bool
   | List : xopT (list (nat*nat))
@@ -20,8 +18,13 @@ Module MailboxAPI <: Layer.
   .
 
   Definition opT := xopT.
-  Definition State := MailServerLockAbsAPI.State.
-  Definition initP (s : State) := True.
+
+End MailboxOp.
+
+Module MailboxAPI <: Layer MailboxOp MailServerLockAbsState.
+
+  Import MailboxOp.
+  Import MailServerLockAbsState.
 
   Inductive xstep : forall T, opT T -> nat -> State -> T -> State -> list event -> Prop :=
   | StepDeliverOK : forall m mbox tid fn lock,
@@ -80,7 +83,7 @@ Module MailboxAPI <: Layer.
       (mk_state mbox None)
       nil
 
-  | StepExt : forall s tid `(extop : _ T) r,
+  | StepExt : forall s tid `(extop : extopT T) r,
     xstep (Ext extop) tid
       s
       r
@@ -93,14 +96,10 @@ Module MailboxAPI <: Layer.
 End MailboxAPI.
 
 
-Module MailboxRestrictedAPI <: Layer.
+Module MailboxRestrictedAPI <: Layer MailboxOp MailServerLockAbsState.
 
-  Import MailboxAPI.
-  Import MailServerLockAbsAPI.
-
-  Definition opT := MailboxAPI.opT.
-  Definition State := MailboxAPI.State.
-  Definition initP := MailboxAPI.initP.
+  Import MailboxOp.
+  Import MailServerLockAbsState.
 
   Inductive step_allow : forall T, opT T -> nat -> State -> Prop :=
   | AllowDeliver : forall m tid s,
@@ -128,9 +127,11 @@ Module MailboxRestrictedAPI <: Layer.
 End MailboxRestrictedAPI.
 
 
-Module MailboxLockingRule <: ProcRule MailboxAPI.
+Module MailboxLockingRule <: ProcRule MailboxOp.
 
-  Definition follows_protocol (ts : @threads_state MailboxAPI.opT) :=
+  Import MailboxOp.
+
+  Definition follows_protocol (ts : @threads_state opT) :=
     forall s,
       follows_protocol_s MailboxAPI.step MailboxRestrictedAPI.step_allow ts s.
 

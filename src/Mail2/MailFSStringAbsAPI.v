@@ -32,13 +32,7 @@ Qed.
 
 Hint Resolve encode_tid_fn_injective.
 
-
-Module MailFSStringAbsAPI <: Layer.
-
-  Import MailServerAPI.
-  Import MailFSAPI.
-
-  Definition opT := MailFSAPI.opT.
+Module MailFSStringAbsState <: State.
 
   Definition dir_contents := FMap.t string string.
 
@@ -50,6 +44,13 @@ Module MailFSStringAbsAPI <: Layer.
 
   Definition State := state_rec.
   Definition initP (s : State) := True.
+
+End MailFSStringAbsState.
+
+Module MailFSStringAbsAPI <: Layer MailFSOp MailFSStringAbsState.
+
+  Import MailFSOp.
+  Import MailFSStringAbsState.
 
   Inductive xstep : forall T, opT T -> nat -> State -> T -> State -> list event -> Prop :=
   | StepCreateWriteTmpOK : forall tmp mbox tid data lock,

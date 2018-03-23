@@ -4,21 +4,16 @@ Require Import MailboxTmpAbsAPI.
 Require Import MailServerLockAbsAPI.
 
 
-Module MailboxTmpAbs <: LayerImpl MailboxTmpAbsAPI MailboxAPI.
+Module MailboxTmpAbs' <:
+  LayerImplAbsT MailboxOp
+    MailboxTmpAbsState MailboxTmpAbsAPI
+    MailServerLockAbsState MailboxAPI.
 
-  Definition absR (s1 : MailboxTmpAbsAPI.State) (s2 : MailboxAPI.State) :=
-    MailboxTmpAbsAPI.maildir s1 = MailServerLockAbsAPI.maildir s2 /\
-    (MailboxTmpAbsAPI.locked s1 = false <-> MailServerLockAbsAPI.locked s2 = None).
+  Import MailboxTmpAbsState.
 
-  Definition compile_ts (ts : @threads_state MailboxAPI.opT) := ts.
-
-  Theorem compile_ts_no_atomics :
-    forall (ts : @threads_state MailboxAPI.opT),
-      no_atomics_ts ts ->
-      no_atomics_ts (compile_ts ts).
-  Proof.
-    unfold compile_ts; eauto.
-  Qed.
+  Definition absR (s1 : MailboxTmpAbsState.State) (s2 : MailServerLockAbsState.State) :=
+    MailboxTmpAbsState.maildir s1 = MailServerLockAbsState.maildir s2 /\
+    (MailboxTmpAbsState.locked s1 = false <-> MailServerLockAbsState.locked s2 = None).
 
   Hint Extern 1 (MailboxAPI.step _ _ _ _ _ _) => econstructor.
 
@@ -35,7 +30,7 @@ Module MailboxTmpAbs <: LayerImpl MailboxTmpAbsAPI MailboxAPI.
     all: eexists; split; [ | eauto ].
     all: simpl.
     all: try intuition congruence.
-    all: try ( destruct locked0; try intuition congruence ).
+    all: try ( destruct locked1; try intuition congruence ).
     all: eauto.
     simpl.
     intuition congruence.
@@ -43,27 +38,19 @@ Module MailboxTmpAbs <: LayerImpl MailboxTmpAbsAPI MailboxAPI.
 
   Hint Resolve absR_ok.
 
-  Theorem compile_traces_match :
-    forall ts,
-      no_atomics_ts ts ->
-      traces_match_abs absR
-        MailboxTmpAbsAPI.initP
-        MailboxTmpAbsAPI.step
-        MailboxAPI.step (compile_ts ts) ts.
-  Proof.
-    unfold compile_ts, traces_match_abs; intros.
-    eexists; intuition idtac.
-    eapply trace_incl_abs; eauto.
-    eauto.
-  Qed.
-
   Theorem absInitP :
     forall s1 s2,
-      MailboxTmpAbsAPI.initP s1 ->
+      MailboxTmpAbsState.initP s1 ->
       absR s1 s2 ->
-      MailboxAPI.initP s2.
+      MailServerLockAbsState.initP s2.
   Proof.
     eauto.
   Qed.
 
-End MailboxTmpAbs.
+End MailboxTmpAbs'.
+
+Module MailboxTmpAbsImpl :=
+  LayerImplAbs MailboxOp
+   MailboxTmpAbsState MailboxTmpAbsAPI
+   MailServerLockAbsState MailboxAPI
+   MailboxTmpAbs'.

@@ -6,21 +6,24 @@ Require Import MailFSPathAbsAPI.
 Require Import MailFSPathAPI.
 
 
-Module MailFSPathImpl <: LayerImpl MailFSPathAPI MailFSPathAbsAPI.
+Module MailFSPathImpl <:
+  LayerImpl
+    MailFSPathOp MailFSPathAbsState MailFSPathAPI
+    MailFSStringOp MailFSPathAbsState MailFSPathAbsAPI.
 
-  Definition compile_op T (op : MailFSPathAbsAPI.opT T) : proc _ T :=
+  Definition compile_op T (op : MailFSStringOp.opT T) : proc _ T :=
     match op with
-    | MailFSStringAPI.LinkMail tmpfn mailfn => Op (MailFSPathAPI.Link ("tmp"%string, tmpfn) ("mail"%string, mailfn))
-    | MailFSStringAPI.List => Op (MailFSPathAPI.List "mail"%string)
-    | MailFSStringAPI.Read fn => Op (MailFSPathAPI.Read ("mail"%string, fn))
-    | MailFSStringAPI.Delete fn => Op (MailFSPathAPI.Unlink ("mail"%string, fn))
-    | MailFSStringAPI.CreateWriteTmp tmpfn data => Op (MailFSPathAPI.CreateWrite ("tmp"%string, tmpfn) data)
-    | MailFSStringAPI.UnlinkTmp tmpfn => Op (MailFSPathAPI.Unlink ("tmp"%string, tmpfn))
-    | MailFSStringAPI.Ext extop => Op (MailFSPathAPI.Ext extop)
-    | MailFSStringAPI.Lock => Op (MailFSPathAPI.Lock)
-    | MailFSStringAPI.Unlock => Op (MailFSPathAPI.Unlock)
-    | MailFSStringAPI.GetTID => Op (MailFSPathAPI.GetTID)
-    | MailFSStringAPI.Random => Op (MailFSPathAPI.Random)
+    | MailFSStringOp.LinkMail tmpfn mailfn => Op (MailFSPathOp.Link ("tmp"%string, tmpfn) ("mail"%string, mailfn))
+    | MailFSStringOp.List => Op (MailFSPathOp.List "mail"%string)
+    | MailFSStringOp.Read fn => Op (MailFSPathOp.Read ("mail"%string, fn))
+    | MailFSStringOp.Delete fn => Op (MailFSPathOp.Unlink ("mail"%string, fn))
+    | MailFSStringOp.CreateWriteTmp tmpfn data => Op (MailFSPathOp.CreateWrite ("tmp"%string, tmpfn) data)
+    | MailFSStringOp.UnlinkTmp tmpfn => Op (MailFSPathOp.Unlink ("tmp"%string, tmpfn))
+    | MailFSStringOp.Ext extop => Op (MailFSPathOp.Ext extop)
+    | MailFSStringOp.Lock => Op (MailFSPathOp.Lock)
+    | MailFSStringOp.Unlock => Op (MailFSPathOp.Unlock)
+    | MailFSStringOp.GetTID => Op (MailFSPathOp.GetTID)
+    | MailFSStringOp.Random => Op (MailFSPathOp.Random)
     end.
 
   Ltac step_inv :=
@@ -62,7 +65,7 @@ Module MailFSPathImpl <: LayerImpl MailFSPathAPI MailFSPathAbsAPI.
     eapply Compile.compile_traces_match_ts; eauto.
   Qed.
 
-  Definition absR (s1 : MailFSPathAPI.State) (s2 : MailFSPathAbsAPI.State) :=
+  Definition absR (s1 : MailFSPathAbsState.State) (s2 : MailFSPathAbsState.State) :=
     s1 = s2.
 
   Definition compile_ts := Compile.compile_ts compile_op.
@@ -80,7 +83,7 @@ Module MailFSPathImpl <: LayerImpl MailFSPathAPI MailFSPathAbsAPI.
     forall ts2,
       no_atomics_ts ts2 ->
       traces_match_abs absR
-        MailFSPathAPI.initP
+        MailFSPathAbsState.initP
         MailFSPathAPI.step
         MailFSPathAbsAPI.step (compile_ts ts2) ts2.
   Proof.
@@ -92,9 +95,9 @@ Module MailFSPathImpl <: LayerImpl MailFSPathAPI MailFSPathAbsAPI.
 
   Theorem absInitP :
     forall s1 s2,
-      MailFSPathAPI.initP s1 ->
+      MailFSPathAbsState.initP s1 ->
       absR s1 s2 ->
-      MailFSPathAbsAPI.initP s2.
+      MailFSPathAbsState.initP s2.
   Proof.
     eauto.
   Qed.

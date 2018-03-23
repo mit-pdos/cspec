@@ -3,14 +3,8 @@ Require Import String.
 Require Import MailServerAPI.
 Require Import MailFSStringAPI.
 
-
-Module MailFSPathAbsAPI <: Layer.
-
-  Import MailServerAPI.
-  Import MailFSStringAPI.
-
-  Definition opT := MailFSStringAPI.xopT.
-
+Module MailFSPathAbsState <: State.
+  
   Definition fs_contents := FMap.t (string * string) string.
 
   Record state_rec := mk_state {
@@ -20,6 +14,13 @@ Module MailFSPathAbsAPI <: Layer.
 
   Definition State := state_rec.
   Definition initP (s : State) := True.
+
+End MailFSPathAbsState.
+
+Module MailFSPathAbsAPI <: Layer MailFSStringOp MailFSPathAbsState.
+
+  Import MailFSStringOp.
+  Import MailFSPathAbsState.
 
   Definition filter_dir (dirname : string) (fs : fs_contents) :=
     FMap.filter (fun '(dn, fn) => if string_dec dn dirname then true else false) fs.
