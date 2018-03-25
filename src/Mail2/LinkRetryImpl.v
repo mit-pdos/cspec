@@ -7,10 +7,11 @@ Require Import DeliverAPI.
 Require Import TryDeliverAPI.
 
 
-Module LinkRetryImpl <:
-  LayerImpl
-    TryDeliverOp MailboxTmpAbsState TryDeliverAPI
-    DeliverOp  MailboxTmpAbsState DeliverAPI.
+Module LinkRetryImpl' <:
+  LayerImplLoopT
+    MailboxTmpAbsState
+    TryDeliverOp TryDeliverAPI
+    DeliverOp DeliverAPI.
 
   Definition retry_cond (r : bool) := r.
   Definition once_cond {T} (r : T) := true.
@@ -27,20 +28,6 @@ Module LinkRetryImpl <:
     | DeliverOp.Unlock => (fun _ => TryDeliverOp.Unlock, once_cond, None)
     | DeliverOp.Ext extop => (fun _ => TryDeliverOp.Ext extop, once_cond, None)
     end.
-
-  Definition compile_ts ts :=
-    CompileLoop.compile_ts compile_op ts.
-
-  Theorem compile_ts_no_atomics :
-    forall ts,
-      no_atomics_ts ts ->
-      no_atomics_ts (compile_ts ts).
-  Proof.
-    eapply CompileLoop.compile_ts_no_atomics.
-  Qed.
-
-  Definition absR (s1 : MailboxTmpAbsState.State) (s2 : MailboxTmpAbsState.State) :=
-    s1 = s2.
 
   Ltac step_inv :=
     match goal with
@@ -67,24 +54,10 @@ Module LinkRetryImpl <:
     destruct opM; simpl; intros; pair_inv; step_inv; eauto.
   Qed.
 
-  Theorem compile_traces_match :
-    forall ts,
-      no_atomics_ts ts ->
-      traces_match_abs absR MailboxTmpAbsState.initP TryDeliverAPI.step DeliverAPI.step (compile_ts ts) ts.
-  Proof.
-    unfold traces_match_abs, absR; intros; subst.
-    eapply CompileLoop.compile_traces_match_ts; eauto.
-    eapply noop_or_success.
-    eapply CompileLoop.compile_ts_ok; eauto.
-  Qed.
+End LinkRetryImpl'.
 
-  Theorem absInitP :
-    forall s1 s2,
-      MailboxTmpAbsState.initP s1 ->
-      absR s1 s2 ->
-      MailboxTmpAbsState.initP s2.
-  Proof.
-    eauto.
-  Qed.
-
-End LinkRetryImpl.
+Module LinkRetryImpl :=
+  LayerImplLoop
+    MailboxTmpAbsState
+    TryDeliverOp TryDeliverAPI
+    DeliverOp DeliverAPI.
