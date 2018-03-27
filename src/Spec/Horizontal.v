@@ -555,8 +555,12 @@ Module LayerImplMoversProtocolHT
     no_atomics (compile_op op).
   Proof.
     destruct op; simpl.
-    admit.
-  Admitted.
+    pose proof (a.compile_op_no_atomics op).
+    generalize dependent H.
+    generalize (a.compile_op op).
+    clear.
+    induction 1; simpl; eauto.
+  Qed.
 
   Theorem ysa_movers : forall T (op : ho2.opT T),
     ysa_movers hl1.step (compile_op op).
@@ -566,16 +570,31 @@ Module LayerImplMoversProtocolHT
     eapply a.ysa_movers.
   Qed.
 
+  Lemma atomic_exec_horizStep : forall `(p : proc _ T) i tid S v S' evs,
+    atomic_exec hl1.step (SliceProc i p) tid S v S' evs ->
+      exists s s',
+        FMap.MapsTo i s S /\
+        S' = FMap.add i s' S /\
+        atomic_exec l1.step p tid s v s' evs.
+  Proof.
+    (* NOT ACTUALLY TRUE: SLICE MIGHT NOT EXIST *)
+  Admitted.
+
   Theorem compile_correct :
     compile_correct compile_op hl1.step hl2.step.
   Proof.
-    admit.
-  Admitted.
+    intro; intros.
+    destruct op; simpl in *.
+    eapply atomic_exec_horizStep in H; repeat deex.
+    eapply a.compile_correct in H1.
+    econstructor; eauto.
+  Qed.
 
   Theorem op_follows_protocol : forall tid s `(op : ho2.opT T),
     follows_protocol_proc hl1raw.step hp.step_allow tid s (compile_op op).
   Proof.
-    admit.
+    destruct op; simpl.
+    pose proof (a.op_follows_protocol).
   Admitted.
 
   Theorem allowed_stable :
@@ -585,13 +604,34 @@ Module LayerImplMoversProtocolHT
       hl1.step op' tid' s r s' evs ->
       hp.step_allow op tid s'.
   Proof.
-    admit.
-  Admitted.
+    destruct op, op'.
+    intros.
+    inversion H0; clear H0; intuition idtac.
+    inversion H1; clear H1; subst; repeat sigT_eq.
+    pose (i.indexCmp).
+    destruct (i == i0); subst.
+    - replace s0 with x in * by ( eapply FMap.mapsto_unique; eauto ).
+      econstructor; split.
+      eapply FMap.add_mapsto.
+      eapply a.allowed_stable; eauto.
+    - econstructor; split.
+      eapply FMap.mapsto_add_ne'; eauto.
+      eauto.
+  Qed.
 
   Theorem raw_step_ok :
     forall `(op : ho1.opT T) tid s r s' evs,
       restricted_step hl1raw.step hp.step_allow op tid s r s' evs ->
       hl1.step op tid s r s' evs.
-  Admitted.
+  Proof.
+    destruct op.
+    unfold restricted_step; intuition idtac.
+    inversion H0; clear H0; intuition idtac.
+    inversion H1; clear H1; subst; repeat sigT_eq.
+    eapply FMap.mapsto_unique in H0 as H0'; eauto; subst.
+    econstructor; eauto.
+    eapply a.raw_step_ok.
+    constructor; eauto.
+  Qed.
 
 End LayerImplMoversProtocolHT.
