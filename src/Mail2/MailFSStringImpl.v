@@ -90,9 +90,9 @@ Module MailFSStringImpl' <:
   Theorem ysa_movers_list_core:
     ysa_movers MailFSStringAPI.step list_core.
   Proof.
-    econstructor; eauto 20.
-    (* XXX Ret returns Galina expression? *)
-  Admitted.
+    unfold list_core, ysa_movers.
+    eauto 20.
+  Qed.
 
   Hint Resolve ysa_movers_list_core.
 
