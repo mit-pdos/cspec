@@ -540,7 +540,11 @@ Section YSA.
             exec_any op_step tid s (Op op) r s0 /\
             exec_others op_step tid s0 s')
         (rx r)) ->
-    at_most_one_non_mover P (Bind (Op op) rx).
+    at_most_one_non_mover P (Bind (Op op) rx)
+  | OneFinalNonMover :
+    forall `(op : opT T),
+    at_most_one_non_mover P (Op op)
+  .
 
   Inductive right_movers (P : nat -> State -> Prop) : forall T, proc opT T -> Prop :=
   | RightMoversOne :
@@ -596,6 +600,7 @@ Section YSA.
       eapply left_movers_impl; eauto.
       intros; repeat deex.
       eauto 10.
+    - eapply OneFinalNonMover.
   Qed.
 
   Theorem right_movers_impl :
@@ -758,8 +763,19 @@ Section YSA.
 
       eauto.
 
+    - rewrite trace_incl_op.
+      reflexivity.
+
   Grab Existential Variables.
     all: exact tt.
+  Qed.
+
+  Lemma ysa_movers_right_movers :
+    forall `(p : proc opT T),
+      right_movers any p ->
+      ysa_movers p.
+  Proof.
+    firstorder.
   Qed.
 
 End YSA.
@@ -767,3 +783,4 @@ End YSA.
 Hint Constructors right_movers.
 Hint Constructors at_most_one_non_mover.
 Hint Constructors left_movers.
+Hint Resolve ysa_movers_right_movers.

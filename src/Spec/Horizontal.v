@@ -450,6 +450,8 @@ Section HorizontalCompositionMovers.
       eauto 10.
     }
 
+    eapply OneFinalNonMover.
+
   Unshelve.
     all: exact unit.
   Qed.

@@ -58,8 +58,7 @@ Module MailFSPathImpl' <:
     ysa_movers MailFSPathAPI.step (compile_op op).
   Proof.
     destruct op; simpl; eauto 20.
-    all: admit.
-  Admitted.
+  Qed.
 
 End MailFSPathImpl'.
 

@@ -82,8 +82,7 @@ Module MailFSImpl' <:
     ysa_movers MailFSAPI.step (compile_op op).
   Proof.
     destruct op; simpl; eauto 20.
-    all: admit.
-  Admitted.
+  Qed.
 
   Theorem compile_correct :
     compile_correct compile_op MailFSAPI.step DeliverListTidAPI.step.

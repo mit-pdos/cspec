@@ -285,9 +285,7 @@ Module AtomicReader' <:
     ysa_movers MailboxRestrictedAPI.step (compile_op op).
   Proof.
     destruct op; simpl; eauto 20.
-    admit.
-    admit.
-  Admitted.
+  Qed.
 
   Lemma read_list_exec : forall l r s s' evs v tid,
     List.Forall (fun fn => FMap.In fn (MailServerLockAbsState.maildir s)) l ->
