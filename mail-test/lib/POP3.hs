@@ -42,7 +42,7 @@ pop3RespondOK :: Handle -> IO ()
 pop3RespondOK h =
   pop3Respond h True ""
 
-pop3ProcessCommands :: Handle -> IO MailServerAPI__Coq_pop3req
+pop3ProcessCommands :: Handle -> IO MailServerOp__Coq_pop3req
 pop3ProcessCommands h = do
   line <- hGetLine h
   let cmdparts = words line
@@ -63,17 +63,17 @@ pop3ProcessCommands h = do
           hPutStr h ".\r\n"
           pop3ProcessCommands h
         "STAT" : _ -> do
-          return $ MailServerAPI__POP3Stat
+          return $ MailServerOp__POP3Stat
         "LIST" : _ -> do
-          return $ MailServerAPI__POP3List
+          return $ MailServerOp__POP3List
         ["RETR", id] -> do
-          return $ MailServerAPI__POP3Retr $ read id - 1
+          return $ MailServerOp__POP3Retr $ read id - 1
         ["DELE", id] -> do
-          return $ MailServerAPI__POP3Delete $ read id - 1
+          return $ MailServerOp__POP3Delete $ read id - 1
         "QUIT" : _ -> do
           pop3RespondOK h
           hClose h
-          return MailServerAPI__POP3Closed
+          return MailServerOp__POP3Closed
         _ -> do
           pop3Respond h False "unrecognized command"
           pop3ProcessCommands h
@@ -81,7 +81,7 @@ pop3ProcessCommands h = do
       pop3Respond h False "unrecognized command"
       pop3ProcessCommands h
 
-pop3GetRequest :: POP3Conn -> IO MailServerAPI__Coq_pop3req
+pop3GetRequest :: POP3Conn -> IO MailServerOp__Coq_pop3req
 pop3GetRequest (POP3Conn h) = do
   pop3ProcessCommands h
 

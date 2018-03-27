@@ -16,7 +16,7 @@ import MailFSPathAPI
 import MailServer
 
 
-run_thread :: SMTPServer -> POP3Server -> Coq_maybe_proc (MailFSPathAPI__Coq_xopT a) -> IO ()
+run_thread :: SMTPServer -> POP3Server -> Coq_maybe_proc (MailFSPathOp__Coq_xopT a) -> IO ()
 run_thread _ _ NoProc = return ()
 run_thread smtp pop3 (Proc p) = do
   tid <- myThreadId
@@ -26,7 +26,7 @@ run_thread smtp pop3 (Proc p) = do
   run_proc s p
   return ()
 
-spawn_thread :: SMTPServer -> POP3Server -> Coq_maybe_proc (MailFSPathAPI__Coq_xopT a) -> IO ()
+spawn_thread :: SMTPServer -> POP3Server -> Coq_maybe_proc (MailFSPathOp__Coq_xopT a) -> IO ()
 spawn_thread smtp pop3 p = do
   putStrLn $ "Spawning.."
   tid <- forkIO (run_thread smtp pop3 p)

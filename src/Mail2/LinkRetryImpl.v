@@ -60,4 +60,5 @@ Module LinkRetryImpl :=
   LayerImplLoop
     MailboxTmpAbsState
     TryDeliverOp TryDeliverAPI
-    DeliverOp DeliverAPI.
+    DeliverOp DeliverAPI
+    LinkRetryImpl'.

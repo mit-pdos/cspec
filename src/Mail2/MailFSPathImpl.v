@@ -67,4 +67,5 @@ Module MailFSPathImpl :=
   LayerImplMovers
     MailFSPathAbsState 
     MailFSPathOp MailFSPathAPI
-    MailFSStringOp MailFSPathAbsAPI.
+    MailFSStringOp MailFSPathAbsAPI
+    MailFSPathImpl'.

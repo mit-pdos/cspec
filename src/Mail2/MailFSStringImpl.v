@@ -142,4 +142,5 @@ Module MailFSStringImpl :=
   LayerImplMovers
     MailFSStringAbsState
     MailFSStringOp MailFSStringAPI
-    MailFSOp MailFSStringAbsAPI.
+    MailFSOp MailFSStringAbsAPI
+    MailFSStringImpl'.

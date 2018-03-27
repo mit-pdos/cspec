@@ -95,36 +95,84 @@ Definition mail_server nsmtp npop3 :=
   repeat (Proc pop3_server_thread) npop3.
 
 
-Module c1 := Link MailboxAPI MailServerLockAbsAPI MailServerAPI
-                  AtomicReader MailServerLockAbsImpl.
-Module c2 := Link MailboxTmpAbsAPI MailboxAPI MailServerAPI
-                  MailboxTmpAbs c1.
-Module c3 := Link DeliverAPI MailboxTmpAbsAPI MailServerAPI
-                  AtomicDeliver c2.
+Module c1 :=
+  Link
+    MailboxOp    MailServerLockAbsState MailboxAPI
+    MailServerOp MailServerLockAbsState MailServerLockAbsAPI
+    MailServerOp MailServerState        MailServerAPI
+    AtomicReader MailServerLockAbsImpl.
+Module c2 :=
+  Link
+    MailboxOp    MailboxTmpAbsState     MailboxTmpAbsAPI
+    MailboxOp    MailServerLockAbsState MailboxAPI
+    MailServerOp MailServerState        MailServerAPI
+    MailboxTmpAbsImpl c1.
+Module c3 :=
+  Link
+    DeliverOp    MailboxTmpAbsState     DeliverAPI
+    MailboxOp    MailboxTmpAbsState     MailboxTmpAbsAPI
+    MailServerOp MailServerState        MailServerAPI
+    AtomicDeliver c2.
 
-Module c4 := Link DeliverListTidAPI DeliverAPI MailServerAPI
-                  DeliverListTidImpl c3.
-Module c5 := Link MailFSAPI DeliverListTidAPI MailServerAPI
-                  MailFSImpl c4.
+Module c4 :=
+  Link
+    DeliverListTidOp MailboxTmpAbsState DeliverListTidAPI
+    DeliverOp        MailboxTmpAbsState DeliverAPI
+    MailServerOp     MailServerState    MailServerAPI
+    DeliverListTidImpl c3.
+Module c5 :=
+  Link
+    MailFSOp         MailboxTmpAbsState MailFSAPI
+    DeliverListTidOp MailboxTmpAbsState DeliverListTidAPI
+    MailServerOp     MailServerState    MailServerAPI
+    MailFSImpl c4.
 
-Module c4' := Link TryDeliverAPI DeliverAPI MailServerAPI
-                  LinkRetryImpl c3.
-Module c5' := Link MailFSAPI TryDeliverAPI MailServerAPI
-                  TryDeliverImpl c4'.
+Module c4' :=
+  Link
+    TryDeliverOp MailboxTmpAbsState TryDeliverAPI
+    DeliverOp    MailboxTmpAbsState DeliverAPI
+    MailServerOp MailServerState    MailServerAPI
+    LinkRetryImpl c3.
+Module c5' :=
+  Link
+    MailFSOp     MailboxTmpAbsState MailFSAPI
+    TryDeliverOp MailboxTmpAbsState TryDeliverAPI
+    MailServerOp MailServerState    MailServerAPI
+    TryDeliverImpl c4'.
 
 (*
-Module c6 := Link MailFSStringAbsAPI MailFSAPI MailServerAPI
-                  MailFSStringAbsImpl c5.
+Module c6 :=
+  Link
+    MailFSOp     MailFSStringAbsState MailFSStringAbsAPI
+    MailFSOp     MailboxTmpAbsState   MailFSAPI
+    MailServerOp MailServerState      MailServerAPI
+    MailFSStringAbsImpl c5.
 *)
-Module c6 := Link MailFSStringAbsAPI MailFSAPI MailServerAPI
-                  MailFSStringAbsImpl c5'.
+Module c6 :=
+  Link
+    MailFSOp     MailFSStringAbsState MailFSStringAbsAPI
+    MailFSOp     MailboxTmpAbsState   MailFSAPI
+    MailServerOp MailServerState      MailServerAPI
+    MailFSStringAbsImpl c5'.
 
-Module c7 := Link MailFSStringAPI MailFSStringAbsAPI MailServerAPI
-                  MailFSStringImpl c6.
-Module c8 := Link MailFSPathAbsAPI MailFSStringAPI MailServerAPI
-                  MailFSPathAbsImpl c7.
-Module c9 := Link MailFSPathAPI MailFSPathAbsAPI MailServerAPI
-                  MailFSPathImpl c8.
+Module c7 :=
+  Link
+    MailFSStringOp MailFSStringAbsState MailFSStringAPI
+    MailFSOp       MailFSStringAbsState MailFSStringAbsAPI
+    MailServerOp   MailServerState      MailServerAPI
+    MailFSStringImpl c6.
+Module c8 :=
+  Link
+    MailFSStringOp MailFSPathAbsState   MailFSPathAbsAPI
+    MailFSStringOp MailFSStringAbsState MailFSStringAPI
+    MailServerOp   MailServerState      MailServerAPI
+    MailFSPathAbsImpl c7.
+Module c9 :=
+  Link
+    MailFSPathOp   MailFSPathAbsState MailFSPathAPI
+    MailFSStringOp MailFSPathAbsState MailFSPathAbsAPI
+    MailServerOp   MailServerState    MailServerAPI
+    MailFSPathImpl c8.
 
 
 Definition ms_bottom nsmtp npop3 :=

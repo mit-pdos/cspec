@@ -110,5 +110,6 @@ End MailFSImpl'.
 Module MailFSImpl :=
   LayerImplMovers
     MailboxTmpAbsState
-    MailFSOp  MailFSAPI
-    DeliverListTidOp DeliverListTidAPI.
+    MailFSOp MailFSAPI
+    DeliverListTidOp DeliverListTidAPI
+    MailFSImpl'.
