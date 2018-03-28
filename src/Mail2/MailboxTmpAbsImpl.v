@@ -1,4 +1,5 @@
 Require Import POCS.
+Require Import MailServerAPI.
 Require Import MailboxAPI.
 Require Import MailboxTmpAbsAPI.
 Require Import MailServerLockAbsAPI.
@@ -54,3 +55,17 @@ Module MailboxTmpAbsImpl :=
    MailboxTmpAbsState MailboxTmpAbsAPI
    MailServerLockAbsState MailboxAPI
    MailboxTmpAbs'.
+
+Module MailboxTmpAbsH' :=
+  LayerImplAbsHT
+    MailboxOp
+    MailboxTmpAbsState MailboxTmpAbsAPI
+    MailServerLockAbsState MailboxAPI
+    MailboxTmpAbs'
+    UserIdx.
+
+Module MailboxTmpAbsImplH :=
+  LayerImplAbs MailboxHOp
+    MailboxTmpAbsHState     MailboxTmpAbsHAPI
+    MailServerLockAbsHState MailboxHAPI
+    MailboxTmpAbsH'.

@@ -24,6 +24,8 @@ Module DeliverOp <: Ops.
   Definition opT := xopT.
 
 End DeliverOp.
+Module DeliverHOp := HOps DeliverOp UserIdx.
+
 
 Module DeliverAPI <: Layer DeliverOp MailboxTmpAbsState.
 
@@ -127,6 +129,7 @@ Module DeliverAPI <: Layer DeliverOp MailboxTmpAbsState.
   Definition step := xstep.
 
 End DeliverAPI.
+Module DeliverHAPI := HLayer DeliverOp MailboxTmpAbsState DeliverAPI UserIdx.
 
 
 Module DeliverRestrictedAPI <: Layer DeliverOp MailboxTmpAbsState.

@@ -3,8 +3,6 @@ Require Import String.
 
 Require Import MailServerAPI.
 
-Require Import MailServerHAPI.
-
 Require Import MailServerLockAbsAPI.
 Require Import MailServerLockAbsImpl.
 
@@ -103,16 +101,16 @@ Definition mail_server nsmtp npop3 :=
 
 Module c1 :=
   Link
-    MailboxOp    MailServerLockAbsState MailboxAPI
-    MailServerOp MailServerLockAbsState MailServerLockAbsAPI
-    MailServerOp MailServerState        MailServerAPI
-    AtomicReader MailServerLockAbsImpl.
+    MailboxHOp    MailServerLockAbsHState MailboxHAPI
+    MailServerHOp MailServerLockAbsHState MailServerLockAbsHAPI
+    MailServerHOp MailServerHState        MailServerHAPI
+    AtomicReaderH MailServerLockAbsImplH.
 Module c2 :=
   Link
-    MailboxOp    MailboxTmpAbsState     MailboxTmpAbsAPI
-    MailboxOp    MailServerLockAbsState MailboxAPI
-    MailServerOp MailServerState        MailServerAPI
-    MailboxTmpAbsImpl c1.
+    MailboxHOp    MailboxTmpAbsHState     MailboxTmpAbsHAPI
+    MailboxHOp    MailServerLockAbsHState MailboxHAPI
+    MailServerHOp MailServerHState        MailServerHAPI
+    MailboxTmpAbsImplH c1.
 Module c3 :=
   Link
     DeliverOp    MailboxTmpAbsState     DeliverAPI
