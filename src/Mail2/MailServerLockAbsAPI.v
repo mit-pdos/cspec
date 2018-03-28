@@ -13,8 +13,9 @@ Module MailServerLockAbsState <: State.
 
   Definition State := state_rec.
   Definition initP (s : State) := True.
-  
+
 End MailServerLockAbsState.
+Module MailServerLockAbsHState := HState MailServerLockAbsState UserIdx.
 
 Module MailServerLockAbsAPI <: Layer MailServerOp MailServerLockAbsState.
 
@@ -60,3 +61,4 @@ Module MailServerLockAbsAPI <: Layer MailServerOp MailServerLockAbsState.
   Definition step := xstep.
 
 End MailServerLockAbsAPI.
+Module MailServerLockAbsHAPI := HLayer MailServerOp MailServerLockAbsState MailServerLockAbsAPI UserIdx.

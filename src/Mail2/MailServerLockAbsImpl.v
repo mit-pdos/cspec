@@ -40,3 +40,17 @@ Module MailServerLockAbsImpl :=
     MailServerLockAbsState MailServerLockAbsAPI
     MailServerState MailServerAPI
     MailServerLockAbsImpl'.
+
+Module MailServerLockAbsImplH' :=
+  LayerImplAbsHT
+    MailServerOp
+    MailServerLockAbsState MailServerLockAbsAPI
+    MailServerState MailServerAPI
+    MailServerLockAbsImpl'
+    UserIdx.
+
+Module MailServerLockAbsImplH :=
+  LayerImplAbs MailServerHOp
+    MailServerLockAbsHState MailServerLockAbsHAPI
+    MailServerHState        MailServerHAPI
+    MailServerLockAbsImplH'.

@@ -20,6 +20,8 @@ Module MailboxOp <: Ops.
   Definition opT := xopT.
 
 End MailboxOp.
+Module MailboxHOp := HOps MailboxOp UserIdx.
+
 
 Module MailboxAPI <: Layer MailboxOp MailServerLockAbsState.
 
@@ -94,6 +96,7 @@ Module MailboxAPI <: Layer MailboxOp MailServerLockAbsState.
   Definition step := xstep.
 
 End MailboxAPI.
+Module MailboxHAPI := HLayer MailboxOp MailServerLockAbsState MailboxAPI UserIdx.
 
 
 Module MailboxProtocol <: Protocol MailboxOp MailServerLockAbsState.
@@ -124,6 +127,7 @@ Module MailboxProtocol <: Protocol MailboxOp MailServerLockAbsState.
   Definition step_allow := xstep_allow.
 
 End MailboxProtocol.
+Module MailboxHProtocol := HProtocol MailboxOp MailServerLockAbsState MailboxProtocol UserIdx.
 
 
 Module MailboxRestrictedAPI <: Layer MailboxOp MailServerLockAbsState.
@@ -132,3 +136,4 @@ Module MailboxRestrictedAPI <: Layer MailboxOp MailServerLockAbsState.
     restricted_step MailboxAPI.step MailboxProtocol.step_allow.
 
 End MailboxRestrictedAPI.
+Module MailboxRestrictedHAPI := HLayer MailboxOp MailServerLockAbsState MailboxRestrictedAPI UserIdx.

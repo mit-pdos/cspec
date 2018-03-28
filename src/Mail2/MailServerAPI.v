@@ -5,6 +5,14 @@ Require Import String.
 Parameter smtpconn : Type.
 Parameter pop3conn : Type.
 
+
+Module UserIdx <: HIndex.
+  Definition indexT := string.
+  Definition indexValid (u : string) := u = "Alice"%string \/ u = "Bob"%string.
+  Definition indexCmp := string_Ordering.
+End UserIdx.
+
+
 Module MailServerOp <: Ops.
 
   Inductive pop3req :=
@@ -17,10 +25,11 @@ Module MailServerOp <: Ops.
 
   Inductive extopT : Type -> Type :=
   | AcceptSMTP : extopT smtpconn
-  | SMTPGetMessage : smtpconn -> extopT (option string)
+  | SMTPGetMessage : smtpconn -> extopT (option (string * string))
   | SMTPRespond : smtpconn -> bool -> extopT unit
 
   | AcceptPOP3 : extopT pop3conn
+  | POP3Authenticate : pop3conn -> extopT string
   | POP3GetRequest : pop3conn -> extopT pop3req
   | POP3RespondStat : pop3conn -> nat -> nat -> extopT unit
   | POP3RespondList : pop3conn -> list nat -> extopT unit
@@ -36,8 +45,10 @@ Module MailServerOp <: Ops.
   .
 
   Definition opT := xopT.
-  
+
 End MailServerOp.
+Module MailServerHOp := HOps MailServerOp UserIdx.
+
 
 Module MailServerState <: State.
 
@@ -45,8 +56,10 @@ Module MailServerState <: State.
 
   Definition State := dir_contents.
   Definition initP (s : State) := True.
-  
+
 End MailServerState.
+Module MailServerHState := HState MailServerState UserIdx.
+
 
 Module MailServerAPI <: Layer MailServerOp MailServerState.
 
@@ -93,3 +106,4 @@ Module MailServerAPI <: Layer MailServerOp MailServerState.
   Definition step := xstep.
 
 End MailServerAPI.
+Module MailServerHAPI := HLayer MailServerOp MailServerState MailServerAPI UserIdx.

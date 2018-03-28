@@ -482,3 +482,20 @@ Module AtomicReader :=
     MailServerOp MailServerLockAbsAPI
     MailboxProtocol
     AtomicReader'.
+
+Module AtomicReaderH' :=
+  LayerImplMoversProtocolHT
+    MailServerLockAbsState
+    MailboxOp    MailboxAPI MailboxRestrictedAPI
+    MailServerOp MailServerLockAbsAPI
+    MailboxProtocol
+    AtomicReader'
+    UserIdx.
+
+Module AtomicReaderH :=
+  LayerImplMoversProtocol
+    MailServerLockAbsHState
+    MailboxHOp    MailboxHAPI MailboxRestrictedHAPI
+    MailServerHOp MailServerLockAbsHAPI
+    MailboxHProtocol
+    AtomicReaderH'.

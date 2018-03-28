@@ -40,54 +40,60 @@ Require Import LinkRetryImpl.
 Require Import TryDeliverAPI.
 Require Import TryDeliverImpl.
 
+Require Import MailFSMergedAPI.
+Require Import MailFSMergedImpl.
+
 
 Import MailServerOp.
 
 
-Definition do_smtp_req : proc opT unit :=
-  conn <- Op (Ext AcceptSMTP);
-  omsg <- Op (Ext (SMTPGetMessage conn));
+Definition nouser := ""%string.
+
+Definition do_smtp_req : proc _ unit :=
+  conn <- Op (Slice nouser (Ext AcceptSMTP));
+  omsg <- Op (Slice nouser (Ext (SMTPGetMessage conn)));
   match omsg with
   | None => Ret tt
-  | Some msg =>
-    ok <- Op (Deliver msg);
-    _ <- Op (Ext (SMTPRespond conn ok));
+  | Some (user, msg) =>
+    ok <- Op (Slice user (Deliver msg));
+    _ <- Op (Slice nouser (Ext (SMTPRespond conn ok)));
     Ret tt
   end.
 
-Definition handle_pop3_one conn (msgs : list ((nat*nat) * string)) :=
-  req <- Op (Ext (POP3GetRequest conn));
+Definition handle_pop3_one conn (u : string) (msgs : list ((nat*nat) * string)) :=
+  req <- Op (Slice u (Ext (POP3GetRequest conn)));
   match req with
   | POP3Stat =>
-    _ <- Op (Ext (POP3RespondStat conn (Datatypes.length msgs)
-                 (fold_left plus (map String.length (map snd msgs)) 0)));
+    _ <- Op (Slice u (Ext (POP3RespondStat conn (Datatypes.length msgs)
+                           (fold_left plus (map String.length (map snd msgs)) 0))));
     Ret false
   | POP3List =>
-    _ <- Op (Ext (POP3RespondList conn (map String.length (map snd msgs))));
+    _ <- Op (Slice u (Ext (POP3RespondList conn (map String.length (map snd msgs)))));
     Ret false
   | POP3Retr n =>
-    _ <- Op (Ext (POP3RespondRetr conn (nth n (map snd msgs) ""%string)));
+    _ <- Op (Slice u (Ext (POP3RespondRetr conn (nth n (map snd msgs) ""%string))));
     Ret false
   | POP3Delete n =>
-    _ <- Op (Delete (nth n (map fst msgs) (0, 0)));
-    _ <- Op (Ext (POP3RespondDelete conn));
+    _ <- Op (Slice u (Delete (nth n (map fst msgs) (0, 0))));
+    _ <- Op (Slice u (Ext (POP3RespondDelete conn)));
     Ret false
   | POP3Closed =>
     Ret true
   end.
 
-Definition do_pop3_req : proc opT unit :=
-  conn <- Op (Ext AcceptPOP3);
-  msgs <- Op (Pickup);
+Definition do_pop3_req : proc _ unit :=
+  conn <- Op (Slice nouser (Ext AcceptPOP3));
+  user <- Op (Slice nouser (Ext (POP3Authenticate conn)));
+  msgs <- Op (Slice user Pickup);
   _ <- Until (fun done => done)
-             (fun _ => handle_pop3_one conn msgs)
+             (fun _ => handle_pop3_one conn user msgs)
              None;
   Ret tt.
 
-Definition smtp_server_thread : proc MailServerOp.opT unit :=
+Definition smtp_server_thread : proc _ unit :=
   Until (fun _ => false) (fun _ => do_smtp_req) None.
 
-Definition pop3_server_thread : proc MailServerOp.opT unit :=
+Definition pop3_server_thread : proc _ unit :=
   Until (fun _ => false) (fun _ => do_pop3_req) None.
 
 Definition mail_server nsmtp npop3 :=
@@ -173,6 +179,19 @@ Module c9 :=
     MailFSStringOp MailFSPathAbsState MailFSPathAbsAPI
     MailServerOp   MailServerState    MailServerAPI
     MailFSPathImpl c8.
+
+
+Module MailServerHOp := HOps MailServerOp StringIdx.
+Module MailServerHState := HState MailServerState StringIdx.
+Module MailServerHAPI := HLayer MailServerOp MailServerState MailServerAPI StringIdx.
+
+
+Module c10 :=
+  Link
+    MailFSMergedOp MailFSMergedState MailFSMergedAPI
+    MailFSHOp      MailFSHState      MailFSHPathAPI
+    MailServerHOp  MailServerHState  MailServerHAPI
+    MailFSMergedImpl ??.
 
 
 Definition ms_bottom nsmtp npop3 :=

@@ -1,6 +1,8 @@
 Require Import POCS.
 Require Import String.
 Require Import MailServerAPI.
+Require Import MailFSPathAPI.
+
 
 Module MailFSMergedOp <: Ops.
 
@@ -44,16 +46,17 @@ Module MailFSMergedState <: State.
 End MailFSMergedState.
 
 
+Definition filter_dir (dirname : string * string) (fs : MailFSMergedState.fs_contents) :=
+  FMap.filter (fun '(dn, fn) => if dn == dirname then true else false) fs.
+
+Definition drop_dirname (fs : MailFSMergedState.fs_contents) :=
+  FMap.map_keys (fun '(dn, fn) => fn) fs.
+
+
 Module MailFSMergedAPI <: Layer MailFSMergedOp MailFSMergedState.
 
   Import MailFSMergedOp.
   Import MailFSMergedState.
-
-  Definition filter_dir (dirname : string * string) (fs : fs_contents) :=
-    FMap.filter (fun '(dn, fn) => if dn == dirname then true else false) fs.
-
-  Definition drop_dirname (fs : fs_contents) :=
-    FMap.map_keys (fun '(dn, fn) => fn) fs.
 
   Inductive xstep : forall T, opT T -> nat -> State -> T -> State -> list event -> Prop :=
   | StepCreateWriteOK : forall fs tid tmpfn data lock,
@@ -163,3 +166,128 @@ Module MailFSMergedAPI <: Layer MailFSMergedOp MailFSMergedState.
   Definition step := xstep.
 
 End MailFSMergedAPI.
+
+
+Module StringIdx <: HIndex.
+  Definition indexT := string.
+  Definition indexValid (u : string) := u = "Alice"%string \/ u = "Bob"%string.
+  Definition indexCmp := string_Ordering.
+End StringIdx.
+
+Module MailFSHOp := HOps MailFSPathOp StringIdx.
+
+
+Module MailFSMergedAbsAPI <: Layer MailFSHOp MailFSMergedState.
+
+  Import MailFSPathOp.
+  Import MailFSHOp.
+  Import MailFSMergedState.
+
+  Inductive xstep : forall T, opT T -> nat -> State -> T -> State -> list event -> Prop :=
+  | StepCreateWriteOK : forall fs tid dir fn data lock u,
+    xstep (Slice u (CreateWrite (dir, fn) data)) tid
+      (mk_state fs lock)
+      true
+      (mk_state (FMap.add (u, dir, fn) data fs) lock)
+      nil
+  | StepCreateWriteErr1 : forall fs tid dir fn data lock u,
+    xstep (Slice u (CreateWrite (dir, fn) data)) tid
+      (mk_state fs lock)
+      false
+      (mk_state fs lock)
+      nil
+  | StepCreateWriteErr2 : forall fs tid dir fn data data' lock u,
+    xstep (Slice u (CreateWrite (dir, fn) data)) tid
+      (mk_state fs lock)
+      false
+      (mk_state (FMap.add (u, dir, fn) data' fs) lock)
+      nil
+  | StepUnlink : forall fs tid dir fn lock u,
+    xstep (Slice u (Unlink (dir, fn))) tid
+      (mk_state fs lock)
+      tt
+      (mk_state (FMap.remove (u, dir, fn) fs) lock)
+      nil
+  | StepLinkOK : forall fs tid srcdir srcfn data dstdir dstfn lock u,
+    FMap.MapsTo (u, srcdir, srcfn) data fs ->
+    ~ FMap.In (u, dstdir, dstfn) fs ->
+    xstep (Slice u (Link (srcdir, srcfn) (dstdir, dstfn))) tid
+      (mk_state fs lock)
+      true
+      (mk_state (FMap.add (u, dstdir, dstfn) data fs) lock)
+      nil
+  | StepLinkErr : forall fs tid srcdir srcfn dstdir dstfn lock u,
+    xstep (Slice u (Link (srcdir, srcfn) (dstdir, dstfn))) tid
+      (mk_state fs lock)
+      false
+      (mk_state fs lock)
+      nil
+
+  | StepList : forall fs tid r dirname lock u,
+    FMap.is_permutation_key r (drop_dirname (filter_dir (u, dirname) fs)) ->
+    xstep (Slice u (List dirname)) tid
+      (mk_state fs lock)
+      r
+      (mk_state fs lock)
+      nil
+
+  | StepGetTID : forall s tid u,
+    xstep (Slice u GetTID) tid
+      s
+      tid
+      s
+      nil
+  | StepRandom : forall s tid r u,
+    xstep (Slice u Random) tid
+      s
+      r
+      s
+      nil
+
+  | StepReadOK : forall dir fn fs tid m lock u,
+    FMap.MapsTo (u, dir, fn) m fs ->
+    xstep (Slice u (Read (dir, fn))) tid
+      (mk_state fs lock)
+      (Some m)
+      (mk_state fs lock)
+      nil
+  | StepReadNone : forall dir fn fs tid lock u,
+    ~ FMap.In (u, dir, fn) fs ->
+    xstep (Slice u (Read (dir, fn))) tid
+      (mk_state fs lock)
+      None
+      (mk_state fs lock)
+      nil
+
+  | StepLock : forall fs tid u locked,
+    FMap.MapsTo u false locked ->
+    xstep (Slice u Lock) tid
+      (mk_state fs locked)
+      tt
+      (mk_state fs (FMap.add u true locked))
+      nil
+  | StepLockErr : forall fs tid u locked,
+    ~ FMap.In u locked ->
+    xstep (Slice u Lock) tid
+      (mk_state fs locked)
+      tt
+      (mk_state fs locked)
+      nil
+  | StepUnlock : forall fs tid u locked,
+    xstep (Slice u Unlock) tid
+      (mk_state fs locked)
+      tt
+      (mk_state fs (FMap.add u false locked))
+      nil
+
+  | StepExt : forall s tid `(extop : extopT T) r u,
+    xstep (Slice u (Ext extop)) tid
+      s
+      r
+      s
+      (Event (extop, r) :: nil)
+  .
+
+  Definition step := xstep.
+
+End MailFSMergedAbsAPI.
