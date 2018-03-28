@@ -23,7 +23,7 @@ Module MailFSPathAbsAPI <: Layer MailFSStringOp MailFSPathAbsState.
   Import MailFSPathAbsState.
 
   Definition filter_dir (dirname : string) (fs : fs_contents) :=
-    FMap.filter (fun '(dn, fn) => if string_dec dn dirname then true else false) fs.
+    FMap.filter (fun '(dn, fn) => if dn == dirname then true else false) fs.
 
   Definition drop_dirname (fs : fs_contents) :=
     FMap.map_keys (fun '(dn, fn) => fn) fs.
@@ -36,7 +36,6 @@ Module MailFSPathAbsAPI <: Layer MailFSStringOp MailFSPathAbsState.
     unfold filter_dir.
     apply FMap.filter_complete; auto.
     destruct (dirname == dirname); simpl in *; try congruence.
-    destruct (string_dec dirname dirname); try congruence.
   Qed.
 
   Lemma filter_dir_in_eq: forall dirname k s,
@@ -66,7 +65,7 @@ Module MailFSPathAbsAPI <: Layer MailFSStringOp MailFSPathAbsState.
     eapply FMap.map_keys_in' in H; deex.
     destruct k'.
     eapply FMap.filter_holds in H as H'.
-    destruct (string_dec s0 dirname); congruence.
+    destruct (s0 == dirname); congruence.
   Qed.
 
   Lemma drop_dirname_filter_dir: forall s dirname k,
