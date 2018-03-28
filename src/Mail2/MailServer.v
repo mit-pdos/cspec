@@ -113,10 +113,10 @@ Module c2 :=
     MailboxTmpAbsImplH c1.
 Module c3 :=
   Link
-    DeliverOp    MailboxTmpAbsState     DeliverAPI
-    MailboxOp    MailboxTmpAbsState     MailboxTmpAbsAPI
-    MailServerOp MailServerState        MailServerAPI
-    AtomicDeliver c2.
+    DeliverHOp    MailboxTmpAbsHState     DeliverHAPI
+    MailboxHOp    MailboxTmpAbsHState     MailboxTmpAbsHAPI
+    MailServerHOp MailServerHState        MailServerHAPI
+    AtomicDeliverH c2.
 
 Module c4 :=
   Link
@@ -173,10 +173,10 @@ Module c8 :=
     MailFSPathAbsImpl c7.
 Module c9 :=
   Link
-    MailFSPathOp   MailFSPathAbsState MailFSPathAPI
-    MailFSStringOp MailFSPathAbsState MailFSPathAbsAPI
-    MailServerOp   MailServerState    MailServerAPI
-    MailFSPathImpl c8.
+    MailFSPathHOp   MailFSPathAbsHState MailFSPathHAPI
+    MailFSStringHOp MailFSPathAbsHState MailFSPathAbsHAPI
+    MailServerHOp   MailServerHState    MailServerHAPI
+    MailFSPathImplH c8.
 
 
 Module MailServerHOp := HOps MailServerOp StringIdx.
@@ -189,7 +189,7 @@ Module c10 :=
     MailFSMergedOp MailFSMergedState MailFSMergedAPI
     MailFSHOp      MailFSHState      MailFSHPathAPI
     MailServerHOp  MailServerHState  MailServerHAPI
-    MailFSMergedImpl ??.
+    MailFSMergedImpl c9.
 
 
 Definition ms_bottom nsmtp npop3 :=

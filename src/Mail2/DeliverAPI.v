@@ -132,43 +132,43 @@ End DeliverAPI.
 Module DeliverHAPI := HLayer DeliverOp MailboxTmpAbsState DeliverAPI UserIdx.
 
 
-Module DeliverRestrictedAPI <: Layer DeliverOp MailboxTmpAbsState.
+Module DeliverProtocol <: Protocol DeliverOp MailboxTmpAbsState.
 
   Import DeliverOp.
   Import MailboxTmpAbsState.
 
-  Inductive step_allow : forall T, opT T -> nat -> State -> Prop :=
+  Inductive xstep_allow : forall T, opT T -> nat -> State -> Prop :=
   | AllowCreateWriteTmp : forall tid tmp mbox data lock,
-    step_allow (CreateWriteTmp data) tid (mk_state tmp mbox lock)
+    xstep_allow (CreateWriteTmp data) tid (mk_state tmp mbox lock)
   | AllowLinkMail : forall tid tmp mbox lock,
     FMap.In (tid, 0) tmp ->
-    step_allow (LinkMail) tid (mk_state tmp mbox lock)
+    xstep_allow (LinkMail) tid (mk_state tmp mbox lock)
   | AllowUnlinkTmp : forall tid s,
-    step_allow (UnlinkTmp) tid s
+    xstep_allow (UnlinkTmp) tid s
   | AllowList : forall tid s,
-    step_allow List tid s
+    xstep_allow List tid s
   | AllowRead : forall tid s fn,
-    step_allow (Read fn) tid s
+    xstep_allow (Read fn) tid s
   | AllowDelete : forall tid s fn,
-    step_allow (Delete fn) tid s
+    xstep_allow (Delete fn) tid s
   | AllowLock : forall tid s,
-    step_allow Lock tid s
+    xstep_allow Lock tid s
   | AllowUnlock : forall tid s,
-    step_allow Unlock tid s
+    xstep_allow Unlock tid s
   | AllowExt : forall tid s `(extop : _ T),
-    step_allow (Ext extop) tid s
+    xstep_allow (Ext extop) tid s
   .
 
+  Definition step_allow := xstep_allow.
+
+End DeliverProtocol.
+Module DeliverHProtocol := HProtocol DeliverOp MailboxTmpAbsState DeliverProtocol UserIdx.
+
+
+Module DeliverRestrictedAPI <: Layer DeliverOp MailboxTmpAbsState.
+
   Definition step :=
-    restricted_step DeliverAPI.step step_allow.
+    restricted_step DeliverAPI.step DeliverProtocol.step_allow.
 
 End DeliverRestrictedAPI.
-
-
-Module DeliverTmpExistenceRule <: ProcRule DeliverOp.
-
-  Definition follows_protocol (ts : @threads_state DeliverOp.opT) :=
-    forall s,
-      follows_protocol_s DeliverAPI.step DeliverRestrictedAPI.step_allow ts s.
-
-End DeliverTmpExistenceRule.
+Module DeliverRestrictedHAPI := HLayer DeliverOp MailboxTmpAbsState DeliverRestrictedAPI UserIdx.
