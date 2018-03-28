@@ -168,12 +168,6 @@ Module MailFSMergedAPI <: Layer MailFSMergedOp MailFSMergedState.
 End MailFSMergedAPI.
 
 
-Module StringIdx <: HIndex.
-  Definition indexT := string.
-  Definition indexValid (u : string) := u = "Alice"%string \/ u = "Bob"%string.
-  Definition indexCmp := string_Ordering.
-End StringIdx.
-
 Module MailFSHOp := HOps MailFSPathOp StringIdx.
 
 
