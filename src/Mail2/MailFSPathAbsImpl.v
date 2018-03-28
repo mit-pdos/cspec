@@ -18,16 +18,6 @@ Module MailFSPathAbsImpl' <:
       ( dirname = "tmp"%string /\ FMap.MapsTo filename contents (MailFSStringAbsState.tmpdir s2) \/
         dirname = "mail"%string /\ FMap.MapsTo filename contents (MailFSStringAbsState.maildir s2) ).
 
-  Definition compile_ts (ts : @threads_state MailFSStringOp.opT) := ts.
-
-  Theorem compile_ts_no_atomics :
-    forall (ts : @threads_state MailFSStringOp.opT),
-      no_atomics_ts ts ->
-      no_atomics_ts (compile_ts ts).
-  Proof.
-    unfold compile_ts; eauto.
-  Qed.
-
   Hint Extern 1 (MailFSStringAPI.step _ _ _ _ _ _) => econstructor.
 
   Lemma fn_ne : forall (dirname fn1 fn2 : string),
@@ -265,22 +255,6 @@ Module MailFSPathAbsImpl' <:
 
     inversion H; simpl in *; subst.
     eexists; split; eauto.
-  Qed.
-
-  Hint Resolve absR_ok.
-
-  Theorem compile_traces_match :
-    forall ts,
-      no_atomics_ts ts ->
-      traces_match_abs absR
-        MailFSPathAbsState.initP
-        MailFSPathAbsAPI.step
-        MailFSStringAPI.step (compile_ts ts) ts.
-  Proof.
-    unfold compile_ts, traces_match_abs; intros.
-    eexists; intuition idtac.
-    eapply trace_incl_abs; eauto.
-    eauto.
   Qed.
 
   Theorem absInitP :

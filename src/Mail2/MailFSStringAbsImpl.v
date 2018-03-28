@@ -20,16 +20,6 @@ Module MailFSStringAbsImpl' <:
     dirR (MailFSStringAbsState.tmpdir  s1) (MailboxTmpAbsState.tmpdir  s2) /\
     MailFSStringAbsState.locked s1 = MailboxTmpAbsState.locked s2.
 
-  Definition compile_ts (ts : @threads_state MailFSOp.opT) := ts.
-
-  Theorem compile_ts_no_atomics :
-    forall (ts : @threads_state MailFSOp.opT),
-      no_atomics_ts ts ->
-      no_atomics_ts (compile_ts ts).
-  Proof.
-    unfold compile_ts; eauto.
-  Qed.
-
   Hint Extern 1 (MailFSAPI.step _ _ _ _ _ _) => econstructor.
 
   Lemma dirR_mapsto :
@@ -139,22 +129,6 @@ Module MailFSStringAbsImpl' <:
     inversion H0; clear H0; subst; repeat sigT_eq; simpl in *.
     all:
       solve [ eexists; split; [ split | econstructor ]; simpl; intuition eauto ].
-  Qed.
-
-  Hint Resolve absR_ok.
-
-  Theorem compile_traces_match :
-    forall ts,
-      no_atomics_ts ts ->
-      traces_match_abs absR
-        MailFSStringAbsState.initP
-        MailFSStringAbsAPI.step
-        MailFSAPI.step (compile_ts ts) ts.
-  Proof.
-    unfold compile_ts, traces_match_abs; intros.
-    eexists; intuition idtac.
-    eapply trace_incl_abs; eauto.
-    eauto.
   Qed.
 
   Theorem absInitP :
