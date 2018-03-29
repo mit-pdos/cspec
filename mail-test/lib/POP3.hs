@@ -50,7 +50,6 @@ pop3ProcessAuth h = do
     cmd : rest ->
       case (map toUpper cmd) : rest of
         ["USER", u] -> do
-          pop3RespondOK h
           return $ Just u
         "CAPA" : _ -> do
           pop3RespondOK h
@@ -70,6 +69,13 @@ pop3ProcessAuth h = do
 pop3Authenticate :: POP3Conn -> IO (Maybe String)
 pop3Authenticate (POP3Conn h) = do
   pop3ProcessAuth h
+
+pop3RespondAuth :: POP3Conn -> Bool -> IO ()
+pop3RespondAuth (POP3Conn h) True = do
+  pop3RespondOK h
+pop3RespondAuth (POP3Conn h) False = do
+  pop3Respond h False "unknown user"
+  hClose h
 
 pop3ProcessCommands :: Handle -> IO MailServerOp__Coq_pop3req
 pop3ProcessCommands h = do

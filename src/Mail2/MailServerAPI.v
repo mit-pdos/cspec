@@ -30,6 +30,7 @@ Module MailServerOp <: Ops.
 
   | AcceptPOP3 : extopT pop3conn
   | POP3Authenticate : pop3conn -> extopT (option string)
+  | POP3RespondAuth : pop3conn -> bool -> extopT unit
   | POP3GetRequest : pop3conn -> extopT pop3req
   | POP3RespondStat : pop3conn -> nat -> nat -> extopT unit
   | POP3RespondList : pop3conn -> list nat -> extopT unit

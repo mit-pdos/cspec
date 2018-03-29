@@ -114,6 +114,11 @@ run_proc _ (Op (MailFSMergedOp__Ext (MailServerOp__POP3Authenticate conn))) = do
   req <- pop3Authenticate conn
   return $ unsafeCoerce req
 
+run_proc _ (Op (MailFSMergedOp__Ext (MailServerOp__POP3RespondAuth conn eok))) = do
+  debugmsg $ "POP3RespondAuth"
+  pop3RespondAuth conn eok
+  return $ unsafeCoerce ()
+
 run_proc _ (Op (MailFSMergedOp__Ext (MailServerOp__POP3GetRequest conn))) = do
   debugmsg $ "POP3GetRequest"
   req <- pop3GetRequest conn

@@ -53,9 +53,16 @@ Definition do_smtp_req : proc _ unit :=
   match omsg with
   | None => Ret tt
   | Some (user, msg) =>
-    ok <- Op (Slice user (Deliver msg));
-    _ <- Op (Slice nouser (Ext (SMTPRespond conn ok)));
-    Ret tt
+    eok <- Op (CheckSlice user);
+    match eok with
+    | false =>
+      _ <- Op (Slice nouser (Ext (SMTPRespond conn false)));
+      Ret tt
+    | true =>
+      ok <- Op (Slice user (Deliver msg));
+      _ <- Op (Slice nouser (Ext (SMTPRespond conn ok)));
+      Ret tt
+    end
   end.
 
 Definition handle_pop3_one conn (u : string) (msgs : list ((nat*nat) * string)) :=
@@ -85,11 +92,18 @@ Definition do_pop3_req : proc _ unit :=
   match ouser with
   | None => Ret tt
   | Some user =>
-    msgs <- Op (Slice user Pickup);
-    _ <- Until (fun done => done)
-               (fun _ => handle_pop3_one conn user msgs)
-               None;
-    Ret tt
+    eok <- Op (CheckSlice user);
+    _ <- Op (Slice nouser (Ext (POP3RespondAuth conn eok)));
+    match eok with
+    | false =>
+      Ret tt
+    | true =>
+      msgs <- Op (Slice user Pickup);
+      _ <- Until (fun done => done)
+                 (fun _ => handle_pop3_one conn user msgs)
+                 None;
+      Ret tt
+    end
   end.
 
 Definition smtp_server_thread : proc _ unit :=
