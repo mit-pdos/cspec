@@ -7,7 +7,7 @@ Require Import MailboxTmpAbsAPI.
 Module TryDeliverOp <: Ops.
 
   Definition extopT := MailServerAPI.MailServerOp.extopT.
-  
+
   Inductive xopT : Type -> Type :=
   | CreateWriteTmp : forall (data : string), xopT bool
   | LinkMail : xopT bool
@@ -25,6 +25,8 @@ Module TryDeliverOp <: Ops.
   Definition opT := xopT.
 
 End TryDeliverOp.
+Module TryDeliverHOp := HOps TryDeliverOp UserIdx.
+
 
 Module TryDeliverAPI <: Layer TryDeliverOp MailboxTmpAbsState.
 
@@ -125,3 +127,4 @@ Module TryDeliverAPI <: Layer TryDeliverOp MailboxTmpAbsState.
   Definition step := xstep.
 
 End TryDeliverAPI.
+Module TryDeliverHAPI := HLayer TryDeliverOp MailboxTmpAbsState TryDeliverAPI UserIdx.

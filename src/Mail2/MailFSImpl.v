@@ -113,3 +113,18 @@ Module MailFSImpl :=
     MailFSOp MailFSAPI
     DeliverListTidOp DeliverListTidAPI
     MailFSImpl'.
+
+Module MailFSImplH' :=
+  LayerImplMoversHT
+    MailboxTmpAbsState
+    MailFSOp MailFSAPI
+    DeliverListTidOp DeliverListTidAPI
+    MailFSImpl'
+    UserIdx.
+
+Module MailFSImplH :=
+  LayerImplMovers
+    MailboxTmpAbsHState
+    MailFSHOp MailFSHAPI
+    DeliverListTidHOp DeliverListTidHAPI
+    MailFSImplH'.

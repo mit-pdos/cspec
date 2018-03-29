@@ -25,8 +25,10 @@ Module MailFSPathOp <: Ops.
   .
 
   Definition opT := xopT.
-  
+
 End MailFSPathOp.
+Module MailFSPathHOp := HOps MailFSPathOp UserIdx.
+
 
 Module MailFSPathAPI <: Layer MailFSPathOp MailFSPathAbsState.
 
@@ -134,3 +136,4 @@ Module MailFSPathAPI <: Layer MailFSPathOp MailFSPathAbsState.
   Definition step := xstep.
 
 End MailFSPathAPI.
+Module MailFSPathHAPI := HLayer MailFSPathOp MailFSPathAbsState MailFSPathAPI UserIdx.

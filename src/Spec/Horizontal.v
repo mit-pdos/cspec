@@ -635,3 +635,63 @@ Module LayerImplMoversProtocolHT
   Qed.
 
 End LayerImplMoversProtocolHT.
+
+
+Module LayerImplMoversHT
+  (s : State)
+  (o1 : Ops) (l1 : Layer o1 s)
+  (o2 : Ops) (l2 : Layer o2 s)
+  (a : LayerImplMoversT s o1 l1 o2 l2)
+  (i : HIndex).
+
+  Module hs := HState s i.
+  Module ho1 := HOps o1 i.
+  Module ho2 := HOps o2 i.
+  Module hl1 := HLayer o1 s l1 i.
+  Module hl2 := HLayer o2 s l2 i.
+
+  Definition compile_op T (op : ho2.opT T) : proc ho1.opT T :=
+    match op with
+    | Slice i op => SliceProc i (a.compile_op op)
+    end.
+
+  Theorem compile_op_no_atomics : forall T (op : ho2.opT T),
+    no_atomics (compile_op op).
+  Proof.
+    destruct op; simpl.
+    pose proof (a.compile_op_no_atomics op).
+    generalize dependent H.
+    generalize (a.compile_op op).
+    clear.
+    induction 1; simpl; eauto.
+  Qed.
+
+  Theorem ysa_movers : forall T (op : ho2.opT T),
+    ysa_movers hl1.step (compile_op op).
+  Proof.
+    destruct op; simpl.
+    eapply horiz_ysa_movers.
+    eapply a.ysa_movers.
+  Qed.
+
+  Lemma atomic_exec_horizStep : forall `(p : proc _ T) i tid S v S' evs,
+    atomic_exec hl1.step (SliceProc i p) tid S v S' evs ->
+      exists s s',
+        FMap.MapsTo i s S /\
+        S' = FMap.add i s' S /\
+        atomic_exec l1.step p tid s v s' evs.
+  Proof.
+    (* NOT ACTUALLY TRUE: SLICE MIGHT NOT EXIST *)
+  Admitted.
+
+  Theorem compile_correct :
+    compile_correct compile_op hl1.step hl2.step.
+  Proof.
+    intro; intros.
+    destruct op; simpl in *.
+    eapply atomic_exec_horizStep in H; repeat deex.
+    eapply a.compile_correct in H1.
+    econstructor; eauto.
+  Qed.
+
+End LayerImplMoversHT.

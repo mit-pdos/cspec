@@ -1,5 +1,6 @@
 Require Import POCS.
 Require Import String.
+Require Import MailServerAPI.
 Require Import MailboxAPI.
 Require Import TryDeliverAPI.
 Require Import MailFSAPI.
@@ -93,3 +94,18 @@ Module TryDeliverImpl :=
     MailFSOp     MailFSAPI
     TryDeliverOp TryDeliverAPI
     TryDeliverImpl'.
+
+Module TryDeliverImplH' :=
+  LayerImplMoversHT
+    MailboxTmpAbsState
+    MailFSOp     MailFSAPI
+    TryDeliverOp TryDeliverAPI
+    TryDeliverImpl'
+    UserIdx.
+
+Module TryDeliverImplH :=
+  LayerImplMovers
+    MailboxTmpAbsHState
+    MailFSHOp     MailFSHAPI
+    TryDeliverHOp TryDeliverHAPI
+    TryDeliverImplH'.

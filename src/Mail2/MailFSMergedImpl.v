@@ -6,22 +6,19 @@ Require Import MailFSPathAPI.
 Require Import MailFSPathAbsAPI.
 
 
-Module MailFSHState := HState MailFSPathAbsState StringIdx.
-Module MailFSHPathAPI := HLayer MailFSPathOp MailFSPathAbsState MailFSPathAPI StringIdx.
-
 Module MailFSMergedAbsImpl' <:
-  LayerImplAbsT MailFSHOp
-    MailFSMergedState MailFSMergedAbsAPI
-    MailFSHState      MailFSHPathAPI.
+  LayerImplAbsT MailFSPathHOp
+    MailFSMergedState   MailFSMergedAbsAPI
+    MailFSPathAbsHState MailFSPathHAPI.
 
-  Definition absR (s1 : MailFSMergedState.State) (s2 : MailFSHState.State) :=
+  Definition absR (s1 : MailFSMergedState.State) (s2 : MailFSPathAbsHState.State) :=
     True.
 
   Hint Resolve FMap.add_mapsto.
   Hint Resolve FMap.mapsto_add_ne'.
 
   Theorem absR_ok :
-    op_abs absR MailFSMergedAbsAPI.step MailFSHPathAPI.step.
+    op_abs absR MailFSMergedAbsAPI.step MailFSPathHAPI.step.
   Proof.
     unfold op_abs; intros.
   Admitted.
@@ -30,16 +27,17 @@ Module MailFSMergedAbsImpl' <:
     forall s1 s2,
       MailFSMergedState.initP s1 ->
       absR s1 s2 ->
-      MailFSHState.initP s2.
+      MailFSPathAbsHState.initP s2.
   Proof.
   Admitted.
 
 End MailFSMergedAbsImpl'.
 
+
 Module MailFSMergedAbsImpl :=
- LayerImplAbs MailFSHOp
-    MailFSMergedState MailFSMergedAbsAPI
-    MailFSHState      MailFSHPathAPI
+ LayerImplAbs MailFSPathHOp
+    MailFSMergedState   MailFSMergedAbsAPI
+    MailFSPathAbsHState MailFSPathHAPI
     MailFSMergedAbsImpl'.
 
 
@@ -47,11 +45,11 @@ Module MailFSMergedOpImpl' <:
   LayerImplMoversT
     MailFSMergedState
     MailFSMergedOp MailFSMergedAPI
-    MailFSHOp      MailFSMergedAbsAPI.
+    MailFSPathHOp  MailFSMergedAbsAPI.
 
   Import MailFSPathOp.
 
-  Definition compile_op T (op : MailFSHOp.opT T) : proc _ T :=
+  Definition compile_op T (op : MailFSPathHOp.opT T) : proc _ T :=
     match op with
     | Slice u op' =>
       match op' with
@@ -127,12 +125,12 @@ Module MailFSMergedOpImpl :=
   LayerImplMovers
     MailFSMergedState
     MailFSMergedOp MailFSMergedAPI
-    MailFSHOp      MailFSMergedAbsAPI
+    MailFSPathHOp  MailFSMergedAbsAPI
     MailFSMergedOpImpl'.
 
 Module MailFSMergedImpl :=
   Link
-    MailFSMergedOp MailFSMergedState MailFSMergedAPI
-    MailFSHOp      MailFSMergedState MailFSMergedAbsAPI
-    MailFSHOp      MailFSHState      MailFSHPathAPI
+    MailFSMergedOp MailFSMergedState   MailFSMergedAPI
+    MailFSPathHOp  MailFSMergedState   MailFSMergedAbsAPI
+    MailFSPathHOp  MailFSPathAbsHState MailFSPathHAPI
     MailFSMergedOpImpl MailFSMergedAbsImpl.

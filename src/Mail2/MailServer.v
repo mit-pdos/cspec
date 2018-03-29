@@ -126,51 +126,53 @@ Module c4 :=
     DeliverListTidImplH c3.
 Module c5 :=
   Link
-    MailFSOp         MailboxTmpAbsState MailFSAPI
-    DeliverListTidOp MailboxTmpAbsState DeliverListTidAPI
-    MailServerOp     MailServerState    MailServerAPI
-    MailFSImpl c4.
+    MailFSHOp         MailboxTmpAbsHState MailFSHAPI
+    DeliverListTidHOp MailboxTmpAbsHState DeliverListTidHAPI
+    MailServerHOp     MailServerHState    MailServerHAPI
+    MailFSImplH c4.
 
+(*
 Module c4' :=
   Link
-    TryDeliverOp MailboxTmpAbsState TryDeliverAPI
-    DeliverOp    MailboxTmpAbsState DeliverAPI
-    MailServerOp MailServerState    MailServerAPI
-    LinkRetryImpl c3.
+    TryDeliverHOp MailboxTmpAbsHState TryDeliverHAPI
+    DeliverHOp    MailboxTmpAbsHState DeliverHAPI
+    MailServerHOp MailServerHState    MailServerHAPI
+    LinkRetryImplH c3.
 Module c5' :=
   Link
-    MailFSOp     MailboxTmpAbsState MailFSAPI
-    TryDeliverOp MailboxTmpAbsState TryDeliverAPI
-    MailServerOp MailServerState    MailServerAPI
-    TryDeliverImpl c4'.
+    MailFSHOp     MailboxTmpAbsHState MailFSHAPI
+    TryDeliverHOp MailboxTmpAbsHState TryDeliverHAPI
+    MailServerHOp MailServerHState    MailServerHAPI
+    TryDeliverImplH c4'.
+*)
 
+Module c6 :=
+  Link
+    MailFSHOp     MailFSStringAbsHState MailFSStringAbsHAPI
+    MailFSHOp     MailboxTmpAbsHState   MailFSHAPI
+    MailServerHOp MailServerHState      MailServerHAPI
+    MailFSStringAbsImplH c5.
 (*
 Module c6 :=
   Link
     MailFSOp     MailFSStringAbsState MailFSStringAbsAPI
     MailFSOp     MailboxTmpAbsState   MailFSAPI
     MailServerOp MailServerState      MailServerAPI
-    MailFSStringAbsImpl c5.
-*)
-Module c6 :=
-  Link
-    MailFSOp     MailFSStringAbsState MailFSStringAbsAPI
-    MailFSOp     MailboxTmpAbsState   MailFSAPI
-    MailServerOp MailServerState      MailServerAPI
     MailFSStringAbsImpl c5'.
+*)
 
 Module c7 :=
   Link
-    MailFSStringOp MailFSStringAbsState MailFSStringAPI
-    MailFSOp       MailFSStringAbsState MailFSStringAbsAPI
-    MailServerOp   MailServerState      MailServerAPI
-    MailFSStringImpl c6.
+    MailFSStringHOp MailFSStringAbsHState MailFSStringHAPI
+    MailFSHOp       MailFSStringAbsHState MailFSStringAbsHAPI
+    MailServerHOp   MailServerHState      MailServerHAPI
+    MailFSStringImplH c6.
 Module c8 :=
   Link
-    MailFSStringOp MailFSPathAbsState   MailFSPathAbsAPI
-    MailFSStringOp MailFSStringAbsState MailFSStringAPI
-    MailServerOp   MailServerState      MailServerAPI
-    MailFSPathAbsImpl c7.
+    MailFSStringHOp MailFSPathAbsHState   MailFSPathAbsHAPI
+    MailFSStringHOp MailFSStringAbsHState MailFSStringHAPI
+    MailServerHOp   MailServerHState      MailServerHAPI
+    MailFSPathAbsImplH c7.
 Module c9 :=
   Link
     MailFSPathHOp   MailFSPathAbsHState MailFSPathHAPI
@@ -179,20 +181,15 @@ Module c9 :=
     MailFSPathImplH c8.
 
 
-Module MailServerHOp := HOps MailServerOp StringIdx.
-Module MailServerHState := HState MailServerState StringIdx.
-Module MailServerHAPI := HLayer MailServerOp MailServerState MailServerAPI StringIdx.
-
-
 Module c10 :=
   Link
-    MailFSMergedOp MailFSMergedState MailFSMergedAPI
-    MailFSHOp      MailFSHState      MailFSHPathAPI
-    MailServerHOp  MailServerHState  MailServerHAPI
+    MailFSMergedOp MailFSMergedState   MailFSMergedAPI
+    MailFSPathHOp  MailFSPathAbsHState MailFSPathHAPI
+    MailServerHOp  MailServerHState    MailServerHAPI
     MailFSMergedImpl c9.
 
 
 Definition ms_bottom nsmtp npop3 :=
-  c9.compile_ts (mail_server nsmtp npop3).
+  c10.compile_ts (mail_server nsmtp npop3).
 
-Print Assumptions c9.compile_traces_match.
+Print Assumptions c10.compile_traces_match.

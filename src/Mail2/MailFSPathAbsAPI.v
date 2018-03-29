@@ -4,7 +4,7 @@ Require Import MailServerAPI.
 Require Import MailFSStringAPI.
 
 Module MailFSPathAbsState <: State.
-  
+
   Definition fs_contents := FMap.t (string * string) string.
 
   Record state_rec := mk_state {
@@ -16,6 +16,8 @@ Module MailFSPathAbsState <: State.
   Definition initP (s : State) := True.
 
 End MailFSPathAbsState.
+Module MailFSPathAbsHState := HState MailFSPathAbsState UserIdx.
+
 
 Module MailFSPathAbsAPI <: Layer MailFSStringOp MailFSPathAbsState.
 
@@ -195,3 +197,4 @@ Module MailFSPathAbsAPI <: Layer MailFSStringOp MailFSPathAbsState.
   Definition step := xstep.
 
 End MailFSPathAbsAPI.
+Module MailFSPathAbsHAPI := HLayer MailFSStringOp MailFSPathAbsState MailFSPathAbsAPI UserIdx.

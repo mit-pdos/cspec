@@ -6,8 +6,8 @@ Require Import MailFSAPI.
 
 Module MailFSStringOp <: Ops.
 
-    Definition extopT := MailServerAPI.MailServerOp.extopT.
-  
+  Definition extopT := MailServerAPI.MailServerOp.extopT.
+
   Inductive xopT : Type -> Type :=
   | CreateWriteTmp : forall (tmpfn : string) (data : string), xopT bool
   | LinkMail : forall (tmpfn : string) (mboxfn : string), xopT bool
@@ -28,6 +28,8 @@ Module MailFSStringOp <: Ops.
   Definition opT := xopT.
 
 End MailFSStringOp.
+Module MailFSStringHOp := HOps MailFSStringOp UserIdx.
+
 
 Module MailFSStringAPI <: Layer MailFSStringOp MailFSStringAbsState.
 
@@ -141,3 +143,4 @@ Module MailFSStringAPI <: Layer MailFSStringOp MailFSStringAbsState.
   Definition step := xstep.
 
 End MailFSStringAPI.
+Module MailFSStringHAPI := HLayer MailFSStringOp MailFSStringAbsState MailFSStringAPI UserIdx.

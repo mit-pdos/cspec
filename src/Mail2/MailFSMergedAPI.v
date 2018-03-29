@@ -168,13 +168,10 @@ Module MailFSMergedAPI <: Layer MailFSMergedOp MailFSMergedState.
 End MailFSMergedAPI.
 
 
-Module MailFSHOp := HOps MailFSPathOp StringIdx.
-
-
-Module MailFSMergedAbsAPI <: Layer MailFSHOp MailFSMergedState.
+Module MailFSMergedAbsAPI <: Layer MailFSPathHOp MailFSMergedState.
 
   Import MailFSPathOp.
-  Import MailFSHOp.
+  Import MailFSPathHOp.
   Import MailFSMergedState.
 
   Inductive xstep : forall T, opT T -> nat -> State -> T -> State -> list event -> Prop :=

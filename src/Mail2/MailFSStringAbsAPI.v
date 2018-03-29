@@ -32,6 +32,7 @@ Qed.
 
 Hint Resolve encode_tid_fn_injective.
 
+
 Module MailFSStringAbsState <: State.
 
   Definition dir_contents := FMap.t string string.
@@ -46,6 +47,8 @@ Module MailFSStringAbsState <: State.
   Definition initP (s : State) := True.
 
 End MailFSStringAbsState.
+Module MailFSStringAbsHState := HState MailFSStringAbsState UserIdx.
+
 
 Module MailFSStringAbsAPI <: Layer MailFSOp MailFSStringAbsState.
 
@@ -159,3 +162,4 @@ Module MailFSStringAbsAPI <: Layer MailFSOp MailFSStringAbsState.
   Definition step := xstep.
 
 End MailFSStringAbsAPI.
+Module MailFSStringAbsHAPI := HLayer MailFSOp MailFSStringAbsState MailFSStringAbsAPI UserIdx.

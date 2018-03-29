@@ -69,3 +69,18 @@ Module MailFSPathImpl :=
     MailFSPathOp MailFSPathAPI
     MailFSStringOp MailFSPathAbsAPI
     MailFSPathImpl'.
+
+Module MailFSPathImplH' :=
+  LayerImplMoversHT
+    MailFSPathAbsState 
+    MailFSPathOp MailFSPathAPI
+    MailFSStringOp MailFSPathAbsAPI
+    MailFSPathImpl'
+    UserIdx.
+
+Module MailFSPathImplH :=
+  LayerImplMovers
+    MailFSPathAbsHState 
+    MailFSPathHOp MailFSPathHAPI
+    MailFSStringHOp MailFSPathAbsHAPI
+    MailFSPathImplH'.

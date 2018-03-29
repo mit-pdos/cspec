@@ -273,3 +273,16 @@ Module MailFSPathAbsImpl :=
     MailFSPathAbsState MailFSPathAbsAPI
     MailFSStringAbsState MailFSStringAPI
     MailFSPathAbsImpl'.
+
+Module MailFSPathAbsImplH' :=
+ LayerImplAbsHT MailFSStringOp
+    MailFSPathAbsState MailFSPathAbsAPI
+    MailFSStringAbsState MailFSStringAPI
+    MailFSPathAbsImpl'
+    UserIdx.
+
+Module MailFSPathAbsImplH :=
+ LayerImplAbs MailFSStringHOp
+    MailFSPathAbsHState MailFSPathAbsHAPI
+    MailFSStringAbsHState MailFSStringHAPI
+    MailFSPathAbsImplH'.
