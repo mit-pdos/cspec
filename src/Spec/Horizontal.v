@@ -651,7 +651,9 @@ Module LayerImplMoversProtocolHT
     follows_protocol_proc hl1raw.step hp.step_allow tid s (compile_op op).
   Proof.
     destruct op; simpl.
-    pose proof (a.op_follows_protocol).
+    - pose proof (a.op_follows_protocol).
+      admit.
+    - constructor; constructor.
   Admitted.
 
   Theorem allowed_stable :
