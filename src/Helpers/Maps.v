@@ -483,6 +483,16 @@ Module FMap.
       apply add_in' in H; intuition eauto.
     Qed.
 
+    Theorem add_in_in : forall a1 a2 v m,
+        In a2 m ->
+        In a1 (add a2 v m) ->
+        In a1 m.
+    Proof.
+      intros.
+      eapply add_in' in H0; intuition eauto.
+      subst; eauto.
+    Qed.
+
     Fixpoint _remove (x0:A) (l:list (A*V)) : list (A*V) :=
       match l with
       | nil => nil

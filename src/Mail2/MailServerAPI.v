@@ -65,7 +65,6 @@ Module MailServerAPI <: Layer MailServerOp MailServerState.
 
   Import MailServerOp.
   Import MailServerState.
-  
 
   Inductive xstep : forall T, opT T -> nat -> State -> T -> State -> list event -> Prop :=
   | StepDeliverOK : forall m mbox fn tid,

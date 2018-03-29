@@ -21,6 +21,7 @@ Module MailFSMergedOp <: Ops.
 
   | Lock : forall (u : string), xopT unit
   | Unlock : forall (u : string), xopT unit
+  | Exists : forall (u : string), xopT bool
 
   | Ext : forall `(op : extopT T), xopT T
   .
@@ -155,6 +156,21 @@ Module MailFSMergedAPI <: Layer MailFSMergedOp MailFSMergedState.
       (mk_state fs (FMap.add u false locked))
       nil
 
+  | StepExistsOK : forall fs tid u locked,
+    FMap.In u locked ->
+    xstep (Exists u) tid
+      (mk_state fs locked)
+      true
+      (mk_state fs locked)
+      nil
+  | StepExistsErr : forall fs tid u locked,
+    ~ FMap.In u locked ->
+    xstep (Exists u) tid
+      (mk_state fs locked)
+      false
+      (mk_state fs locked)
+      nil
+
   | StepExt : forall s tid `(extop : extopT T) r,
     xstep (Ext extop) tid
       s
@@ -269,6 +285,21 @@ Module MailFSMergedAbsAPI <: Layer MailFSPathHOp MailFSMergedState.
       (mk_state fs locked)
       tt
       (mk_state fs (FMap.add u false locked))
+      nil
+
+  | StepExistsOK : forall fs tid u locked,
+    FMap.In u locked ->
+    xstep (CheckSlice u) tid
+      (mk_state fs locked)
+      true
+      (mk_state fs locked)
+      nil
+  | StepExistsErr : forall fs tid u locked,
+    ~ FMap.In u locked ->
+    xstep (CheckSlice u) tid
+      (mk_state fs locked)
+      false
+      (mk_state fs locked)
       nil
 
   | StepExt : forall s tid `(extop : extopT T) r u,

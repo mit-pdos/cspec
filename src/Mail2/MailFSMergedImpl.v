@@ -74,6 +74,8 @@ Module MailFSMergedOpImpl' <:
       | Random =>
         Op (MailFSMergedOp.Random)
       end
+    | CheckSlice u =>
+      Op (MailFSMergedOp.Exists u)
     end.
 
   Ltac break_pairs :=
@@ -85,7 +87,8 @@ Module MailFSMergedOpImpl' <:
     forall `(op : _ T),
       no_atomics (compile_op op).
   Proof.
-    destruct op; destruct op; compute; eauto.
+    destruct op; simpl; eauto.
+    destruct op; compute; eauto.
     all: repeat break_pairs; eauto.
   Qed.
 
@@ -115,7 +118,8 @@ Module MailFSMergedOpImpl' <:
   Theorem ysa_movers : forall `(op : _ T),
     ysa_movers MailFSMergedAPI.step (compile_op op).
   Proof.
-    destruct op; destruct op; simpl; repeat break_pairs; eauto 20.
+    destruct op; simpl; eauto.
+    destruct op; simpl; repeat break_pairs; eauto 20.
   Qed.
 
 End MailFSMergedOpImpl'.

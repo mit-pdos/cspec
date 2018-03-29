@@ -32,6 +32,7 @@ Section HorizontalComposition.
 
   Inductive horizOpT : Type -> Type :=
   | Slice : forall (i : indexT) T (op : sliceOpT T), horizOpT T
+  | CheckSlice : forall (i : indexT), horizOpT bool
   .
 
   Definition horizState := FMap.t indexT sliceState.
@@ -43,6 +44,11 @@ Section HorizontalComposition.
       FMap.MapsTo idx s S ->
       sliceStep op tid s r s' evs ->
       horizStep (Slice idx op) tid S r (FMap.add idx s' S) evs
+  | StepCheckSlice :
+    forall tid idx (S : horizState) r,
+      ( FMap.In idx S /\ r = true \/
+        ~ FMap.In idx S /\ r = false ) ->
+      horizStep (CheckSlice idx) tid S r S nil
   .
 
   Definition horizInitP (S : horizState) :=
@@ -66,6 +72,7 @@ End HorizontalComposition.
 Arguments horizState indexT {cmp} sliceState.
 Arguments horizStep indexT {cmp sliceOpT sliceState} sliceStep.
 Arguments Slice {indexT sliceOpT} i {T}.
+Arguments CheckSlice {indexT sliceOpT} i.
 
 
 Section HorizontalCompositionAbs.
@@ -95,6 +102,7 @@ Section HorizontalCompositionAbs.
 
   Hint Resolve FMap.add_mapsto.
   Hint Resolve FMap.mapsto_add_ne'.
+  Hint Resolve FMap.mapsto_in.
 
   Theorem horizAbsR_ok :
     op_abs absR sliceStep1 sliceStep2 ->
@@ -102,19 +110,35 @@ Section HorizontalCompositionAbs.
   Proof.
     unfold op_abs, horizAbsR; intros.
     inversion H1; clear H1; subst; repeat sigT_eq.
-    eapply H0 in H5; deex.
-    eapply H in H8; eauto; deex.
-    eexists; split; [ | econstructor; eauto ].
-    intros.
-    destruct (i == idx); subst.
-    - split; intros.
-      + eapply FMap.mapsto_add_eq in H5; subst; eauto.
-      + eapply FMap.mapsto_add_eq in H5; subst; eauto.
-    - specialize (H0 i); intuition idtac.
-      + eapply FMap.mapsto_add_ne in H0; eauto.
-        specialize (H5 _ H0); deex; eauto.
-      + eapply FMap.mapsto_add_ne in H0; eauto.
-        specialize (H6 _ H0); deex; eauto.
+    {
+      eapply H0 in H5; deex.
+      eapply H in H8; eauto; deex.
+      eexists; split; [ | econstructor; eauto ].
+      intros.
+      destruct (i == idx); subst.
+      - split; intros.
+        + eapply FMap.mapsto_add_eq in H5; subst; eauto.
+        + eapply FMap.mapsto_add_eq in H5; subst; eauto.
+      - specialize (H0 i); intuition idtac.
+        + eapply FMap.mapsto_add_ne in H0; eauto.
+          specialize (H5 _ H0); deex; eauto.
+        + eapply FMap.mapsto_add_ne in H0; eauto.
+          specialize (H6 _ H0); deex; eauto.
+    }
+    {
+      eexists.
+      split.
+      eassumption.
+      constructor.
+      intuition idtac.
+      - eapply FMap.in_mapsto_exists in H3; deex.
+        eapply H0 in H1; deex.
+        intuition eauto.
+      - right; intuition idtac.
+        eapply FMap.in_mapsto_exists in H1; deex.
+        eapply H0 in H1; deex.
+        eauto.
+    }
   Qed.
 
 
@@ -156,6 +180,11 @@ Section HorizontalCompositionMovers.
 
   Hint Resolve FMap.add_mapsto.
   Hint Resolve FMap.mapsto_add_ne'.
+  Hint Resolve FMap.mapsto_in.
+  Hint Resolve FMap.add_in_in.
+  Hint Resolve FMap.add_incr.
+  Hint Constructors horizStep.
+  Hint Extern 1 (horizStep _ _ _ _ _ _ _ _ _) => econstructor.
 
   Theorem horiz_right_mover_ok :
     forall `(op : sliceOpT T),
@@ -168,19 +197,26 @@ Section HorizontalCompositionMovers.
     inversion H0; clear H0; subst; repeat sigT_eq.
     eapply H in H10 as H'; intuition subst.
     inversion H3; clear H3; subst; repeat sigT_eq.
-    destruct (i == idx); subst.
-    - eapply FMap.mapsto_add in H6; subst.
-      eapply H1 in H11; eauto; deex.
-      eexists; split.
-      + econstructor; eauto.
-      + rewrite FMap.add_add.
-        erewrite <- FMap.add_add with (v1 := s'0).
-        econstructor; eauto.
-    - eapply FMap.mapsto_add_ne in H6; eauto.
-      eexists; split.
-      + econstructor; eauto.
-      + rewrite FMap.add_add_ne by eauto.
-        econstructor; eauto.
+    {
+      destruct (i == idx); subst.
+      - eapply FMap.mapsto_add in H6; subst.
+        eapply H1 in H11; eauto; deex.
+        eexists; split.
+        + econstructor; eauto.
+        + rewrite FMap.add_add.
+          erewrite <- FMap.add_add with (v1 := s'0).
+          econstructor; eauto.
+      - eapply FMap.mapsto_add_ne in H6; eauto.
+        eexists; split.
+        + econstructor; eauto.
+        + rewrite FMap.add_add_ne by eauto.
+          econstructor; eauto.
+    }
+    {
+      eexists; split; eauto.
+      econstructor.
+      intuition subst; eauto.
+    }
   Qed.
 
   Theorem horiz_enabled_stable :
@@ -193,7 +229,7 @@ Section HorizontalCompositionMovers.
     unfold enabled_stable; intros.
     unfold enabled_in in *; repeat deex.
     inversion H1; clear H1; subst; repeat sigT_eq.
-    inversion H2; clear H2; subst; repeat sigT_eq.
+    inversion H2; clear H2; subst; repeat sigT_eq; eauto.
     destruct (i == idx); subst.
     - replace s0 with s1 in * by ( eapply FMap.mapsto_unique; eauto ).
       edestruct H.
@@ -218,19 +254,26 @@ Section HorizontalCompositionMovers.
     - inversion H0; clear H0; subst; repeat sigT_eq.
       eapply H in H10 as H'; intuition subst.
       inversion H3; clear H3; subst; repeat sigT_eq.
-      destruct (i == idx); subst.
-      * eapply FMap.mapsto_add in H7; subst.
-        eapply H1 in H11; eauto; deex.
-        eexists; split.
-        + econstructor; eauto.
-        + rewrite FMap.add_add.
-          erewrite <- FMap.add_add with (v1 := s').
-          econstructor; eauto.
-      * eapply FMap.mapsto_add_ne in H7; eauto.
-        eexists; split.
-        + econstructor; eauto.
-        + rewrite FMap.add_add_ne by eauto.
-          econstructor; eauto.
+      {
+        destruct (i == idx); subst.
+        * eapply FMap.mapsto_add in H7; subst.
+          eapply H1 in H11; eauto; deex.
+          eexists; split.
+          + econstructor; eauto.
+          + rewrite FMap.add_add.
+            erewrite <- FMap.add_add with (v1 := s').
+            econstructor; eauto.
+        * eapply FMap.mapsto_add_ne in H7; eauto.
+          eexists; split.
+          + econstructor; eauto.
+          + rewrite FMap.add_add_ne by eauto.
+            econstructor; eauto.
+      }
+      {
+        eexists; split; eauto.
+        econstructor.
+        intuition subst; eauto.
+      }
   Qed.
 
   Theorem horiz_left_mover_pred_ok :
@@ -247,19 +290,26 @@ Section HorizontalCompositionMovers.
     - inversion H0; clear H0; subst; repeat sigT_eq.
       eapply H in H10 as H'; intuition subst.
       inversion H4; clear H4; subst; repeat sigT_eq.
-      destruct (i == idx); subst.
-      * eapply FMap.mapsto_add in H7; subst.
-        eapply H1 in H12; eauto; deex.
-        eexists; split.
-        + econstructor; eauto.
-        + rewrite FMap.add_add.
-          erewrite <- FMap.add_add with (v1 := s').
-          econstructor; eauto.
-      * eapply FMap.mapsto_add_ne in H7; eauto.
-        eexists; split.
-        + econstructor; eauto.
-        + rewrite FMap.add_add_ne by eauto.
-          econstructor; eauto.
+      {
+        destruct (i == idx); subst.
+        * eapply FMap.mapsto_add in H7; subst.
+          eapply H1 in H12; eauto; deex.
+          eexists; split.
+          + econstructor; eauto.
+          + rewrite FMap.add_add.
+            erewrite <- FMap.add_add with (v1 := s').
+            econstructor; eauto.
+        * eapply FMap.mapsto_add_ne in H7; eauto.
+          eexists; split.
+          + econstructor; eauto.
+          + rewrite FMap.add_add_ne by eauto.
+            econstructor; eauto.
+      }
+      {
+        eexists; split; eauto.
+        econstructor.
+        intuition subst; eauto.
+      }
   Qed.
 
   Hint Resolve horiz_right_mover_ok.
@@ -278,7 +328,7 @@ Section HorizontalCompositionMovers.
     induction 1; intros; eauto.
     eapply IHclos_refl_trans_1n in H1.
     repeat deex.
-    inversion H2; clear H2; subst; repeat sigT_eq.
+    inversion H2; clear H2; subst; repeat sigT_eq; eauto.
     destruct (i == idx); subst; eauto.
     eapply FMap.mapsto_add_ne in H1; eauto.
   Qed.
@@ -295,7 +345,7 @@ Section HorizontalCompositionMovers.
   Proof.
     induction 1; intros; eauto.
     - eapply IHatomic_exec2 in H1; repeat deex; eauto.
-    - inversion H; clear H; subst; repeat sigT_eq.
+    - inversion H; clear H; subst; repeat sigT_eq; eauto.
       destruct (i == idx); subst; eauto.
   Qed.
 
@@ -309,10 +359,10 @@ Section HorizontalCompositionMovers.
   Proof.
     induction 1; intros; eauto.
     - eapply IHexec_any in H2; repeat deex.
-      inversion H0; clear H0; subst; repeat sigT_eq.
+      inversion H0; clear H0; subst; repeat sigT_eq; eauto.
       destruct (i == idx); subst; eauto.
     - inversion H; clear H; subst; repeat sigT_eq; eauto.
-      + inversion H7; clear H7; subst; repeat sigT_eq.
+      + inversion H7; clear H7; subst; repeat sigT_eq; eauto.
         destruct (i == idx); subst; eauto.
       + eapply atomic_exec_preserves_slice in H7; eauto.
     - eapply IHexec_any in H1; repeat deex.
@@ -322,7 +372,7 @@ Section HorizontalCompositionMovers.
       generalize (@inr T _ p').
       clear; intros.
       induction H; eauto.
-      + inversion H; clear H; subst; repeat sigT_eq.
+      + inversion H; clear H; subst; repeat sigT_eq; eauto.
         destruct (i == idx); subst; eauto.
       + eapply atomic_exec_preserves_slice in H; eauto.
   Qed.
@@ -337,7 +387,7 @@ Section HorizontalCompositionMovers.
           exec_any sliceStep tid s1 (Op op) r s2.
   Proof.
     induction 1; intros; subst.
-    - inversion H0; clear H0; subst; repeat sigT_eq.
+    - inversion H0; clear H0; subst; repeat sigT_eq; eauto.
       destruct (i == idx); subst; eauto.
       replace s3 with s1 in * by ( eapply FMap.mapsto_unique; eauto ).
       eapply ExecAnyOther; eauto.
@@ -363,7 +413,7 @@ Section HorizontalCompositionMovers.
     - replace s2 with s1 in * by ( eapply FMap.mapsto_unique; eauto ).
       eauto.
     - repeat deex.
-      inversion H3; clear H3; subst; repeat sigT_eq.
+      inversion H3; clear H3; subst; repeat sigT_eq; eauto.
       clear H0.
       destruct (i == idx); subst; eauto.
       replace s1 with s in * by ( eapply FMap.mapsto_unique; eauto ).
@@ -491,6 +541,8 @@ Module HProtocol (o : Ops) (s : State) (p : Protocol o s) (i : HIndex).
       exists s,
         FMap.MapsTo i s S /\
         p.step_allow op tid s
+    | CheckSlice i =>
+      True
     end.
 End HProtocol.
 
@@ -550,12 +602,13 @@ Module LayerImplMoversProtocolHT
   Definition compile_op T (op : ho2.opT T) : proc ho1.opT T :=
     match op with
     | Slice i op => SliceProc i (a.compile_op op)
+    | CheckSlice i => Op (CheckSlice i)
     end.
 
   Theorem compile_op_no_atomics : forall T (op : ho2.opT T),
     no_atomics (compile_op op).
   Proof.
-    destruct op; simpl.
+    destruct op; simpl; eauto.
     pose proof (a.compile_op_no_atomics op).
     generalize dependent H.
     generalize (a.compile_op op).
@@ -566,7 +619,7 @@ Module LayerImplMoversProtocolHT
   Theorem ysa_movers : forall T (op : ho2.opT T),
     ysa_movers hl1.step (compile_op op).
   Proof.
-    destruct op; simpl.
+    destruct op; simpl; eauto.
     eapply horiz_ysa_movers.
     eapply a.ysa_movers.
   Qed.
@@ -586,9 +639,12 @@ Module LayerImplMoversProtocolHT
   Proof.
     intro; intros.
     destruct op; simpl in *.
-    eapply atomic_exec_horizStep in H; repeat deex.
-    eapply a.compile_correct in H1.
-    econstructor; eauto.
+    - eapply atomic_exec_horizStep in H; repeat deex.
+      eapply a.compile_correct in H1.
+      econstructor; eauto.
+    - repeat atomic_exec_inv.
+      inversion H5; clear H5; subst; repeat sigT_eq.
+      econstructor; eauto.
   Qed.
 
   Theorem op_follows_protocol : forall tid s `(op : ho2.opT T),
@@ -605,19 +661,25 @@ Module LayerImplMoversProtocolHT
       hl1.step op' tid' s r s' evs ->
       hp.step_allow op tid s'.
   Proof.
-    destruct op, op'.
-    intros.
-    inversion H0; clear H0; intuition idtac.
-    inversion H1; clear H1; subst; repeat sigT_eq.
-    pose (i.indexCmp).
-    destruct (i == i0); subst.
-    - replace s0 with x in * by ( eapply FMap.mapsto_unique; eauto ).
-      econstructor; split.
-      eapply FMap.add_mapsto.
-      eapply a.allowed_stable; eauto.
-    - econstructor; split.
-      eapply FMap.mapsto_add_ne'; eauto.
-      eauto.
+    destruct op, op'; eauto.
+    {
+      intros.
+      inversion H0; clear H0; intuition idtac.
+      inversion H1; clear H1; subst; repeat sigT_eq.
+      pose (i.indexCmp).
+      destruct (i == i0); subst.
+      - replace s0 with x in * by ( eapply FMap.mapsto_unique; eauto ).
+        econstructor; split.
+        eapply FMap.add_mapsto.
+        eapply a.allowed_stable; eauto.
+      - econstructor; split.
+        eapply FMap.mapsto_add_ne'; eauto.
+        eauto.
+    }
+    {
+      intros.
+      inversion H1; subst; eauto.
+    }
   Qed.
 
   Theorem raw_step_ok :
@@ -626,13 +688,16 @@ Module LayerImplMoversProtocolHT
       hl1.step op tid s r s' evs.
   Proof.
     destruct op.
-    unfold restricted_step; intuition idtac.
-    inversion H0; clear H0; intuition idtac.
-    inversion H1; clear H1; subst; repeat sigT_eq.
-    eapply FMap.mapsto_unique in H0 as H0'; eauto; subst.
-    econstructor; eauto.
-    eapply a.raw_step_ok.
-    constructor; eauto.
+    - unfold restricted_step; intuition idtac.
+      inversion H0; clear H0; intuition idtac.
+      inversion H1; clear H1; subst; repeat sigT_eq.
+      eapply FMap.mapsto_unique in H0 as H0'; eauto; subst.
+      econstructor; eauto.
+      eapply a.raw_step_ok.
+      constructor; eauto.
+    - unfold restricted_step; intuition idtac.
+      inversion H1; clear H1; subst; repeat sigT_eq.
+      econstructor; eauto.
   Qed.
 
 End LayerImplMoversProtocolHT.
@@ -654,12 +719,13 @@ Module LayerImplMoversHT
   Definition compile_op T (op : ho2.opT T) : proc ho1.opT T :=
     match op with
     | Slice i op => SliceProc i (a.compile_op op)
+    | CheckSlice i => Op (CheckSlice i)
     end.
 
   Theorem compile_op_no_atomics : forall T (op : ho2.opT T),
     no_atomics (compile_op op).
   Proof.
-    destruct op; simpl.
+    destruct op; simpl; eauto.
     pose proof (a.compile_op_no_atomics op).
     generalize dependent H.
     generalize (a.compile_op op).
@@ -670,7 +736,7 @@ Module LayerImplMoversHT
   Theorem ysa_movers : forall T (op : ho2.opT T),
     ysa_movers hl1.step (compile_op op).
   Proof.
-    destruct op; simpl.
+    destruct op; simpl; eauto.
     eapply horiz_ysa_movers.
     eapply a.ysa_movers.
   Qed.
@@ -690,9 +756,12 @@ Module LayerImplMoversHT
   Proof.
     intro; intros.
     destruct op; simpl in *.
-    eapply atomic_exec_horizStep in H; repeat deex.
-    eapply a.compile_correct in H1.
-    econstructor; eauto.
+    - eapply atomic_exec_horizStep in H; repeat deex.
+      eapply a.compile_correct in H1.
+      econstructor; eauto.
+    - repeat atomic_exec_inv.
+      inversion H5; clear H5; subst; repeat sigT_eq.
+      econstructor; eauto.
   Qed.
 
 End LayerImplMoversHT.
