@@ -466,12 +466,98 @@ Section HorizontalCompositionMovers.
   Hint Resolve horiz_left_mover_pred_ok.
 
 
+  Lemma atomic_exec_horizStep : forall `(p0 : proc _ T) i tid S v S' evs,
+    atomic_exec (horizStep indexT indexValid sliceStep) p0 tid S v S' evs ->
+      forall p,
+        p0 = SliceProc i p ->
+        exists s',
+          atomic_exec sliceStep p tid (hget S i) v s' evs /\
+          S' = hadd i s' S.
+  Proof.
+    induction 1; simpl; intros.
+    - destruct p; simpl in *; try congruence.
+      inversion H; clear H; subst; repeat sigT_eq.
+      eexists; split; eauto.
+      destruct_validIndex.
+      rewrite hadd_hget_eq; eauto.
+    - destruct p; simpl in *; try congruence.
+      inversion H1; clear H1; subst; repeat sigT_eq.
+      edestruct IHatomic_exec1; eauto.
+      edestruct IHatomic_exec2; eauto.
+      intuition subst.
+      destruct_validIndex.
+      rewrite hget_hadd_eq in *.
+      eexists; split; eauto.
+      rewrite hadd_hadd_eq; eauto.
+    - destruct p; simpl in *; try congruence.
+      inversion H0; clear H0; subst; repeat sigT_eq.
+      inversion H; clear H; subst; repeat sigT_eq.
+      eauto.
+    - destruct p0; simpl in *; try congruence.
+      inversion H0; clear H0; subst; repeat sigT_eq.
+      edestruct IHatomic_exec.
+      + unfold until1.
+        instantiate (1 := Bind (p0 v0) (fun x => if Bool.bool_dec (c0 x) true then Ret x else Until c0 (fun x0 => p0 x0) (Some x))).
+        simpl; f_equal.
+        eapply functional_extensionality; intros.
+        destruct (Bool.bool_dec (c0 x) true); reflexivity.
+      + intuition subst.
+        eexists; split; eauto.
+  Qed.
+
+  Lemma exec_tid_slice :
+    forall S1 S2 tid `(p : proc _ T) r evs,
+      exec_tid (horizStep indexT indexValid sliceStep) tid S1 p S2 r evs ->
+      forall `(p' : proc _ T) i,
+        p = SliceProc i p' ->
+        exists s' r',
+          exec_tid sliceStep tid (hget S1 i) p' s' r' evs /\
+          S2 = hadd i s' S1 /\
+          match r with
+          | inl v => r' = inl v
+          | inr rx => exists rx', r' = inr rx' /\ rx = SliceProc i rx'
+          end.
+  Proof.
+    induction 1; intros; subst.
+    - destruct p'; simpl in *; try congruence.
+      inversion H; clear H; subst; repeat sigT_eq.
+      do 2 eexists; split; eauto.
+      split; eauto.
+      destruct_validIndex.
+      rewrite hadd_hget_eq; eauto.
+    - destruct p'; simpl in *; try congruence.
+      inversion H0; clear H0; subst; repeat sigT_eq.
+      inversion H; clear H; subst; repeat sigT_eq.
+      eauto 10.
+    - destruct p'; simpl in *; try congruence.
+      inversion H0; clear H0; subst; repeat sigT_eq.
+      eapply atomic_exec_horizStep in H; eauto; deex.
+      eauto 10.
+    - destruct p'; simpl in *; try congruence.
+      inversion H0; clear H0; subst; repeat sigT_eq.
+      edestruct IHexec_tid; eauto; repeat deex.
+      do 2 eexists; split; eauto.
+      destruct result; subst; eauto.
+      deex; eauto.
+    - destruct p'; simpl in *; try congruence.
+      inversion H; clear H; subst; repeat sigT_eq.
+      do 2 eexists; split; eauto.
+      split; eauto.
+      destruct_validIndex.
+      rewrite hadd_hget_eq; eauto.
+      eexists; split; eauto.
+      unfold until1; simpl.
+      f_equal.
+      apply functional_extensionality; intros.
+      destruct (Bool.bool_dec (c0 x) true); eauto.
+  Qed.
+
   Lemma exec_any_slice :
     forall S1 S2 tid `(p : proc _ T) r,
       exec_any (horizStep indexT indexValid sliceStep) tid S1 p r S2 ->
-      forall `(op : sliceOpT T) i,
-        p = Op (Slice i op) ->
-        exec_any sliceStep tid (hget S1 i) (Op op) r (hget S2 i).
+      forall `(p' : proc _ T) i,
+        p = SliceProc i p' ->
+        exec_any sliceStep tid (hget S1 i) p' r (hget S2 i).
   Proof.
     induction 1; intros; subst.
     - inversion H0; clear H0; subst; repeat sigT_eq; eauto.
@@ -486,12 +572,15 @@ Section HorizontalCompositionMovers.
       + specialize (IHexec_any _ _ eq_refl).
         rewrite hget_hadd_ne in * by eauto.
         eauto.
-    - inversion H; clear H; subst; repeat sigT_eq.
-      inversion H6; clear H6; subst; repeat sigT_eq.
-      eapply ExecAnyThisDone.
-      destruct_validIndex; rewrite hget_hadd_eq.
-      eauto.
-    - inversion H.
+    - eapply exec_tid_slice in H; eauto; repeat deex.
+      destruct_validIndex.
+      rewrite hget_hadd_eq; eauto.
+    - eapply exec_tid_slice in H; eauto; repeat deex.
+      eapply ExecAnyThisMore; eauto.
+      specialize (IHexec_any _ _ eq_refl).
+      destruct_validIndex.
+      rewrite hget_hadd_eq in *.
+      eapply IHexec_any.
   Qed.
 
   Lemma exec_others_slice :
@@ -704,45 +793,6 @@ Module LayerImplMoversProtocolHT
     eapply a.ysa_movers.
   Qed.
 
-  Lemma atomic_exec_horizStep : forall `(p0 : proc _ T) i tid S v S' evs,
-    atomic_exec hl1.step p0 tid S v S' evs ->
-      forall p,
-        p0 = SliceProc i p ->
-        exists s',
-          atomic_exec l1.step p tid (hget S i) v s' evs /\
-          S' = hadd i s' S.
-  Proof.
-    induction 1; simpl; intros.
-    - destruct p; simpl in *; try congruence.
-      inversion H; clear H; subst; repeat sigT_eq.
-      eexists; split; eauto.
-      destruct_validIndex.
-      rewrite hadd_hget_eq; eauto.
-    - destruct p; simpl in *; try congruence.
-      inversion H1; clear H1; subst; repeat sigT_eq.
-      edestruct IHatomic_exec1; eauto.
-      edestruct IHatomic_exec2; eauto.
-      intuition subst.
-      destruct_validIndex.
-      rewrite hget_hadd_eq in *.
-      eexists; split; eauto.
-      rewrite hadd_hadd_eq; eauto.
-    - destruct p; simpl in *; try congruence.
-      inversion H0; clear H0; subst; repeat sigT_eq.
-      inversion H; clear H; subst; repeat sigT_eq.
-      eauto.
-    - destruct p0; simpl in *; try congruence.
-      inversion H0; clear H0; subst; repeat sigT_eq.
-      edestruct IHatomic_exec.
-      + unfold until1.
-        instantiate (1 := Bind (p0 v0) (fun x => if Bool.bool_dec (c0 x) true then Ret x else Until c0 (fun x0 => p0 x0) (Some x))).
-        simpl; f_equal.
-        eapply functional_extensionality; intros.
-        destruct (Bool.bool_dec (c0 x) true); reflexivity.
-      + intuition subst.
-        eexists; split; eauto.
-  Qed.
-
   Theorem compile_correct :
     compile_correct compile_op hl1.step hl2.step.
   Proof.
@@ -772,6 +822,7 @@ Module LayerImplMoversProtocolHT
       + constructor. eauto.
         intros.
         eapply H1; eauto.
+        eapply exec_any_slice; eauto.
         admit.
       + constructor. eauto.
       + constructor.
@@ -860,45 +911,6 @@ Module LayerImplMoversHT
     destruct op; simpl; eauto.
     eapply horiz_ysa_movers.
     eapply a.ysa_movers.
-  Qed.
-
-  Lemma atomic_exec_horizStep : forall `(p0 : proc _ T) i tid S v S' evs,
-    atomic_exec hl1.step p0 tid S v S' evs ->
-      forall p,
-        p0 = SliceProc i p ->
-        exists s',
-          atomic_exec l1.step p tid (hget S i) v s' evs /\
-          S' = hadd i s' S.
-  Proof.
-    induction 1; simpl; intros.
-    - destruct p; simpl in *; try congruence.
-      inversion H; clear H; subst; repeat sigT_eq.
-      eexists; split; eauto.
-      destruct_validIndex.
-      rewrite hadd_hget_eq; eauto.
-    - destruct p; simpl in *; try congruence.
-      inversion H1; clear H1; subst; repeat sigT_eq.
-      edestruct IHatomic_exec1; eauto.
-      edestruct IHatomic_exec2; eauto.
-      intuition subst.
-      destruct_validIndex.
-      rewrite hget_hadd_eq in *.
-      eexists; split; eauto.
-      rewrite hadd_hadd_eq; eauto.
-    - destruct p; simpl in *; try congruence.
-      inversion H0; clear H0; subst; repeat sigT_eq.
-      inversion H; clear H; subst; repeat sigT_eq.
-      eauto.
-    - destruct p0; simpl in *; try congruence.
-      inversion H0; clear H0; subst; repeat sigT_eq.
-      edestruct IHatomic_exec.
-      + unfold until1.
-        instantiate (1 := Bind (p0 v0) (fun x => if Bool.bool_dec (c0 x) true then Ret x else Until c0 (fun x0 => p0 x0) (Some x))).
-        simpl; f_equal.
-        eapply functional_extensionality; intros.
-        destruct (Bool.bool_dec (c0 x) true); reflexivity.
-      + intuition subst.
-        eexists; split; eauto.
   Qed.
 
   Theorem compile_correct :
