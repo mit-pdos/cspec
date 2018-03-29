@@ -1,3 +1,5 @@
+Require Import ProofIrrelevance.
+Require Import FunctionalExtensionality.
 Require Import Helpers.Helpers.
 Require Import Helpers.ListStuff.
 Require Import Helpers.Maps.
@@ -30,24 +32,138 @@ Section HorizontalComposition.
   Variable sliceStep : OpSemantics sliceOpT sliceState.
   Variable initP : sliceState -> Prop.
 
-  Inductive horizOpT : Type -> Type :=
-  | Slice : forall (i : indexT) T (op : sliceOpT T), horizOpT T
-  | CheckSlice : forall (i : indexT), horizOpT bool
+  Definition validIndexT := { i : indexT | indexValid i }.
+
+  Inductive CheckResult :=
+  | Missing
+  | Present : validIndexT -> CheckResult
   .
 
-  Definition horizState := FMap.t indexT sliceState.
+  Inductive horizOpT : Type -> Type :=
+  | Slice : forall (i : validIndexT) T (op : sliceOpT T), horizOpT T
+  | CheckSlice : forall (i : indexT), horizOpT CheckResult
+  .
+
+  Record horizState := mk_horizState {
+    HSMap : FMap.t indexT sliceState;
+    HSValid : forall i, indexValid i -> FMap.In i HSMap;
+  }.
+
+  Definition hget (S : horizState) (i : validIndexT) : sliceState.
+    destruct S.
+    destruct i.
+    eapply HSValid0 in i.
+    eapply FMap.in_mapsto_get in i.
+    destruct i.
+    exact x0.
+  Defined.
+
+  Definition hadd (i : validIndexT) (s : sliceState) (S : horizState) : horizState.
+    destruct S.
+    destruct i.
+    refine (mk_horizState (FMap.add x s HSMap0) _).
+    intros.
+    eapply FMap.add_incr; eauto.
+  Defined.
+
+  Theorem hget_mapsto :
+    forall i m,
+      FMap.MapsTo (proj1_sig i) (hget m i) (HSMap m).
+  Proof.
+    destruct m.
+    destruct i.
+    simpl in *.
+    destruct (FMap.in_mapsto_get x HSMap0 (HSValid0 x i)).
+    eauto.
+  Qed.
+
+  Opaque FMap.add.
+
+  Theorem hget_hadd_eq : forall S s i H0 H1,
+    hget (hadd (exist _ i H0) s S) (exist _ i H1) = s.
+  Proof.
+    destruct S; simpl; intros.
+    match goal with
+    | |- context[FMap.in_mapsto_get ?a ?b ?c] => destruct (FMap.in_mapsto_get a b c)
+    end.
+    eapply FMap.mapsto_add in m; eauto.
+  Qed.
+
+  Theorem hget_hadd_ne : forall S s i i' H0 H1,
+    i <> i' ->
+    hget (hadd (exist _ i H0) s S) (exist _ i' H1) = hget S (exist _ i' H1).
+  Proof.
+    destruct S; simpl; intros.
+    repeat match goal with
+    | |- context[FMap.in_mapsto_get ?a ?b ?c] => destruct (FMap.in_mapsto_get a b c)
+    end.
+    eapply FMap.mapsto_add_ne in m; eauto.
+    eapply FMap.mapsto_unique; eauto.
+  Qed.
+
+  Theorem hadd_hget_eq : forall S i H0 H1,
+    hadd (exist _ i H0) (hget S (exist _ i H1)) S = S.
+  Proof.
+    destruct S; simpl; intros.
+    repeat match goal with
+    | |- context[FMap.in_mapsto_get ?a ?b ?c] => destruct (FMap.in_mapsto_get a b c)
+    end.
+    match goal with
+    | |- {| HSMap := ?m ; HSValid := ?v |} = _ =>
+      generalize v; remember m
+    end.
+    rewrite FMap.mapsto_add_nilpotent in Heqt; eauto.
+    subst; intros.
+    f_equal.
+    apply proof_irrelevance.
+  Qed.
+
+  Theorem hadd_hadd_eq : forall S s s' i H0 H1,
+    hadd (exist _ i H0) s (hadd (exist _ i H1) s' S) = hadd (exist _ i H0) s S.
+  Proof.
+    destruct S; simpl; intros.
+    match goal with
+    | |- {| HSMap := ?m ; HSValid := ?v |} = _ =>
+      generalize v; remember m
+    end.
+    rewrite FMap.add_add in Heqt.
+    subst; intros.
+    f_equal.
+    apply proof_irrelevance.
+  Qed.
+
+  Theorem hadd_hadd_ne : forall S s s' i i' H0 H1,
+    i <> i' ->
+    hadd (exist _ i H0) s (hadd (exist _ i' H1) s' S) =
+    hadd (exist _ i' H1) s' (hadd (exist _ i H0) s S).
+  Proof.
+    destruct S; simpl; intros.
+    match goal with
+    | |- {| HSMap := ?m ; HSValid := ?v |} = _ =>
+      generalize v; remember m
+    end.
+    rewrite FMap.add_add_ne in Heqt; eauto.
+    subst; intros.
+    f_equal.
+    apply proof_irrelevance.
+  Qed.
+
+  Inductive sameSlice : CheckResult -> indexT -> Prop :=
+  | SameSliceMissing : forall i,
+    sameSlice Missing i
+  | SameSlicePresent : forall i P,
+    sameSlice (Present (exist _ i P)) i
+  .
 
   Inductive horizStep :
       forall T, horizOpT T -> nat -> horizState -> T -> horizState -> list event -> Prop :=
   | StepSlice :
-    forall tid idx (S : horizState) (s : sliceState) `(op : sliceOpT T) r s' evs,
-      FMap.MapsTo idx s S ->
-      sliceStep op tid s r s' evs ->
-      horizStep (Slice idx op) tid S r (FMap.add idx s' S) evs
+    forall tid idx (S : horizState) `(op : sliceOpT T) r s' evs,
+      sliceStep op tid (hget S idx) r s' evs ->
+      horizStep (Slice idx op) tid S r (hadd idx s' S) evs
   | StepCheckSlice :
     forall tid idx (S : horizState) r,
-      ( FMap.In idx S /\ r = true \/
-        ~ FMap.In idx S /\ r = false ) ->
+      sameSlice r idx ->
       horizStep (CheckSlice idx) tid S r S nil
   .
 
@@ -55,10 +171,10 @@ Section HorizontalComposition.
     forall i,
       indexValid i ->
       exists s,
-        FMap.MapsTo i s S /\
+        FMap.MapsTo i s (HSMap S) /\
         initP s.
 
-  Fixpoint SliceProc (i : indexT) `(p : proc sliceOpT T) : proc horizOpT T :=
+  Fixpoint SliceProc (i : validIndexT) `(p : proc sliceOpT T) : proc horizOpT T :=
     match p with
     | Op op => Op (Slice i op)
     | Ret v => Ret v
@@ -69,16 +185,27 @@ Section HorizontalComposition.
 
 End HorizontalComposition.
 
-Arguments horizState indexT {cmp} sliceState.
-Arguments horizStep indexT {cmp sliceOpT sliceState} sliceStep.
-Arguments Slice {indexT sliceOpT} i {T}.
-Arguments CheckSlice {indexT sliceOpT} i.
+Arguments horizState indexT {cmp} indexValid sliceState.
+Arguments horizStep indexT {cmp} indexValid {sliceOpT sliceState} sliceStep.
+Arguments Slice {indexT indexValid sliceOpT} i {T}.
+Arguments CheckSlice {indexT indexValid sliceOpT} i.
+
+Ltac destruct_horizState :=
+  match goal with
+  | x : horizState _ _ _ |- _ => destruct x; simpl in *
+  end.
+
+Ltac destruct_validIndex :=
+  match goal with
+  | x : validIndexT _ |- _ => destruct x; simpl in *
+  end.
 
 
 Section HorizontalCompositionAbs.
 
   Variable indexT : Type.
   Context {cmp : Ordering indexT}.
+  Variable indexValid : indexT -> Prop.
 
   Variable sliceOpT : Type -> Type.
 
@@ -91,14 +218,15 @@ Section HorizontalCompositionAbs.
 
   Variable absR : sliceState1 -> sliceState2 -> Prop.
 
-  Definition horizAbsR (S1 : horizState indexT sliceState1) (S2 : horizState indexT sliceState2) : Prop :=
+  Definition horizAbsR (S1 : horizState indexT indexValid sliceState1)
+                       (S2 : horizState indexT indexValid sliceState2) : Prop :=
     forall (i : indexT),
       ( forall s1,
-          FMap.MapsTo i s1 S1 ->
-            exists s2, FMap.MapsTo i s2 S2 /\ absR s1 s2 ) /\
+          FMap.MapsTo i s1 (HSMap S1) ->
+            exists s2, FMap.MapsTo i s2 (HSMap S2) /\ absR s1 s2 ) /\
       ( forall s2,
-          FMap.MapsTo i s2 S2 ->
-            exists s1, FMap.MapsTo i s1 S1 /\ absR s1 s2 ).
+          FMap.MapsTo i s2 (HSMap S2) ->
+            exists s1, FMap.MapsTo i s1 (HSMap S1) /\ absR s1 s2 ).
 
   Hint Resolve FMap.add_mapsto.
   Hint Resolve FMap.mapsto_add_ne'.
@@ -106,24 +234,34 @@ Section HorizontalCompositionAbs.
 
   Theorem horizAbsR_ok :
     op_abs absR sliceStep1 sliceStep2 ->
-    op_abs horizAbsR (horizStep indexT sliceStep1) (horizStep indexT sliceStep2).
+    op_abs horizAbsR (horizStep indexT indexValid sliceStep1) (horizStep indexT indexValid sliceStep2).
   Proof.
     unfold op_abs, horizAbsR; intros.
     inversion H1; clear H1; subst; repeat sigT_eq.
     {
-      eapply H0 in H5; deex.
-      eapply H in H8; eauto; deex.
-      eexists; split; [ | econstructor; eauto ].
-      intros.
-      destruct (i == idx); subst.
-      - split; intros.
-        + eapply FMap.mapsto_add_eq in H5; subst; eauto.
-        + eapply FMap.mapsto_add_eq in H5; subst; eauto.
-      - specialize (H0 i); intuition idtac.
-        + eapply FMap.mapsto_add_ne in H0; eauto.
-          specialize (H5 _ H0); deex; eauto.
-        + eapply FMap.mapsto_add_ne in H0; eauto.
-          specialize (H6 _ H0); deex; eauto.
+      eapply H in H7; repeat deex.
+      {
+        eexists; split; [ | econstructor; eauto ].
+        intros.
+        repeat destruct_horizState.
+        repeat destruct_validIndex.
+        destruct (i == x); subst.
+        - split; intros.
+          + eapply FMap.mapsto_add_eq in H3; subst; eauto.
+          + eapply FMap.mapsto_add_eq in H3; subst; eauto.
+        - specialize (H0 i); intuition idtac.
+          + eapply FMap.mapsto_add_ne in H0; eauto.
+            specialize (H3 _ H0); deex; eauto.
+          + eapply FMap.mapsto_add_ne in H0; eauto.
+            specialize (H4 _ H0); deex; eauto.
+      }
+      {
+        pose proof (@hget_mapsto _ _ _ _ idx s1).
+        pose proof (@hget_mapsto _ _ _ _ idx s2).
+        eapply H0 in H1; deex.
+        replace s0 with (hget s2 idx) in * by ( eapply FMap.mapsto_unique; eauto ).
+        eauto.
+      }
     }
     {
       eexists.
@@ -131,18 +269,10 @@ Section HorizontalCompositionAbs.
       eassumption.
       constructor.
       intuition idtac.
-      - eapply FMap.in_mapsto_exists in H3; deex.
-        eapply H0 in H1; deex.
-        intuition eauto.
-      - right; intuition idtac.
-        eapply FMap.in_mapsto_exists in H1; deex.
-        eapply H0 in H1; deex.
-        eauto.
     }
   Qed.
 
 
-  Variable indexValid : indexT -> Prop.
   Variable initP1 : sliceState1 -> Prop.
   Variable initP2 : sliceState2 -> Prop.
 
@@ -154,9 +284,9 @@ Section HorizontalCompositionAbs.
 
   Theorem horizAbsR_initP_ok :
     forall s1 s2,
-      horizInitP indexValid initP1 s1 ->
+      horizInitP initP1 s1 ->
       horizAbsR s1 s2 ->
-      horizInitP indexValid initP2 s2.
+      horizInitP initP2 s2.
   Proof.
     unfold horizInitP, horizAbsR; intros.
     specialize (H _ H1); deex.
@@ -166,13 +296,14 @@ Section HorizontalCompositionAbs.
 
 End HorizontalCompositionAbs.
 
-Arguments horizAbsR indexT {cmp sliceState1 sliceState2} absR.
+Arguments horizAbsR indexT {cmp indexValid sliceState1 sliceState2} absR.
 
 
 Section HorizontalCompositionMovers.
 
   Variable indexT : Type.
   Context {cmp : Ordering indexT}.
+  Variable indexValid : indexT -> Prop.
 
   Variable sliceOpT : Type -> Type.
   Variable sliceState : Type.
@@ -186,36 +317,44 @@ Section HorizontalCompositionMovers.
   Hint Constructors horizStep.
   Hint Extern 1 (horizStep _ _ _ _ _ _ _ _ _) => econstructor.
 
+  Opaque hget.
+  Opaque hadd.
+
   Theorem horiz_right_mover_ok :
     forall `(op : sliceOpT T),
       right_mover sliceStep op ->
       forall i,
-        right_mover (horizStep indexT sliceStep) (Slice i op).
+        right_mover (horizStep indexT indexValid sliceStep) (Slice i op).
   Proof.
     intros.
     unfold right_mover; intros.
     inversion H0; clear H0; subst; repeat sigT_eq.
-    eapply H in H10 as H'; intuition subst.
+    eapply H in H9 as H'; intuition subst.
     inversion H3; clear H3; subst; repeat sigT_eq.
     {
-      destruct (i == idx); subst.
-      - eapply FMap.mapsto_add in H6; subst.
-        eapply H1 in H11; eauto; deex.
+      repeat destruct_horizState.
+      repeat destruct_validIndex.
+      destruct (x == x0); subst.
+      - rewrite hget_hadd_eq in *.
+        eapply H1 in H8; eauto; deex.
         eexists; split.
         + econstructor; eauto.
-        + rewrite FMap.add_add.
-          erewrite <- FMap.add_add with (v1 := s'0).
+          replace i0 with i by apply proof_irrelevance; eauto.
+        + rewrite hadd_hadd_eq.
+          erewrite <- hadd_hadd_eq with (s := s'0).
+          replace i0 with i by apply proof_irrelevance; eauto.
           econstructor; eauto.
-      - eapply FMap.mapsto_add_ne in H6; eauto.
+          rewrite hget_hadd_eq; eauto.
+      - rewrite hget_hadd_ne in * by eauto.
         eexists; split.
         + econstructor; eauto.
-        + rewrite FMap.add_add_ne by eauto.
+        + rewrite hadd_hadd_ne by eauto.
           econstructor; eauto.
+          rewrite hget_hadd_ne by eauto.
+          eauto.
     }
     {
       eexists; split; eauto.
-      econstructor.
-      intuition subst; eauto.
     }
   Qed.
 
@@ -223,56 +362,61 @@ Section HorizontalCompositionMovers.
     forall `(op : sliceOpT T),
       enabled_stable sliceStep T op ->
       forall i,
-        enabled_stable (horizStep indexT sliceStep) T (Slice i op).
+        enabled_stable (horizStep indexT indexValid sliceStep) T (Slice i op).
   Proof.
     intros.
     unfold enabled_stable; intros.
     unfold enabled_in in *; repeat deex.
     inversion H1; clear H1; subst; repeat sigT_eq.
     inversion H2; clear H2; subst; repeat sigT_eq; eauto.
-    destruct (i == idx); subst.
-    - replace s0 with s1 in * by ( eapply FMap.mapsto_unique; eauto ).
-      edestruct H.
-      2: unfold enabled_in; eauto.
-      2: eauto.
-      eauto.
+    repeat destruct_validIndex.
+    destruct (x == x0); subst.
+    - edestruct H.
+      eassumption.
+      unfold enabled_in; eauto.
+      replace i0 with i in * by apply proof_irrelevance; eauto.
       repeat deex.
       do 3 eexists. econstructor; eauto.
+      rewrite hget_hadd_eq; eauto.
     - do 3 eexists. econstructor; eauto.
+      rewrite hget_hadd_ne; eauto.
   Qed.
 
   Theorem horiz_left_mover_ok :
     forall `(op : sliceOpT T),
       left_mover sliceStep op ->
       forall i,
-        left_mover (horizStep indexT sliceStep) (Slice i op).
+        left_mover (horizStep indexT indexValid sliceStep) (Slice i op).
   Proof.
     intros.
     split; intros.
     - eapply horiz_enabled_stable.
       destruct H; eauto.
     - inversion H0; clear H0; subst; repeat sigT_eq.
-      eapply H in H10 as H'; intuition subst.
+      eapply H in H9 as H'; intuition subst.
       inversion H3; clear H3; subst; repeat sigT_eq.
       {
-        destruct (i == idx); subst.
-        * eapply FMap.mapsto_add in H7; subst.
-          eapply H1 in H11; eauto; deex.
+        repeat destruct_validIndex.
+        destruct (x == x0); subst.
+        * rewrite hget_hadd_eq in *.
+          replace i0 with i in * by apply proof_irrelevance; eauto.
+          eapply H1 in H8; eauto; deex.
           eexists; split.
           + econstructor; eauto.
-          + rewrite FMap.add_add.
-            erewrite <- FMap.add_add with (v1 := s').
+          + rewrite hadd_hadd_eq.
+            erewrite <- hadd_hadd_eq with (s := s').
             econstructor; eauto.
-        * eapply FMap.mapsto_add_ne in H7; eauto.
+            rewrite hget_hadd_eq; eauto.
+        * rewrite hget_hadd_ne in * by eauto.
           eexists; split.
           + econstructor; eauto.
-          + rewrite FMap.add_add_ne by eauto.
+          + rewrite hadd_hadd_ne by eauto.
             econstructor; eauto.
+            rewrite hget_hadd_ne by eauto.
+            eauto.
       }
       {
         eexists; split; eauto.
-        econstructor.
-        intuition subst; eauto.
       }
   Qed.
 
@@ -280,35 +424,38 @@ Section HorizontalCompositionMovers.
     forall `(op : sliceOpT T) P,
       left_mover_pred sliceStep op P ->
       forall i,
-        left_mover_pred (horizStep indexT sliceStep) (Slice i op)
-          (fun tid S => forall s, FMap.MapsTo i s S -> P tid s).
+        left_mover_pred (horizStep indexT indexValid sliceStep) (Slice i op)
+          (fun tid S => P tid (hget S i)).
   Proof.
     intros.
     split; intros.
     - eapply horiz_enabled_stable.
       destruct H; eauto.
     - inversion H0; clear H0; subst; repeat sigT_eq.
-      eapply H in H10 as H'; intuition subst.
+      eapply H in H9 as H'; intuition subst.
       inversion H4; clear H4; subst; repeat sigT_eq.
       {
-        destruct (i == idx); subst.
-        * eapply FMap.mapsto_add in H7; subst.
-          eapply H1 in H12; eauto; deex.
+        repeat destruct_validIndex.
+        destruct (x == x0); subst.
+        * rewrite hget_hadd_eq in *.
+          replace i0 with i in * by apply proof_irrelevance; eauto.
+          eapply H1 in H10; eauto; deex.
           eexists; split.
           + econstructor; eauto.
-          + rewrite FMap.add_add.
-            erewrite <- FMap.add_add with (v1 := s').
+          + rewrite hadd_hadd_eq.
+            erewrite <- hadd_hadd_eq with (s := s').
             econstructor; eauto.
-        * eapply FMap.mapsto_add_ne in H7; eauto.
+            rewrite hget_hadd_eq; eauto.
+        * rewrite hget_hadd_ne in * by eauto.
           eexists; split.
           + econstructor; eauto.
-          + rewrite FMap.add_add_ne by eauto.
+          + rewrite hadd_hadd_ne by eauto.
             econstructor; eauto.
+            rewrite hget_hadd_ne by eauto.
+            eauto.
       }
       {
         eexists; split; eauto.
-        econstructor.
-        intuition subst; eauto.
       }
   Qed.
 
@@ -317,149 +464,92 @@ Section HorizontalCompositionMovers.
   Hint Resolve horiz_left_mover_pred_ok.
 
 
-  Lemma exec_others_preserves_slice :
-    forall S1 S2 tid,
-      exec_others (horizStep indexT sliceStep) tid S1 S2 ->
-      forall i s2,
-        FMap.MapsTo i s2 S2 ->
-        exists s1,
-          FMap.MapsTo i s1 S1.
-  Proof.
-    induction 1; intros; eauto.
-    eapply IHclos_refl_trans_1n in H1.
-    repeat deex.
-    inversion H2; clear H2; subst; repeat sigT_eq; eauto.
-    destruct (i == idx); subst; eauto.
-    eapply FMap.mapsto_add_ne in H1; eauto.
-  Qed.
-
-  Hint Resolve FMap.mapsto_add_ne.
-
-  Lemma atomic_exec_preserves_slice :
-    forall S1 S2 tid `(p : proc _ T) r evs,
-      atomic_exec (horizStep indexT sliceStep) p tid S1 r S2 evs ->
-      forall i s2,
-        FMap.MapsTo i s2 S2 ->
-        exists s1,
-          FMap.MapsTo i s1 S1.
-  Proof.
-    induction 1; intros; eauto.
-    - eapply IHatomic_exec2 in H1; repeat deex; eauto.
-    - inversion H; clear H; subst; repeat sigT_eq; eauto.
-      destruct (i == idx); subst; eauto.
-  Qed.
-
-  Lemma exec_any_preserves_slice :
-    forall S1 S2 tid `(p : proc _ T) r,
-      exec_any (horizStep indexT sliceStep) tid S1 p r S2 ->
-      forall i s2,
-        FMap.MapsTo i s2 S2 ->
-        exists s1,
-          FMap.MapsTo i s1 S1.
-  Proof.
-    induction 1; intros; eauto.
-    - eapply IHexec_any in H2; repeat deex.
-      inversion H0; clear H0; subst; repeat sigT_eq; eauto.
-      destruct (i == idx); subst; eauto.
-    - inversion H; clear H; subst; repeat sigT_eq; eauto.
-      + inversion H7; clear H7; subst; repeat sigT_eq; eauto.
-        destruct (i == idx); subst; eauto.
-      + eapply atomic_exec_preserves_slice in H7; eauto.
-    - eapply IHexec_any in H1; repeat deex.
-      clear IHexec_any H0.
-      generalize dependent H.
-      generalize dependent H1.
-      generalize (@inr T _ p').
-      clear; intros.
-      induction H; eauto.
-      + inversion H; clear H; subst; repeat sigT_eq; eauto.
-        destruct (i == idx); subst; eauto.
-      + eapply atomic_exec_preserves_slice in H; eauto.
-  Qed.
-
   Lemma exec_any_slice :
     forall S1 S2 tid `(p : proc _ T) r,
-      exec_any (horizStep indexT sliceStep) tid S1 p r S2 ->
-      forall `(op : sliceOpT T) i s1 s2,
+      exec_any (horizStep indexT indexValid sliceStep) tid S1 p r S2 ->
+      forall `(op : sliceOpT T) i,
         p = Op (Slice i op) ->
-        FMap.MapsTo i s1 S1 ->
-        FMap.MapsTo i s2 S2 ->
-          exec_any sliceStep tid s1 (Op op) r s2.
+        exec_any sliceStep tid (hget S1 i) (Op op) r (hget S2 i).
   Proof.
     induction 1; intros; subst.
     - inversion H0; clear H0; subst; repeat sigT_eq; eauto.
-      destruct (i == idx); subst; eauto.
-      replace s3 with s1 in * by ( eapply FMap.mapsto_unique; eauto ).
-      eapply ExecAnyOther; eauto.
+      repeat destruct_validIndex.
+      destruct (x == x0); subst; eauto.
+      + replace i0 with i in * by apply proof_irrelevance.
+        eapply ExecAnyOther.
+        eassumption.
+        2: eauto.
+        rewrite hget_hadd_eq in *.
+        eauto.
+      + specialize (IHexec_any _ _ eq_refl).
+        rewrite hget_hadd_ne in * by eauto.
+        eauto.
     - inversion H; clear H; subst; repeat sigT_eq.
-      inversion H8; clear H8; subst; repeat sigT_eq.
-      replace s1 with s0 in * by ( eapply FMap.mapsto_unique; eauto ).
-      eapply FMap.mapsto_add in H2; subst.
+      inversion H6; clear H6; subst; repeat sigT_eq.
+      eapply ExecAnyThisDone.
+      destruct_validIndex; rewrite hget_hadd_eq.
       eauto.
     - inversion H.
-  Unshelve.
-    all: eauto.
   Qed.
 
   Lemma exec_others_slice :
     forall S1 S2 tid,
-      exec_others (horizStep indexT sliceStep) tid S1 S2 ->
-      forall s1 s2 i,
-        FMap.MapsTo i s1 S1 ->
-        FMap.MapsTo i s2 S2 ->
-          exec_others sliceStep tid s1 s2.
+      exec_others (horizStep indexT indexValid sliceStep) tid S1 S2 ->
+      forall i,
+        exec_others sliceStep tid (hget S1 i) (hget S2 i).
   Proof.
     induction 1; intros; eauto.
-    - replace s2 with s1 in * by ( eapply FMap.mapsto_unique; eauto ).
+    repeat deex.
+    inversion H1; clear H1; subst; repeat sigT_eq; eauto.
+    repeat destruct_validIndex.
+    destruct (x0 == x1); subst; eauto.
+    * replace i0 with i in * by apply proof_irrelevance.
+      econstructor; [ | apply IHclos_refl_trans_1n ].
+      do 5 eexists; split; eauto.
+      rewrite hget_hadd_eq; eauto.
+    * specialize (IHclos_refl_trans_1n (exist _ x0 i)).
+      rewrite hget_hadd_ne in * by eauto.
       eauto.
-    - repeat deex.
-      inversion H3; clear H3; subst; repeat sigT_eq; eauto.
-      clear H0.
-      destruct (i == idx); subst; eauto.
-      replace s1 with s in * by ( eapply FMap.mapsto_unique; eauto ).
-      econstructor; eauto 10.
-      eapply IHclos_refl_trans_1n; eauto.
   Unshelve.
-    all: eauto.
+    all: try exact tt.
   Qed.
 
   Hint Resolve exec_any_slice.
   Hint Resolve exec_others_slice.
 
-
   Lemma horiz_left_movers :
     forall `(p : proc _ T) P,
       left_movers sliceStep P p ->
       forall i,
-        left_movers (horizStep indexT sliceStep)
-          (fun tid S => forall s, FMap.MapsTo i s S -> P tid s)
+        left_movers (horizStep indexT indexValid sliceStep)
+          (fun tid S => P tid (hget S i))
           (SliceProc i p).
   Proof.
     induction 1; simpl; intros; eauto.
     econstructor; intros.
     - eauto.
-    - admit.
+    - eapply H0 in H3.
+      edestruct H3; repeat deex.
+      do 3 eexists.
+      constructor.
+      eauto.
     - eapply left_movers_impl; eauto.
       simpl; intros; repeat deex.
 
-      eapply exec_others_preserves_slice in H6 as H6'; eauto.
-      repeat deex.
-      eapply exec_any_preserves_slice in H5 as H5'; eauto.
-      repeat deex.
-
-      eauto 10.
-  Admitted.
+      do 2 eexists.
+      intuition eauto.
+  Qed.
 
 
   Theorem horiz_ysa_movers :
     forall `(p : proc _ T),
       ysa_movers sliceStep p ->
       forall i,
-        ysa_movers (horizStep indexT sliceStep) (SliceProc i p).
+        ysa_movers (horizStep indexT indexValid sliceStep) (SliceProc i p).
   Proof.
     unfold ysa_movers; intros.
     eapply right_movers_impl with
-      (P1 := fun tid S => forall s, FMap.MapsTo i s S -> any tid s);
+      (P1 := fun tid S => any tid (hget S i));
       [ | firstorder ].
     generalize dependent H.
     generalize (@any sliceState).
@@ -471,12 +561,8 @@ Section HorizontalCompositionMovers.
       eapply right_movers_impl; eauto.
       simpl; intros; repeat deex.
 
-      eapply exec_others_preserves_slice in H5 as H5'; eauto.
-      repeat deex.
-      eapply exec_any_preserves_slice in H4 as H4'; eauto.
-      repeat deex.
-
-      eauto 10.
+      do 2 eexists.
+      intuition eauto.
     }
 
     eapply RightMoversDone.
@@ -494,17 +580,11 @@ Section HorizontalCompositionMovers.
       eapply horiz_left_movers; eauto.
       simpl; intros; repeat deex.
 
-      eapply exec_others_preserves_slice in H3 as H3'; eauto.
-      repeat deex.
-      eapply exec_any_preserves_slice in H1 as H1'; eauto.
-      repeat deex.
-      eauto 10.
+      do 2 eexists.
+      intuition eauto.
     }
 
     eapply OneFinalNonMover.
-
-  Unshelve.
-    all: exact unit.
   Qed.
 
 End HorizontalCompositionMovers.
@@ -519,17 +599,17 @@ Module Type HIndex.
 End HIndex.
 
 Module HOps (o : Ops) (i : HIndex) <: Ops.
-  Definition opT := horizOpT i.indexT o.opT.
+  Definition opT := horizOpT i.indexValid o.opT.
 End HOps.
 
 Module HState (s : State) (i : HIndex) <: State.
-  Definition State := @horizState i.indexT i.indexCmp s.State.
+  Definition State := @horizState i.indexT i.indexCmp i.indexValid s.State.
   Definition initP : State -> Prop :=
-    horizInitP i.indexValid s.initP.
+    horizInitP s.initP.
 End HState.
 
 Module HLayer (o : Ops) (s : State) (l : Layer o s) (i : HIndex).
-  Definition step := @horizStep i.indexT i.indexCmp _ _ l.step.
+  Definition step := @horizStep i.indexT i.indexCmp i.indexValid _ _ l.step.
 End HLayer.
 
 Module HProtocol (o : Ops) (s : State) (p : Protocol o s) (i : HIndex).
@@ -538,9 +618,7 @@ Module HProtocol (o : Ops) (s : State) (p : Protocol o s) (i : HIndex).
   Definition step_allow T (hop : ho.opT T) (tid : nat) (S : hs.State) : Prop :=
     match hop with
     | Slice i op =>
-      exists s,
-        FMap.MapsTo i s S /\
-        p.step_allow op tid s
+      p.step_allow op tid (hget S i)
     | CheckSlice i =>
       True
     end.
@@ -561,7 +639,7 @@ Module LayerImplAbsHT
   Module hl2 := HLayer o s2 l2 i.
 
   Definition absR :=
-    @horizAbsR i.indexT i.indexCmp _ _ a.absR.
+    @horizAbsR i.indexT i.indexCmp i.indexValid _ _ a.absR.
 
   Theorem absInitP :
     forall s1 s2,
@@ -624,23 +702,52 @@ Module LayerImplMoversProtocolHT
     eapply a.ysa_movers.
   Qed.
 
-  Lemma atomic_exec_horizStep : forall `(p : proc _ T) i tid S v S' evs,
-    atomic_exec hl1.step (SliceProc i p) tid S v S' evs ->
-      exists s s',
-        FMap.MapsTo i s S /\
-        S' = FMap.add i s' S /\
-        atomic_exec l1.step p tid s v s' evs.
+  Lemma atomic_exec_horizStep : forall `(p0 : proc _ T) i tid S v S' evs,
+    atomic_exec hl1.step p0 tid S v S' evs ->
+      forall p,
+        p0 = SliceProc i p ->
+        exists s',
+          atomic_exec l1.step p tid (hget S i) v s' evs /\
+          S' = hadd i s' S.
   Proof.
-    (* NOT ACTUALLY TRUE: SLICE MIGHT NOT EXIST *)
-  Admitted.
+    induction 1; simpl; intros.
+    - destruct p; simpl in *; try congruence.
+      inversion H; clear H; subst; repeat sigT_eq.
+      eexists; split; eauto.
+      destruct_validIndex.
+      rewrite hadd_hget_eq; eauto.
+    - destruct p; simpl in *; try congruence.
+      inversion H1; clear H1; subst; repeat sigT_eq.
+      edestruct IHatomic_exec1; eauto.
+      edestruct IHatomic_exec2; eauto.
+      intuition subst.
+      destruct_validIndex.
+      rewrite hget_hadd_eq in *.
+      eexists; split; eauto.
+      rewrite hadd_hadd_eq; eauto.
+    - destruct p; simpl in *; try congruence.
+      inversion H0; clear H0; subst; repeat sigT_eq.
+      inversion H; clear H; subst; repeat sigT_eq.
+      eauto.
+    - destruct p0; simpl in *; try congruence.
+      inversion H0; clear H0; subst; repeat sigT_eq.
+      edestruct IHatomic_exec.
+      + unfold until1.
+        instantiate (1 := Bind (p0 v0) (fun x => if Bool.bool_dec (c0 x) true then Ret x else Until c0 (fun x0 => p0 x0) (Some x))).
+        simpl; f_equal.
+        eapply functional_extensionality; intros.
+        destruct (Bool.bool_dec (c0 x) true); reflexivity.
+      + intuition subst.
+        eexists; split; eauto.
+  Qed.
 
   Theorem compile_correct :
     compile_correct compile_op hl1.step hl2.step.
   Proof.
     intro; intros.
     destruct op; simpl in *.
-    - eapply atomic_exec_horizStep in H; repeat deex.
-      eapply a.compile_correct in H1.
+    - eapply atomic_exec_horizStep in H; eauto; deex.
+      eapply a.compile_correct in H.
       econstructor; eauto.
     - repeat atomic_exec_inv.
       inversion H5; clear H5; subst; repeat sigT_eq.
@@ -652,7 +759,20 @@ Module LayerImplMoversProtocolHT
   Proof.
     destruct op; simpl.
     - pose proof (a.op_follows_protocol).
-      admit.
+      specialize (H tid (hget s i) _ op).
+      remember (a.compile_op op).
+      clear Heqp.
+      remember (hget s i).
+      clear op.
+      generalize dependent s.
+      induction H; intros; subst; simpl.
+      + constructor. eauto.
+      + constructor. eauto.
+        intros.
+        eapply H1; eauto.
+        admit.
+      + constructor. eauto.
+      + constructor.
     - constructor; constructor.
   Admitted.
 
@@ -666,16 +786,15 @@ Module LayerImplMoversProtocolHT
     destruct op, op'; eauto.
     {
       intros.
-      inversion H0; clear H0; intuition idtac.
+      simpl in *.
       inversion H1; clear H1; subst; repeat sigT_eq.
       pose (i.indexCmp).
-      destruct (i == i0); subst.
-      - replace s0 with x in * by ( eapply FMap.mapsto_unique; eauto ).
-        econstructor; split.
-        eapply FMap.add_mapsto.
+      repeat destruct_validIndex.
+      destruct (x == x0); subst.
+      - replace i0 with i in * by apply proof_irrelevance.
+        rewrite hget_hadd_eq.
         eapply a.allowed_stable; eauto.
-      - econstructor; split.
-        eapply FMap.mapsto_add_ne'; eauto.
+      - rewrite hget_hadd_ne in * by eauto.
         eauto.
     }
     {
@@ -691,9 +810,7 @@ Module LayerImplMoversProtocolHT
   Proof.
     destruct op.
     - unfold restricted_step; intuition idtac.
-      inversion H0; clear H0; intuition idtac.
       inversion H1; clear H1; subst; repeat sigT_eq.
-      eapply FMap.mapsto_unique in H0 as H0'; eauto; subst.
       econstructor; eauto.
       eapply a.raw_step_ok.
       constructor; eauto.
@@ -743,23 +860,52 @@ Module LayerImplMoversHT
     eapply a.ysa_movers.
   Qed.
 
-  Lemma atomic_exec_horizStep : forall `(p : proc _ T) i tid S v S' evs,
-    atomic_exec hl1.step (SliceProc i p) tid S v S' evs ->
-      exists s s',
-        FMap.MapsTo i s S /\
-        S' = FMap.add i s' S /\
-        atomic_exec l1.step p tid s v s' evs.
+  Lemma atomic_exec_horizStep : forall `(p0 : proc _ T) i tid S v S' evs,
+    atomic_exec hl1.step p0 tid S v S' evs ->
+      forall p,
+        p0 = SliceProc i p ->
+        exists s',
+          atomic_exec l1.step p tid (hget S i) v s' evs /\
+          S' = hadd i s' S.
   Proof.
-    (* NOT ACTUALLY TRUE: SLICE MIGHT NOT EXIST *)
-  Admitted.
+    induction 1; simpl; intros.
+    - destruct p; simpl in *; try congruence.
+      inversion H; clear H; subst; repeat sigT_eq.
+      eexists; split; eauto.
+      destruct_validIndex.
+      rewrite hadd_hget_eq; eauto.
+    - destruct p; simpl in *; try congruence.
+      inversion H1; clear H1; subst; repeat sigT_eq.
+      edestruct IHatomic_exec1; eauto.
+      edestruct IHatomic_exec2; eauto.
+      intuition subst.
+      destruct_validIndex.
+      rewrite hget_hadd_eq in *.
+      eexists; split; eauto.
+      rewrite hadd_hadd_eq; eauto.
+    - destruct p; simpl in *; try congruence.
+      inversion H0; clear H0; subst; repeat sigT_eq.
+      inversion H; clear H; subst; repeat sigT_eq.
+      eauto.
+    - destruct p0; simpl in *; try congruence.
+      inversion H0; clear H0; subst; repeat sigT_eq.
+      edestruct IHatomic_exec.
+      + unfold until1.
+        instantiate (1 := Bind (p0 v0) (fun x => if Bool.bool_dec (c0 x) true then Ret x else Until c0 (fun x0 => p0 x0) (Some x))).
+        simpl; f_equal.
+        eapply functional_extensionality; intros.
+        destruct (Bool.bool_dec (c0 x) true); reflexivity.
+      + intuition subst.
+        eexists; split; eauto.
+  Qed.
 
   Theorem compile_correct :
     compile_correct compile_op hl1.step hl2.step.
   Proof.
     intro; intros.
     destruct op; simpl in *.
-    - eapply atomic_exec_horizStep in H; repeat deex.
-      eapply a.compile_correct in H1.
+    - eapply atomic_exec_horizStep in H; eauto; deex.
+      eapply a.compile_correct in H.
       econstructor; eauto.
     - repeat atomic_exec_inv.
       inversion H5; clear H5; subst; repeat sigT_eq.
@@ -807,7 +953,8 @@ Module LayerImplLoopHT
       edestruct a.noop_or_success; eauto.
       - left. intuition idtac.
         subst.
-        rewrite FMap.mapsto_add_nilpotent; eauto.
+        destruct_validIndex.
+        rewrite hadd_hget_eq; eauto.
       - right. intuition idtac.
         econstructor; eauto.
     }
@@ -815,7 +962,6 @@ Module LayerImplLoopHT
       inversion H; clear H; subst.
       inversion H0; clear H0; subst; repeat sigT_eq.
       right; intuition eauto.
-      econstructor; eauto.
       econstructor; eauto.
     }
   Qed.
