@@ -81,12 +81,16 @@ Definition handle_pop3_one conn (u : string) (msgs : list ((nat*nat) * string)) 
 
 Definition do_pop3_req : proc _ unit :=
   conn <- Op (Slice nouser (Ext AcceptPOP3));
-  user <- Op (Slice nouser (Ext (POP3Authenticate conn)));
-  msgs <- Op (Slice user Pickup);
-  _ <- Until (fun done => done)
-             (fun _ => handle_pop3_one conn user msgs)
-             None;
-  Ret tt.
+  ouser <- Op (Slice nouser (Ext (POP3Authenticate conn)));
+  match ouser with
+  | None => Ret tt
+  | Some user =>
+    msgs <- Op (Slice user Pickup);
+    _ <- Until (fun done => done)
+               (fun _ => handle_pop3_one conn user msgs)
+               None;
+    Ret tt
+  end.
 
 Definition smtp_server_thread : proc _ unit :=
   Until (fun _ => false) (fun _ => do_smtp_req) None.

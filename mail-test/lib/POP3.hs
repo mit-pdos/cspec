@@ -42,6 +42,35 @@ pop3RespondOK :: Handle -> IO ()
 pop3RespondOK h =
   pop3Respond h True ""
 
+pop3ProcessAuth :: Handle -> IO (Maybe String)
+pop3ProcessAuth h = do
+  line <- hGetLine h
+  let cmdparts = words line
+  case cmdparts of
+    cmd : rest ->
+      case (map toUpper cmd) : rest of
+        ["USER", u] -> do
+          pop3RespondOK h
+          return $ Just u
+        "CAPA" : _ -> do
+          pop3RespondOK h
+          hPutStr h ".\r\n"
+          pop3ProcessAuth h
+        "QUIT" : _ -> do
+          pop3RespondOK h
+          hClose h
+          return Nothing
+        _ -> do
+          pop3Respond h False "unrecognized command"
+          pop3ProcessAuth h
+    _ -> do
+      pop3Respond h False "unrecognized command"
+      pop3ProcessAuth h
+
+pop3Authenticate :: POP3Conn -> IO (Maybe String)
+pop3Authenticate (POP3Conn h) = do
+  pop3ProcessAuth h
+
 pop3ProcessCommands :: Handle -> IO MailServerOp__Coq_pop3req
 pop3ProcessCommands h = do
   line <- hGetLine h

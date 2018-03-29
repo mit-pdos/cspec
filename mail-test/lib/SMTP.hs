@@ -13,7 +13,7 @@ data Message =
   Message
     { mail_client :: [String]
     , mail_from :: [String]
-    , mail_to :: [String]
+    , mail_to :: String
     , mail_data :: String
     } deriving (Show, Eq)
 
@@ -41,6 +41,9 @@ smtpClose h = do
   smtpRespond h 221 "closing"
   hClose h
 
+process_to :: [String] -> String
+process_to words = "still-unknown"
+
 smtpProcessCommands :: Handle -> Message -> IO (Maybe Message)
 smtpProcessCommands h msg = do
   line <- hGetLine h
@@ -57,7 +60,7 @@ smtpProcessCommands h msg = do
       smtpProcessCommands h $ msg { mail_from = from }
     "RCPT" : to -> do
       smtpRespondOK h
-      smtpProcessCommands h $ msg { mail_to = to }
+      smtpProcessCommands h $ msg { mail_to = process_to to }
     ["DATA"] -> do
       smtpRespond h 354 "proceed with data"
       smtpProcessData h msg
@@ -77,13 +80,13 @@ smtpProcessData h msg = do
   else do
     smtpProcessData h $ msg { mail_data = (mail_data msg) ++ line ++ "\n" }
 
-smtpGetMessage :: SMTPConn -> IO (Maybe String)
+smtpGetMessage :: SMTPConn -> IO (Maybe (String, String))
 smtpGetMessage (SMTPConn h) = do
   smtpRespond h 220 "ready"
-  maybemsg <- smtpProcessCommands h (Message [] [] [] "")
+  maybemsg <- smtpProcessCommands h (Message [] [] "unknown" "")
   case maybemsg of
     Nothing -> return Nothing
-    Just msg -> return $ Just (mail_data msg)
+    Just msg -> return $ Just (mail_to msg, mail_data msg)
 
 smtpDone :: SMTPConn -> Bool -> IO ()
 smtpDone (SMTPConn h) True = do
