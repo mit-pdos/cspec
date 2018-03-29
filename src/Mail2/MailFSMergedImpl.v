@@ -12,7 +12,23 @@ Module MailFSMergedAbsImpl' <:
     MailFSPathAbsHState MailFSPathHAPI.
 
   Definition absR (s1 : MailFSMergedState.State) (s2 : MailFSPathAbsHState.State) :=
-    True.
+    forall u,
+      ( forall s2',
+        FMap.MapsTo u s2' (HSMap s2) ->
+          FMap.MapsTo u (MailFSPathAbsState.locked s2') (MailFSMergedState.locked s1) /\
+          ( forall dir fn f,
+            FMap.MapsTo (dir, fn) f (MailFSPathAbsState.fs s2') ->
+            FMap.MapsTo (u, dir, fn) f (MailFSMergedState.fs s1) ) ) /\
+      ( forall locked,
+        FMap.MapsTo u locked (MailFSMergedState.locked s1) ->
+          exists s2',
+            FMap.MapsTo u s2' (HSMap s2) /\
+            MailFSPathAbsState.locked s2' = locked ) /\
+      ( forall dir fn f,
+        FMap.MapsTo (u, dir, fn) f (MailFSMergedState.fs s1) ->
+          exists s2',
+            FMap.MapsTo u s2' (HSMap s2) /\
+            FMap.MapsTo (dir, fn) f (MailFSPathAbsState.fs s2') ).
 
   Hint Resolve FMap.add_mapsto.
   Hint Resolve FMap.mapsto_add_ne'.
@@ -29,7 +45,20 @@ Module MailFSMergedAbsImpl' <:
       absR s1 s2 ->
       MailFSPathAbsHState.initP s2.
   Proof.
-  Admitted.
+    unfold MailFSPathAbsHState.initP.
+    unfold MailFSMergedState.initP.
+    unfold horizInitP.
+    unfold absR.
+    intros.
+
+    eapply H in H1.
+    eapply FMap.in_mapsto_exists in H1; deex.
+
+    eapply H0 in H1; deex.
+    eexists; split; eauto.
+
+    unfold MailFSPathAbsState.initP; eauto.
+  Qed.
 
 End MailFSMergedAbsImpl'.
 

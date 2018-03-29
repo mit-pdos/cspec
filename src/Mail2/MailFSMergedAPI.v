@@ -42,7 +42,10 @@ Module MailFSMergedState <: State.
   }.
 
   Definition State := state_rec.
-  Definition initP (s : State) := True.
+  Definition initP (s : State) :=
+    forall u,
+      UserIdx.indexValid u ->
+      FMap.In u (locked s).
 
 End MailFSMergedState.
 
