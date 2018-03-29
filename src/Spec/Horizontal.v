@@ -189,6 +189,8 @@ Arguments horizState indexT {cmp} indexValid sliceState.
 Arguments horizStep indexT {cmp} indexValid {sliceOpT sliceState} sliceStep.
 Arguments Slice {indexT indexValid sliceOpT} i {T}.
 Arguments CheckSlice {indexT indexValid sliceOpT} i.
+Arguments Missing {indexT indexValid}.
+
 
 Ltac destruct_horizState :=
   match goal with

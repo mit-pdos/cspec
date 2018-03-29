@@ -21,7 +21,7 @@ Module MailFSMergedOp <: Ops.
 
   | Lock : forall (u : string), xopT unit
   | Unlock : forall (u : string), xopT unit
-  | Exists : forall (u : string), xopT bool
+  | Exists : forall (u : string), xopT (CheckResult UserIdx.indexValid)
 
   | Ext : forall `(op : extopT T), xopT T
   .
@@ -156,18 +156,18 @@ Module MailFSMergedAPI <: Layer MailFSMergedOp MailFSMergedState.
       (mk_state fs (FMap.add u false locked))
       nil
 
-  | StepExistsOK : forall fs tid u locked,
+  | StepExistsOK : forall fs tid u P locked,
     FMap.In u locked ->
     xstep (Exists u) tid
       (mk_state fs locked)
-      true
+      (Present (exist _ u P))
       (mk_state fs locked)
       nil
   | StepExistsErr : forall fs tid u locked,
     ~ FMap.In u locked ->
     xstep (Exists u) tid
       (mk_state fs locked)
-      false
+      Missing
       (mk_state fs locked)
       nil
 
@@ -191,119 +191,119 @@ Module MailFSMergedAbsAPI <: Layer MailFSPathHOp MailFSMergedState.
   Import MailFSMergedState.
 
   Inductive xstep : forall T, opT T -> nat -> State -> T -> State -> list event -> Prop :=
-  | StepCreateWriteOK : forall fs tid dir fn data lock u,
-    xstep (Slice u (CreateWrite (dir, fn) data)) tid
+  | StepCreateWriteOK : forall fs tid dir fn data lock u P,
+    xstep (Slice (exist _ u P) (CreateWrite (dir, fn) data)) tid
       (mk_state fs lock)
       true
       (mk_state (FMap.add (u, dir, fn) data fs) lock)
       nil
-  | StepCreateWriteErr1 : forall fs tid dir fn data lock u,
-    xstep (Slice u (CreateWrite (dir, fn) data)) tid
+  | StepCreateWriteErr1 : forall fs tid dir fn data lock u P,
+    xstep (Slice (exist _ u P) (CreateWrite (dir, fn) data)) tid
       (mk_state fs lock)
       false
       (mk_state fs lock)
       nil
-  | StepCreateWriteErr2 : forall fs tid dir fn data data' lock u,
-    xstep (Slice u (CreateWrite (dir, fn) data)) tid
+  | StepCreateWriteErr2 : forall fs tid dir fn data data' lock u P,
+    xstep (Slice (exist _ u P) (CreateWrite (dir, fn) data)) tid
       (mk_state fs lock)
       false
       (mk_state (FMap.add (u, dir, fn) data' fs) lock)
       nil
-  | StepUnlink : forall fs tid dir fn lock u,
-    xstep (Slice u (Unlink (dir, fn))) tid
+  | StepUnlink : forall fs tid dir fn lock u P,
+    xstep (Slice (exist _ u P) (Unlink (dir, fn))) tid
       (mk_state fs lock)
       tt
       (mk_state (FMap.remove (u, dir, fn) fs) lock)
       nil
-  | StepLinkOK : forall fs tid srcdir srcfn data dstdir dstfn lock u,
+  | StepLinkOK : forall fs tid srcdir srcfn data dstdir dstfn lock u P,
     FMap.MapsTo (u, srcdir, srcfn) data fs ->
     ~ FMap.In (u, dstdir, dstfn) fs ->
-    xstep (Slice u (Link (srcdir, srcfn) (dstdir, dstfn))) tid
+    xstep (Slice (exist _ u P) (Link (srcdir, srcfn) (dstdir, dstfn))) tid
       (mk_state fs lock)
       true
       (mk_state (FMap.add (u, dstdir, dstfn) data fs) lock)
       nil
-  | StepLinkErr : forall fs tid srcdir srcfn dstdir dstfn lock u,
-    xstep (Slice u (Link (srcdir, srcfn) (dstdir, dstfn))) tid
+  | StepLinkErr : forall fs tid srcdir srcfn dstdir dstfn lock u P,
+    xstep (Slice (exist _ u P) (Link (srcdir, srcfn) (dstdir, dstfn))) tid
       (mk_state fs lock)
       false
       (mk_state fs lock)
       nil
 
-  | StepList : forall fs tid r dirname lock u,
+  | StepList : forall fs tid r dirname lock u P,
     FMap.is_permutation_key r (drop_dirname (filter_dir (u, dirname) fs)) ->
-    xstep (Slice u (List dirname)) tid
+    xstep (Slice (exist _ u P) (List dirname)) tid
       (mk_state fs lock)
       r
       (mk_state fs lock)
       nil
 
-  | StepGetTID : forall s tid u,
-    xstep (Slice u GetTID) tid
+  | StepGetTID : forall s tid u P,
+    xstep (Slice (exist _ u P) GetTID) tid
       s
       tid
       s
       nil
-  | StepRandom : forall s tid r u,
-    xstep (Slice u Random) tid
+  | StepRandom : forall s tid r u P,
+    xstep (Slice (exist _ u P) Random) tid
       s
       r
       s
       nil
 
-  | StepReadOK : forall dir fn fs tid m lock u,
+  | StepReadOK : forall dir fn fs tid m lock u P,
     FMap.MapsTo (u, dir, fn) m fs ->
-    xstep (Slice u (Read (dir, fn))) tid
+    xstep (Slice (exist _ u P) (Read (dir, fn))) tid
       (mk_state fs lock)
       (Some m)
       (mk_state fs lock)
       nil
-  | StepReadNone : forall dir fn fs tid lock u,
+  | StepReadNone : forall dir fn fs tid lock u P,
     ~ FMap.In (u, dir, fn) fs ->
-    xstep (Slice u (Read (dir, fn))) tid
+    xstep (Slice (exist _ u P) (Read (dir, fn))) tid
       (mk_state fs lock)
       None
       (mk_state fs lock)
       nil
 
-  | StepLock : forall fs tid u locked,
+  | StepLock : forall fs tid u locked P,
     FMap.MapsTo u false locked ->
-    xstep (Slice u Lock) tid
+    xstep (Slice (exist _ u P) Lock) tid
       (mk_state fs locked)
       tt
       (mk_state fs (FMap.add u true locked))
       nil
-  | StepLockErr : forall fs tid u locked,
+  | StepLockErr : forall fs tid u locked P,
     ~ FMap.In u locked ->
-    xstep (Slice u Lock) tid
+    xstep (Slice (exist _ u P) Lock) tid
       (mk_state fs locked)
       tt
       (mk_state fs locked)
       nil
-  | StepUnlock : forall fs tid u locked,
-    xstep (Slice u Unlock) tid
+  | StepUnlock : forall fs tid u locked P,
+    xstep (Slice (exist _ u P) Unlock) tid
       (mk_state fs locked)
       tt
       (mk_state fs (FMap.add u false locked))
       nil
 
-  | StepExistsOK : forall fs tid u locked,
+  | StepExistsOK : forall fs tid u P locked,
     FMap.In u locked ->
     xstep (CheckSlice u) tid
       (mk_state fs locked)
-      true
+      (Present (exist _ u P))
       (mk_state fs locked)
       nil
   | StepExistsErr : forall fs tid u locked,
     ~ FMap.In u locked ->
     xstep (CheckSlice u) tid
       (mk_state fs locked)
-      false
+      Missing
       (mk_state fs locked)
       nil
 
-  | StepExt : forall s tid `(extop : extopT T) r u,
-    xstep (Slice u (Ext extop)) tid
+  | StepExt : forall s tid `(extop : extopT T) r u P,
+    xstep (Slice (exist _ u P) (Ext extop)) tid
       s
       r
       s

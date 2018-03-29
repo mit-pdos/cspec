@@ -24,6 +24,7 @@ import POP3
 
 -- Extracted code
 import ConcurProc
+import qualified Horizontal
 import MailFSMergedAPI
 import MailServer
 import MailServerAPI
@@ -220,4 +221,7 @@ run_proc (S _ _ lockvar) (Op (MailFSMergedOp__Unlock u)) = do
 run_proc _ (Op (MailFSMergedOp__Exists u)) = do
   debugmsg $ "Exists " ++ u
   ok <- fileExist (userPath u)
-  return $ unsafeCoerce ok
+  if ok then do
+    return $ unsafeCoerce (Horizontal.Present u)
+  else do
+    return $ unsafeCoerce Horizontal.Missing

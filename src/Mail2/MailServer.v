@@ -45,7 +45,7 @@ Require Import MailFSMergedImpl.
 Import MailServerOp.
 
 
-Definition nouser := ""%string.
+Axiom nouser : validIndexT UserIdx.indexValid.
 
 Definition do_smtp_req : proc _ unit :=
   conn <- Op (Slice nouser (Ext AcceptSMTP));
@@ -55,17 +55,17 @@ Definition do_smtp_req : proc _ unit :=
   | Some (user, msg) =>
     eok <- Op (CheckSlice user);
     match eok with
-    | false =>
+    | Missing =>
       _ <- Op (Slice nouser (Ext (SMTPRespond conn false)));
       Ret tt
-    | true =>
-      ok <- Op (Slice user (Deliver msg));
+    | Present u =>
+      ok <- Op (Slice u (Deliver msg));
       _ <- Op (Slice nouser (Ext (SMTPRespond conn ok)));
       Ret tt
     end
   end.
 
-Definition handle_pop3_one conn (u : string) (msgs : list ((nat*nat) * string)) :=
+Definition handle_pop3_one conn (u : validIndexT UserIdx.indexValid) (msgs : list ((nat*nat) * string)) :=
   req <- Op (Slice u (Ext (POP3GetRequest conn)));
   match req with
   | POP3Stat =>
@@ -93,14 +93,15 @@ Definition do_pop3_req : proc _ unit :=
   | None => Ret tt
   | Some user =>
     eok <- Op (CheckSlice user);
-    _ <- Op (Slice nouser (Ext (POP3RespondAuth conn eok)));
     match eok with
-    | false =>
+    | Missing =>
+      _ <- Op (Slice nouser (Ext (POP3RespondAuth conn false)));
       Ret tt
-    | true =>
-      msgs <- Op (Slice user Pickup);
+    | Present u =>
+      _ <- Op (Slice nouser (Ext (POP3RespondAuth conn true)));
+      msgs <- Op (Slice u Pickup);
       _ <- Until (fun done => done)
-                 (fun _ => handle_pop3_one conn user msgs)
+                 (fun _ => handle_pop3_one conn u msgs)
                  None;
       Ret tt
     end
