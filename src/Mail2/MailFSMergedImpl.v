@@ -109,16 +109,16 @@ Module MailFSMergedOpImpl' <:
   Proof.
     unfold compile_correct; intros.
     destruct op.
-    destruct op.
-    all: try destruct_validIndex.
-    all: repeat break_pairs.
-(*
-    all: atomic_exec_inv.
-    all: repeat step_inv.
-    all: eauto.
+    - destruct op.
+      all: try destruct_validIndex.
+      all: repeat break_pairs.
+      all: atomic_exec_inv.
+      all: repeat step_inv.
+      all: eauto.
+    - unfold UserIdx.indexT in *.
+      atomic_exec_inv.
+      step_inv; eauto.
   Qed.
-*)
-  Admitted.
 
   Theorem ysa_movers : forall `(op : _ T),
     ysa_movers MailFSMergedAPI.step (compile_op op).
