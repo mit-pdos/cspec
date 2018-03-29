@@ -823,11 +823,17 @@ Module LayerImplMoversProtocolHT
         intros.
         eapply H1; eauto.
         eapply exec_any_slice; eauto.
-        admit.
+        eapply exec_any_impl; try eassumption.
+
+        clear.
+        unfold restricted_step; intuition idtac.
+        inversion H1; clear H1; subst; repeat sigT_eq; simpl in *.
+        * econstructor; eauto.
+        * econstructor; eauto.
       + constructor. eauto.
       + constructor.
     - constructor; constructor.
-  Admitted.
+  Qed.
 
   Theorem allowed_stable :
     forall `(op : ho1.opT T) `(op' : ho1.opT T') tid tid' s s' r evs,

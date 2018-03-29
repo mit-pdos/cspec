@@ -338,6 +338,22 @@ Section StepImpl.
     eapply atomic_exec_step_impl in H; eauto.
   Qed.
 
+  Theorem exec_any_impl :
+    forall tid s `(p : proc _ T) s' r,
+      exec_any op_step1 tid s p r s' ->
+      exec_any op_step2 tid s p r s'.
+  Proof.
+    intros.
+    induction H; eauto.
+    eapply exec_tid_step_impl in H; eauto.
+    eapply exec_tid_step_impl in H; eauto.
+  Unshelve.
+    all: intros; eauto.
+    all: try exact true.
+    all: try exact None.
+    exact (Ret r0).
+  Qed.
+
 End StepImpl.
 
 
