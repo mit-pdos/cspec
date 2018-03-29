@@ -33,9 +33,6 @@ Require Import MailFSPathAbsImpl.
 Require Import MailFSPathAPI.
 Require Import MailFSPathImpl.
 
-Require Import LinkRetryImpl.
-
-Require Import TryDeliverAPI.
 Require Import TryDeliverImpl.
 
 Require Import MailFSMergedAPI.
@@ -152,18 +149,12 @@ Module c5 :=
     MailServerHOp     MailServerHState    MailServerHAPI
     MailFSImplH c4.
 
-Module c4' :=
-  Link
-    TryDeliverHOp MailboxTmpAbsHState TryDeliverHAPI
-    DeliverHOp    MailboxTmpAbsHState DeliverHAPI
-    MailServerHOp MailServerHState    MailServerHAPI
-    LinkRetryImplH c3.
-Module c5' :=
+Module c45' :=
   Link
     MailFSHOp     MailboxTmpAbsHState MailFSHAPI
-    TryDeliverHOp MailboxTmpAbsHState TryDeliverHAPI
+    DeliverHOp    MailboxTmpAbsHState DeliverHAPI
     MailServerHOp MailServerHState    MailServerHAPI
-    TryDeliverImplH c4'.
+    TryDeliverImplH c3.
 
 Module c6 :=
   Link
@@ -172,7 +163,7 @@ Module c6 :=
     MailServerHOp MailServerHState      MailServerHAPI
     MailFSStringAbsImplH
     (* c5 *)
-    c5'.
+    c45'.
 
 Module c7 :=
   Link
