@@ -120,10 +120,10 @@ Module c3 :=
 
 Module c4 :=
   Link
-    DeliverListTidOp MailboxTmpAbsState DeliverListTidAPI
-    DeliverOp        MailboxTmpAbsState DeliverAPI
-    MailServerOp     MailServerState    MailServerAPI
-    DeliverListTidImpl c3.
+    DeliverListTidHOp MailboxTmpAbsHState DeliverListTidHAPI
+    DeliverHOp        MailboxTmpAbsHState DeliverHAPI
+    MailServerHOp     MailServerHState    MailServerHAPI
+    DeliverListTidImplH c3.
 Module c5 :=
   Link
     MailFSOp         MailboxTmpAbsState MailFSAPI

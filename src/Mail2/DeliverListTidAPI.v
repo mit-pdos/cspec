@@ -26,6 +26,8 @@ Module DeliverListTidOp <: Ops.
   Definition opT := xopT.
 
 End DeliverListTidOp.
+Module DeliverListTidHOp := HOps DeliverListTidOp UserIdx.
+
 
 Module DeliverListTidAPI <: Layer DeliverListTidOp MailboxTmpAbsState.
 
@@ -134,46 +136,47 @@ Module DeliverListTidAPI <: Layer DeliverListTidOp MailboxTmpAbsState.
   Definition step := xstep.
 
 End DeliverListTidAPI.
+Module DeliverListTidHAPI := HLayer DeliverListTidOp MailboxTmpAbsState DeliverListTidAPI UserIdx.
 
 
-Module DeliverListTidRestrictedAPI <: Layer DeliverListTidOp MailboxTmpAbsState.
+Module DeliverListTidProtocol <: Protocol DeliverListTidOp MailboxTmpAbsState.
 
   Import DeliverListTidOp.
   Import MailboxTmpAbsState.
 
-  Inductive step_allow : forall T, opT T -> nat -> State -> Prop :=
+  Inductive xstep_allow : forall T, opT T -> nat -> State -> Prop :=
   | AllowCreateWriteTmp : forall tid s data,
-    step_allow (CreateWriteTmp data) tid s
+    xstep_allow (CreateWriteTmp data) tid s
   | AllowLinkMail : forall tid tmp mbox mailfn lock,
     ~ FMap.In (tid, mailfn) mbox ->
-    step_allow (LinkMail mailfn) tid (mk_state tmp mbox lock)
+    xstep_allow (LinkMail mailfn) tid (mk_state tmp mbox lock)
   | AllowUnlinkTmp : forall tid s,
-    step_allow (UnlinkTmp) tid s
+    xstep_allow (UnlinkTmp) tid s
   | AllowList : forall tid s,
-    step_allow List tid s
+    xstep_allow List tid s
   | AllowListTid : forall tid s,
-    step_allow ListTid tid s
+    xstep_allow ListTid tid s
   | AllowRead : forall tid s fn,
-    step_allow (Read fn) tid s
+    xstep_allow (Read fn) tid s
   | AllowDelete : forall tid s fn,
-    step_allow (Delete fn) tid s
+    xstep_allow (Delete fn) tid s
   | AllowLock : forall tid s,
-    step_allow Lock tid s
+    xstep_allow Lock tid s
   | AllowUnlock : forall tid s,
-    step_allow Unlock tid s
+    xstep_allow Unlock tid s
   | AllowExt : forall tid s `(extop : _ T),
-    step_allow (Ext extop) tid s
+    xstep_allow (Ext extop) tid s
   .
 
-  Definition step :=
-    restricted_step DeliverListTidAPI.step step_allow.
+  Definition step_allow := xstep_allow.
+
+End DeliverListTidProtocol.
+Module DeliverListTidHProtocol := HProtocol DeliverListTidOp MailboxTmpAbsState DeliverListTidProtocol UserIdx.
+
+
+Module DeliverListTidRestrictedAPI <: Layer DeliverListTidOp MailboxTmpAbsState.
+
+  Definition step := restricted_step DeliverListTidAPI.step DeliverListTidProtocol.step_allow.
 
 End DeliverListTidRestrictedAPI.
-
-Module LinkMailRule <: ProcRule DeliverListTidOp.
-
-  Definition follows_protocol (ts : @threads_state DeliverListTidOp.opT) :=
-    forall s,
-      follows_protocol_s DeliverListTidAPI.step DeliverListTidRestrictedAPI.step_allow ts s.
-
-End LinkMailRule.
+Module DeliverListTidRestrictedHAPI := HLayer DeliverListTidOp MailboxTmpAbsState DeliverListTidRestrictedAPI UserIdx.

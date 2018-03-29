@@ -1,15 +1,17 @@
 Require Import POCS.
 Require Import String.
+Require Import MailServerAPI.
 Require Import MailboxTmpAbsAPI.
 Require Import DeliverAPI.
 Require Import DeliverListTidAPI.
 
 
-Module DeliverListTidRestrictedImpl <:
-  LayerImplFollowsRule
-    DeliverListTidOp MailboxTmpAbsState DeliverListTidRestrictedAPI
-    DeliverOp MailboxTmpAbsState DeliverAPI
-    LinkMailRule.
+Module DeliverListTidImpl' <:
+  LayerImplMoversProtocolT
+    MailboxTmpAbsState
+    DeliverListTidOp DeliverListTidAPI DeliverListTidRestrictedAPI
+    DeliverOp        DeliverAPI
+    DeliverListTidProtocol.
 
   Fixpoint nextfn (files : list nat) (r : nat) : nat :=
     match files with
@@ -72,13 +74,20 @@ Module DeliverListTidRestrictedImpl <:
     | DeliverOp.Ext extop => Op (DeliverListTidOp.Ext extop)
     end.
 
+  Theorem compile_op_no_atomics :
+    forall `(op : _ T),
+      no_atomics (compile_op op).
+  Proof.
+    destruct op; compute; eauto.
+  Qed.
+
   Ltac step_inv :=
     match goal with
     | H : DeliverAPI.step _ _ _ _ _ _ |- _ =>
       inversion H; clear H; subst; repeat sigT_eq
     | H : DeliverListTidAPI.step _ _ _ _ _ _ |- _ =>
       inversion H; clear H; subst; repeat sigT_eq
-    | H : DeliverListTidRestrictedAPI.step_allow _ _ _ |- _ =>
+    | H : DeliverListTidProtocol.step_allow _ _ _ |- _ =>
       inversion H; clear H; subst; repeat sigT_eq
     | H : DeliverListTidRestrictedAPI.step _ _ _ _ _ _ |- _ =>
       inversion H; clear H; subst; repeat sigT_eq
@@ -86,7 +95,7 @@ Module DeliverListTidRestrictedImpl <:
 
   Hint Extern 1 (DeliverAPI.step _ _ _ _ _ _) => econstructor.
   Hint Extern 1 (DeliverListTidAPI.step _ _ _ _ _ _) => econstructor.
-  Hint Extern 1 (DeliverListTidRestrictedAPI.step_allow _ _ _) => econstructor.
+  Hint Extern 1 (DeliverListTidProtocol.step_allow _ _ _) => econstructor.
   Hint Extern 1 (DeliverListTidRestrictedAPI.step _ _ _ _ _ _) => econstructor.
 
   Lemma listtid_right_mover :
@@ -117,19 +126,14 @@ Module DeliverListTidRestrictedImpl <:
 
   Hint Resolve listtid_right_mover.
 
-  Theorem linkmail_atomic : forall `(rx : _ -> proc _ T),
-    trace_incl DeliverListTidRestrictedAPI.step
-      (Bind (compile_op (DeliverOp.LinkMail)) rx)
-      (Bind (atomize compile_op (DeliverOp.LinkMail)) rx).
+  Theorem ysa_movers : forall `(op : _ T),
+    ysa_movers DeliverListTidRestrictedAPI.step (compile_op op).
   Proof.
-    intros.
-    eapply trace_incl_atomize_ysa.
-    simpl.
-    unfold linkmail_core, ysa_movers.
-    eauto 20.
+    destruct op; simpl; eauto 20.
+    unfold linkmail_core; eauto.
   Qed.
 
-  Theorem my_compile_correct :
+  Theorem compile_correct :
     compile_correct compile_op DeliverListTidRestrictedAPI.step DeliverAPI.step.
   Proof.
     unfold compile_correct; intros.
@@ -138,70 +142,11 @@ Module DeliverListTidRestrictedImpl <:
     all: repeat atomic_exec_inv; repeat step_inv; eauto.
   Qed.
 
-  Theorem my_atomize_correct :
-    atomize_correct compile_op DeliverListTidRestrictedAPI.step.
-  Proof.
-    unfold atomize_correct; intros.
-    destruct op; try trace_incl_simple.
-
-    rewrite linkmail_atomic.
-    eapply trace_incl_bind_a; eauto.
-  Qed.
-
-  Hint Resolve my_compile_correct.
-  Hint Resolve my_atomize_correct.
-
-  Theorem all_traces_match :
-    forall ts1 ts2,
-      proc_match (Compile.compile_ok compile_op) ts1 ts2 ->
-      traces_match_ts DeliverListTidRestrictedAPI.step DeliverAPI.step ts1 ts2.
-  Proof.
-    intros.
-    eapply Compile.compile_traces_match_ts; eauto.
-  Qed.
-
-  Definition absR (s1 : MailboxTmpAbsState.State) (s2 : MailboxTmpAbsState.State) :=
-    s1 = s2.
-
-  Definition compile_ts := Compile.compile_ts compile_op.
-
-  Theorem compile_ts_no_atomics :
-    forall ts,
-      no_atomics_ts ts ->
-      no_atomics_ts (compile_ts ts).
-  Proof.
-    eapply Compile.compile_ts_no_atomics.
-    destruct op; compute; eauto.
-  Qed.
-
-  Theorem compile_traces_match :
-    forall ts2,
-      no_atomics_ts ts2 ->
-      traces_match_abs absR
-        MailboxTmpAbsState.initP
-        DeliverListTidRestrictedAPI.step
-        DeliverAPI.step (compile_ts ts2) ts2.
-  Proof.
-    unfold traces_match_abs; intros.
-    rewrite H2 in *; clear H2.
-    eapply all_traces_match; eauto.
-    eapply Compile.compile_ts_ok; eauto.
-  Qed.
-
-  Theorem absInitP :
-    forall s1 s2,
-      MailboxTmpAbsState.initP s1 ->
-      absR s1 s2 ->
-      MailboxTmpAbsState.initP s2.
-  Proof.
-    eauto.
-  Qed.
-
 
   Lemma linkmail_follows_protocol : forall tid s,
     follows_protocol_proc
       DeliverListTidAPI.step
-      DeliverListTidRestrictedAPI.step_allow
+      DeliverListTidProtocol.step_allow
       tid s (linkmail_core).
   Proof.
     intros.
@@ -225,51 +170,22 @@ Module DeliverListTidRestrictedImpl <:
 
   Hint Resolve linkmail_follows_protocol.
 
-  Theorem compile_ts_follows_protocol :
-    forall ts,
-      no_atomics_ts ts ->
-      LinkMailRule.follows_protocol (compile_ts ts).
+  Theorem op_follows_protocol :
+    forall tid s `(op : _ T),
+      follows_protocol_proc
+        DeliverListTidAPI.step
+        DeliverListTidProtocol.step_allow
+        tid s (compile_op op).
   Proof.
-    unfold compile_ts.
-    unfold LinkMailRule.follows_protocol.
-    unfold follows_protocol_s.
-    intros.
-    eapply compile_ts_follows_protocol_proc; try eassumption.
-    intros.
-
     destruct op; simpl; eauto.
   Qed.
-
-End DeliverListTidRestrictedImpl.
-
-
-Module DeliverListTidImpl' <:
-  LayerImplRequiresRule
-    DeliverListTidOp MailboxTmpAbsState DeliverListTidAPI
-    DeliverListTidOp MailboxTmpAbsState DeliverListTidRestrictedAPI
-    LinkMailRule.
-
-  Import LinkMailRule.
-
-  Definition absR (s1 : MailboxTmpAbsState.State) (s2 : MailboxTmpAbsState.State) :=
-    s1 = s2.
-
-  Ltac step_inv :=
-    match goal with
-    | H : DeliverListTidAPI.step _ _ _ _ _ _ |- _ =>
-      inversion H; clear H; subst; repeat sigT_eq
-    | H : DeliverListTidRestrictedAPI.step_allow _ _ _ |- _ =>
-      inversion H; clear H; subst; repeat sigT_eq
-    | H : DeliverListTidRestrictedAPI.step _ _ _ _ _ _ |- _ =>
-      destruct H; intuition idtac
-    end.
 
   Theorem allowed_stable :
     forall `(op : DeliverListTidOp.opT T) `(op' : DeliverListTidOp.opT T') tid tid' s s' r evs,
       tid <> tid' ->
-      DeliverListTidRestrictedAPI.step_allow op tid s ->
+      DeliverListTidProtocol.step_allow op tid s ->
       DeliverListTidRestrictedAPI.step op' tid' s r s' evs ->
-      DeliverListTidRestrictedAPI.step_allow op tid s'.
+      DeliverListTidProtocol.step_allow op tid s'.
   Proof.
     intros.
     destruct op; destruct op'; repeat step_inv; subst; eauto.
@@ -282,54 +198,11 @@ Module DeliverListTidImpl' <:
       eapply FMap.in_remove; eauto.
   Qed.
 
-
-  Definition compile_ts (ts : @threads_state DeliverListTidOp.opT) := ts.
-
-  Theorem compile_ts_no_atomics :
-    forall ts,
-      no_atomics_ts ts ->
-      no_atomics_ts (compile_ts ts).
+  Theorem raw_step_ok :
+    forall `(op : _ T) tid s r s' evs,
+      restricted_step DeliverListTidAPI.step DeliverListTidProtocol.step_allow op tid s r s' evs ->
+      DeliverListTidRestrictedAPI.step op tid s r s' evs.
   Proof.
-    unfold compile_ts; eauto.
-  Qed.
-
-  Theorem absInitP :
-    forall s1 s2,
-      MailboxTmpAbsState.initP s1 ->
-      absR s1 s2 ->
-      MailboxTmpAbsState.initP s2.
-  Proof.
-    eauto.
-  Qed.
-
-  Theorem compile_traces_match :
-    forall ts,
-      follows_protocol ts ->
-      no_atomics_ts ts ->
-      traces_match_abs absR
-        MailboxTmpAbsState.initP
-        DeliverListTidAPI.step
-        DeliverListTidRestrictedAPI.step (compile_ts ts) ts.
-  Proof.
-    unfold compile_ts, follows_protocol, absR.
-    unfold traces_match_abs; intros; subst.
-    clear H1.
-    specialize (H sm).
-    destruct H2.
-    induction H1; eauto.
-    specialize (H tid _ p) as Htid.
-    intuition idtac; repeat deex.
-
-    edestruct IHexec.
-      eapply follows_protocol_s_exec_tid_upd; eauto.
-      intros; eapply allowed_stable; eauto.
-      destruct result; eauto.
-
-    eexists; intuition idtac.
-    eapply ExecPrefixOne.
-      eauto.
-      eapply follows_protocol_preserves_exec_tid'; eauto.
-      eauto.
     eauto.
   Qed.
 
@@ -337,8 +210,26 @@ End DeliverListTidImpl'.
 
 
 Module DeliverListTidImpl :=
-  LinkWithRule
-    DeliverListTidOp MailboxTmpAbsState DeliverListTidAPI
-    DeliverListTidOp MailboxTmpAbsState DeliverListTidRestrictedAPI
-    DeliverOp MailboxTmpAbsState DeliverAPI
-    LinkMailRule DeliverListTidImpl' DeliverListTidRestrictedImpl.
+  LayerImplMoversProtocol
+    MailboxTmpAbsState
+    DeliverListTidOp DeliverListTidAPI DeliverListTidRestrictedAPI
+    DeliverOp        DeliverAPI
+    DeliverListTidProtocol
+    DeliverListTidImpl'.
+
+Module DeliverListTidImplH' :=
+  LayerImplMoversProtocolHT
+    MailboxTmpAbsState
+    DeliverListTidOp DeliverListTidAPI DeliverListTidRestrictedAPI
+    DeliverOp        DeliverAPI
+    DeliverListTidProtocol
+    DeliverListTidImpl'
+    UserIdx.
+
+Module DeliverListTidImplH :=
+  LayerImplMoversProtocol
+    MailboxTmpAbsHState
+    DeliverListTidHOp DeliverListTidHAPI DeliverListTidRestrictedHAPI
+    DeliverHOp        DeliverHAPI
+    DeliverListTidHProtocol
+    DeliverListTidImplH'.
