@@ -7,7 +7,7 @@ Require Import DeliverAPI.
 Module MailFSOp <: Ops.
 
   Definition extopT := MailServerAPI.MailServerOp.extopT.
-  
+
   Inductive xopT : Type -> Type :=
   | CreateWriteTmp : forall (data : string), xopT bool
   | LinkMail : forall (mboxfn : nat), xopT bool
@@ -28,7 +28,8 @@ Module MailFSOp <: Ops.
   Definition opT := xopT.
 
 End MailFSOp.
-  
+Module MailFSHOp := HOps MailFSOp UserIdx.
+
 
 Module MailFSAPI <: Layer MailFSOp MailboxTmpAbsState.
 
@@ -143,3 +144,4 @@ Module MailFSAPI <: Layer MailFSOp MailboxTmpAbsState.
   Definition step := xstep.
 
 End MailFSAPI.
+Module MailFSHAPI := HLayer MailFSOp MailboxTmpAbsState MailFSAPI UserIdx.
