@@ -62,3 +62,18 @@ Module LinkRetryImpl :=
     TryDeliverOp TryDeliverAPI
     DeliverOp DeliverAPI
     LinkRetryImpl'.
+
+Module LinkRetryImplH' :=
+  LayerImplLoopHT
+    MailboxTmpAbsState
+    TryDeliverOp TryDeliverAPI
+    DeliverOp DeliverAPI
+    LinkRetryImpl'
+    UserIdx.
+
+Module LinkRetryImplH :=
+  LayerImplLoop
+    MailboxTmpAbsHState
+    TryDeliverHOp TryDeliverHAPI
+    DeliverHOp DeliverHAPI
+    LinkRetryImplH'.

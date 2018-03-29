@@ -10,6 +10,7 @@ Require Import Ordering.
 Require Import Abstraction.
 Require Import Movers.
 Require Import Compile.
+Require Import CompileLoop.
 Require Import Protocol.
 
 Import ListNotations.
@@ -695,3 +696,44 @@ Module LayerImplMoversHT
   Qed.
 
 End LayerImplMoversHT.
+
+
+Module LayerImplLoopHT
+  (s : State)
+  (o1 : Ops) (l1 : Layer o1 s)
+  (o2 : Ops) (l2 : Layer o2 s)
+  (a : LayerImplLoopT s o1 l1 o2 l2)
+  (i : HIndex).
+
+  Module hs := HState s i.
+  Module ho1 := HOps o1 i.
+  Module ho2 := HOps o2 i.
+  Module hl1 := HLayer o1 s l1 i.
+  Module hl2 := HLayer o2 s l2 i.
+
+  Definition compile_op T (op : ho2.opT T) :
+    (option T -> ho1.opT T) * (T -> bool) * option T :=
+    match op with
+    | Slice idx op' =>
+      let '(p, cond, i) := a.compile_op op' in
+        ((fun x => Slice idx (p x)), cond, i)
+    end.
+
+  Theorem noop_or_success :
+    noop_or_success compile_op hl1.step hl2.step.
+  Proof.
+    intro; intros.
+    destruct opM; simpl in *.
+    destruct (a.compile_op op) eqn:He.
+    destruct p.
+    inversion H; clear H; subst.
+    inversion H0; clear H0; subst; repeat sigT_eq.
+    edestruct a.noop_or_success; eauto.
+    - left. intuition idtac.
+      subst.
+      admit.
+    - right. intuition idtac.
+      econstructor; eauto.
+  Admitted.
+
+End LayerImplLoopHT.

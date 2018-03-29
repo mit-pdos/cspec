@@ -135,7 +135,6 @@ Module c5 :=
     MailServerHOp     MailServerHState    MailServerHAPI
     MailFSImplH c4.
 
-(*
 Module c4' :=
   Link
     TryDeliverHOp MailboxTmpAbsHState TryDeliverHAPI
@@ -148,22 +147,15 @@ Module c5' :=
     TryDeliverHOp MailboxTmpAbsHState TryDeliverHAPI
     MailServerHOp MailServerHState    MailServerHAPI
     TryDeliverImplH c4'.
-*)
 
 Module c6 :=
   Link
     MailFSHOp     MailFSStringAbsHState MailFSStringAbsHAPI
     MailFSHOp     MailboxTmpAbsHState   MailFSHAPI
     MailServerHOp MailServerHState      MailServerHAPI
-    MailFSStringAbsImplH c5.
-(*
-Module c6 :=
-  Link
-    MailFSOp     MailFSStringAbsState MailFSStringAbsAPI
-    MailFSOp     MailboxTmpAbsState   MailFSAPI
-    MailServerOp MailServerState      MailServerAPI
-    MailFSStringAbsImpl c5'.
-*)
+    MailFSStringAbsImplH
+    (* c5 *)
+    c5'.
 
 Module c7 :=
   Link
