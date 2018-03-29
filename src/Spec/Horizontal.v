@@ -786,6 +786,10 @@ Module LayerImplLoopHT
     | Slice idx op' =>
       let '(p, cond, i) := a.compile_op op' in
         ((fun x => Slice idx (p x)), cond, i)
+    | CheckSlice idx =>
+      ((fun x => CheckSlice idx),
+        fun _ => true,
+        None)
     end.
 
   Theorem noop_or_success :
@@ -793,16 +797,25 @@ Module LayerImplLoopHT
   Proof.
     intro; intros.
     destruct opM; simpl in *.
-    destruct (a.compile_op op) eqn:He.
-    destruct p.
-    inversion H; clear H; subst.
-    inversion H0; clear H0; subst; repeat sigT_eq.
-    edestruct a.noop_or_success; eauto.
-    - left. intuition idtac.
-      subst.
-      admit.
-    - right. intuition idtac.
+    {
+      destruct (a.compile_op op) eqn:He.
+      destruct p.
+      inversion H; clear H; subst.
+      inversion H0; clear H0; subst; repeat sigT_eq.
+      edestruct a.noop_or_success; eauto.
+      - left. intuition idtac.
+        subst.
+        rewrite FMap.mapsto_add_nilpotent; eauto.
+      - right. intuition idtac.
+        econstructor; eauto.
+    }
+    {
+      inversion H; clear H; subst.
+      inversion H0; clear H0; subst; repeat sigT_eq.
+      right; intuition eauto.
       econstructor; eauto.
-  Admitted.
+      econstructor; eauto.
+    }
+  Qed.
 
 End LayerImplLoopHT.

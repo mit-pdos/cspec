@@ -48,8 +48,11 @@ debugmsg s =
   else
     return ()
 
+userPath :: String -> String
+userPath u = "/tmp/mailtest/" ++ u
+
 dirPath :: String -> String -> String
-dirPath u dir = "/tmp/mailtest/" ++ u ++ "/" ++ dir
+dirPath u dir = (userPath u) ++ "/" ++ dir
 
 filePath :: String -> String -> String -> String
 filePath u dir fn = (dirPath u dir) ++ "/" ++ fn
@@ -196,7 +199,7 @@ run_proc _ (Op (MailFSMergedOp__Read ((u, dir), fn))) = do
                  return $ unsafeCoerce Nothing)
 
 run_proc (S _ _ lockvar) (Op (MailFSMergedOp__Lock u)) = do
-  debugmsg $ "Lock"
+  debugmsg $ "Lock " ++ u
   mboxfd <- openFd (dirPath u "mail") ReadOnly Nothing defaultFileFlags
   lck <- lockFd mboxfd Exclusive Block
   closeFd mboxfd
@@ -204,7 +207,12 @@ run_proc (S _ _ lockvar) (Op (MailFSMergedOp__Lock u)) = do
   return $ unsafeCoerce ()
 
 run_proc (S _ _ lockvar) (Op (MailFSMergedOp__Unlock u)) = do
-  debugmsg $ "Unlock"
+  debugmsg $ "Unlock " ++ u
   lck <- takeMVar lockvar
   unlock lck
   return $ unsafeCoerce ()
+
+run_proc _ (Op (MailFSMergedOp__Exists u)) = do
+  debugmsg $ "Exists " ++ u
+  ok <- fileExist (userPath u)
+  return $ unsafeCoerce ok

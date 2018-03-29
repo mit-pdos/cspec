@@ -1038,6 +1038,19 @@ Module FMap.
       apply mapsto_add_eq in H; auto.
     Qed.
 
+    Theorem mapsto_add_nilpotent :
+      forall a v m,
+        MapsTo a v m ->
+        add a v m = m.
+    Proof.
+      intros.
+      apply mapsto_extensionality; intuition idtac.
+      - destruct (cmp_dec x a); fwd.
+      - destruct (cmp_dec x a); fwd.
+        replace v0 with v in * by ( eapply mapsto_unique; eauto ).
+        fwd.
+    Qed.
+
     Definition is_permutation_key (l : list A) (m : t) : Prop :=
       forall x, List.In x l <-> In x m.
 
