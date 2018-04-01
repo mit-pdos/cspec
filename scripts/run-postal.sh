@@ -12,4 +12,4 @@ do
     echo "u$i pw" >> /tmp/mailtest/users
 done    
 
-timeout 4m postal -p 2525 -t $NUSER -r 10000 localhost /tmp/mailtest/users
+timeout 4m ~/tmp/postal-0.70/postal -p 2525 -t $NUSER -r 10000 localhost /tmp/mailtest/users
