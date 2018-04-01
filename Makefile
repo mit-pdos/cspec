@@ -44,7 +44,7 @@ docs: coq
 concur-test/extract: build/Spec/Example2.vo
 mail-test/extract: build/Mail2/MailServer.vo
 
-bin/%: %/extract
+bin/%: %/extract %/lib/*.hs
 	mkdir -p $(@D)
 	cd $(patsubst %/extract,%,$<) && PATH="$(PATH):"$(shell pwd)"/bin" stack build --copy-bins --local-bin-path ../bin
 
