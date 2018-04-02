@@ -13,6 +13,9 @@ import (
 	"strings"
 )
 
+// A go mail server that is equivalent to the Gallina/Haskell version, handling
+// postal.  Set GOPATH to 6.826-labs/gomail, and run server by typing "go run
+// gomail.go".
 
 const dir = "/tmp/mailtest"
 
