@@ -203,3 +203,151 @@ Definition ms_bottom nsmtp npop3 :=
   c0.compile_ts (mail_server nsmtp npop3).
 
 Print Assumptions c0.compile_traces_match.
+
+
+
+Lemma exec_equiv_ts_build :
+  forall opT `(p1 : proc opT T1) p2,
+    exec_equiv p1 p2 ->
+    exec_equiv_ts (Proc p1 :: nil) (Proc p2 :: nil).
+Proof.
+  unfold exec_equiv, exec_equiv_opt.
+  intros.
+  specialize (H (NoProc :: nil) 0).
+  cbn in H.
+  eauto.
+Qed.
+
+Lemma exec_equiv_until_proper :
+  forall opT `(p1 : _ -> proc opT T) p2 c i,
+    (forall x, exec_equiv_rx (p1 x) (p2 x)) ->
+    exec_equiv_rx (Until c p1 i) (Until c p2 i).
+Proof.
+Admitted.
+
+Lemma exec_equiv_rx_Some :
+  forall opT `(p : T1 -> proc opT T2) x p',
+    exec_equiv_rx ((fun ox => match ox with
+                              | Some xx => p xx
+                              | None => p'
+                              end) (Some x)) (p x).
+Proof.
+  reflexivity.
+Qed.
+
+Lemma exec_equiv_rx_true :
+  forall opT `(pt : proc opT T2) pf,
+    exec_equiv_rx ((fun b => match b with
+                             | true => pt
+                             | false => pf
+                             end) true) pt.
+Proof.
+  reflexivity.
+Qed.
+
+Lemma exec_equiv_rx_Present :
+  forall opT `(P : TP -> Prop) `(p : validIndexT P -> proc opT T2) x p',
+    exec_equiv_rx ((fun ox => match ox with
+                              | Present xx => p xx
+                              | Missing => p'
+                              end) (Present x)) (p x).
+Proof.
+  reflexivity.
+Qed.
+
+Lemma exec_equiv_rx_pair :
+  forall opT `(p : T1 -> T2 -> proc opT T3) x y,
+    exec_equiv_rx ((fun '(xx, yy) => p xx yy) (x, y)) (p x y).
+Proof.
+  reflexivity.
+Qed.
+
+Lemma exec_equiv_rx_exist :
+  forall opT `(P : T -> Prop) `(p : forall (x : T), P x -> proc opT T3) x y,
+    exec_equiv_rx ((fun '(exist _ xx yy) => p xx yy) (exist P x y)) (p x y).
+Proof.
+  reflexivity.
+Qed.
+
+Ltac reflexivity' :=
+  match goal with
+  | |- exec_equiv_rx (?lhs ?a) (?rhs) =>
+    let lhs' := eval pattern a in rhs in
+    match lhs' with
+    | ?f a => instantiate (1 := f); reflexivity
+    end
+  end.
+
+Definition ms_bottom' : {t : threads_state | exec_equiv_ts t (ms_bottom 1 0)}.
+  cbn.
+  eexists.
+  eapply exec_equiv_ts_build.
+  eapply exec_equiv_rx_to_exec_equiv.
+  destruct nouser.
+  eapply exec_equiv_until_proper; intros.
+  eapply Bind_exec_equiv_proper; [ reflexivity | intro ].
+  eapply Bind_exec_equiv_proper; [ reflexivity | intro ].
+
+  destruct a0; simpl.
+  destruct p; simpl.
+  rewrite exec_equiv_rx_Some; [ | shelve ].
+  2: simpl; reflexivity.
+
+  rewrite exec_equiv_rx_pair.
+  eapply Bind_exec_equiv_proper; [ reflexivity | intro ].
+
+  destruct a0; simpl; clear;
+    destruct nouser; simpl; clear.
+
+  2: rewrite exec_equiv_rx_Present; [ | shelve ].
+  simpl.
+  reflexivity.
+
+  destruct v.
+  rewrite exec_equiv_bind_bind.
+  rewrite exec_equiv_bind_bind.
+
+  rewrite exec_equiv_rx_exist.
+  eapply Bind_exec_equiv_proper; [ reflexivity | intro ].
+
+  etransitivity; [ | rewrite exec_equiv_bind_bind; reflexivity ].
+  eapply Bind_exec_equiv_proper; [ reflexivity | intro ].
+
+  etransitivity; [ | rewrite exec_equiv_ret_bind; reflexivity ].
+  destruct a1; simpl.
+
+  rewrite exec_equiv_rx_true; [ | shelve ].
+  2: simpl.
+
+  repeat rewrite exec_equiv_bind_bind.
+  eapply Bind_exec_equiv_proper; [ reflexivity | intro ].
+  etransitivity; [ | rewrite exec_equiv_bind_bind; reflexivity ].
+  etransitivity; [ | rewrite exec_equiv_bind_bind; reflexivity ].
+  eapply Bind_exec_equiv_proper; [ reflexivity | intro ].
+  etransitivity; [ | rewrite exec_equiv_bind_bind; reflexivity ].
+  eapply Bind_exec_equiv_proper; [ reflexivity | intro ].
+  etransitivity; [ | rewrite exec_equiv_ret_bind; reflexivity ].
+  etransitivity; [ | rewrite exec_equiv_ret_bind; reflexivity ].
+  etransitivity; [ | rewrite exec_equiv_bind_bind; reflexivity ].
+  etransitivity; [ | rewrite exec_equiv_bind_bind; reflexivity ].
+  eapply Bind_exec_equiv_proper; [ reflexivity | intro ].
+  etransitivity; [ | rewrite exec_equiv_bind_bind; reflexivity ].
+  eapply Bind_exec_equiv_proper; [ reflexivity | intro ].
+  etransitivity; [ | rewrite exec_equiv_ret_bind; reflexivity ].
+  etransitivity; [ | rewrite exec_equiv_ret_bind; reflexivity ].
+  eapply Bind_exec_equiv_proper; [ reflexivity | intro ].
+  reflexivity'.
+
+  etransitivity; [ | rewrite exec_equiv_bind_bind; reflexivity ].
+  etransitivity; [ | rewrite exec_equiv_bind_bind; reflexivity ].
+  eapply Bind_exec_equiv_proper; [ reflexivity | intro ].
+  etransitivity; [ | rewrite exec_equiv_bind_bind; reflexivity ].
+  eapply Bind_exec_equiv_proper; [ reflexivity | intro ].
+  etransitivity; [ | rewrite exec_equiv_ret_bind; reflexivity ].
+  etransitivity; [ | rewrite exec_equiv_ret_bind; reflexivity ].
+  eapply Bind_exec_equiv_proper; [ reflexivity | intro ].
+
+  reflexivity'.
+Defined.
+
+Eval compute in (proj1_sig ms_bottom').
