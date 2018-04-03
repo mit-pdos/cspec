@@ -31,12 +31,17 @@ import MailServerAPI
 
 -- State for each process/thread
 data State =
-  S SMTPServer POP3Server !(MVar Lock)
+  S Integer SMTPServer POP3Server !(MVar Lock)
 
 mkState :: SMTPServer -> POP3Server -> IO State
 mkState smtp pop3 = do
   lockvar <- newEmptyMVar
-  return $ S smtp pop3 lockvar
+  tid <- myThreadId
+  -- Horrible hack: get the numeric TID by printing the ThreadId as a string,
+  -- using [show], which returns something like "ThreadId 5", and then parse
+  -- it back to Integer using [read].
+  let (_, tidstr) = splitAt 9 (show tid) in
+    return $ S (read tidstr) smtp pop3 lockvar
 
 verbose :: Bool
 verbose = False
@@ -78,24 +83,19 @@ run_proc s (Until c p v0) = do
   else
     run_proc s (Until c p (unsafeCoerce v))
 
-run_proc _ (Op MailFSMergedOp__GetTID) = do
-  tid <- myThreadId
-  -- Horrible hack: get the numeric TID by printing the ThreadId as a string,
-  -- using [show], which returns something like "ThreadId 5", and then parse
-  -- it back to Integer using [read].
-  let (_, tidstr) = splitAt 9 (show tid) in do
-    return $ unsafeCoerce (read tidstr :: Integer)
+run_proc (S tid _ _ _) (Op MailFSMergedOp__GetTID) = do
+  return $ unsafeCoerce tid
 
 run_proc _ (Op MailFSMergedOp__Random) = do
   ts <- rdtsc
   return $ unsafeCoerce (fromIntegral ts :: Integer)
 
-run_proc (S smtpserver _ _) (Op (MailFSMergedOp__Ext (MailServerOp__AcceptSMTP))) = do
+run_proc (S _ smtpserver _ _) (Op (MailFSMergedOp__Ext (MailServerOp__AcceptSMTP))) = do
   debugmsg $ "AcceptSMTP"
   conn <- smtpAccept smtpserver
   return $ unsafeCoerce conn
 
-run_proc (S _ pop3server _) (Op (MailFSMergedOp__Ext (MailServerOp__AcceptPOP3))) = do
+run_proc (S _ _ pop3server _) (Op (MailFSMergedOp__Ext (MailServerOp__AcceptPOP3))) = do
   debugmsg $ "AcceptPOP3"
   conn <- pop3Accept pop3server
   return $ unsafeCoerce conn
@@ -204,7 +204,7 @@ run_proc _ (Op (MailFSMergedOp__Read ((u, dir), fn))) = do
                  debugmsg "Unknown exception on read"
                  return $ unsafeCoerce Nothing)
 
-run_proc (S _ _ lockvar) (Op (MailFSMergedOp__Lock u)) = do
+run_proc (S _ _ _ lockvar) (Op (MailFSMergedOp__Lock u)) = do
   debugmsg $ "Lock " ++ u
   mboxfd <- openFd (dirPath u "mail") ReadOnly Nothing defaultFileFlags
   lck <- lockFd mboxfd Exclusive Block
@@ -212,7 +212,7 @@ run_proc (S _ _ lockvar) (Op (MailFSMergedOp__Lock u)) = do
   putMVar lockvar lck
   return $ unsafeCoerce ()
 
-run_proc (S _ _ lockvar) (Op (MailFSMergedOp__Unlock u)) = do
+run_proc (S _ _ _ lockvar) (Op (MailFSMergedOp__Unlock u)) = do
   debugmsg $ "Unlock " ++ u
   lck <- takeMVar lockvar
   unlock lck
