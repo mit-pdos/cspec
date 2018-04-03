@@ -25,7 +25,7 @@ smtpListen portnum = do
 smtpAccept :: SMTPServer -> IO SMTPConn
 smtpAccept (SMTPServer sock) = do
   (conn, _, _) <- accept sock
-  hSetBuffering conn NoBuffering
+  hSetBuffering conn LineBuffering
   return $ SMTPConn conn
 
 smtpRespond :: Handle -> Int -> String -> IO ()

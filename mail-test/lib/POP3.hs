@@ -28,7 +28,7 @@ pop3Listen portnum = do
 pop3Accept :: POP3Server -> IO POP3Conn
 pop3Accept (POP3Server sock) = do
   (conn, _, _) <- accept sock
-  hSetBuffering conn NoBuffering
+  hSetBuffering conn LineBuffering
   pop3RespondOK conn
   return $ POP3Conn conn
 
