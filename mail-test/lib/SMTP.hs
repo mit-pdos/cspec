@@ -5,6 +5,7 @@ module SMTP where
 import Network
 import System.IO
 import Support
+import Data.List.Split
 
 data SMTPServer =
   SMTPServer Socket
@@ -41,11 +42,17 @@ smtpClose h = do
   smtpRespond h 221 "closing"
   hClose h
 
-process_to :: [String] -> String
-process_to words =
-  if length words >= 1 && (words !! 0) == "TO:"
-  then filter (not . flip elem "<>") (words !! 1)
-  else "still-unknown"
+process_to:: [String] -> String
+process_to rcpt =
+  let u = splitOn ":" (rcpt !! 0)
+  in filter (not . flip elem "<>") (u !! 1)
+    
+
+-- process_to :: [String] -> String
+-- process_to words =
+--   if length words == 1 && (words !! 0) == "TO:"
+--   then filter (not . flip elem "<>") (words !! 1)
+--   else "still-unknown"
 
 smtpProcessCommands :: Handle -> Message -> IO (Maybe Message)
 smtpProcessCommands h msg = do
@@ -63,7 +70,6 @@ smtpProcessCommands h msg = do
       smtpProcessCommands h $ msg { mail_from = from }
     "RCPT" : to -> do
       smtpRespondOK h
-      -- putStrLn $ "to: " ++ process_to to
       smtpProcessCommands h $ msg { mail_to = process_to to }
     ["DATA"] -> do
       smtpRespond h 354 "proceed with data"
