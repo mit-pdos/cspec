@@ -12,4 +12,9 @@ do
     echo "u$i pw" >> /tmp/mailtest/users
 done    
 
+echo "run-postal $NUSER"
+
+./bin/mail-test &
+sleep 5
 timeout 4m ~/tmp/postal-0.70/postal -p 2525 -t $NUSER -r 10000 localhost /tmp/mailtest/users
+kill %1
