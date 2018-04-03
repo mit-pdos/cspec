@@ -14,8 +14,8 @@ data Message =
     { mail_client :: [String]
     , mail_from :: [String]
     , mail_to :: String
-    , mail_data :: String
-    } deriving (Show, Eq)
+    , mail_data :: ShowS
+    }
 
 smtpListen :: Int -> IO SMTPServer
 smtpListen portnum = do
@@ -82,15 +82,15 @@ smtpProcessData h msg = do
   if line == ".\r" then
     return (Just msg)
   else do
-    smtpProcessData h $ msg { mail_data = (mail_data msg) ++ line ++ "\n" }
+    smtpProcessData h $ msg { mail_data = (mail_data msg) . showString (line ++ "\n") }
 
 smtpGetMessage :: SMTPConn -> IO (Maybe (String, String))
 smtpGetMessage (SMTPConn h) = do
   smtpRespond h 220 "ready"
-  maybemsg <- smtpProcessCommands h (Message [] [] "unknown" "")
+  maybemsg <- smtpProcessCommands h (Message [] [] "unknown" (showString ""))
   case maybemsg of
     Nothing -> return Nothing
-    Just msg -> return $ Just (mail_to msg, mail_data msg)
+    Just msg -> return $ Just (mail_to msg, mail_data msg "")
 
 smtpDone :: SMTPConn -> Bool -> IO ()
 smtpDone (SMTPConn h) True = do
