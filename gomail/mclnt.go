@@ -1,6 +1,6 @@
 package main
 
-# use: $ time go run mclnt.go
+// use: $ time go run mclnt.go
 
 import (
 	"fmt"
