@@ -17,8 +17,9 @@ import (
 )
 
 const (
+	NGO=10
 	NUSER=100
-	NMSG=1000
+	NMSG=10
 )
 
 func sendmail(u string) {
@@ -75,6 +76,7 @@ func read_lines(tr *textproto.Reader) []string {
 }
 
 func pickup(u string) {
+	fmt.Printf("pickup %s\n", u)
 	c, err := net.Dial("tcp", "localhost:2110")
 	if err != nil {
 		log.Fatal(err)
@@ -110,47 +112,55 @@ func pickup(u string) {
 	read_ok(tr)
 }
 
-func clients(nclient int, f func (u string), b string) {
+func smtp_client(c int) {
+	for i := 0; i < (NMSG * NUSER) / NGO; i++ {
+		u := (i+c) % NUSER
+		sendmail("u" + strconv.Itoa(u))
+	}
+}
+
+func pop_client(c int) {
+	fmt.Printf("pop clnt %d\n", c)
+	n := NUSER/NGO
+	o := c * n
+	for u := 0; u < n; u++ {
+		pickup("u" + strconv.Itoa(u+o))
+	}
+}
+
+func measure(s string, f func(int)) {
 	var wg sync.WaitGroup
-	wg.Add(nclient)
 	start := time.Now()
-	for t := 0; t < nclient; t++ {
-		go func () {
+	wg.Add(NGO)
+	for c := 0; c < NGO; c++ {
+		go func (c int) {
 			defer wg.Done()
-			for i := 0; i < NMSG; i++ {
-				u := i % NUSER
-				f("u" + strconv.Itoa(u))
-			}
-		}()
+			f(c)
+		}(c)
 	}
 	wg.Wait()
 	t := time.Now()
 	elapsed := t.Sub(start)
-	tput := float64(nclient*NMSG) / elapsed.Seconds()
-	fmt.Printf("%s: time %v #msgs %v tput %v\n", b, elapsed, nclient * NMSG, tput)
+	fmt.Printf("%s: time %v\n", s, elapsed)
 }
 
 func main() {
 	if len(os.Args) != 3 {
-		panic("<nclient smtp> <nclient pop>")
-	}
-	nsmtp, err := strconv.Atoi(os.Args[1])
-	if err != nil {
-		log.Fatal(err)
-	}
-	npop, err := strconv.Atoi(os.Args[2])
-	if err != nil {
-		log.Fatal(err)
+		panic("<smtp> <pop>")
 	}
 	var wg sync.WaitGroup
 	wg.Add(2)
 	go func () {
 		defer wg.Done()
-		clients(nsmtp, sendmail, "deliver")
+		if os.Args[1] == "1" {
+			measure("smtp", smtp_client)
+		}
 	}()
 	go func () {
 		defer wg.Done()
-		clients(npop, pickup, "pickup")
+		if os.Args[2] == "1" {
+			measure("pop", pop_client)
+		}
 	}()
 	wg.Wait()
 }
