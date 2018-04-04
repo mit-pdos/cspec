@@ -3,14 +3,14 @@ package main
 import (
 	"bufio"
 	"bytes"
-	"crypto/md5"
-	"encoding/hex"
 	"fmt"
 	"log"
 	"net"
 	"net/textproto"
 	"os"
+	"strconv"
 	"strings"
+	"time"
 )
 
 // A go mail server that is equivalent to the Gallina/Haskell version, handling
@@ -36,31 +36,41 @@ func reply(c net.Conn, format string, elems ...interface{}) {
 	}
 }
 
-func (msg *Message) process_msg() error {
-	// fmt.Printf("process msg %v\n", msg)
-	hasher := md5.New()
+func (msg *Message) process_msg(tid int) error {
+	// fmt.Printf("process msg %v tid %v\n", msg, tid)
 
-	var buffer bytes.Buffer
-	for _, s := range msg.Data {
-           buffer.WriteString(s)
-	}
-	b := []byte(buffer.String())
-	hasher.Write(b)
-	name := hex.EncodeToString(hasher.Sum(nil))
-	tpn := dir+"/" + msg.To + "/tmp/"+name
+	tpn := dir+"/" + msg.To + "/tmp/" + strconv.Itoa(tid)
 	file, err := os.Create(tpn)
 	if err != nil {
 		return err
 	}
+	var buffer bytes.Buffer
+	for _, s := range msg.Data {
+		buffer.WriteString(s)
+	}
+	b := []byte(buffer.String())
 	_, err = file.Write(b)
 	if err != nil {
 		return err
 	}
 	file.Close()
-	fpn := dir+"/" + msg.To + "/mail/"+name
-	err = os.Rename(tpn,fpn)
+
+	for {
+		fpn := dir+"/" + msg.To + "/mail/" + strconv.FormatInt(time.Now().UnixNano(), 16)
+		err = os.Link(tpn, fpn)
+		if err == nil {
+			break
+		}
+		if os.IsExist(err) {
+			fmt.Printf("retry link\n")
+		} else {
+			return err
+		}
+	}
+	
+	err = os.Remove(tpn)
 	if err != nil {
-		return err
+		log.Fatalf("Unlink error %v\n", err)
 	}
 	return nil
 }
@@ -73,7 +83,7 @@ func process_data(tp *textproto.Reader) (error, []string) {
 	return nil, lines
 }
 
-func process_smtp(c net.Conn) {
+func process_smtp(c net.Conn, tid int) {
 	reader := bufio.NewReader(c)
 	tp := textproto.NewReader(reader)
 	var msg *Message
@@ -121,8 +131,9 @@ func process_smtp(c net.Conn) {
 				break
 			}
 			msg.Data = lines
-			err = msg.process_msg()
+			err = msg.process_msg(tid)
 			if err != nil {
+				fmt.Printf("err %v\n", err)
 				reply(c, "500 Error process_msg")
 				break
 			} else {
@@ -146,10 +157,10 @@ func main() {
 		log.Fatal(err)
 	}
 	defer conn.Close()
-	for {
+	for c := 0;  ; c++ {
 		nc, err := conn.Accept()
 		if err == nil {
-			go process_smtp(nc)
+			go process_smtp(nc, c)
 		}
 	}
 }
