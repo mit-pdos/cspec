@@ -44,7 +44,7 @@ mkState smtp pop3 = do
     return $ S (read tidstr) smtp pop3 lockvar
 
 verbose :: Bool
-verbose = False
+verbose = True
 
 debugmsg :: String -> IO ()
 debugmsg s =
