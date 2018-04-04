@@ -4,6 +4,7 @@ module Main where
 -- Haskell libraries
 import Control.Concurrent
 import Control.Monad
+import System.Environment
 
 -- Our library code
 import Interpreter
@@ -35,8 +36,17 @@ spawn_thread smtp pop3 p = do
 
 main :: IO ()
 main = do
+  args <- getArgs
+  mainArgs args
+
+mainArgs :: [String] -> IO ()
+mainArgs [nsmtp, npop3] = do
   smtp <- smtpListen 2525
   pop3 <- pop3Listen 2110
-  mapM_ (spawn_thread smtp pop3) (ms_bottom 4 4)
+  mapM_ (spawn_thread smtp pop3) (ms_bottom (read nsmtp) (read npop3))
   putStrLn "Started all threads"
   forever $ threadDelay 1000000
+
+mainArgs _ = do
+  exec <- getProgName
+  putStrLn $ "Usage: " ++ exec ++ " nsmtp npop3"
