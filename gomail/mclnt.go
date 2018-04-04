@@ -35,7 +35,6 @@ func sendmail(u string) {
 		log.Fatal(err)
 	}
 
-	// Send the email body.
 	wc, err := c.Data()
 	if err != nil {
 		log.Fatal(err)
@@ -60,7 +59,11 @@ func read_ok(tr *textproto.Reader) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	fmt.Printf("line %s\n", line)
+	// fmt.Printf("line %s\n", line)
+	if strings.HasPrefix(line, "+OK ") {
+		return
+	}
+	log.Fatal("no +OK")
 }
 
 func read_lines(tr *textproto.Reader) []string {
@@ -68,11 +71,10 @@ func read_lines(tr *textproto.Reader) []string {
 	if err != nil {
 		log.Fatal(err)
 	}
-	fmt.Printf("lines %v\n", lines)
 	return lines
 }
 
-func pickup() {
+func pickup(u string) {
 	c, err := net.Dial("tcp", "localhost:2110")
 	if err != nil {
 		log.Fatal(err)
@@ -86,13 +88,14 @@ func pickup() {
 
 	read_ok(tr)
 	
-	tw.PrintfLine("USER u1")
+	tw.PrintfLine("USER %s", u)
 	read_ok(tr)
 	
 	tw.PrintfLine("LIST")
 	read_ok(tr)
 
 	lines := read_lines(tr)
+	fmt.Printf("user %v lines %v\n", u, lines)
 	for i := 0; i < len(lines); i++ {
 		msg := strings.Fields(lines[i])
 		tw.PrintfLine("RETR %s", msg[0])
@@ -107,7 +110,7 @@ func pickup() {
 	read_ok(tr)
 }
 
-func smtp_clients(nclient int) {
+func clients(nclient int, f func (u string), b string) {
 	var wg sync.WaitGroup
 	wg.Add(nclient)
 	start := time.Now()
@@ -116,7 +119,7 @@ func smtp_clients(nclient int) {
 			defer wg.Done()
 			for i := 0; i < NMSG; i++ {
 				u := i % NUSER
-				sendmail("u" + strconv.Itoa(u))
+				f("u" + strconv.Itoa(u))
 			}
 		}()
 	}
@@ -124,16 +127,30 @@ func smtp_clients(nclient int) {
 	t := time.Now()
 	elapsed := t.Sub(start)
 	tput := float64(nclient*NMSG) / elapsed.Seconds()
-	fmt.Printf("time %v #msgs %v tput %v\n", elapsed, nclient * NMSG, tput)
+	fmt.Printf("%s: time %v #msgs %v tput %v\n", b, elapsed, nclient * NMSG, tput)
 }
 
 func main() {
-	if len(os.Args) != 2 {
-		panic("<nclient>")
+	if len(os.Args) != 3 {
+		panic("<nclient smtp> <nclient pop>")
 	}
-	_, err := strconv.Atoi(os.Args[1])
+	nsmtp, err := strconv.Atoi(os.Args[1])
 	if err != nil {
 		log.Fatal(err)
 	}
-	pickup()
+	npop, err := strconv.Atoi(os.Args[2])
+	if err != nil {
+		log.Fatal(err)
+	}
+	var wg sync.WaitGroup
+	wg.Add(2)
+	go func () {
+		defer wg.Done()
+		clients(nsmtp, sendmail, "deliver")
+	}()
+	go func () {
+		defer wg.Done()
+		clients(npop, pickup, "pickup")
+	}()
+	wg.Wait()
 }
