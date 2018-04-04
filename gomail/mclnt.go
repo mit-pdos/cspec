@@ -6,8 +6,16 @@ import (
 	"fmt"
 	"log"
 	"net/smtp"
+	"strconv"
+	"sync"
+	"os"
+	"time"
 )
 
+const (
+	NUSER=100
+	NMSG=10000
+)
 
 func sendmail(u string) {
 	c, err := smtp.Dial("localhost:2525")
@@ -37,7 +45,6 @@ func sendmail(u string) {
 		log.Fatal(err)
 	}
 
-	// Send the QUIT command and close the connection.
 	err = c.Quit()
 	if err != nil {
 		log.Fatal(err)
@@ -45,7 +52,28 @@ func sendmail(u string) {
 }
 
 func main() {
-	for i := 0; i < 10000; i++ {
-		sendmail("u1")
+	if len(os.Args) != 2 {
+		panic("<nclient>")
 	}
+	nclient, err := strconv.Atoi(os.Args[1])
+	if err != nil {
+		log.Fatal(err)
+	}
+	var wg sync.WaitGroup
+	wg.Add(nclient)
+	start := time.Now()
+	for t := 0; t < nclient; t++ {
+		go func () {
+			defer wg.Done()
+			for i := 0; i < NMSG; i++ {
+				u := NMSG % NUSER
+				sendmail("u" + strconv.Itoa(u))
+			}
+		}()
+	}
+	wg.Wait()
+	t := time.Now()
+	elapsed := t.Sub(start)
+	tput := float64(nclient*NMSG) / elapsed.Seconds()
+	fmt.Printf("time %v #msgs %v tput %v\n", elapsed, nclient * NMSG, tput)
 }
