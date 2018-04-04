@@ -14,7 +14,7 @@ import (
 
 const (
 	NUSER=100
-	NMSG=10000
+	NMSG=1000
 )
 
 func sendmail(u string) {
@@ -66,7 +66,7 @@ func main() {
 		go func () {
 			defer wg.Done()
 			for i := 0; i < NMSG; i++ {
-				u := NMSG % NUSER
+				u := i % NUSER
 				sendmail("u" + strconv.Itoa(u))
 			}
 		}()
