@@ -350,4 +350,5 @@ Definition ms_bottom' : {t : threads_state | exec_equiv_ts t (ms_bottom 1 0)}.
   reflexivity'.
 Defined.
 
-Eval compute in (proj1_sig ms_bottom').
+Definition ms_bottom_1_0_simpl := Eval compute in (proj1_sig ms_bottom').
+Print ms_bottom_1_0_simpl.
