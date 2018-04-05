@@ -11,6 +11,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -166,6 +167,57 @@ func smtp() {
 	}
 }
 
+type mailbox struct  {
+	sync.Mutex
+	u string
+	files []os.FileInfo
+}
+
+func (mbox *mailbox) pn() string {
+	return dir + "/" + mbox.u + "/mail/"
+}
+
+func (mbox *mailbox) file(words []string) (*os.FileInfo, bool) {
+	if len(words) < 2 {
+		return nil, false
+	}
+	i, err := strconv.Atoi(words[1])
+	if err != nil {
+		return nil, false
+	}
+	if len(mbox.files) < i+1 {
+		return nil, false
+	}
+	return &mbox.files[i], true
+}
+
+func send_data(tw *textproto.Writer, pn string, file *os.FileInfo) bool {
+	n := pn + (*file).Name()
+	f, err := os.Open(n)
+	if err != nil {
+		return false
+	}
+	data := make([]byte, (*file).Size())
+	_, err = f.Read(data)
+	if err != nil {
+		return false
+	}
+	f.Close()
+	
+	tw.PrintfLine("+OK")
+
+	dwr := tw.DotWriter()
+	_, err = dwr.Write(data)
+	if err != nil {
+		return false
+	}
+	err = dwr.Close()
+	if err != nil {
+		return false
+	}
+	return true
+}
+
 func process_pop(c net.Conn, tid int) {
 	defer c.Close()
 	
@@ -173,11 +225,9 @@ func process_pop(c net.Conn, tid int) {
 	tr := textproto.NewReader(reader)
 	writer := bufio.NewWriter(c)
 	tw := textproto.NewWriter(writer)
-
-	tw.PrintfLine("+OK")
+	var mbox *mailbox
 	
-	var u string
-	var files []os.FileInfo
+	tw.PrintfLine("+OK")
 	
 	for {
 		line, err := tr.ReadLine()
@@ -199,80 +249,57 @@ func process_pop(c net.Conn, tid int) {
 				tw.PrintfLine("-ERR")
 				break
 			}
-			u = words[1]
-			pn := dir + "/" + u + "/mail/"
-			files, err = ioutil.ReadDir(pn)
+			mbox = &mailbox{}
+			mbox.u = words[1]
+			mbox.Lock()
+			mbox.files, err = ioutil.ReadDir(mbox.pn())
+			mbox.Unlock()
 			if err != nil {
 				tw.PrintfLine("-ERR readdir")
 				break
 			}
 			tw.PrintfLine("+OK")
 		case "LIST":
+			if mbox == nil {
+				tw.PrintfLine("-ERR readdir")
+				break
+			}
 			tw.PrintfLine("+OK")
 			// d := tw.DotWriter()
-			for i, file := range files {
+			for i, file := range mbox.files {
 				tw.PrintfLine("%d %d", i, file.Size())
 			}
 			tw.PrintfLine(".")
 			tw.PrintfLine("+OK")
 		case "RETR":
-			if len(words) < 2 {
-				tw.PrintfLine("-ERR len")
+			if mbox == nil {
+				tw.PrintfLine("-ERR mbox")
 				break
 			}
-			i, err := strconv.Atoi(words[1])
-			if err != nil {
-				tw.PrintfLine("-ERR conv")
+			file, ok := mbox.file(words)
+			if !ok {
+				tw.PrintfLine("-ERR file")
 				break
 			}
-			pn := dir + "/" + u + "/mail/"
-			if len(files) < i+1 {
-				tw.PrintfLine("-ERR index")
-				break
-			}
-			n := pn + files[i].Name()
-			file, err := os.Open(n)
-			if err != nil {
-				tw.PrintfLine("-ERR open %v", n)
-				break
-			}
-			data := make([]byte, files[i].Size())
-			_, err = file.Read(data)
-			if err != nil {
-				tw.PrintfLine("-ERR read")
-				break
-			}
-			file.Close()
-			tw.PrintfLine("+OK")
-
-			dwr := tw.DotWriter()
-			_, err = dwr.Write(data)
-			if err != nil {
-				tw.PrintfLine("-ERR write")
-				break
-			}
-			err = dwr.Close()
-			if err != nil {
-				tw.PrintfLine("-ERR close")
+			ok = send_data(tw, mbox.pn(), file)
+			if !ok {
+				tw.PrintfLine("-ERR data")
 				break
 			}
 	        case "DELE":
-			if len(words) < 2 {
-				tw.PrintfLine("-ERR len")
+			if mbox == nil {
+				tw.PrintfLine("-ERR mbox")
 				break
 			}
-			i, err := strconv.Atoi(words[1])
-			if err != nil {
-				tw.PrintfLine("-ERR conv")
+			file, ok := mbox.file(words)
+			if !ok {
+				tw.PrintfLine("-ERR file %v")
 				break
 			}
-			if len(files) < i+1 {
-				tw.PrintfLine("-ERR index %s", words[1])
-				break
-			}
-			pn := dir + "/" + u + "/mail/"
-			n := pn + files[i].Name()
+			mbox.Lock()
+			n := mbox.pn() + (*file).Name()
 			err = os.Remove(n)
+			mbox.Unlock()
 			if err != nil {
 				tw.PrintfLine("-ERR remove")
 				break
