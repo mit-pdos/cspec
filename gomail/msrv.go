@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"io/ioutil"
 	"fmt"
 	"log"
 	"net"
@@ -84,6 +85,7 @@ func process_data(tp *textproto.Reader) (error, []string) {
 }
 
 func process_smtp(c net.Conn, tid int) {
+	defer c.Close()
 	reader := bufio.NewReader(c)
 	tp := textproto.NewReader(reader)
 	var msg *Message
@@ -133,7 +135,6 @@ func process_smtp(c net.Conn, tid int) {
 			msg.Data = lines
 			err = msg.process_msg(tid)
 			if err != nil {
-				fmt.Printf("err %v\n", err)
 				reply(c, "500 Error process_msg")
 				break
 			} else {
@@ -151,7 +152,7 @@ func process_smtp(c net.Conn, tid int) {
 	}	
 }
 
-func main() {
+func smtp() {
 	conn, err := net.Listen("tcp", "localhost:2525")
 	if err != nil {
 		log.Fatal(err)
@@ -163,4 +164,147 @@ func main() {
 			go process_smtp(nc, c)
 		}
 	}
+}
+
+func process_pop(c net.Conn, tid int) {
+	defer c.Close()
+	
+	reader := bufio.NewReader(c)
+	tr := textproto.NewReader(reader)
+	writer := bufio.NewWriter(c)
+	tw := textproto.NewWriter(writer)
+
+	tw.PrintfLine("+OK")
+	
+	var u string
+	var files []os.FileInfo
+	
+	for {
+		line, err := tr.ReadLine()
+		if err != nil {
+			tw.PrintfLine("-ERR")
+			break
+		}
+
+		words := strings.Fields(line)
+		// fmt.Printf("msg: %v\n", words)
+		if len(words) <= 0 {
+			tw.PrintfLine("-ERR")
+			break
+		}
+
+		switch words[0] {
+		case "USER":
+			if len(words) < 2 {
+				tw.PrintfLine("-ERR")
+				break
+			}
+			u = words[1]
+			pn := dir + "/" + u + "/mail/"
+			files, err = ioutil.ReadDir(pn)
+			if err != nil {
+				tw.PrintfLine("-ERR readdir")
+				break
+			}
+			tw.PrintfLine("+OK")
+		case "LIST":
+			tw.PrintfLine("+OK")
+			// d := tw.DotWriter()
+			for i, file := range files {
+				tw.PrintfLine("%d %d", i, file.Size())
+			}
+			tw.PrintfLine(".")
+			tw.PrintfLine("+OK")
+		case "RETR":
+			if len(words) < 2 {
+				tw.PrintfLine("-ERR len")
+				break
+			}
+			i, err := strconv.Atoi(words[1])
+			if err != nil {
+				tw.PrintfLine("-ERR conv")
+				break
+			}
+			pn := dir + "/" + u + "/mail/"
+			if len(files) < i+1 {
+				tw.PrintfLine("-ERR index")
+				break
+			}
+			n := pn + files[i].Name()
+			file, err := os.Open(n)
+			if err != nil {
+				tw.PrintfLine("-ERR open %v", n)
+				break
+			}
+			data := make([]byte, files[i].Size())
+			_, err = file.Read(data)
+			if err != nil {
+				tw.PrintfLine("-ERR read")
+				break
+			}
+			file.Close()
+			tw.PrintfLine("+OK")
+
+			dwr := tw.DotWriter()
+			_, err = dwr.Write(data)
+			if err != nil {
+				tw.PrintfLine("-ERR write")
+				break
+			}
+			err = dwr.Close()
+			if err != nil {
+				tw.PrintfLine("-ERR close")
+				break
+			}
+	        case "DELE":
+			if len(words) < 2 {
+				tw.PrintfLine("-ERR len")
+				break
+			}
+			i, err := strconv.Atoi(words[1])
+			if err != nil {
+				tw.PrintfLine("-ERR conv")
+				break
+			}
+			if len(files) < i+1 {
+				tw.PrintfLine("-ERR index %s", words[1])
+				break
+			}
+			pn := dir + "/" + u + "/mail/"
+			n := pn + files[i].Name()
+			err = os.Remove(n)
+			if err != nil {
+				tw.PrintfLine("-ERR remove")
+				break
+			}
+			tw.PrintfLine("+OK")
+		case "QUIT":
+			tw.PrintfLine("+OK")
+			break
+	        default:
+			tw.PrintfLine("-ERR")
+			break
+		}
+	}
+}
+
+
+func pop() {
+	conn, err := net.Listen("tcp", "localhost:2110")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer conn.Close()
+	for c := 0;  ; c++ {
+		nc, err := conn.Accept()
+		if err == nil {
+			go process_pop(nc, c)
+		}
+	}
+}
+
+
+func main() {
+	go smtp()
+	pop()
 }

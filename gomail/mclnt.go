@@ -19,7 +19,7 @@ import (
 const (
 	NGO=10
 	NUSER=100
-	NMSG=10
+	NMSG=1000
 )
 
 func sendmail(u string) {
@@ -60,8 +60,8 @@ func read_ok(tr *textproto.Reader) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	// fmt.Printf("line %s\n", line)
-	if strings.HasPrefix(line, "+OK ") {
+	// fmt.Printf("ok line %s\n", line)
+	if strings.HasPrefix(line, "+OK") {
 		return
 	}
 	log.Fatal("no +OK")
@@ -72,11 +72,12 @@ func read_lines(tr *textproto.Reader) []string {
 	if err != nil {
 		log.Fatal(err)
 	}
+	// fmt.Printf("lines: %v\n", lines)
 	return lines
 }
 
 func pickup(u string) {
-	fmt.Printf("pickup %s\n", u)
+	// fmt.Printf("pickup %s\n", u)
 	c, err := net.Dial("tcp", "localhost:2110")
 	if err != nil {
 		log.Fatal(err)
@@ -97,7 +98,7 @@ func pickup(u string) {
 	read_ok(tr)
 
 	lines := read_lines(tr)
-	fmt.Printf("user %v lines %v\n", u, lines)
+	// fmt.Printf("user %v lines %v\n", u, lines)
 	for i := 0; i < len(lines); i++ {
 		msg := strings.Fields(lines[i])
 		tw.PrintfLine("RETR %s", msg[0])
@@ -120,7 +121,6 @@ func smtp_client(c int) {
 }
 
 func pop_client(c int) {
-	fmt.Printf("pop clnt %d\n", c)
 	n := NUSER/NGO
 	o := c * n
 	for u := 0; u < n; u++ {
