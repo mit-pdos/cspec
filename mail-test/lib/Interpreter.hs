@@ -93,6 +93,11 @@ run_proc _ (Op MailFSMergedOp__Random) = do
   ts <- rdtsc
   return $ unsafeCoerce (fromIntegral ts :: Integer)
 
+run_proc _ (Op (MailFSMergedOp__Ext (MailServerOp__PickUser))) = do
+  debugmsg $ "PickUser"
+  u <- rdtsc
+  return $ unsafeCoerce $ "u" ++ (show $ u `mod` 100)
+
 run_proc (S _ smtpserver _ _) (Op (MailFSMergedOp__Ext (MailServerOp__AcceptSMTP))) = do
   debugmsg $ "AcceptSMTP"
   conn <- smtpAccept smtpserver

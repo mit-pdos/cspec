@@ -36,6 +36,9 @@ Module MailServerOp <: Ops.
   | POP3RespondList : pop3conn -> list nat -> extopT unit
   | POP3RespondRetr : pop3conn -> string -> extopT unit
   | POP3RespondDelete : pop3conn -> extopT unit
+
+  (* For benchmarking *)
+  | PickUser : extopT string
   .
 
   Inductive xopT : Type -> Type :=

@@ -129,18 +129,20 @@ Fixpoint pop3_one (u : validIndexT UserIdx.indexValid) (msgs : list ((nat*nat) *
     pop3_one u msgs'
   end.
 
-Definition do_pop3 u : proc _ unit :=
-    eok <- Op (CheckUser u);
-    match eok with
-    | Missing =>
-      Ret tt
-    | Present u =>
-      msgs <- Op (Pickup u);
-      _ <- pop3_one u msgs;
-      Ret tt
-    end.
+Definition do_pop3 : proc _ unit :=
+  u <- Op (Ext PickUser);
+  eok <- Op (CheckUser u);
+  match eok with
+  | Missing =>
+    Ret tt
+  | Present u =>
+    msgs <- Op (Pickup u);
+    _ <- pop3_one u msgs;
+    Ret tt
+  end.
 
-Definition do_smtp u msg : proc _ unit :=
+Definition do_smtp msg : proc _ unit :=
+  u <- Op (Ext PickUser);
   eok <- Op (CheckUser u);
   match eok with
   | Missing =>
@@ -150,33 +152,33 @@ Definition do_smtp u msg : proc _ unit :=
     Ret tt
   end.
 
-Definition do_pop_loop u niter :=
+Definition do_pop_loop niter :=
   Until
     (fun x => if x == 0 then true else false)
     (fun x =>
       match x with
       | None => Ret 0
       | Some niter =>
-        _ <- do_pop3 u;
+        _ <- do_pop3;
         Ret (niter - 1)
       end)
     (Some niter).
 
-Definition do_smtp_loop u msg niter :=
+Definition do_smtp_loop msg niter :=
   Until
     (fun x => if x == 0 then true else false)
     (fun x =>
       match x with
       | None => Ret 0
       | Some niter =>
-        _ <- do_smtp u msg;
+        _ <- do_smtp msg;
         Ret (niter - 1)
       end)
     (Some niter).
 
 Definition mail_perf nsmtp npop3 nsmtpiter npop3iter :=
-  repeat (Proc (do_smtp_loop "u1" "msg" nsmtpiter)) nsmtp ++
-  repeat (Proc (do_pop_loop "u1" npop3iter)) npop3.
+  repeat (Proc (do_smtp_loop "msg" nsmtpiter)) nsmtp ++
+  repeat (Proc (do_pop_loop npop3iter)) npop3.
 
 Module c1 :=
   Link
@@ -268,10 +270,6 @@ Module c0 :=
 
 Definition ms_bottom nsmtp npop3 nsmtpiter npop3iter :=
   c0.compile_ts (mail_perf nsmtp npop3 nsmtpiter npop3iter).
-
-Definition ms_bottom_smtp :=
-  c0.compile_ts (Proc (do_smtp "u1"%string "msg"%string) :: nil).
-
 
 Definition ms_bottom_server nsmtp npop3 :=
   c0.compile_ts (mail_server nsmtp npop3).
@@ -509,7 +507,11 @@ Definition ms_bottom_opt' nsmtp npop3 nsmtpiter npop3iter :
     etransitivity; [ | rewrite exec_equiv_bind_bind; reflexivity ].
     etransitivity; [ | rewrite exec_equiv_until_once; reflexivity ].
     eapply Bind_exec_equiv_proper; [ reflexivity | intro ].
-    destruct a; simpl.
+
+    etransitivity; [ | rewrite exec_equiv_bind_bind; reflexivity ].
+    etransitivity; [ | rewrite exec_equiv_until_once; reflexivity ].
+    eapply Bind_exec_equiv_proper; [ reflexivity | intro ].
+    destruct a0; simpl.
 
     2: rewrite exec_equiv_rx_Present; [ | shelve ].
     simpl.
@@ -528,7 +530,7 @@ Definition ms_bottom_opt' nsmtp npop3 nsmtpiter npop3iter :
     eapply Bind_exec_equiv_proper; [ reflexivity | intro ].
 
     etransitivity; [ | rewrite exec_equiv_ret_bind; reflexivity ].
-    destruct a0; simpl.
+    destruct a1; simpl.
 
     rewrite exec_equiv_rx_true; [ | shelve ].
     2: simpl.
