@@ -27,10 +27,10 @@ run_thread smtp pop3 (Proc p) = do
   run_proc s p
   return ()
 
-spawn_thread :: SMTPServer -> POP3Server -> Coq_maybe_proc (MailFSMergedOp__Coq_xopT a) -> IO ()
-spawn_thread smtp pop3 p = do
+spawn_thread :: SMTPServer -> POP3Server -> Coq_maybe_proc (MailFSMergedOp__Coq_xopT a) -> MVar () -> IO ()
+spawn_thread smtp pop3 p completion = do
   putStrLn $ "Spawning.."
-  tid <- forkIO (run_thread smtp pop3 p)
+  tid <- forkFinally (run_thread smtp pop3 p) (\_ -> putMVar completion ())
   putStrLn $ "Spawned " ++ (show tid)
   return ()
 
@@ -40,14 +40,19 @@ main = do
   mainArgs args
 
 mainArgs :: [String] -> IO ()
-mainArgs [nsmtp, npop3] = do
+mainArgs [nsmtp, npop3, nsmtpiter, npop3iter] = do
   smtp <- smtpListen 2525
   pop3 <- pop3Listen 2110
-  -- mapM_ (spawn_thread smtp pop3) (ms_bottom (read nsmtp) (read npop3))
-  s <- mkState smtp pop3
-  run_proc1 s (Proc (do_smtp "u1" "msg"))
+  completions <- mapM
+    (\p -> do
+      completion <- newEmptyMVar;
+      spawn_thread smtp pop3 p completion;
+      return completion)
+    (ms_bottom (read nsmtp) (read npop3) (read nsmtpiter) (read npop3iter))
+  -- s <- mkState smtp pop3
+  -- run_proc1 s (Proc (do_smtp "u1" "msg"))
   putStrLn "Started all threads"
-  forever $ threadDelay 1000000
+  mapM_ takeMVar completions
 
 mainArgs _ = do
   exec <- getProgName

@@ -106,29 +106,39 @@ Definition do_pop3_req : proc _ unit :=
     end
   end.
 
+Definition smtp_server_thread : proc _ unit :=
+  Until (fun _ => false) (fun _ => do_smtp_req) None.
+
+Definition pop3_server_thread : proc _ unit :=
+  Until (fun _ => false) (fun _ => do_pop3_req) None.
+
+Definition mail_server nsmtp npop3 :=
+  repeat (Proc smtp_server_thread) nsmtp ++
+  repeat (Proc pop3_server_thread) npop3.
+
+
+
 Fixpoint pop3_one (u : validIndexT UserIdx.indexValid) (msgs : list ((nat*nat) * string)) :=
   match msgs with
-  | nil => Ret false
+  | nil => Ret tt
   | msg :: msgs' =>
     _ <- Op (Delete u (fst msg));
     pop3_one u msgs'
   end.
 
-Definition do_pop3: proc _ unit :=
-    eok <- Op (CheckUser "u1"%string);
+Definition do_pop3 u : proc _ unit :=
+    eok <- Op (CheckUser u);
     match eok with
     | Missing =>
       Ret tt
     | Present u =>
       msgs <- Op (Pickup u);
-      _ <- Until (fun done => done)
-                 (fun _ => pop3_one u msgs)
-                 None;
+      _ <- pop3_one u msgs;
       Ret tt
     end.
 
-Definition do_smtp u msg: proc _ unit :=
-  eok <- Op (CheckUser u%string);
+Definition do_smtp u msg : proc _ unit :=
+  eok <- Op (CheckUser u);
   match eok with
   | Missing =>
     Ret tt
@@ -137,25 +147,27 @@ Definition do_smtp u msg: proc _ unit :=
     Ret tt
   end.
 
-Definition smtp_server_thread : proc _ unit :=
-  Until (fun _ => false) (fun _ => do_smtp_req) None.
+Fixpoint do_pop_loop u niter :=
+  match niter with
+  | S niter' =>
+    _ <- do_pop3 u;
+    do_pop_loop u niter'
+  | O =>
+    Ret tt
+  end.
 
-Definition pop3_server_thread : proc _ unit :=
-  Until (fun _ => false) (fun _ => do_pop3_req) None.
+Fixpoint do_smtp_loop u msg niter :=
+  match niter with
+  | S niter' =>
+    _ <- do_smtp u msg;
+    do_smtp_loop u msg niter'
+  | O =>
+    Ret tt
+  end.
 
-Definition smtp_thread : proc _ unit :=
-  Until (fun _ => false) (fun _ => do_smtp "u1" "msg") None.
-
-Definition pop3_thread : proc _ unit :=
-  Until (fun _ => false) (fun _ => do_pop3) None.
-
-Definition mail_perf nsmtp npop3 :=
-  repeat (Proc smtp_thread) nsmtp ++
-  repeat (Proc pop3_thread) npop3.
-
-Definition mail_server nsmtp npop3 :=
-  repeat (Proc smtp_server_thread) nsmtp ++
-  repeat (Proc pop3_server_thread) npop3.
+Definition mail_perf nsmtp npop3 nsmtpiter npop3iter :=
+  repeat (Proc (do_smtp_loop "u1" "msg" nsmtpiter)) nsmtp ++
+  repeat (Proc (do_pop_loop "u1" npop3iter)) npop3.
 
 Module c1 :=
   Link
@@ -239,13 +251,11 @@ Module c0 :=
     MailServerComposedOp MailServerComposedState MailServerComposedAPI
     c10 MailServerComposedImpl.
 
-Definition ms_bottom nsmtp npop3 :=
-  c0.compile_ts (mail_perf nsmtp npop3).
-
-Check mail_perf.
+Definition ms_bottom nsmtp npop3 nsmtpiter npop3iter :=
+  c0.compile_ts (mail_perf nsmtp npop3 nsmtpiter npop3iter).
 
 Definition ms_bottom_smtp :=
-  c0.compile_ts (Proc (do_smtp "u1"%string "msg"%string)).
+  c0.compile_ts (Proc (do_smtp "u1"%string "msg"%string) :: nil).
 
 
 Definition ms_bottom_server nsmtp npop3 :=
