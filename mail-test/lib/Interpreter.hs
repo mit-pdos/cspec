@@ -64,26 +64,6 @@ dirPath u dir = (userPath u) ++ "/" ++ dir
 filePath :: String -> String -> String -> String
 filePath u dir fn = (dirPath u dir) ++ "/" ++ fn
 
-run_proc1 :: State -> Coq_proc (MailServerComposedOp__Coq_xopT a) GHC.Prim.Any -> IO a
-run_proc1 s (Ret v) = do
-  -- debugmsg $ "Ret"
-  return $ unsafeCoerce v
-run_proc1 s (Bind p1 p2) = do
-  -- debugmsg $ "Bind"
-  v1 <- run_proc1 s p1
-  v2 <- run_proc1 s (p2 $ unsafeCoerce v1)
-  return v2
-run_proc1 s (Atomic _) = do
-  -- debugmsg $ "Atomic"
-  error "Running atomic"
-run_proc1 s (Until c p v0) = do
-  -- debugmsg $ "Until"
-  v <- run_proc1 s (p v0)
-  if (c $ unsafeCoerce v) then
-    return v
-  else
-    run_proc1 s (Until c p (unsafeCoerce v))
-
 run_proc :: State -> Coq_proc (MailFSMergedOp__Coq_xopT a) GHC.Prim.Any -> IO a
 run_proc s (Ret v) = do
   -- debugmsg $ "Ret"
@@ -97,12 +77,14 @@ run_proc s (Atomic _) = do
   -- debugmsg $ "Atomic"
   error "Running atomic"
 run_proc s (Until c p v0) = do
-  -- debugmsg $ "Until"
+  debugmsg $ "Until"
   v <- run_proc s (p v0)
-  if (c $ unsafeCoerce v) then
+  if (c $ unsafeCoerce v) then do
+    debugmsg $ "Until true"
     return v
-  else
-    run_proc s (Until c p (unsafeCoerce v))
+  else do
+    debugmsg $ "Until false"
+    run_proc s (Until c p (unsafeCoerce (Just v)))
 
 run_proc (S tid _ _ _) (Op MailFSMergedOp__GetTID) = do
   return $ unsafeCoerce tid
