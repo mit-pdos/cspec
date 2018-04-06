@@ -106,16 +106,56 @@ Definition do_pop3_req : proc _ unit :=
     end
   end.
 
+Fixpoint pop3_one (u : validIndexT UserIdx.indexValid) (msgs : list ((nat*nat) * string)) :=
+  match msgs with
+  | nil => Ret false
+  | msg :: msgs' =>
+    _ <- Op (Delete u (fst msg));
+    pop3_one u msgs'
+  end.
+
+Definition do_pop3: proc _ unit :=
+    eok <- Op (CheckUser "u1"%string);
+    match eok with
+    | Missing =>
+      Ret tt
+    | Present u =>
+      msgs <- Op (Pickup u);
+      _ <- Until (fun done => done)
+                 (fun _ => pop3_one u msgs)
+                 None;
+      Ret tt
+    end.
+
+Definition do_smtp u msg: proc _ unit :=
+  eok <- Op (CheckUser u%string);
+  match eok with
+  | Missing =>
+    Ret tt
+  | Present u =>
+    ok <- Op (Deliver u msg);
+    Ret tt
+  end.
+
 Definition smtp_server_thread : proc _ unit :=
   Until (fun _ => false) (fun _ => do_smtp_req) None.
 
 Definition pop3_server_thread : proc _ unit :=
   Until (fun _ => false) (fun _ => do_pop3_req) None.
 
+Definition smtp_thread : proc _ unit :=
+  Until (fun _ => false) (fun _ => do_smtp "u1" "msg") None.
+
+Definition pop3_thread : proc _ unit :=
+  Until (fun _ => false) (fun _ => do_pop3) None.
+
+Definition mail_perf nsmtp npop3 :=
+  repeat (Proc smtp_thread) nsmtp ++
+  repeat (Proc pop3_thread) npop3.
+
 Definition mail_server nsmtp npop3 :=
   repeat (Proc smtp_server_thread) nsmtp ++
   repeat (Proc pop3_server_thread) npop3.
-
 
 Module c1 :=
   Link
@@ -200,10 +240,18 @@ Module c0 :=
     c10 MailServerComposedImpl.
 
 Definition ms_bottom nsmtp npop3 :=
+  c0.compile_ts (mail_perf nsmtp npop3).
+
+Check mail_perf.
+
+Definition ms_bottom_smtp :=
+  c0.compile_ts (Proc (do_smtp "u1"%string "msg"%string)).
+
+
+Definition ms_bottom_server nsmtp npop3 :=
   c0.compile_ts (mail_server nsmtp npop3).
 
 Print Assumptions c0.compile_traces_match.
-
 
 
 Lemma exec_equiv_ts_build :
@@ -278,6 +326,7 @@ Ltac reflexivity' :=
     end
   end.
 
+(*
 Definition ms_bottom' : {t : threads_state | exec_equiv_ts t (ms_bottom 1 0)}.
   cbn.
   eexists.
@@ -352,3 +401,4 @@ Defined.
 
 Definition ms_bottom_1_0_simpl := Eval compute in (proj1_sig ms_bottom').
 Print ms_bottom_1_0_simpl.
+*)

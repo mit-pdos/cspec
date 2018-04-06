@@ -43,7 +43,9 @@ mainArgs :: [String] -> IO ()
 mainArgs [nsmtp, npop3] = do
   smtp <- smtpListen 2525
   pop3 <- pop3Listen 2110
-  mapM_ (spawn_thread smtp pop3) (ms_bottom (read nsmtp) (read npop3))
+  -- mapM_ (spawn_thread smtp pop3) (ms_bottom (read nsmtp) (read npop3))
+  s <- mkState smtp pop3
+  run_proc1 s (Proc (do_smtp "u1" "msg"))
   putStrLn "Started all threads"
   forever $ threadDelay 1000000
 
