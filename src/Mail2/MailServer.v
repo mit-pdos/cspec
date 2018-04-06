@@ -147,23 +147,29 @@ Definition do_smtp u msg : proc _ unit :=
     Ret tt
   end.
 
-Fixpoint do_pop_loop u niter :=
-  match niter with
-  | S niter' =>
-    _ <- do_pop3 u;
-    do_pop_loop u niter'
-  | O =>
-    Ret tt
-  end.
+Definition do_pop_loop u niter :=
+  Until
+    (fun x => if x == 0 then true else false)
+    (fun x =>
+      match x with
+      | None => Ret 0
+      | Some niter =>
+        _ <- do_pop3 u;
+        Ret (niter - 1)
+      end)
+    (Some niter).
 
-Fixpoint do_smtp_loop u msg niter :=
-  match niter with
-  | S niter' =>
-    _ <- do_smtp u msg;
-    do_smtp_loop u msg niter'
-  | O =>
-    Ret tt
-  end.
+Definition do_smtp_loop u msg niter :=
+  Until
+    (fun x => if x == 0 then true else false)
+    (fun x =>
+      match x with
+      | None => Ret 0
+      | Some niter =>
+        _ <- do_smtp u msg;
+        Ret (niter - 1)
+      end)
+    (Some niter).
 
 Definition mail_perf nsmtp npop3 nsmtpiter npop3iter :=
   repeat (Proc (do_smtp_loop "u1" "msg" nsmtpiter)) nsmtp ++
@@ -335,6 +341,233 @@ Ltac reflexivity' :=
     | ?f a => instantiate (1 := f); reflexivity
     end
   end.
+
+
+Section CompileTSHelper.
+
+  Variable opT1 : Type -> Type.
+  Variable opT2 : Type -> Type.
+  Variable compile_proc : forall T, proc opT2 T -> proc opT1 T.
+
+  Fixpoint compile_ts (ts : @threads_state opT2) : @threads_state opT1 :=
+    match ts with
+    | nil => nil
+    | NoProc :: ts' => NoProc :: compile_ts ts'
+    | Proc p :: ts' => Proc (compile_proc p) :: compile_ts ts'
+    end.
+
+End CompileTSHelper.
+
+Theorem compile_ts_eq :
+  forall `(compile_op : forall T, opT2 T -> proc opT1 T) ts,
+    Compile.compile_ts compile_op ts =
+    compile_ts (Compile.compile compile_op) ts.
+Proof.
+  induction ts; simpl; intros; eauto.
+  destruct a; f_equal; eauto.
+Qed.
+
+Theorem compile_ts_app :
+  forall `(compile_proc : forall T, proc opT1 T -> proc opT2 T) ts1 ts2,
+    compile_ts compile_proc (ts1 ++ ts2) =
+    compile_ts compile_proc ts1 ++ compile_ts compile_proc ts2.
+Proof.
+  induction ts1; simpl; intros; eauto.
+  destruct a; simpl; f_equal; eauto.
+Qed.
+
+Theorem compile_ts_compile_ts :
+  forall `(compile_proc1 : forall T, proc opT1 T -> proc opT2 T)
+         `(compile_proc2 : forall T, proc opT2 T -> proc opT3 T) ts,
+    compile_ts compile_proc2 (compile_ts compile_proc1 ts) =
+    compile_ts (fun T (p : proc opT1 T) => compile_proc2 _ (compile_proc1 _ p)) ts.
+Proof.
+  induction ts; simpl; intros; eauto.
+  destruct a; simpl; f_equal; eauto.
+Qed.
+
+Theorem compile_ts_repeat :
+  forall `(compile_proc : forall T, proc opT1 T -> proc opT2 T) p n,
+    compile_ts compile_proc (repeat p n) =
+    repeat (match p with
+            | NoProc => NoProc
+            | Proc p => Proc (compile_proc _ p)
+            end) n.
+Proof.
+  induction n; simpl; intros; eauto.
+  destruct p; f_equal; eauto.
+Qed.
+
+Theorem exec_equiv_ts_list' :
+  forall opT (ts : @threads_state opT) ts' tsbase,
+    Forall2 (fun p1 p2 =>
+      exists T (p1' p2' : proc _ T),
+        p1 = Proc p1' /\
+        p2 = Proc p2' /\
+        exec_equiv p1' p2') ts' ts ->
+    exec_equiv_ts (tsbase ++ ts')
+                  (tsbase ++ ts).
+Proof.
+  induction ts; destruct ts'; simpl; intros.
+  - reflexivity.
+  - inversion H.
+  - inversion H.
+  - inversion H; clear H; subst; repeat deex.
+    unfold exec_equiv in H1.
+    unfold exec_equiv_opt in H1.
+    specialize (H1 (tsbase ++ Proc p1' :: ts') (Datatypes.length tsbase)).
+    repeat rewrite thread_upd_app_length in H1.
+    etransitivity; eauto.
+    specialize (IHts ts' (tsbase ++ (Proc p2' :: nil))).
+    intuition idtac.
+    repeat rewrite <- app_assoc in H.
+    simpl in *.
+    eauto.
+Qed.
+
+Theorem exec_equiv_ts_list :
+  forall opT (ts : @threads_state opT) ts',
+    Forall2 (fun p1 p2 =>
+      exists T (p1' p2' : proc _ T),
+        p1 = Proc p1' /\
+        p2 = Proc p2' /\
+        exec_equiv p1' p2') ts' ts ->
+    exec_equiv_ts ts' ts.
+Proof.
+  intros.
+  pose proof (exec_equiv_ts_list').
+  specialize (H0 _ ts ts' nil).
+  eauto.
+Qed.
+
+Theorem Forall2_repeat :
+  forall T (x y : T) (P : T -> T -> Prop) n,
+    P x y ->
+    Forall2 P (repeat x n) (repeat y n).
+Proof.
+  induction n; simpl; eauto.
+Qed.
+
+
+Definition ms_bottom_opt' nsmtp npop3 nsmtpiter npop3iter :
+    {t : threads_state | exec_equiv_ts t (ms_bottom nsmtp npop3 nsmtpiter npop3iter)}.
+  unfold ms_bottom.
+  unfold mail_perf.
+  unfold c0.compile_ts.
+  unfold c10.compile_ts.
+  unfold c9.compile_ts.
+  unfold c8.compile_ts.
+  unfold c7.compile_ts.
+  unfold c6.compile_ts.
+  unfold c45'.compile_ts.
+  unfold c3.compile_ts.
+  unfold c2.compile_ts.
+  unfold c1.compile_ts.
+  unfold MailServerComposedImpl.compile_ts.
+  unfold MailServerLockAbsImplH.compile_ts.
+  unfold AtomicReaderH.compile_ts.
+  unfold MailboxTmpAbsImplH.compile_ts.
+  unfold AtomicDeliverH.compile_ts.
+  unfold TryDeliverImplH.compile_ts.
+  unfold MailFSStringAbsImplH.compile_ts.
+  unfold MailFSStringImplH.compile_ts.
+  unfold MailFSPathAbsImplH.compile_ts.
+  unfold MailFSPathImplH.compile_ts.
+  unfold MailFSMergedImpl.compile_ts.
+  unfold MailFSMergedOpImpl.compile_ts.
+  unfold MailFSMergedAbsImpl.compile_ts.
+
+  eexists.
+
+  repeat rewrite compile_ts_eq.
+  repeat rewrite compile_ts_compile_ts.
+  repeat rewrite compile_ts_app.
+  repeat rewrite compile_ts_repeat.
+
+  eapply exec_equiv_ts_list.
+  eapply Forall2_app; eapply Forall2_repeat.
+
+  - do 3 eexists.
+    split; [ reflexivity | ].
+    split; [ reflexivity | ].
+
+    eapply exec_equiv_rx_to_exec_equiv.
+    eapply exec_equiv_until_proper; intros.
+    destruct x; simpl.
+    rewrite exec_equiv_rx_Some; [ | shelve ].
+    2: simpl; reflexivity.
+
+    etransitivity; [ | rewrite exec_equiv_bind_bind; reflexivity ].
+    eapply Bind_exec_equiv_proper; [ reflexivity | intro ].
+    destruct a; simpl.
+
+    2: rewrite exec_equiv_rx_Present; [ | shelve ].
+    simpl.
+    reflexivity.
+
+    destruct v.
+    rewrite exec_equiv_rx_exist.
+    etransitivity; [ | rewrite exec_equiv_bind_bind; reflexivity ].
+    etransitivity; [ | rewrite exec_equiv_bind_bind; reflexivity ].
+    etransitivity; [ | rewrite exec_equiv_bind_bind; reflexivity ].
+    eapply Bind_exec_equiv_proper; [ reflexivity | intro ].
+
+    etransitivity; [ | rewrite exec_equiv_bind_bind; reflexivity ].
+    eapply Bind_exec_equiv_proper; [ reflexivity | intro ].
+
+    etransitivity; [ | rewrite exec_equiv_ret_bind; reflexivity ].
+    destruct a0; simpl.
+
+    rewrite exec_equiv_rx_true; [ | shelve ].
+    2: simpl.
+
+    etransitivity; [ | rewrite exec_equiv_bind_bind; reflexivity ].
+    etransitivity; [ | rewrite exec_equiv_bind_bind; reflexivity ].
+    eapply Bind_exec_equiv_proper; [ reflexivity | intro ].
+
+    etransitivity; [ | rewrite exec_equiv_bind_bind; reflexivity ].
+    etransitivity; [ | rewrite exec_equiv_bind_bind; reflexivity ].
+    eapply Bind_exec_equiv_proper; [ reflexivity | intro ].
+
+    etransitivity; [ | rewrite exec_equiv_bind_bind; reflexivity ].
+    eapply Bind_exec_equiv_proper; [ reflexivity | intro ].
+
+    etransitivity; [ | rewrite exec_equiv_ret_bind; reflexivity ].
+    etransitivity; [ | rewrite exec_equiv_ret_bind; reflexivity ].
+    etransitivity; [ | rewrite exec_equiv_bind_bind; reflexivity ].
+    etransitivity; [ | rewrite exec_equiv_bind_bind; reflexivity ].
+    eapply Bind_exec_equiv_proper; [ reflexivity | intro ].
+
+    etransitivity; [ | rewrite exec_equiv_bind_bind; reflexivity ].
+    eapply Bind_exec_equiv_proper; [ reflexivity | intro ].
+
+    etransitivity; [ | rewrite exec_equiv_ret_bind; reflexivity ].
+    etransitivity; [ | rewrite exec_equiv_ret_bind; reflexivity ].
+    etransitivity; [ | rewrite exec_equiv_ret_bind; reflexivity ].
+    reflexivity'.
+
+    etransitivity; [ | rewrite exec_equiv_bind_bind; reflexivity ].
+    etransitivity; [ | rewrite exec_equiv_bind_bind; reflexivity ].
+    eapply Bind_exec_equiv_proper; [ reflexivity | intro ].
+
+    etransitivity; [ | rewrite exec_equiv_bind_bind; reflexivity ].
+    eapply Bind_exec_equiv_proper; [ reflexivity | intro ].
+
+    etransitivity; [ | rewrite exec_equiv_ret_bind; reflexivity ].
+    etransitivity; [ | rewrite exec_equiv_ret_bind; reflexivity ].
+    etransitivity; [ | rewrite exec_equiv_ret_bind; reflexivity ].
+    reflexivity'.
+
+  - do 3 eexists.
+    split; [ reflexivity | ].
+    split; [ reflexivity | ].
+    reflexivity.
+Defined.
+
+Definition ms_bottom_opt nsmtp npop3 nsmtpiter npop3iter :=
+  Eval cbn in (proj1_sig (ms_bottom_opt' nsmtp npop3 nsmtpiter npop3iter)).
+Print ms_bottom_opt.
+
 
 (*
 Definition ms_bottom' : {t : threads_state | exec_equiv_ts t (ms_bottom 1 0)}.

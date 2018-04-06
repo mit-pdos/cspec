@@ -792,6 +792,16 @@ Proof.
     omega.
 Qed.
 
+Lemma thread_upd_app_length : forall `(ts : @threads_state opT) p p' ts',
+  (ts ++ p :: ts') [[ length ts := p' ]] = ts ++ p' :: ts'.
+Proof.
+  induction ts; simpl; intros.
+  - rewrite thread_upd_0; eauto.
+  - rewrite thread_upd_S.
+    f_equal.
+    eauto.
+Qed.
+
 
 Ltac maybe_proc_inv := match goal with
   | H : ?a = ?a |- _ =>

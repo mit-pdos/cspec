@@ -48,9 +48,7 @@ mainArgs [nsmtp, npop3, nsmtpiter, npop3iter] = do
       completion <- newEmptyMVar;
       spawn_thread smtp pop3 p completion;
       return completion)
-    (ms_bottom (read nsmtp) (read npop3) (read nsmtpiter) (read npop3iter))
-  -- s <- mkState smtp pop3
-  -- run_proc1 s (Proc (do_smtp "u1" "msg"))
+    (ms_bottom_opt (read nsmtp) (read npop3) (read nsmtpiter) (read npop3iter))
   putStrLn "Started all threads"
   mapM_ takeMVar completions
 
