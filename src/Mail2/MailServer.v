@@ -121,13 +121,20 @@ Definition mail_server nsmtp npop3 :=
 
 
 
-Fixpoint pop3_one (u : validIndexT UserIdx.indexValid) (msgs : list ((nat*nat) * string)) :=
-  match msgs with
-  | nil => Ret tt
-  | msg :: msgs' =>
-    _ <- Op (Delete u (fst msg));
-    pop3_one u msgs'
-  end.
+Definition pop3_one (u : validIndexT UserIdx.indexValid) (msgs : list ((nat*nat) * string)) :=
+  Until
+    (fun l => match l with | nil => true | _ => false end)
+    (fun l => match l with
+      | None => Ret nil
+      | Some l =>
+        match l with
+        | nil => Ret nil
+        | msg :: l' =>
+          _ <- Op (Delete u (fst msg));
+          Ret l'
+        end
+      end)
+    (Some msgs).
 
 Definition do_pop3 : proc _ unit :=
   u <- Op (Ext PickUser);
@@ -176,9 +183,21 @@ Definition do_smtp_loop msg niter :=
       end)
     (Some niter).
 
-Definition mail_perf nsmtp npop3 nsmtpiter npop3iter :=
-  repeat (Proc (do_smtp_loop "msg" nsmtpiter)) nsmtp ++
-  repeat (Proc (do_pop_loop npop3iter)) npop3.
+Definition do_bench_loop msg nsmtpiter npop3iter niter :=
+  Until
+    (fun x => if x == 0 then true else false)
+    (fun x =>
+      match x with
+      | None => Ret 0
+      | Some niter =>
+        _ <- if nsmtpiter == 0 then Ret 0 else do_smtp_loop msg nsmtpiter;
+        _ <- if npop3iter == 0 then Ret 0 else do_pop_loop npop3iter;
+        Ret (niter - 1)
+      end)
+    (Some niter).
+
+Definition mail_perf nprocs niter nsmtpiter npop3iter :=
+  repeat (Proc (do_bench_loop "msg" nsmtpiter npop3iter niter)) nprocs.
 
 Module c1 :=
   Link
@@ -277,6 +296,8 @@ Definition ms_bottom_server nsmtp npop3 :=
 Print Assumptions c0.compile_traces_match.
 
 
+(*
+
 Lemma exec_equiv_until_proper :
   forall opT `(p1 : _ -> proc opT T) p2 c i,
     (forall x, exec_equiv_rx (p1 x) (p2 x)) ->
@@ -290,6 +311,16 @@ Lemma exec_equiv_rx_Some :
                               | Some xx => p xx
                               | None => p'
                               end) (Some x)) (p x).
+Proof.
+  reflexivity.
+Qed.
+
+Lemma exec_equiv_rx_nil :
+  forall opT `(p : proc opT T) `(p' : LT -> list LT -> proc opT T),
+    exec_equiv_rx ((fun l => match l with
+                             | nil => p
+                             | x :: l' => p' x l'
+                             end) nil) p.
 Proof.
   reflexivity.
 Qed.
@@ -578,7 +609,41 @@ Definition ms_bottom_opt' nsmtp npop3 nsmtpiter npop3iter :
   - do 3 eexists.
     split; [ reflexivity | ].
     split; [ reflexivity | ].
+
+    eapply exec_equiv_rx_to_exec_equiv.
+    eapply exec_equiv_until_proper; intros.
+    destruct x; simpl.
+    rewrite exec_equiv_rx_Some; [ | shelve ].
+    2: simpl; reflexivity.
+
+    etransitivity; [ | rewrite exec_equiv_bind_bind; reflexivity ].
+    etransitivity; [ | rewrite exec_equiv_until_once; reflexivity ].
+    destruct nouser.
+    eapply Bind_exec_equiv_proper; [ reflexivity | intro ].
+
+    etransitivity; [ | rewrite exec_equiv_bind_bind; reflexivity ].
+    etransitivity; [ | rewrite exec_equiv_until_once; reflexivity ].
+    eapply Bind_exec_equiv_proper; [ reflexivity | intro ].
+    destruct a0; simpl.
+
+    2: rewrite exec_equiv_rx_Present; [ | shelve ].
+    simpl.
+    etransitivity; [ | rewrite exec_equiv_ret_bind; reflexivity ].
     reflexivity.
+
+    destruct v.
+    rewrite exec_equiv_rx_exist.
+    etransitivity; [ | rewrite exec_equiv_bind_bind; reflexivity ].
+    etransitivity; [ | rewrite exec_equiv_bind_bind; reflexivity ].
+    etransitivity; [ | rewrite exec_equiv_until_once; reflexivity ].
+    eapply Bind_exec_equiv_proper; [ reflexivity | intro ].
+
+    etransitivity; [ | rewrite exec_equiv_bind_bind; reflexivity ].
+    etransitivity; [ | rewrite exec_equiv_until_once; reflexivity ].
+    etransitivity; [ | rewrite exec_equiv_bind_bind; reflexivity ].
+    eapply Bind_exec_equiv_proper; [ reflexivity | intro ].
+
+    reflexivity'.
 Defined.
 
 Definition ms_bottom_opt nsmtp npop3 nsmtpiter npop3iter :=
@@ -661,4 +726,6 @@ Defined.
 
 Definition ms_bottom_1_0_simpl := Eval compute in (proj1_sig ms_bottom').
 Print ms_bottom_1_0_simpl.
+*)
+
 *)

@@ -15,6 +15,6 @@ Extract Inlined Constant decode_tid_fn => "Support.decode_tid_fn".
 Extract Inlined Constant smtpconn => "Support.SMTPConn".
 Extract Inlined Constant pop3conn => "Support.POP3Conn".
 
-Separate Extraction ms_bottom ms_bottom_server ms_bottom_opt.
+Separate Extraction ms_bottom ms_bottom_server.
 
 Cd "../../".

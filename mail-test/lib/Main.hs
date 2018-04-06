@@ -40,7 +40,7 @@ main = do
   mainArgs args
 
 mainArgs :: [String] -> IO ()
-mainArgs [nsmtp, npop3, nsmtpiter, npop3iter] = do
+mainArgs [nprocs, niter, nsmtpiter, npop3iter] = do
   smtp <- smtpListen 2525
   pop3 <- pop3Listen 2110
   completions <- mapM
@@ -48,7 +48,7 @@ mainArgs [nsmtp, npop3, nsmtpiter, npop3iter] = do
       completion <- newEmptyMVar;
       spawn_thread smtp pop3 p completion;
       return completion)
-    (ms_bottom_opt (read nsmtp) (read npop3) (read nsmtpiter) (read npop3iter))
+    (ms_bottom (read nprocs) (read niter) (read nsmtpiter) (read npop3iter))
   putStrLn "Started all threads"
   mapM_ takeMVar completions
 
