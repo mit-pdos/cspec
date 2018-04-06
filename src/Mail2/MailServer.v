@@ -279,18 +279,6 @@ Definition ms_bottom_server nsmtp npop3 :=
 Print Assumptions c0.compile_traces_match.
 
 
-Lemma exec_equiv_ts_build :
-  forall opT `(p1 : proc opT T1) p2,
-    exec_equiv p1 p2 ->
-    exec_equiv_ts (Proc p1 :: nil) (Proc p2 :: nil).
-Proof.
-  unfold exec_equiv, exec_equiv_opt.
-  intros.
-  specialize (H (NoProc :: nil) 0).
-  cbn in H.
-  eauto.
-Qed.
-
 Lemma exec_equiv_until_proper :
   forall opT `(p1 : _ -> proc opT T) p2 c i,
     (forall x, exec_equiv_rx (p1 x) (p2 x)) ->
@@ -371,6 +359,15 @@ Theorem compile_ts_eq :
   forall `(compile_op : forall T, opT2 T -> proc opT1 T) ts,
     Compile.compile_ts compile_op ts =
     compile_ts (Compile.compile compile_op) ts.
+Proof.
+  induction ts; simpl; intros; eauto.
+  destruct a; f_equal; eauto.
+Qed.
+
+Theorem compile_ts_loop_eq :
+  forall `(compile_op : forall T, opT2 T -> (option T -> opT1 T) * (T -> bool) * option T) ts,
+    CompileLoop.compile_ts compile_op ts =
+    compile_ts (CompileLoop.compile _ compile_op) ts.
 Proof.
   induction ts; simpl; intros; eauto.
   destruct a; f_equal; eauto.
@@ -468,7 +465,8 @@ Definition ms_bottom_opt' nsmtp npop3 nsmtpiter npop3iter :
   unfold c8.compile_ts.
   unfold c7.compile_ts.
   unfold c6.compile_ts.
-  unfold c45'.compile_ts.
+  unfold c5'.compile_ts.
+  unfold c4'.compile_ts.
   unfold c3.compile_ts.
   unfold c2.compile_ts.
   unfold c1.compile_ts.
@@ -477,6 +475,7 @@ Definition ms_bottom_opt' nsmtp npop3 nsmtpiter npop3iter :
   unfold AtomicReaderH.compile_ts.
   unfold MailboxTmpAbsImplH.compile_ts.
   unfold AtomicDeliverH.compile_ts.
+  unfold LinkRetryImplH.compile_ts.
   unfold TryDeliverImplH.compile_ts.
   unfold MailFSStringAbsImplH.compile_ts.
   unfold MailFSStringImplH.compile_ts.
@@ -489,6 +488,7 @@ Definition ms_bottom_opt' nsmtp npop3 nsmtpiter npop3iter :
   eexists.
 
   repeat rewrite compile_ts_eq.
+  repeat rewrite compile_ts_loop_eq.
   repeat rewrite compile_ts_compile_ts.
   repeat rewrite compile_ts_app.
   repeat rewrite compile_ts_repeat.
@@ -507,17 +507,20 @@ Definition ms_bottom_opt' nsmtp npop3 nsmtpiter npop3iter :
     2: simpl; reflexivity.
 
     etransitivity; [ | rewrite exec_equiv_bind_bind; reflexivity ].
+    etransitivity; [ | rewrite exec_equiv_until_once; reflexivity ].
     eapply Bind_exec_equiv_proper; [ reflexivity | intro ].
     destruct a; simpl.
 
     2: rewrite exec_equiv_rx_Present; [ | shelve ].
     simpl.
+    etransitivity; [ | rewrite exec_equiv_ret_bind; reflexivity ].
     reflexivity.
 
     destruct v.
     rewrite exec_equiv_rx_exist.
     etransitivity; [ | rewrite exec_equiv_bind_bind; reflexivity ].
     etransitivity; [ | rewrite exec_equiv_bind_bind; reflexivity ].
+    etransitivity; [ | rewrite exec_equiv_until_once; reflexivity ].
     etransitivity; [ | rewrite exec_equiv_bind_bind; reflexivity ].
     eapply Bind_exec_equiv_proper; [ reflexivity | intro ].
 
@@ -531,19 +534,21 @@ Definition ms_bottom_opt' nsmtp npop3 nsmtpiter npop3iter :
     2: simpl.
 
     etransitivity; [ | rewrite exec_equiv_bind_bind; reflexivity ].
-    etransitivity; [ | rewrite exec_equiv_bind_bind; reflexivity ].
+    etransitivity; [ | erewrite exec_equiv_until_proper; [ reflexivity | intros ] ].
+    2: {
+      eapply Bind_exec_equiv_proper; [ reflexivity | intro ].
+      etransitivity; [ rewrite exec_equiv_bind_bind; reflexivity | ].
+      eapply Bind_exec_equiv_proper; [ reflexivity | intro ].
+      etransitivity; [ rewrite exec_equiv_bind_bind; reflexivity | ].
+      eapply Bind_exec_equiv_proper; [ reflexivity | intro ].
+      etransitivity; [ rewrite exec_equiv_ret_bind; reflexivity | ].
+      reflexivity.
+    }
+
     eapply Bind_exec_equiv_proper; [ reflexivity | intro ].
 
     etransitivity; [ | rewrite exec_equiv_bind_bind; reflexivity ].
-    etransitivity; [ | rewrite exec_equiv_bind_bind; reflexivity ].
-    eapply Bind_exec_equiv_proper; [ reflexivity | intro ].
-
-    etransitivity; [ | rewrite exec_equiv_bind_bind; reflexivity ].
-    eapply Bind_exec_equiv_proper; [ reflexivity | intro ].
-
-    etransitivity; [ | rewrite exec_equiv_ret_bind; reflexivity ].
-    etransitivity; [ | rewrite exec_equiv_ret_bind; reflexivity ].
-    etransitivity; [ | rewrite exec_equiv_bind_bind; reflexivity ].
+    etransitivity; [ | rewrite exec_equiv_until_once; reflexivity ].
     etransitivity; [ | rewrite exec_equiv_bind_bind; reflexivity ].
     eapply Bind_exec_equiv_proper; [ reflexivity | intro ].
 
@@ -555,6 +560,7 @@ Definition ms_bottom_opt' nsmtp npop3 nsmtpiter npop3iter :
     etransitivity; [ | rewrite exec_equiv_ret_bind; reflexivity ].
     reflexivity'.
 
+    etransitivity; [ | rewrite exec_equiv_until_once; reflexivity ].
     etransitivity; [ | rewrite exec_equiv_bind_bind; reflexivity ].
     etransitivity; [ | rewrite exec_equiv_bind_bind; reflexivity ].
     eapply Bind_exec_equiv_proper; [ reflexivity | intro ].

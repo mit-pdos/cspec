@@ -659,6 +659,33 @@ Proof.
   eapply H2.
 Qed.
 
+Instance Until_exec_equiv_proper :
+  Proper (eq ==>
+          pointwise_relation (option T) exec_equiv_rx ==>
+          eq ==>
+          @exec_equiv_rx opT T) Until.
+Proof.
+  unfold exec_equiv_rx; intros.
+  unfold pointwise_relation.
+  intro; intros; subst.
+  intro; intros.
+  intro; intros; subst.
+  unfold exec_equiv, exec_equiv_opt, exec_equiv_ts; intros.
+  split; intros.
+  - match goal with
+    | H : exec_prefix _ _ (thread_upd ?ts ?tid (Proc ?pp)) _ |- _ =>
+      remember (thread_upd ts tid (Proc pp));
+      generalize dependent ts;
+      destruct H as [? H];
+      induction H; intros; subst; eauto
+    end.
+
+    destruct (tid0 == tid); subst.
+    + autorewrite with t in *.
+      repeat maybe_proc_inv.
+      repeat exec_tid_inv.
+Admitted.
+
 Theorem exec_equiv_ts_upd_same : forall `(ts : @threads_state opT) p tid,
   ts [[ tid ]] = p ->
   exec_equiv_ts ts (ts [[ tid := p ]]).
