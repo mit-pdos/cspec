@@ -630,6 +630,20 @@ Proof.
     eauto.
 Qed.
 
+Theorem exec_equiv_until_once : forall opT `(p : proc opT T),
+  exec_equiv_rx (Until (fun _ => true) (fun _ => p) None) p.
+Proof.
+  intros.
+  rewrite exec_equiv_until.
+  unfold until1.
+  destruct (Bool.bool_dec true true); try congruence.
+  unfold exec_equiv_rx; intros.
+  rewrite exec_equiv_bind_bind.
+  eapply exec_equiv_bind_a; intros.
+  rewrite exec_equiv_ret_bind.
+  reflexivity.
+Qed.
+
 Instance Bind_exec_equiv_proper :
   Proper (exec_equiv_rx ==>
           pointwise_relation T exec_equiv_rx ==>
