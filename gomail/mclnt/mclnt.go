@@ -17,7 +17,7 @@ import (
 )
 
 const (
-	NGO=10
+	NGO=1
 	NUSER=100
 	NMSG=1000
 )

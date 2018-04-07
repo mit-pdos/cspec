@@ -11,7 +11,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	"sync"
+	"syscall"
 	"time"
 )
 
@@ -19,7 +19,7 @@ import (
 // postal.  Set GOPATH to 6.826-labs/gomail, and run server by typing "go run
 // gomail.go".
 
-const dir = "/tmp/mailtest"
+const dir = "/dev/shm/mailtest"
 
 type Message struct {
 	Client string
@@ -168,9 +168,24 @@ func smtp() {
 }
 
 type mailbox struct  {
-	sync.Mutex
 	u string
 	files []os.FileInfo
+}
+
+func mkMailbox(u string) (*mailbox, error) {
+	mbox := &mailbox{u: u}
+	fd, err := syscall.Open(mbox.pn(), os.O_RDONLY, 0755)
+	if err != nil {
+		return nil, err
+	}
+	err = syscall.Flock(fd, 2)
+	if err != nil {
+		return nil, err
+	}
+	mbox.files, err = ioutil.ReadDir(mbox.pn())
+	_ = syscall.Flock(fd, 8)
+	syscall.Close(fd)
+	return mbox, err
 }
 
 func (mbox *mailbox) pn() string {
@@ -191,23 +206,43 @@ func (mbox *mailbox) file(words []string) (*os.FileInfo, bool) {
 	return &mbox.files[i], true
 }
 
-func send_data(tw *textproto.Writer, pn string, file *os.FileInfo) bool {
-	n := pn + (*file).Name()
+func (mbox *mailbox) retr(file *os.FileInfo) ([]byte, error) {
+	n := mbox.pn() + (*file).Name()
 	f, err := os.Open(n)
 	if err != nil {
-		return false
+		return nil, err
 	}
 	data := make([]byte, (*file).Size())
 	_, err = f.Read(data)
 	if err != nil {
-		return false
+		return nil, err
 	}
 	f.Close()
-	
-	tw.PrintfLine("+OK")
+	return data, nil
+}
 
+func (mbox *mailbox) dele(file *os.FileInfo) error {
+	fd, err := syscall.Open(mbox.pn(), os.O_RDONLY, 0755)
+	if err != nil {
+		return err
+	}
+	err = syscall.Flock(fd, 2)
+	if err != nil {
+		return err
+	}
+
+	n := mbox.pn() + (*file).Name()
+	err = os.Remove(n)
+	_ = syscall.Flock(fd, 8)
+	syscall.Close(fd)
+	return err
+}
+
+
+func send_data(tw *textproto.Writer, data []byte) bool {
+	tw.PrintfLine("+OK")
 	dwr := tw.DotWriter()
-	_, err = dwr.Write(data)
+	_, err := dwr.Write(data)
 	if err != nil {
 		return false
 	}
@@ -249,11 +284,7 @@ func process_pop(c net.Conn, tid int) {
 				tw.PrintfLine("-ERR")
 				break
 			}
-			mbox = &mailbox{}
-			mbox.u = words[1]
-			mbox.Lock()
-			mbox.files, err = ioutil.ReadDir(mbox.pn())
-			mbox.Unlock()
+			mbox, err = mkMailbox(words[1])
 			if err != nil {
 				tw.PrintfLine("-ERR readdir")
 				break
@@ -281,7 +312,12 @@ func process_pop(c net.Conn, tid int) {
 				tw.PrintfLine("-ERR file")
 				break
 			}
-			ok = send_data(tw, mbox.pn(), file)
+			b, err := mbox.retr(file)
+			if err != nil {
+				tw.PrintfLine("-ERR file")
+				break
+			}
+			ok = send_data(tw, b)
 			if !ok {
 				tw.PrintfLine("-ERR data")
 				break
@@ -296,10 +332,7 @@ func process_pop(c net.Conn, tid int) {
 				tw.PrintfLine("-ERR file %v")
 				break
 			}
-			mbox.Lock()
-			n := mbox.pn() + (*file).Name()
-			err = os.Remove(n)
-			mbox.Unlock()
+			mbox.dele(file)
 			if err != nil {
 				tw.PrintfLine("-ERR remove")
 				break

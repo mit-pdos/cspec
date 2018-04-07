@@ -9,7 +9,7 @@ COQRFLAGS := -R build POCS
 BINS	:= concur-test mail-test
 
 .PHONY: default
-default: $(patsubst %,bin/%,$(BINS)) docs gomail/mclnt gomail/msrv
+default: $(patsubst %,bin/%,$(BINS)) docs bin/mclnt bin/gomail
 
 build/%.v: src/%.v
 	@mkdir -p $(@D)
@@ -48,9 +48,9 @@ bin/%: %/extract %/lib/*.hs
 	mkdir -p $(@D)
 	cd $(patsubst %/extract,%,$<) && PATH="$(PATH):"$(shell pwd)"/bin" stack build --copy-bins --local-bin-path ../bin
 
-gomail/mclnt: gomail/mclnt.go
+bin/mclnt: gomail/mclnt/mclnt.go
 	go build -o bin/mclnt $<
-gomail/msrv: gomail/msrv.go
+bin/gomail: gomail/msrv/msrv.go
 	go build -o bin/gomail $<
 
 .PHONY: clean
