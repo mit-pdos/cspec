@@ -1,5 +1,4 @@
 Require Import POCS.
-Require Import String.
 
 Require Import MailServerAPI.
 
@@ -72,13 +71,13 @@ Definition handle_pop3_one conn (u : validIndexT UserIdx.indexValid) (msgs : lis
   match req with
   | POP3Stat =>
     _ <- Op (Ext (POP3RespondStat conn (Datatypes.length msgs)
-                  (fold_left plus (map String.length (map snd msgs)) 0)));
+                  (fold_left plus (map string_length (map snd msgs)) 0)));
     Ret false
   | POP3List =>
-    _ <- Op (Ext (POP3RespondList conn (map String.length (map snd msgs))));
+    _ <- Op (Ext (POP3RespondList conn (map string_length (map snd msgs))));
     Ret false
   | POP3Retr n =>
-    _ <- Op (Ext (POP3RespondRetr conn (nth n (map snd msgs) ""%string)));
+    _ <- Op (Ext (POP3RespondRetr conn (nth n (map snd msgs) tmp_string)));
     Ret false
   | POP3Delete n =>
     _ <- Op (Delete u (nth n (map fst msgs) (0, 0)));
@@ -197,7 +196,7 @@ Definition do_bench_loop msg nsmtpiter npop3iter niter :=
     (Some niter).
 
 Definition mail_perf nprocs niter nsmtpiter npop3iter :=
-  repeat (Proc (do_bench_loop "msg" nsmtpiter npop3iter niter)) nprocs.
+  repeat (Proc (do_bench_loop bench_msg nsmtpiter npop3iter niter)) nprocs.
 
 Module c1 :=
   Link

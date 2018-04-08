@@ -1,5 +1,4 @@
 Require Import POCS.
-Require Import String.
 Require Import MailServerAPI.
 Require Import MailFSStringAPI.
 
@@ -93,7 +92,7 @@ Module MailFSPathAbsAPI <: Layer MailFSStringOp MailFSPathAbsState.
     xstep (CreateWriteTmp tmpfn data) tid
       (mk_state fs lock)
       true
-      (mk_state (FMap.add ("tmp"%string, tmpfn) data fs) lock)
+      (mk_state (FMap.add (tmp_string, tmpfn) data fs) lock)
       nil
 
   | StepCreateWriteTmpErr1 : forall fs tid tmpfn data lock,
@@ -106,22 +105,22 @@ Module MailFSPathAbsAPI <: Layer MailFSStringOp MailFSPathAbsState.
     xstep (CreateWriteTmp tmpfn data) tid
       (mk_state fs lock)
       false
-      (mk_state (FMap.add ("tmp"%string, tmpfn) data' fs) lock)
+      (mk_state (FMap.add (tmp_string, tmpfn) data' fs) lock)
       nil
 
   | StepUnlinkTmp : forall fs tid tmpfn lock,
     xstep (UnlinkTmp tmpfn) tid
       (mk_state fs lock)
       tt
-      (mk_state (FMap.remove ("tmp"%string, tmpfn) fs) lock)
+      (mk_state (FMap.remove (tmp_string, tmpfn) fs) lock)
       nil
   | StepLinkMailOK : forall fs tid mailfn data tmpfn lock,
-    FMap.MapsTo ("tmp"%string, tmpfn) data fs ->
-    ~ FMap.In ("mail"%string, mailfn) fs ->
+    FMap.MapsTo (tmp_string, tmpfn) data fs ->
+    ~ FMap.In (mail_string, mailfn) fs ->
     xstep (LinkMail tmpfn mailfn) tid
       (mk_state fs lock)
       true
-      (mk_state (FMap.add ("mail"%string, mailfn) data fs) lock)
+      (mk_state (FMap.add (mail_string, mailfn) data fs) lock)
       nil
   | StepLinkMailErr : forall fs tid mailfn tmpfn lock,
     xstep (LinkMail tmpfn mailfn) tid
@@ -131,7 +130,7 @@ Module MailFSPathAbsAPI <: Layer MailFSStringOp MailFSPathAbsState.
       nil
 
   | StepList : forall fs tid r lock,
-    FMap.is_permutation_key r (drop_dirname (filter_dir "mail"%string fs)) ->
+    FMap.is_permutation_key r (drop_dirname (filter_dir mail_string fs)) ->
     xstep List tid
       (mk_state fs lock)
       r
@@ -152,14 +151,14 @@ Module MailFSPathAbsAPI <: Layer MailFSStringOp MailFSPathAbsState.
       nil
 
   | StepReadOK : forall fn fs tid m lock,
-    FMap.MapsTo ("mail"%string, fn) m fs ->
+    FMap.MapsTo (mail_string, fn) m fs ->
     xstep (Read fn) tid
       (mk_state fs lock)
       (Some m)
       (mk_state fs lock)
       nil
   | StepReadNone : forall fn fs tid lock,
-    ~ FMap.In ("mail"%string, fn) fs ->
+    ~ FMap.In (mail_string, fn) fs ->
     xstep (Read fn) tid
       (mk_state fs lock)
       None
@@ -170,7 +169,7 @@ Module MailFSPathAbsAPI <: Layer MailFSStringOp MailFSPathAbsState.
     xstep (Delete fn) tid
       (mk_state fs lock)
       tt
-      (mk_state (FMap.remove ("mail"%string, fn) fs) lock)
+      (mk_state (FMap.remove (mail_string, fn) fs) lock)
       nil
 
   | StepLock : forall fs tid,

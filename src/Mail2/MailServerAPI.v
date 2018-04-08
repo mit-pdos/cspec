@@ -1,14 +1,22 @@
 Require Import POCS.
-Require Import String.
 
 
 Parameter smtpconn : Type.
 Parameter pop3conn : Type.
+Parameter string : Type.
+Parameter tmp_string : string.
+Parameter mail_string : string.
+Parameter bench_msg : string.
+Parameter tmp_mail_ne : tmp_string <> mail_string.
+Parameter string_length : string -> nat.
+
+Instance string_Ordering : Ordering string.
+Admitted.
 
 
 Module UserIdx <: HIndex.
   Definition indexT := string.
-  Definition indexValid (u : string) := u = "Alice"%string \/ u = "Bob"%string.
+  Parameter indexValid : string -> Prop.
   Definition indexCmp := string_Ordering.
 End UserIdx.
 

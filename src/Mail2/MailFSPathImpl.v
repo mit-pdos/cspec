@@ -1,5 +1,4 @@
 Require Import POCS.
-Require Import String.
 Require Import MailServerAPI.
 Require Import MailFSStringAPI.
 Require Import MailFSPathAbsAPI.
@@ -14,12 +13,12 @@ Module MailFSPathImpl' <:
 
   Definition compile_op T (op : MailFSStringOp.opT T) : proc _ T :=
     match op with
-    | MailFSStringOp.LinkMail tmpfn mailfn => Op (MailFSPathOp.Link ("tmp"%string, tmpfn) ("mail"%string, mailfn))
-    | MailFSStringOp.List => Op (MailFSPathOp.List "mail"%string)
-    | MailFSStringOp.Read fn => Op (MailFSPathOp.Read ("mail"%string, fn))
-    | MailFSStringOp.Delete fn => Op (MailFSPathOp.Unlink ("mail"%string, fn))
-    | MailFSStringOp.CreateWriteTmp tmpfn data => Op (MailFSPathOp.CreateWrite ("tmp"%string, tmpfn) data)
-    | MailFSStringOp.UnlinkTmp tmpfn => Op (MailFSPathOp.Unlink ("tmp"%string, tmpfn))
+    | MailFSStringOp.LinkMail tmpfn mailfn => Op (MailFSPathOp.Link (tmp_string, tmpfn) (mail_string, mailfn))
+    | MailFSStringOp.List => Op (MailFSPathOp.List mail_string)
+    | MailFSStringOp.Read fn => Op (MailFSPathOp.Read (mail_string, fn))
+    | MailFSStringOp.Delete fn => Op (MailFSPathOp.Unlink (mail_string, fn))
+    | MailFSStringOp.CreateWriteTmp tmpfn data => Op (MailFSPathOp.CreateWrite (tmp_string, tmpfn) data)
+    | MailFSStringOp.UnlinkTmp tmpfn => Op (MailFSPathOp.Unlink (tmp_string, tmpfn))
     | MailFSStringOp.Ext extop => Op (MailFSPathOp.Ext extop)
     | MailFSStringOp.Lock => Op (MailFSPathOp.Lock)
     | MailFSStringOp.Unlock => Op (MailFSPathOp.Unlock)

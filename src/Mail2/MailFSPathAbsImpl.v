@@ -1,5 +1,4 @@
 Require Import POCS.
-Require Import String.
 Require Import MailServerAPI.
 Require Import MailFSStringAbsAPI.
 Require Import MailFSStringAPI.
@@ -15,8 +14,8 @@ Module MailFSPathAbsImpl' <:
     MailFSPathAbsState.locked s1 = MailFSStringAbsState.locked s2 /\
     forall dirname filename contents,
       FMap.MapsTo (dirname, filename) contents (MailFSPathAbsState.fs s1) <->
-      ( dirname = "tmp"%string /\ FMap.MapsTo filename contents (MailFSStringAbsState.tmpdir s2) \/
-        dirname = "mail"%string /\ FMap.MapsTo filename contents (MailFSStringAbsState.maildir s2) ).
+      ( dirname = tmp_string /\ FMap.MapsTo filename contents (MailFSStringAbsState.tmpdir s2) \/
+        dirname = mail_string /\ FMap.MapsTo filename contents (MailFSStringAbsState.maildir s2) ).
 
   Hint Extern 1 (MailFSStringAPI.step _ _ _ _ _ _) => econstructor.
 
@@ -27,15 +26,23 @@ Module MailFSPathAbsImpl' <:
     congruence.
   Qed.
 
+  Lemma tmp_mail_ne_pair : forall (fn1 fn2 : string),
+    (tmp_string, fn1) <> (mail_string, fn2).
+  Proof.
+    intros; intro; apply tmp_mail_ne; congruence.
+  Qed.
+
   Hint Resolve FMap.add_mapsto.
   Hint Resolve FMap.mapsto_add_ne'.
   Hint Resolve fn_ne.
+  Hint Resolve tmp_mail_ne_pair.
+  Hint Resolve tmp_mail_ne.
 
   Lemma absR_add_tmp :
     forall fs tmp mail fn data lock lock',
       absR (MailFSPathAbsState.mk_state fs lock)
            (MailFSStringAbsState.mk_state tmp mail lock') ->
-      absR (MailFSPathAbsState.mk_state (FMap.add ("tmp"%string, fn) data fs) lock)
+      absR (MailFSPathAbsState.mk_state (FMap.add (tmp_string, fn) data fs) lock)
            (MailFSStringAbsState.mk_state (FMap.add fn data tmp) mail lock').
   Proof.
     unfold absR; simpl; intuition subst.
@@ -49,7 +56,7 @@ Module MailFSPathAbsImpl' <:
     - eapply FMap.mapsto_add_or in H3; intuition subst; eauto.
       eapply FMap.mapsto_add_ne'; try congruence.
       eapply H1; eauto.
-    - eapply FMap.mapsto_add_ne'; try congruence.
+    - eapply FMap.mapsto_add_ne'; try congruence; eauto.
       eapply H1; eauto.
   Qed.
 
@@ -57,7 +64,7 @@ Module MailFSPathAbsImpl' <:
     forall fs tmp mail fn lock lock',
       absR (MailFSPathAbsState.mk_state fs lock)
            (MailFSStringAbsState.mk_state tmp mail lock') ->
-      absR (MailFSPathAbsState.mk_state (FMap.remove ("tmp"%string, fn) fs) lock)
+      absR (MailFSPathAbsState.mk_state (FMap.remove (tmp_string, fn) fs) lock)
            (MailFSStringAbsState.mk_state (FMap.remove fn tmp) mail lock').
   Proof.
     unfold absR; simpl; intuition subst.
@@ -70,19 +77,21 @@ Module MailFSPathAbsImpl' <:
     - destruct (filename == fn); try congruence; subst.
       eapply FMap.mapsto_remove in H3; intuition subst.
       eapply FMap.mapsto_remove in H3; intuition subst.
-      specialize (H1 "tmp"%string filename contents); simpl in *.
+      specialize (H1 tmp_string filename contents); simpl in *.
       intuition try congruence.
       eapply FMap.remove_mapsto; congruence.
-    - specialize (H1 "mail"%string filename contents); simpl in *.
+      exfalso; eauto.
+    - specialize (H1 mail_string filename contents); simpl in *.
       intuition try congruence.
-      eapply FMap.remove_mapsto; congruence.
+      exfalso; eauto.
+      eapply FMap.remove_mapsto; eauto.
   Qed.
 
   Lemma absR_add_mail :
     forall fs tmp mail fn data lock lock',
       absR (MailFSPathAbsState.mk_state fs lock)
            (MailFSStringAbsState.mk_state tmp mail lock') ->
-      absR (MailFSPathAbsState.mk_state (FMap.add ("mail"%string, fn) data fs) lock)
+      absR (MailFSPathAbsState.mk_state (FMap.add (mail_string, fn) data fs) lock)
            (MailFSStringAbsState.mk_state tmp (FMap.add fn data mail) lock').
   Proof.
     unfold absR; simpl; intuition subst.
@@ -93,7 +102,7 @@ Module MailFSPathAbsImpl' <:
         intuition eauto; subst.
         destruct (filename == fn); try congruence.
         intuition eauto.
-    - eapply FMap.mapsto_add_ne'; try congruence.
+    - eapply FMap.mapsto_add_ne'; try congruence; eauto.
       eapply H1; eauto.
     - eapply FMap.mapsto_add_or in H3; intuition subst; eauto.
       eapply FMap.mapsto_add_ne'; try congruence.
@@ -104,7 +113,7 @@ Module MailFSPathAbsImpl' <:
     forall fs tmp mail fn lock lock',
       absR (MailFSPathAbsState.mk_state fs lock)
            (MailFSStringAbsState.mk_state tmp mail lock') ->
-      absR (MailFSPathAbsState.mk_state (FMap.remove ("mail"%string, fn) fs) lock)
+      absR (MailFSPathAbsState.mk_state (FMap.remove (mail_string, fn) fs) lock)
            (MailFSStringAbsState.mk_state tmp (FMap.remove fn mail) lock').
   Proof.
     unfold absR; simpl; intuition subst.
@@ -114,14 +123,16 @@ Module MailFSPathAbsImpl' <:
       destruct (filename == fn); try congruence.
       right; split; try reflexivity.
       eapply FMap.remove_mapsto with (x := fn) in H2; auto.
-    - specialize (H1 "tmp"%string filename contents); simpl in *.
+    - specialize (H1 tmp_string filename contents); simpl in *.
       intuition try congruence.
-      eapply FMap.remove_mapsto; congruence.
+      eapply FMap.remove_mapsto; eauto.
+      exfalso; eauto.
     - destruct (filename == fn); try congruence; subst.
       eapply FMap.mapsto_remove in H3; intuition subst.
       eapply FMap.mapsto_remove in H3; intuition subst.
-      specialize (H1 "mail"%string filename contents); simpl in *.
+      specialize (H1 mail_string filename contents); simpl in *.
       intuition try congruence.
+      exfalso; eauto.
       eapply FMap.remove_mapsto; congruence.
   Qed.
 
@@ -130,7 +141,7 @@ Module MailFSPathAbsImpl' <:
       absR (MailFSPathAbsState.mk_state fs lock)
            (MailFSStringAbsState.mk_state tmp mail lock') ->
       FMap.In fn tmp ->
-      FMap.In ("tmp"%string, fn) fs.
+      FMap.In (tmp_string, fn) fs.
   Proof.
     unfold absR; intros.
     eapply FMap.in_mapsto_exists in H0; destruct H0.
@@ -142,11 +153,12 @@ Module MailFSPathAbsImpl' <:
     forall fs tmp mail fn data lock lock',
       absR (MailFSPathAbsState.mk_state fs lock)
            (MailFSStringAbsState.mk_state tmp mail lock') ->
-      FMap.MapsTo ("tmp"%string, fn) data fs ->
+      FMap.MapsTo (tmp_string, fn) data fs ->
       FMap.MapsTo fn data tmp.
   Proof.
     unfold absR; intros.
-    eapply H in H0; intuition congruence.
+    eapply H in H0; intuition eauto.
+    exfalso; eauto.
   Qed.
 
   Lemma absR_in_mail :
@@ -154,7 +166,7 @@ Module MailFSPathAbsImpl' <:
       absR (MailFSPathAbsState.mk_state fs lock)
            (MailFSStringAbsState.mk_state tmp mail lock') ->
       FMap.In fn mail ->
-      FMap.In ("mail"%string, fn) fs.
+      FMap.In (mail_string, fn) fs.
   Proof.
     unfold absR; intros.
     eapply FMap.in_mapsto_exists in H0; destruct H0.
@@ -166,18 +178,19 @@ Module MailFSPathAbsImpl' <:
     forall fs tmp mail fn data lock lock',
       absR (MailFSPathAbsState.mk_state fs lock)
            (MailFSStringAbsState.mk_state tmp mail lock') ->
-      FMap.MapsTo ("mail"%string, fn) data fs ->
+      FMap.MapsTo (mail_string, fn) data fs ->
       FMap.MapsTo fn data mail.
   Proof.
     unfold absR; intros.
-    eapply H in H0; intuition congruence.
+    eapply H in H0; intuition eauto.
+    exfalso; eauto.
   Qed.
 
   Lemma absR_in_mail' :
     forall fs tmp mail fn lock lock',
       absR (MailFSPathAbsState.mk_state fs lock)
            (MailFSStringAbsState.mk_state tmp mail lock') ->
-      FMap.In ("mail"%string, fn) fs ->
+      FMap.In (mail_string, fn) fs ->
       FMap.In fn mail.
   Proof.
     intros.
@@ -192,7 +205,7 @@ Module MailFSPathAbsImpl' <:
            (MailFSStringAbsState.mk_state tmp mail lock') ->
       FMap.is_permutation_key r
         (MailFSPathAbsAPI.drop_dirname
-           (MailFSPathAbsAPI.filter_dir "mail" fs)) ->
+           (MailFSPathAbsAPI.filter_dir mail_string fs)) ->
       FMap.is_permutation_key r mail.
   Proof.
     intros.
@@ -205,17 +218,17 @@ Module MailFSPathAbsImpl' <:
       apply FMap.in_mapsto_get in Hx.
       destruct Hx.
       intuition idtac.
-      specialize (H3 "mail"%string x x0) as Hy.
+      specialize (H3 mail_string x x0) as Hy.
       apply Hy in m.
-      intuition; try congruence.
+      intuition; try solve [ exfalso; eauto ].
       simpl in *.
       apply FMap.mapsto_in in H9; auto.
     + unfold absR in *.
       intuition idtac.
       apply FMap.in_mapsto_get in H1.
       destruct H1.
-      specialize (H3 "mail"%string x x0) as Hy.
-      intuition; try congruence.
+      specialize (H3 mail_string x x0) as Hy.
+      intuition; try solve [ exfalso; eauto ].
       simpl in *.
       apply FMap.mapsto_in in H4.
       apply MailFSPathAbsAPI.filter_dir_drop_dirname in H4.

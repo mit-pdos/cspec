@@ -1,5 +1,4 @@
 Require Import POCS.
-Require Import String.
 Require Import MailServerAPI.
 Require Import MailboxTmpAbsAPI.
 
