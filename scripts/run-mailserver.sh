@@ -1,12 +1,11 @@
-SRV=$1
-NCLIENT=4
-for i in `seq 1 $NCLIENT`;
+NPROC=$1
+NMSG=100000
+N=$(($NMSG * $NPROC))
+echo "== mail-test $NPROC $NMSG $N == "
+for i in `seq 1 $NPROC`;
 do
-    ./scripts/mk-users.sh
-    $1 4 4 &
+    echo "== mail-test $i $((N / i))"
+    ./scripts/mk-users.sh; time ./bin/mail-test $NPROC $((N / i)) 1 0
     sleep 10
-    echo "mclnt $i"
-    ./bin/mclnt $i
-    kill %1
 done    
 
