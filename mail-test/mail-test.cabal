@@ -4,7 +4,7 @@ build-type:          Simple
 cabal-version:       >=1.10
 
 executable mail-test
-  ghc-options:         -O2 -threaded -rtsopts -with-rtsopts=-N
+  ghc-options:         -O2 -rtsopts
   hs-source-dirs:      extract, lib
   main-is:             Main.hs
   build-depends:       base >= 4.7 && < 5

@@ -16,6 +16,7 @@ import System.IO
 import System.IO.Error
 import System.CPUTime.Rdtsc
 import System.Lock.FLock
+import System.Posix.Process
 
 -- Our own libraries
 import Support
@@ -37,12 +38,8 @@ data State =
 mkState :: SMTPServer -> POP3Server -> IO State
 mkState smtp pop3 = do
   lockvar <- newEmptyMVar
-  tid <- myThreadId
-  -- Horrible hack: get the numeric TID by printing the ThreadId as a string,
-  -- using [show], which returns something like "ThreadId 5", and then parse
-  -- it back to Integer using [read].
-  let (_, tidstr) = splitAt 9 (show tid) in
-    return $ S (read tidstr) smtp pop3 lockvar
+  pid <- getProcessID
+  return $ S (fromIntegral pid) smtp pop3 lockvar
 
 verbose :: Bool
 verbose = False
