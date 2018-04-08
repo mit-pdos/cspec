@@ -1,3 +1,5 @@
+#!/bin/bash
+
 NPROC=$1
 NMSG=100000
 N=$(($NMSG * $NPROC))
