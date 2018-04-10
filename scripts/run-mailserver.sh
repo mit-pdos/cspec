@@ -3,6 +3,7 @@
 NPROC=$1
 NMSG=100000
 N=$(($NMSG * $NPROC))
+TIMEFORMAT='real %R nuser %U sys %S (s)'
 echo "== mail-test $NPROC $NMSG $N `date` == "
 for i in `seq 1 $NPROC`;
 do
