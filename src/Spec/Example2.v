@@ -22,61 +22,67 @@ Global Generalizable All Variables.
 
 
 (** Opcodes and states *)
+Print bool.
+Inductive CounterID := ctr1 | ctr2.
 
 Inductive TASOpT : Type -> Type :=
-| TestAndSet :TASOpT bool
-| Clear : TASOpT unit
-| ReadTAS : TASOpT nat
-| WriteTAS : nat -> TASOpT unit.
-
-Inductive LockOpT : Type -> Type :=
-| Acquire : LockOpT bool
-| Release : LockOpT unit
-| Read : LockOpT nat
-| Write : nat -> LockOpT unit.
-
-Inductive CounterOpT : Type -> Type :=
-| Inc : CounterOpT nat
-| Dec : CounterOpT nat.
+| TestAndSet : CounterID -> TASOpT bool
+| Clear : CounterID -> TASOpT unit
+| ReadTAS : CounterID -> TASOpT nat
+| WriteTAS : CounterID -> nat -> TASOpT unit.
 
 Record TASState := mkTASState {
-  TASValue : nat;
-  TASLock : bool;
+  TASValue : CounterID -> nat;
+  TASLock : CounterID -> bool;
 }.
 
-Record LockState := mkState {
-  Value : nat;
-  Lock : option nat;
-}.
+Print Layer.
+Print OpSemantics.
+Definition CounterState := CounterID -> nat.
 
-Definition CounterState := nat.
+Implicit Types (l:bool).
 
+Definition upd A {Aeq: EqualDec A} B (f: A -> B) (x0:A) (y:B) : A -> B :=
+  fun x => if x == x0 then y else f x.
+
+Instance CounterID_eqdec : EqualDec CounterID.
+Proof.
+  unfold EqualDec.
+  decide equality.
+Defined.
 
 (** Layer definitions *)
-
 Module TASAPI <: Layer.
 
   Definition opT := TASOpT.
   Definition State := TASState.
 
   Inductive xstep : forall T, opT T -> nat -> State -> T -> State -> list event -> Prop :=
-  | StepTAS : forall tid v l,
-    xstep TestAndSet tid (mkTASState v l) l (mkTASState v true) nil
-  | StepClear : forall tid v l,
-    xstep Clear tid (mkTASState v l) tt (mkTASState v false) nil
-  | StepRead : forall tid v l,
-    xstep ReadTAS tid (mkTASState v l) v (mkTASState v l) nil
-  | StepWrite : forall tid v0 v l,
-    xstep (WriteTAS v) tid (mkTASState v0 l) tt (mkTASState v l) nil
+  | StepTAS : forall ctr tid v ls,
+    xstep (TestAndSet ctr) tid (mkTASState v ls) (ls ctr) (mkTASState v (upd ls ctr true)) nil
+  | StepClear : forall ctr tid v ls,
+    xstep (Clear ctr) tid (mkTASState v ls) tt (mkTASState v (upd ls ctr false)) nil
+  | StepRead : forall ctr tid v ls,
+    xstep (ReadTAS ctr) tid (mkTASState v ls) (v ctr) (mkTASState v ls) nil
+  | StepWrite : forall ctr tid v0 v ls,
+    xstep (WriteTAS ctr v) tid (mkTASState v0 ls) tt (mkTASState (upd v0 ctr v) ls) nil
   .
 
   Definition step := xstep.
 
-  Definition initP s :=
-    TASLock s = false.
+  (* Do we want the counters to have to start at 0? *)
+  Inductive initP' : State -> Prop :=
+  | InitTAS : initP' (mkTASState (fun ctr => 0) (fun ctr => false))
+  .
+  Hint Resolve InitTAS.
+  Definition initP s := initP' s.
 
 End TASAPI.
 
+Record LockState := mkState {
+  Value : CounterID -> nat;
+  Lock : CounterID -> option nat; (* arg: ID of lock. result: tid of thread holding lock *)
+}.
 
 Module TASLockAPI <: Layer.
 
@@ -84,25 +90,35 @@ Module TASLockAPI <: Layer.
   Definition State := LockState.
 
   Inductive xstep : forall T, opT T -> nat -> State -> T -> State -> list event -> Prop :=
-  | StepTAS0 : forall tid v,
-    xstep TestAndSet tid (mkState v None) false (mkState v (Some tid)) nil
-  | StepTAS1 : forall tid tid' v,
-    xstep TestAndSet tid (mkState v (Some tid')) true (mkState v (Some tid')) nil
-  | StepClear : forall tid v l,
-    xstep Clear tid (mkState v l) tt (mkState v None) nil
-  | StepRead : forall tid v l,
-    xstep ReadTAS tid (mkState v l) v (mkState v l) nil
-  | StepWrite : forall tid v0 v l,
-    xstep (WriteTAS v) tid (mkState v0 l) tt (mkState v l) nil
+  | StepTAS0 : forall ctr tid v (ls : CounterID -> option nat),
+     (ls ctr = None) -> 
+    xstep (TestAndSet ctr) tid (mkState v ls) false (mkState v (upd ls ctr (Some tid))) nil
+  | StepTAS1 : forall ctr tid tid' v (ls : CounterID -> option nat),
+      (ls ctr = Some tid') ->
+    xstep (TestAndSet ctr) tid (mkState v ls) true (mkState v ls) nil
+  | StepClear : forall ctr tid v (ls : CounterID -> option nat),
+    xstep (Clear ctr) tid (mkState v ls) tt (mkState v (upd ls ctr None)) nil
+  | StepRead : forall ctr tid v (ls : CounterID -> option nat),
+    xstep (ReadTAS ctr) tid (mkState v ls) (v ctr) (mkState v ls) nil
+  | StepWrite : forall ctr tid v v' (ls : CounterID -> option nat),
+    xstep (WriteTAS ctr v') tid (mkState v ls) tt (mkState (upd v ctr v') ls) nil
   .
 
   Definition step := xstep.
-
-  Definition initP s :=
-    Lock s = None.
+  Inductive initP' : State -> Prop :=
+  | InitLock : initP' (mkState (fun ctr => 0) (fun ctr => None))
+  .
+  Hint Resolve InitLock.
+  Definition initP s := initP' s.
 
 End TASLockAPI.
 
+Inductive LockOpT : Type -> Type :=
+| Acquire : CounterID -> LockOpT bool
+| Release : CounterID -> LockOpT unit
+| Read : CounterID -> LockOpT nat
+  (* ctr -> value -> LockOpt unit *)
+| Write : CounterID -> nat -> LockOpT unit.
 
 Module RawLockAPI <: Layer.
 
@@ -110,47 +126,59 @@ Module RawLockAPI <: Layer.
   Definition State := LockState.
 
   Inductive xstep : forall T, opT T -> nat -> State -> T -> State -> list event -> Prop :=
-  | StepAcquire : forall tid v r,
-    xstep Acquire tid (mkState v None) r (mkState v (Some tid)) nil
-  | StepRelease : forall tid v l,
-    xstep Release tid (mkState v l) tt (mkState v None) nil
-  | StepRead : forall tid v l,
-    xstep Read tid (mkState v l) v (mkState v l) nil
-  | StepWrite : forall tid v0 v l,
-    xstep (Write v) tid (mkState v0 l) tt (mkState v l) nil
+  | StepAcquire : forall ctr tid v r (ls : CounterID -> option nat),
+      (ls ctr = None) -> 
+    xstep (Acquire ctr) tid (mkState v ls) r (mkState v (upd ls ctr (Some tid))) nil
+  | StepRelease : forall ctr tid v (ls : CounterID -> option nat),
+    xstep (Release ctr) tid (mkState v ls) tt (mkState v (upd ls ctr None)) nil
+  | StepRead : forall ctr tid v (ls : CounterID -> option nat),
+    xstep (Read ctr) tid (mkState v ls) (v ctr) (mkState v ls) nil
+  | StepWrite : forall ctr tid v v' (ls : CounterID -> option nat),
+    xstep (Write ctr v') tid (mkState v ls) tt (mkState (upd v ctr v') ls) nil
   .
 
   Definition step := xstep.
 
-  Definition initP s :=
-    Lock s = None.
+  Inductive initP' : State -> Prop :=
+  | InitRawLock : initP' (mkState (fun ctr => 0) (fun ctr => None))
+  .
+  Hint Resolve InitRawLock.
+  Definition initP s := initP' s.
 
 End RawLockAPI.
-
 
 Module LockAPI <: Layer.
 
   Definition opT := LockOpT.
   Definition State := LockState.
-
+  
   Inductive step_allow : forall T, opT T -> nat -> State -> Prop :=
-  | StepAcquire : forall tid s,
-    step_allow Acquire tid s
-  | StepRelease : forall tid v,
-    step_allow Release tid (mkState v (Some tid))
-  | StepRead : forall tid v,
-    step_allow Read tid (mkState v (Some tid))
-  | StepWrite : forall tid v0 v,
-    step_allow (Write v) tid (mkState v0 (Some tid)).
+  | StepAcquire : forall ctr tid s,
+    step_allow (Acquire ctr) tid s
+  | StepRelease : forall ctr tid v (ls : CounterID -> option nat),
+      (ls ctr = Some tid) ->
+    step_allow (Release ctr) tid (mkState v ls)
+  | StepRead : forall ctr tid v ls,
+      (ls ctr = Some tid) ->
+    step_allow (Read ctr) tid (mkState v ls)
+  | StepWrite : forall ctr tid v v' (ls : CounterID -> option nat),
+      (ls ctr = Some tid) ->
+    step_allow (Write ctr v') tid (mkState v ls).
 
   Definition step :=
     nilpotent_step RawLockAPI.step step_allow.
 
-  Definition initP s :=
-    Lock s = None.
+  Inductive initP' : State -> Prop :=
+  | InitAllowLock : initP' (mkState (fun ctr => 0) (fun ctr => None))
+  .
+  Hint Resolve InitAllowLock.
+  Definition initP s := initP' s.
 
 End LockAPI.
 
+Inductive CounterOpT : Type -> Type :=
+| Inc : CounterID -> CounterOpT nat
+| Dec : CounterID -> CounterOpT nat.
 
 Module LockedCounterAPI <: Layer.
 
@@ -158,18 +186,22 @@ Module LockedCounterAPI <: Layer.
   Definition State := LockState.
 
   Inductive xstep : forall T, opT T -> nat -> State -> T -> State -> list event -> Prop :=
-  | StepInc : forall tid v,
-    xstep Inc tid (mkState v None) v (mkState (v + 1) None) nil
-  | StepDec : forall tid v,
-    xstep Dec tid (mkState v None) v (mkState (v - 1) None) nil.
+  | StepInc : forall ctr tid v (ls : CounterID -> option nat),
+      (ls = (fun ctr => None)) ->
+    xstep (Inc ctr) tid (mkState v ls) (v ctr) (mkState (upd v ctr ((v ctr) + 1)) ls) nil
+  | StepDec : forall ctr tid v (ls : CounterID -> option nat),
+      (ls = (fun ctr => None)) ->
+    xstep (Dec ctr) tid (mkState v ls) (v ctr) (mkState (upd v ctr ((v ctr) - 1)) ls) nil.
 
   Definition step := xstep.
 
-  Definition initP s :=
-    Lock s = None.
+  Inductive initP' : State -> Prop :=
+  | InitAllowLock : initP' (mkState (fun ctr => 0) (fun ctr => None))
+  .
+  Hint Resolve InitAllowLock.
+  Definition initP s := initP' s.
 
 End LockedCounterAPI.
-
 
 Module CounterAPI <: Layer.
 
@@ -177,10 +209,10 @@ Module CounterAPI <: Layer.
   Definition State := CounterState.
 
   Inductive xstep : forall T, opT T -> nat -> State -> T -> State -> list event -> Prop :=
-  | StepInc : forall tid v,
-    xstep Inc tid v v (v + 1) nil
-  | StepDec : forall tid v,
-    xstep Dec tid v v (v - 1) nil.
+  | StepInc : forall ctr tid v,
+    xstep (Inc ctr) tid v (v ctr) (upd v ctr ((v ctr) + 1)) nil
+  | StepDec : forall ctr tid v (ls : CounterID -> option nat),
+    xstep (Dec ctr) tid v (v ctr) (upd v ctr ((v ctr) - 1)) nil.
 
   Definition step := xstep.
 
@@ -188,7 +220,6 @@ Module CounterAPI <: Layer.
     True.
 
 End CounterAPI.
-
 
 (** Locking discipline *)
 
@@ -202,30 +233,29 @@ Module LockingRule <: ProcRule LockAPI.
 
 End LockingRule.
 
-
 (** Using locks to get atomicity. *)
 
 Module LockingCounter <: LayerImplFollowsRule LockAPI LockedCounterAPI LockingRule.
 
-  Definition inc_core : proc LockAPI.opT _ :=
-    _ <- Op Acquire;
-    v <- Op Read;
-    _ <- Op (Write (v + 1));
-    _ <- Op Release;
+  Definition inc_core ctr : proc LockAPI.opT _ :=
+    _ <- Op (Acquire ctr);
+    v <- Op (Read ctr);
+    _ <- Op (Write ctr (v + 1));
+    _ <- Op (Release ctr);
     Ret v.
 
-  Definition dec_core : proc LockAPI.opT _ :=
-    _ <- Op Acquire;
-    v <- Op Read;
-    _ <- Op (Write (v - 1));
-    _ <- Op Release;
+  Definition dec_core ctr : proc LockAPI.opT _ :=
+    _ <- Op (Acquire ctr);
+    v <- Op (Read ctr);
+    _ <- Op (Write ctr (v - 1));
+    _ <- Op (Release ctr);
     Ret v.
 
   Definition compile_op T (op : LockedCounterAPI.opT T)
                         : proc LockAPI.opT T :=
     match op with
-    | Inc => inc_core
-    | Dec => dec_core
+    | Inc ctr => inc_core ctr
+    | Dec ctr => dec_core ctr
     end.
 
   Ltac step_inv :=
@@ -250,8 +280,8 @@ Module LockingCounter <: LayerImplFollowsRule LockAPI LockedCounterAPI LockingRu
   Hint Extern 1 (~ LockAPI.step_allow _ _ _) => intro H'; inversion H'.
   Hint Extern 1 (LockAPI.step_allow _ _ _ -> False) => intro H'; inversion H'.
 
-  Lemma acquire_right_mover :
-    right_mover LockAPI.step Acquire.
+  Lemma acquire_right_mover ctr :
+    right_mover LockAPI.step (Acquire ctr).
   Proof.
     unfold right_mover; intros.
     repeat step_inv; try congruence; eauto;
