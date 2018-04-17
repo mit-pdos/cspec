@@ -31,11 +31,41 @@ Module MailFSMergedAbsImpl' <:
 
   Hint Resolve FMap.add_mapsto.
   Hint Resolve FMap.mapsto_add_ne'.
+  Hint Constructors MailFSPathAPI.xstep.
 
   Theorem absR_ok :
     op_abs absR MailFSMergedAbsAPI.step MailFSPathHAPI.step.
   Proof.
     unfold op_abs; intros.
+    unfold MailFSPathHAPI.step.
+    unfold MailFSPathAPI.step.
+    inversion H0; clear H0; subst; repeat sigT_eq.
+
+    all: eexists; split;
+      [
+      | econstructor;
+        match goal with
+        | |- MailFSPathAPI.xstep _ _ ?s _ _ _ =>
+          replace s with (MailFSPathAbsState.mk_state
+            (MailFSPathAbsState.fs s)
+            (MailFSPathAbsState.locked s)) by ( destruct s; reflexivity )
+        | _ => idtac
+        end;
+        try econstructor
+      ].
+
+    all: eauto.
+    all: try match goal with
+    | |- absR _ (hadd _ (MailFSPathAbsState.mk_state
+                          (MailFSPathAbsState.fs ?s)
+                          (MailFSPathAbsState.locked ?s)) _) =>
+      replace (MailFSPathAbsState.mk_state
+                (MailFSPathAbsState.fs s) (MailFSPathAbsState.locked s))
+        with s by ( destruct s; reflexivity );
+      rewrite hadd_hget_eq;
+      eassumption
+    end.
+
   Admitted.
 
   Theorem absInitP :
