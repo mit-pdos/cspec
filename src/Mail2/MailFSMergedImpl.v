@@ -67,7 +67,16 @@ Module MailFSMergedAbsImpl' <:
       FMap.MapsTo (u, dir, fn) data fs ->
       FMap.MapsTo (dir, fn) data
         (MailFSPathAbsState.fs (hget s2 (exist _ u P))).
-  Admitted.
+  Proof.
+    intros.
+    specialize (H u); simpl in *; intuition idtac.
+    eapply H3 in H0; clear H3; deex.
+    pose proof hget_mapsto.
+    specialize (H3 _ _ _ _ (exist _ u P) s2); simpl in *.
+    eapply FMap.mapsto_unique in H3; [ | exact H0 ].
+    subst.
+    eauto.
+  Qed.
 
   Theorem absR_In :
     forall fs lock s2 u dir fn P,
@@ -75,7 +84,20 @@ Module MailFSMergedAbsImpl' <:
       (~ FMap.In (u, dir, fn) fs) ->
       ~ FMap.In (dir, fn)
         (MailFSPathAbsState.fs (hget s2 (exist _ u P))).
-  Admitted.
+  Proof.
+    intros.
+    specialize (H u); simpl in *; intuition idtac.
+    apply H0; clear H0.
+    apply FMap.in_mapsto_exists in H1; deex.
+    edestruct H2.
+    {
+      pose proof hget_mapsto.
+      specialize (H1 _ _ _ _ (exist _ u P) s2).
+      simpl in H1.
+      eauto.
+    }
+    eapply FMap.mapsto_in; eauto.
+  Qed.
 
   Theorem absR_is_permutation_key :
     forall fs lock s2 u dir r P,
@@ -92,7 +114,16 @@ Module MailFSMergedAbsImpl' <:
       absR (MailFSMergedState.mk_state fs locked) s2 ->
       FMap.MapsTo u v locked ->
       MailFSPathAbsState.locked (hget s2 (exist _ u P)) = v.
-  Admitted.
+  Proof.
+    intros.
+    specialize (H u); simpl in *; intuition idtac.
+    eapply H in H0; deex.
+    f_equal.
+    eapply FMap.mapsto_unique; try eassumption.
+    pose proof hget_mapsto.
+    specialize (H2 _ _ _ _ (exist _ u P) s2).
+    eauto.
+  Qed.
 
   Theorem absR_locked_add :
     forall fs locked s2 u v P,
