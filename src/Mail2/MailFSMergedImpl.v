@@ -33,6 +33,20 @@ Module MailFSMergedAbsImpl' <:
   Hint Resolve FMap.mapsto_add_ne'.
   Hint Constructors MailFSPathAPI.xstep.
 
+  Theorem mapsto_hadd_ne :
+    forall u0 u1 T (s : T) indexValid S v P,
+      u0 <> u1 ->
+      FMap.MapsTo u0 s (HSMap (hadd (exist _ u1 P) v S)) ->
+      FMap.MapsTo u0 s (HSMap (indexValid:=indexValid) S).
+  Admitted.
+
+  Theorem mapsto_hadd_ne' :
+    forall u0 u1 T (s : T) indexValid S v P,
+      u0 <> u1 ->
+      FMap.MapsTo u0 s (HSMap (indexValid:=indexValid) S) ->
+      FMap.MapsTo u0 s (HSMap (hadd (exist _ u1 P) v S)).
+  Admitted.
+
   Theorem absR_fs_add :
     forall fs lock s2 u dir fn data P,
       absR (MailFSMergedState.mk_state fs lock) s2 ->
@@ -107,6 +121,17 @@ Module MailFSMergedAbsImpl' <:
         (MailFSPathAbsAPI.filter_dir dir
           (MailFSPathAbsState.fs
             (hget s2 (exist _ u P))))).
+  Proof.
+    intros.
+    specialize (H u); simpl in *; intuition idtac.
+    unfold FMap.is_permutation_key in *; split; intros.
+    - eapply H0 in H2; clear H0.
+      admit.
+
+    - eapply H0; clear H0.
+      eapply MailFSPathAbsAPI.drop_dirname_filter_dir in H2.
+      admit.
+
   Admitted.
 
   Theorem absR_locked :
@@ -135,7 +160,28 @@ Module MailFSMergedAbsImpl' <:
                    v) s2).
   Proof.
     unfold absR; simpl; intros.
-    specialize (H u0); intuition idtac.
+    destruct (u == u0); subst.
+    - specialize (H u0); simpl in *; intuition idtac.
+      + admit.
+      + admit.
+      + admit.
+      + admit.
+
+    - specialize (H u0); simpl in *; intuition idtac.
+      + eapply mapsto_hadd_ne in H1; eauto.
+        eapply H0 in H1.
+        eapply FMap.mapsto_add_ne'; eauto.
+        intuition eauto.
+      + eapply mapsto_hadd_ne in H1; eauto.
+        eapply H0 in H1.
+        intuition eauto.
+      + eapply FMap.mapsto_add_ne in H1; eauto.
+        eapply H in H1; deex.
+        eexists; intuition eauto.
+        eapply mapsto_hadd_ne'; eauto.
+      + eapply H2 in H1; deex.
+        eexists; intuition eauto.
+        eapply mapsto_hadd_ne'; eauto.
   Admitted.
 
   Theorem absR_valid_in_locked : forall fs locked s2 u,
