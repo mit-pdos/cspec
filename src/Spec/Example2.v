@@ -28,8 +28,8 @@ Module TASOp <: Ops.
   Inductive xopT : Type -> Type :=
   | TestAndSet : xopT bool
   | Clear : xopT unit
-  | ReadTAS : xopT nat
-  | WriteTAS : nat -> xopT unit.
+  | Read : xopT nat
+  | Write : nat -> xopT unit.
 
   Definition opT := xopT.
 
@@ -109,9 +109,9 @@ Module TASAPI <: Layer TASOp TASState.
   | StepClear : forall tid v l,
     xstep Clear tid (mkTASState v l) tt (mkTASState v false) nil
   | StepRead : forall tid v l,
-    xstep ReadTAS tid (mkTASState v l) v (mkTASState v l) nil
+    xstep Read tid (mkTASState v l) v (mkTASState v l) nil
   | StepWrite : forall tid v0 v l,
-    xstep (WriteTAS v) tid (mkTASState v0 l) tt (mkTASState v l) nil
+    xstep (Write v) tid (mkTASState v0 l) tt (mkTASState v l) nil
   .
 
   Definition step := xstep.
@@ -132,9 +132,9 @@ Module TASLockAPI <: Layer TASOp LockState.
   | StepClear : forall tid v l,
     xstep Clear tid (mkState v l) tt (mkState v None) nil
   | StepRead : forall tid v l,
-    xstep ReadTAS tid (mkState v l) v (mkState v l) nil
+    xstep Read tid (mkState v l) v (mkState v l) nil
   | StepWrite : forall tid v0 v l,
-    xstep (WriteTAS v) tid (mkState v0 l) tt (mkState v l) nil
+    xstep (Write v) tid (mkState v0 l) tt (mkState v l) nil
   .
 
   Definition step := xstep.
@@ -587,8 +587,8 @@ Module LockImpl' <:
     match op with
     | Acquire => (fun _ => TestAndSet, acquire_cond, None)
     | Release => (fun _ => Clear, once_cond, None)
-    | Read => (fun _ => ReadTAS, once_cond, None)
-    | Write v => (fun _ => WriteTAS v, once_cond, None)
+    | Read => (fun _ => TASOp.Read, once_cond, None)
+    | Write v => (fun _ => TASOp.Write v, once_cond, None)
     end.
 
   Ltac step_inv :=
