@@ -259,13 +259,48 @@ Module MailFSMergedAbsImpl' <:
     specialize (H u); simpl in *; intuition idtac.
     unfold FMap.is_permutation_key in *; split; intros.
     - eapply H0 in H2; clear H0.
-      admit.
+      unfold drop_dirname in H2.
+      unfold filter_dir in H2.
+      unfold MailFSPathAbsAPI.drop_dirname.
+      unfold MailFSPathAbsAPI.filter_dir.
+      eapply FMap.map_keys_in' in H2; deex.
+      eapply FMap.filter_in in H0 as H0'.
+      eapply FMap.filter_holds in H0.
+      destruct k'.
+      destruct p.
+
+      pose proof FMap.map_keys_in as Hx.
+      specialize (Hx _ _ string _ _ (fun '(_, fn) => fn) (s1, s)).
+      eapply Hx; clear Hx.
+
+      destruct ((s0, s1) == (u, dir)); try congruence.
+      inversion e; clear e; subst.
+
+      eapply FMap.filter_complete.
+      eapply FMap.in_mapsto_exists in H0'; deex.
+      eapply H3 in H2; deex.
+      eapply mapsto_to_hget in H2.
+      rewrite H2 in *.
+      eapply FMap.mapsto_in; eauto.
+
+      destruct (dir == dir); eauto.
 
     - eapply H0; clear H0.
       eapply MailFSPathAbsAPI.drop_dirname_filter_dir in H2.
-      admit.
 
-  Admitted.
+      eapply FMap.in_mapsto_exists in H2; deex.
+      eapply H1 in H0; eauto.
+      unfold drop_dirname.
+      unfold filter_dir.
+
+      pose proof FMap.map_keys_in as Hx.
+      specialize (Hx _ _ string _ _ (fun '(_, fn) => fn) ((u, dir), x)).
+      eapply Hx; clear Hx.
+
+      eapply FMap.filter_complete.
+      eapply FMap.mapsto_in; eauto.
+      destruct ((u, dir) == (u, dir)); eauto.
+  Qed.
 
   Theorem absR_locked :
     forall fs locked s2 u v P,
