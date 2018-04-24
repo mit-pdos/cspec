@@ -805,9 +805,11 @@ Module LockImpl :=
 
 (* End-to-end stack:
 
-  TASAPI --------------------+---------+
-    [ AbsLock ]              |         |
-  TASLockAPI                [c1]       |
+  TASAPI ---------------+----+---------+
+    [ AbsNondet ]       |    |         |
+  TASDelayNondetAPI    [c0]  |         |
+    [ AbsLock ]         |    |         |
+  TASLockAPI -----------+   [c1]       |
     [ LockImpl ]             |         |
   RawLockAPI ----------------+----+    |
     [ LockProtocol ]         |    |   [c]
@@ -818,12 +820,19 @@ Module LockImpl :=
   CounterAPI ---------------------+----+
  *)
 
+Module c0 :=
+  Link
+    TASOp  TASState  TASAPI
+    TASOp  TASState  TASDelayNondetAPI
+    TASOp LockState TASLockAPI
+    AbsNondet AbsLock.
+
 Module c1 :=
   Link
     TASOp  TASState  TASAPI
     TASOp  LockState TASLockAPI
     LockOp LockState RawLockAPI
-    AbsLock LockImpl.
+    c0 LockImpl.
 Module c2 :=
   LayerImplMoversProtocol
     LockState
