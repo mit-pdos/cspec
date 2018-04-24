@@ -219,6 +219,107 @@ Section TSOModel.
     rewrite H; auto.
   Qed.
 
+  Definition single_value (m:memT) tid v :=
+    (forall tid', tid <> tid' -> m.(SBuf) tid' = []) /\
+    mem_read m tid = v.
+
+  Hint Unfold empty_sb single_value
+       mem_read mem_write mem_bgflush : sb.
+
+  Theorem empty_sb_single_value : forall m,
+      empty_sb m ->
+      forall tid, single_value m tid m.(MemValue).
+  Proof.
+    autounfold with sb; simpl; intuition eauto.
+    rewrite H; auto.
+  Qed.
+
+  Theorem mem_write_single_value : forall m tid v0 v,
+      single_value m tid v0 ->
+      single_value (mem_write v m tid) tid v.
+  Proof.
+    autounfold with sb;
+      simpl; (intuition idtac);
+      autorewrite with fupd;
+      eauto.
+  Qed.
+
+  Lemma mem_read_bgflush : forall m tid,
+      mem_read (mem_bgflush m tid) tid = mem_read m tid.
+  Proof.
+    destruct m; intros; simpl.
+    unfold mem_read; simpl.
+    autorewrite with fupd.
+    generalize dependent (SBuf0 tid); intros.
+    induction l; simpl; auto.
+    destruct l; auto.
+  Qed.
+
+  Theorem single_value_bgflush : forall m tid v m' tid',
+      single_value m tid v ->
+      m' = mem_bgflush m tid' ->
+      single_value m' tid v.
+  Proof.
+    unfold single_value; (intuition idtac); subst; simpl.
+    destruct (tid' == tid'0); subst;
+      autorewrite with fupd.
+    rewrite H1 by congruence; auto.
+    rewrite H1 by congruence; auto.
+
+    destruct (tid == tid'); subst.
+    - apply mem_read_bgflush.
+    - unfold mem_bgflush.
+      autorewrite with fupd;
+        rewrite H1 by congruence.
+      rewrite fupd_same by eauto.
+      simpl.
+      destruct m; simpl; auto.
+  Qed.
+
+  Theorem single_value_mem_bg : forall m tid v m',
+      single_value m tid v ->
+      mem_bg m m' ->
+      single_value m' tid v.
+  Proof.
+    induction 2; repeat deex; eauto using single_value_bgflush.
+  Qed.
+
+  Hint Unfold mem_flush : sb.
+
+  Lemma empty_sb_single_value_flush : forall m v tid,
+      single_value m tid v ->
+      empty_sb (mem_flush m tid).
+  Proof.
+    autounfold with sb;
+      (intuition idtac); subst; simpl.
+    destruct (tid == tid0); subst.
+    destruct_with_eqn (SBuf m tid0); simpl; eauto.
+    autorewrite with fupd; auto.
+    destruct_with_eqn (SBuf m tid); simpl; eauto.
+    autorewrite with fupd; auto.
+  Qed.
+
+  Theorem single_value_mem_flush : forall m tid v m',
+      single_value m tid v ->
+      m' = mem_flush m tid ->
+      single_value m' tid v.
+  Proof.
+    autounfold with sb;
+      (intuition idtac); subst; simpl;
+        destruct matches; simpl in *;
+          autorewrite with fupd in *;
+          eauto.
+    simpl_match; auto.
+    congruence.
+  Qed.
+
+  Lemma single_value_mem_read : forall m tid v,
+      single_value m tid v ->
+      mem_read m tid = v.
+  Proof.
+    destruct 1; auto.
+  Qed.
+
 End TSOModel.
 
 Arguments mem_bg {T} m1 m2.

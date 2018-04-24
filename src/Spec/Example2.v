@@ -648,6 +648,24 @@ Module AbsCounter' <:
   Qed.
 
   Hint Resolve step_inc step_dec.
+  Hint Resolve empty_sb_single_value_flush.
+  Hint Resolve empty_sb_mem_read.
+
+  Lemma single_value_flush T : forall (m m': memT T) tid (f: T -> T),
+      empty_sb m ->
+      single_value m' tid (f (mem_read m tid)) ->
+      MemValue (mem_flush m' tid) = f (MemValue m).
+  Proof.
+    intros.
+    assert (empty_sb (mem_flush m' tid)) by eauto.
+    eapply single_value_mem_flush in H0; eauto.
+    apply single_value_mem_read in H0.
+    erewrite (empty_sb_mem_read (m:=(mem_flush m' tid))) in * by auto.
+    erewrite (empty_sb_mem_read (m:=m)) in * by auto.
+    auto.
+  Qed.
+
+  Hint Resolve single_value_flush.
 
   Theorem absR_ok :
     op_abs absR LockedCounterAPI.step CounterAPI.step.
@@ -657,19 +675,29 @@ Module AbsCounter' <:
     simpl in *; subst; destruct_ands.
     unfold absR.
     destruct op; inv_clear H0; simpl.
-    eapply empty_sb_mem_bg_noop in H4; [ | solve [ eauto ] ]; subst.
-    eexists; (intuition idtac); [ | eapply step_inc ].
-    admit. (* mem_flush on single write *)
-    rewrite empty_sb_mem_read by auto; auto.
-    admit. (* thread flush/write through *)
 
-    (* proof is symmetric *)
-    eapply empty_sb_mem_bg_noop in H4; [ | solve [ eauto ] ]; subst.
-    eexists; (intuition idtac); [ | eapply step_dec ].
-    admit.
-    rewrite empty_sb_mem_read by auto; auto.
-    admit.
-  Admitted.
+    - eapply empty_sb_mem_bg_noop in H4; [ | solve [ eauto ] ]; subst.
+
+      assert (single_value v' tid (mem_read Value0 tid + 1)).
+      eapply empty_sb_single_value in H.
+      eapply mem_write_single_value in H.
+      eapply single_value_mem_bg in H; eauto.
+
+      eexists; (intuition eauto).
+      eapply step_inc; eauto.
+      eapply single_value_flush with (f := fun x => x + 1); eauto.
+
+    - eapply empty_sb_mem_bg_noop in H4; [ | solve [ eauto ] ]; subst.
+
+      assert (single_value v' tid (mem_read Value0 tid - 1)).
+      eapply empty_sb_single_value in H.
+      eapply mem_write_single_value in H.
+      eapply single_value_mem_bg in H; eauto.
+
+      eexists; (intuition eauto).
+      eapply step_dec; eauto.
+      eapply single_value_flush with (f := fun x => x - 1); eauto.
+  Qed.
 
   Theorem absInitP :
     forall s1 s2,
