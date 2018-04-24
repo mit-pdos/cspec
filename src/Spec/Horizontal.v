@@ -77,6 +77,15 @@ Section HorizontalComposition.
     eauto.
   Qed.
 
+  Theorem hget_mapsto' :
+    forall i m P,
+      FMap.MapsTo i (hget m (exist _ i P)) (HSMap m).
+  Proof.
+    destruct m; simpl; intros.
+    destruct (FMap.in_mapsto_get i HSMap0 (HSValid0 i P)).
+    eauto.
+  Qed.
+
   Opaque FMap.add.
 
   Theorem hget_hadd_eq : forall S s i H0 H1,
