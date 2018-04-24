@@ -14,6 +14,7 @@ Require Import Modules.
 Require Import Movers.
 Require Import Abstraction.
 Require Import Protocol.
+Require Import TSO.
 
 Import ListNotations.
 
@@ -29,7 +30,8 @@ Module TASOp <: Ops.
   | TestAndSet : xopT bool
   | Clear : xopT unit
   | Read : xopT nat
-  | Write : nat -> xopT unit.
+  | Write : nat -> xopT unit
+  | Flush : xopT unit.
 
   Definition opT := xopT.
 
@@ -42,7 +44,8 @@ Module LockOp <: Ops.
   | Acquire : xopT bool
   | Release : xopT unit
   | Read : xopT nat
-  | Write : nat -> xopT unit.
+  | Write : nat -> xopT unit
+  | Flush : xopT unit.
 
   Definition opT := xopT.
 
@@ -63,7 +66,7 @@ End CounterOp.
 Module TASState <: State.
 
   Record s := mkTASState {
-                  TASValue : nat;
+                  TASValue : memT nat;
                   TASLock : bool;
                 }.
 
@@ -77,7 +80,7 @@ End TASState.
 Module LockState <: State.
 
   Record s := mkState {
-                  Value : nat;
+                  Value : memT nat;
                   Lock : option nat;
                 }.
 
@@ -98,6 +101,16 @@ End CounterState.
 
 (** Layer definitions *)
 
+Definition bg_step `(step: OpSemantics opT State) (bg: State -> State -> Prop) : OpSemantics opT State :=
+  fun _ op tid s r s' evs =>
+    exists s0 s1, bg s0 s /\
+          step _ op tid s r s1 evs /\
+          bg s1 s'.
+
+Definition tas_bg (s1 s2: TASState.State) :=
+  mem_bg s1.(TASState.TASValue) s2.(TASState.TASValue) /\
+  s1.(TASState.TASLock) = s2.(TASState.TASLock).
+
 Module TASAPI <: Layer TASOp TASState.
 
   Import TASOp.
@@ -109,15 +122,74 @@ Module TASAPI <: Layer TASOp TASState.
   | StepClear : forall tid v l,
       xstep Clear tid (mkTASState v l) tt (mkTASState v false) nil
   | StepRead : forall tid v l,
-      xstep Read tid (mkTASState v l) v (mkTASState v l) nil
+      xstep Read tid (mkTASState v l) (mem_read v tid) (mkTASState v l) nil
   | StepWrite : forall tid v0 v l,
-      xstep (Write v) tid (mkTASState v0 l) tt (mkTASState v l) nil
+      xstep (Write v) tid (mkTASState v0 l) tt (mkTASState (mem_write v v0 tid) l) nil
+  | StepFlush : forall tid v l,
+      xstep Flush tid (mkTASState v l) tt (mkTASState (mem_flush v tid) l) nil
+  .
+
+  Definition step := bg_step xstep tas_bg.
+
+End TASAPI.
+
+Module TASDelayNondetAPI <: Layer TASOp TASState.
+
+  Import TASOp.
+  Import TASState.
+
+  Inductive xstep : forall T, opT T -> nat -> State -> T -> State -> list event -> Prop :=
+  | StepTAS : forall tid v l,
+      xstep TestAndSet tid (mkTASState v l) l (mkTASState v true) nil
+  | StepClear : forall tid v l,
+      xstep Clear tid (mkTASState v l) tt (mkTASState v false) nil
+  | StepRead : forall tid v v' l,
+      mem_bg v v' ->
+      xstep Read tid (mkTASState v l) (mem_read v' tid) (mkTASState v' l) nil
+  | StepWrite : forall tid v0 v l,
+      xstep (Write v) tid (mkTASState v0 l) tt (mkTASState (mem_write v v0 tid) l) nil
+  | StepFlush : forall tid v l,
+      xstep Flush tid (mkTASState v l) tt (mkTASState (mem_flush v tid) l) nil
   .
 
   Definition step := xstep.
 
-End TASAPI.
+End TASDelayNondetAPI.
 
+Module AbsNondet' <:
+  LayerImplAbsT TASOp
+                TASState TASAPI
+                TASState TASDelayNondetAPI.
+
+  Import TASState.
+
+  (* absR is from low (full nondeterminism) to high (careful nondeterminism) *)
+  Definition absR (s1 : State) (s2 : State) :=
+    tas_bg s2 s1.
+
+  Theorem absR_ok :
+    op_abs absR TASAPI.step TASDelayNondetAPI.step.
+  Proof.
+    unfold op_abs; intros.
+    destruct s1; inversion H; clear H.
+    simpl in *; subst.
+    unfold absR.
+    destruct op; inversion H0; clear H0; repeat sigT_eq.
+    (* TODO *)
+    (* (also, can we delay non-determinsm for flush? perhaps with a more clever
+       abstraction relation, or just by synthesizing an appropriate mem_bg?) *)
+  Admitted.
+
+  Theorem absInitP :
+    forall s1 s2,
+      TASState.initP s1 ->
+      absR s1 s2 ->
+      TASState.initP s2.
+  Proof.
+    unfold initP, absR, tas_bg; (intuition idtac); congruence.
+  Qed.
+
+End AbsNondet'.
 
 Module TASLockAPI <: Layer TASOp LockState.
 
@@ -131,10 +203,13 @@ Module TASLockAPI <: Layer TASOp LockState.
       xstep TestAndSet tid (mkState v (Some tid')) true (mkState v (Some tid')) nil
   | StepClear : forall tid v l,
       xstep Clear tid (mkState v l) tt (mkState v None) nil
-  | StepRead : forall tid v l,
-      xstep Read tid (mkState v l) v (mkState v l) nil
+  | StepRead : forall tid v v' l,
+      xstep Read tid (mkState v l) (mem_read v' tid) (mkState v' l) nil
   | StepWrite : forall tid v0 v l,
-      xstep (Write v) tid (mkState v0 l) tt (mkState v l) nil
+      xstep (Write v) tid (mkState v0 l) tt (mkState (mem_write v v0 tid) l) nil
+  | StepFlush : forall tid v v' l,
+      mem_bg v v' ->
+      xstep Flush tid (mkState v l) tt (mkState (mem_flush v' tid) l) nil
   .
 
   Definition step := xstep.
@@ -152,10 +227,14 @@ Module RawLockAPI <: Layer LockOp LockState.
       xstep Acquire tid (mkState v None) r (mkState v (Some tid)) nil
   | StepRelease : forall tid v l,
       xstep Release tid (mkState v l) tt (mkState v None) nil
-  | StepRead : forall tid v l,
-      xstep Read tid (mkState v l) v (mkState v l) nil
+  | StepRead : forall tid v v' l,
+      mem_bg v v' ->
+      xstep Read tid (mkState v l) (mem_read v' tid) (mkState v' l) nil
   | StepWrite : forall tid v0 v l,
-      xstep (Write v) tid (mkState v0 l) tt (mkState v l) nil
+      xstep (Write v) tid (mkState v0 l) tt (mkState (mem_write v v0 tid) l) nil
+  | StepFlush : forall tid v v' l,
+      mem_bg v v' ->
+      xstep Flush tid (mkState v l) tt (mkState (mem_flush v' tid) l) nil
   .
 
   Definition step := xstep.
@@ -176,7 +255,10 @@ Module LockProtocol <: Protocol LockOp LockState.
   | StepRead : forall tid v,
       xstep_allow Read tid (mkState v (Some tid))
   | StepWrite : forall tid v0 v,
-      xstep_allow (Write v) tid (mkState v0 (Some tid)).
+      xstep_allow (Write v) tid (mkState v0 (Some tid))
+  | StepFlush : forall tid v,
+      xstep_allow Flush tid (mkState v (Some tid))
+  .
 
   Definition step_allow := xstep_allow.
 
@@ -192,16 +274,21 @@ Module LockAPI <: Layer LockOp LockState.
 End LockAPI.
 
 
+
 Module LockedCounterAPI <: Layer CounterOp LockState.
 
   Import CounterOp.
   Import LockState.
 
   Inductive xstep : forall T, opT T -> nat -> State -> T -> State -> list event -> Prop :=
-  | StepInc : forall tid v,
-      xstep Inc tid (mkState v None) v (mkState (v + 1) None) nil
-  | StepDec : forall tid v,
-      xstep Dec tid (mkState v None) v (mkState (v - 1) None) nil.
+  | StepInc : forall tid v r,
+      r = mem_read v tid ->
+      xstep Inc tid (mkState v None) r
+            (mkState (mem_flush (mem_write (r + 1) v tid) tid) None) nil
+  | StepDec : forall tid v r,
+      r = mem_read v tid ->
+      xstep Dec tid (mkState v None) r
+            (mkState (mem_flush (mem_write (r - 1) v tid) tid) None) nil.
 
   Definition step := xstep.
 
