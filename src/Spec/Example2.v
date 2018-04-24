@@ -1,5 +1,6 @@
 Require Import Helpers.Helpers.
 Require Import Helpers.ListStuff.
+Require Import Helpers.Learn.
 Require Import ConcurProc.
 Require Import Equiv.
 Require Import Omega.
@@ -111,6 +112,13 @@ Definition tas_bg (s1 s2: TASState.State) :=
   mem_bg s1.(TASState.TASValue) s2.(TASState.TASValue) /\
   s1.(TASState.TASLock) = s2.(TASState.TASLock).
 
+Instance tas_bg_PreOrder : PreOrder tas_bg.
+Proof.
+  constructor; hnf; intros; unfold tas_bg in *; intuition eauto.
+  reflexivity.
+  etransitivity; eauto.
+Qed.
+
 Module TASAPI <: Layer TASOp TASState.
 
   Import TASOp.
@@ -148,8 +156,9 @@ Module TASDelayNondetAPI <: Layer TASOp TASState.
       xstep Read tid (mkTASState v l) (mem_read v' tid) (mkTASState v' l) nil
   | StepWrite : forall tid v0 v l,
       xstep (Write v) tid (mkTASState v0 l) tt (mkTASState (mem_write v v0 tid) l) nil
-  | StepFlush : forall tid v l,
-      xstep Flush tid (mkTASState v l) tt (mkTASState (mem_flush v tid) l) nil
+  | StepFlush : forall tid v v' l,
+      mem_bg v v' ->
+      xstep Flush tid (mkTASState v l) tt (mkTASState (mem_flush v' tid) l) nil
   .
 
   Definition step := xstep.
@@ -163,22 +172,42 @@ Module AbsNondet' <:
 
   Import TASState.
 
+  Lemma tas_bg_intro : forall v1 v2 l1 l2,
+      mem_bg v1 v2 ->
+      l1 = l2 ->
+      tas_bg (mkTASState v1 l1) (mkTASState v2 l2).
+  Proof.
+    unfold tas_bg; intuition eauto.
+  Qed.
+
   (* absR is from low (full nondeterminism) to high (careful nondeterminism) *)
   Definition absR (s1 : State) (s2 : State) :=
     tas_bg s2 s1.
 
+  Hint Resolve tas_bg_intro.
+  Hint Resolve mem_bg_commute_write.
+  Hint Constructors TASDelayNondetAPI.xstep.
+
+  Ltac split_state :=
+    repeat match goal with
+           | [ s: TASState.State |- _ ] => destruct s
+           | [ H: tas_bg (mkTASState _ _) (mkTASState _ _) |- _ ] =>
+             destruct H; simpl in *; subst
+           | [ H: mem_bg ?s1 ?s2,
+                  H': mem_bg ?s2 ?s3 |- _ ] =>
+             learn that (mem_bg_trans H H')
+           end.
+
   Theorem absR_ok :
     op_abs absR TASAPI.step TASDelayNondetAPI.step.
   Proof.
-    unfold op_abs; intros.
+    unfold op_abs, TASDelayNondetAPI.step; intros.
     destruct s1; inversion H; clear H.
     simpl in *; subst.
     unfold absR.
-    destruct op; inversion H0; clear H0; repeat sigT_eq.
-    (* TODO *)
-    (* (also, can we delay non-determinsm for flush? perhaps with a more clever
-       abstraction relation, or just by synthesizing an appropriate mem_bg?) *)
-  Admitted.
+    hnf in H0; repeat deex.
+    destruct op; inv_clear H0; split_state; eauto.
+  Qed.
 
   Theorem absInitP :
     forall s1 s2,
@@ -281,14 +310,18 @@ Module LockedCounterAPI <: Layer CounterOp LockState.
   Import LockState.
 
   Inductive xstep : forall T, opT T -> nat -> State -> T -> State -> list event -> Prop :=
-  | StepInc : forall tid v r,
+  | StepInc : forall tid v0 v v' r,
+      mem_bg v0 v ->
       r = mem_read v tid ->
-      xstep Inc tid (mkState v None) r
-            (mkState (mem_flush (mem_write (r + 1) v tid) tid) None) nil
-  | StepDec : forall tid v r,
+      mem_bg (mem_write (mem_read v tid + 1) v tid) v' ->
+      xstep Inc tid (mkState v0 None) r
+            (mkState (mem_flush v' tid) None) nil
+  | StepDec : forall tid v0 v v' r,
+      mem_bg v0 v ->
       r = mem_read v tid ->
-      xstep Dec tid (mkState v None) r
-            (mkState (mem_flush (mem_write (r - 1) v tid) tid) None) nil.
+      mem_bg (mem_write (mem_read v tid - 1) v tid) v' ->
+      xstep Dec tid (mkState v0 None) r
+            (mkState (mem_flush v' tid) None) nil.
 
   Definition step := xstep.
 
@@ -327,6 +360,7 @@ Module LockingCounter' <:
     _ <- Op Acquire;
       v <- Op Read;
       _ <- Op (Write (v + 1));
+      _ <- Op Flush;
       _ <- Op Release;
       Ret v.
 
@@ -334,6 +368,7 @@ Module LockingCounter' <:
     _ <- Op Acquire;
       v <- Op Read;
       _ <- Op (Write (v - 1));
+      _ <- Op Flush;
       _ <- Op Release;
       Ret v.
 
@@ -377,11 +412,16 @@ Module LockingCounter' <:
     right_mover LockAPI.step Acquire.
   Proof.
     unfold right_mover; intros.
-    repeat step_inv; try congruence; eauto;
-      try solve [ exfalso; eauto ].
+    repeat step_inv; eauto 10.
+    destruct op1; repeat step_inv; eauto 10.
+  Qed.
 
-    destruct op1; repeat step_inv; eauto 10;
-      try solve [ exfalso; eauto ].
+  Lemma flush_right_mover :
+    right_mover LockAPI.step Flush.
+  Proof.
+    unfold right_mover; intros.
+    repeat step_inv; eauto 15.
+    destruct op1; repeat step_inv; eauto 15.
   Qed.
 
   Lemma release_left_mover :
@@ -393,8 +433,8 @@ Module LockingCounter' <:
       destruct s. destruct Lock. destruct (n == tid); subst.
       all: eauto 10.
     - unfold left_mover; intros.
-      repeat step_inv; try congruence; subst; eauto 10.
-      destruct op0; eauto 10.
+      repeat step_inv; subst; eauto 15.
+      destruct op0; eauto 15.
       Unshelve.
       all: exact tt.
   Qed.
@@ -403,18 +443,20 @@ Module LockingCounter' <:
     right_mover LockAPI.step Read.
   Proof.
     unfold right_mover; intros.
-    repeat step_inv; try congruence; subst; eauto 10.
+    repeat step_inv; subst; eauto 15.
+    destruct op1; eauto 15.
   Qed.
 
   Lemma write_right_mover : forall v,
       right_mover LockAPI.step (Write v).
   Proof.
     unfold right_mover; intros.
-    repeat step_inv; try congruence; subst; eauto 10.
-    destruct op1; eauto 10.
+    repeat step_inv; subst; eauto 15.
+    destruct op1; eauto 15.
   Qed.
 
   Hint Resolve acquire_right_mover.
+  Hint Resolve flush_right_mover.
   Hint Resolve release_left_mover.
   Hint Resolve read_right_mover.
   Hint Resolve write_right_mover.
@@ -436,12 +478,10 @@ Module LockingCounter' <:
     + repeat atomic_exec_inv.
       simpl; intuition eauto.
       repeat step_inv; eauto.
-
     + repeat atomic_exec_inv.
       simpl; intuition eauto.
       repeat step_inv; eauto.
   Qed.
-
 
   Import LockState.
 
@@ -498,12 +538,22 @@ Module LockingCounter' <:
     repeat exec_propagate.
     unfold restricted_step in *; intuition idtac; repeat step_inv.
     constructor; intros.
+    constructor; intros. eauto.
+
+    repeat exec_propagate.
+    unfold restricted_step in *; intuition idtac; repeat step_inv.
+    constructor; intros.
   Qed.
 
   Lemma dec_follows_protocol : forall tid s,
       follows_protocol_proc RawLockAPI.step LockAPI.step_allow tid s dec_core.
   Proof.
     intros.
+    constructor; intros.
+    constructor; intros. eauto.
+
+    repeat exec_propagate.
+    unfold restricted_step in *; intuition idtac; repeat step_inv.
     constructor; intros.
     constructor; intros. eauto.
 

@@ -179,6 +179,15 @@ Section TSOModel.
     bgflush after remains in memory *)
   Abort.
 
+  Lemma mem_bg_commute_flush : forall m1 m2 m3 m4 (tid : nat),
+      mem_bg m1 m2 ->
+      m3 = mem_flush m2 tid ->
+      mem_bg m3 m4 ->
+      mem_bg (mem_flush m1 tid) m4.
+  Proof.
+    intros; subst.
+
+
 End TSOModel.
 
 Arguments mem_bg {T} m1 m2.

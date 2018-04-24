@@ -384,6 +384,8 @@ Ltac sigT_eq :=
     apply Eqdep.EqdepTheory.inj_pair2 in H; subst
   end.
 
+Ltac inv_clear H := inversion H; clear H; subst; repeat sigT_eq.
+
 (** substitute variables that are let bindings (these can be created with [set
 (x:=value)] and appear in the context as [v := def]) *)
 Ltac subst_var :=
