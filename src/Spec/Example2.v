@@ -220,6 +220,12 @@ Module AbsNondet' <:
 
 End AbsNondet'.
 
+Module AbsNondet :=
+  LayerImplAbs TASOp
+               TASState TASAPI
+               TASState TASDelayNondetAPI
+               AbsNondet'.
+
 Module TASLockAPI <: Layer TASOp LockState.
 
   Import TASOp.
@@ -233,6 +239,7 @@ Module TASLockAPI <: Layer TASOp LockState.
   | StepClear : forall tid v l,
       xstep Clear tid (mkState v l) tt (mkState v None) nil
   | StepRead : forall tid v v' l,
+      mem_bg v v' ->
       xstep Read tid (mkState v l) (mem_read v' tid) (mkState v' l) nil
   | StepWrite : forall tid v0 v l,
       xstep (Write v) tid (mkState v0 l) tt (mkState (mem_write v v0 tid) l) nil
@@ -619,18 +626,50 @@ Module AbsCounter' <:
 
   Definition absR (s1 : LockState.State) (s2 : CounterState.State) :=
     Lock s1 = None /\
-    Value s1 = s2.
+    empty_sb s1.(Value) /\
+    s1.(Value).(MemValue) = s2.
+
+  Lemma step_inc : forall tid v r v',
+      r = v ->
+      v' = v + 1 ->
+      CounterAPI.step CounterOp.Inc tid v r v' [].
+  Proof.
+    intros; subst.
+    constructor.
+  Qed.
+
+  Lemma step_dec : forall tid v r v',
+      r = v ->
+      v' = v - 1 ->
+      CounterAPI.step CounterOp.Dec tid v r v' [].
+  Proof.
+    intros; subst.
+    constructor.
+  Qed.
+
+  Hint Resolve step_inc step_dec.
 
   Theorem absR_ok :
     op_abs absR LockedCounterAPI.step CounterAPI.step.
   Proof.
     unfold op_abs; intros.
     destruct s1; inversion H; clear H.
-    simpl in *; subst.
+    simpl in *; subst; destruct_ands.
     unfold absR.
-    destruct op; inversion H0; clear H0; repeat sigT_eq.
-    all: eexists; intuition eauto; constructor.
-  Qed.
+    destruct op; inv_clear H0; simpl.
+    eapply empty_sb_mem_bg_noop in H4; [ | solve [ eauto ] ]; subst.
+    eexists; (intuition idtac); [ | eapply step_inc ].
+    admit. (* mem_flush on single write *)
+    rewrite empty_sb_mem_read by auto; auto.
+    admit. (* thread flush/write through *)
+
+    (* proof is symmetric *)
+    eapply empty_sb_mem_bg_noop in H4; [ | solve [ eauto ] ]; subst.
+    eexists; (intuition idtac); [ | eapply step_dec ].
+    admit.
+    rewrite empty_sb_mem_read by auto; auto.
+    admit.
+  Admitted.
 
   Theorem absInitP :
     forall s1 s2,
@@ -654,7 +693,7 @@ Module AbsCounter :=
 
 Module AbsLock' <:
   LayerImplAbsT TASOp
-                TASState TASAPI
+                TASState TASDelayNondetAPI
                 LockState TASLockAPI.
 
   Import TASState.
@@ -668,7 +707,7 @@ Module AbsLock' <:
   Hint Constructors TASLockAPI.xstep.
 
   Theorem absR_ok :
-    op_abs absR TASAPI.step TASLockAPI.step.
+    op_abs absR TASDelayNondetAPI.step TASLockAPI.step.
   Proof.
     unfold op_abs; intros.
     destruct s1; destruct s2; unfold absR in *.
@@ -697,7 +736,7 @@ End AbsLock'.
 
 Module AbsLock :=
   LayerImplAbs TASOp
-               TASState TASAPI
+               TASState TASDelayNondetAPI
                LockState TASLockAPI
                AbsLock'.
 
@@ -725,6 +764,7 @@ Module LockImpl' <:
     | Release => (fun _ => Clear, once_cond, None)
     | Read => (fun _ => TASOp.Read, once_cond, None)
     | Write v => (fun _ => TASOp.Write v, once_cond, None)
+    | Flush => (fun _ => TASOp.Flush, once_cond, None)
     end.
 
   Ltac step_inv :=

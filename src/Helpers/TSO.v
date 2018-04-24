@@ -179,6 +179,46 @@ Section TSOModel.
     bgflush after remains in memory *)
   Abort.
 
+  Definition empty_sb (m:memT) := forall tid, m.(SBuf) tid = [].
+
+  Theorem empty_sb_mem_bgflush_noop : forall m tid,
+      empty_sb m ->
+      mem_bgflush m tid = m.
+  Proof.
+    unfold empty_sb, mem_bgflush; intros.
+    apply memT_eq; simpl; intros.
+    rewrite H; auto.
+    rewrite H; simpl.
+    rewrite fupd_same; auto.
+  Qed.
+
+  Theorem empty_sb_mem_bg_noop : forall m m',
+      empty_sb m ->
+      mem_bg m m' ->
+      m' = m.
+  Proof.
+    induction 2; simpl; repeat deex;
+      auto using empty_sb_mem_bgflush_noop.
+  Qed.
+
+  Theorem empty_sb_flush_noop : forall m tid,
+      empty_sb m ->
+      mem_flush m tid = m.
+  Proof.
+    unfold empty_sb, mem_flush; intros.
+    apply memT_eq; simpl; intros.
+    rewrite H; auto.
+    rewrite H; auto.
+  Qed.
+
+  Theorem empty_sb_mem_read : forall m tid,
+      empty_sb m ->
+      mem_read m tid = m.(MemValue).
+  Proof.
+    unfold empty_sb, mem_read; intros.
+    rewrite H; auto.
+  Qed.
+
 End TSOModel.
 
 Arguments mem_bg {T} m1 m2.
