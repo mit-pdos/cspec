@@ -9,7 +9,7 @@ import Interpreter
 
 -- Extracted code
 import ConcurProc
-import Example2
+import CounterExample
 
 
 run_thread :: State -> Coq_maybe_proc (TASOp__Coq_xopT a) -> IO ()

@@ -9,7 +9,7 @@ import GHC.Prim
 
 -- Extracted code
 import ConcurProc
-import Example2
+import CounterExample
 
 data State =
   S !(MVar ()) !(IORef Integer)

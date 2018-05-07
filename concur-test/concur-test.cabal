@@ -19,7 +19,7 @@ executable concur-test
                      , ConcurProc
                      , List
                      , Datatypes
-                     , Example2
+                     , CounterExample
                      , Nat
                      , Helpers
   default-language:    Haskell2010

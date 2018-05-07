@@ -5,9 +5,9 @@ Require Import ExtrHaskellNatInteger.
 
 Extraction Language Haskell.
 
-Require Import Mail2.MailServer.
-Require Import Mail2.MailFSStringAbsAPI.
-Require Import Mail2.MailServerAPI.
+Require Import Mail.MailServer.
+Require Import Mail.MailFSStringAbsAPI.
+Require Import Mail.MailServerAPI.
 
 Extract Inlined Constant encode_tid_fn => "Support.encode_tid_fn".
 Extract Inlined Constant decode_tid_fn => "Support.decode_tid_fn".
