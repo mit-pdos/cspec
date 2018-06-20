@@ -1,0 +1,37 @@
+Possible projects
+
+- Support spawn
+  need to reproof all core lemmas
+  modify mail server to spwan pop and smtp threads
+
+- Code gen
+  generate Go code for unfolded mailserver program
+  compare to our hand-written Go implementation (gomail)
+  Go instead of C, so we don't have to deal with low-level memory management
+
+- Less clunky horizontal composition
+  Maybe use objects + separation logic
+  Use it to have several locks
+
+- Crashes and concurrency
+  Modify exec to support crashes
+  Do layered recovery a la POCS
+  Have top-level crash-safety theorem for mail server
+
+- Lock-free data structures with TSO
+  look-free cache
+
+- Concurrent POSIX spec
+  Model open() isn't atomic
+  Slide fd layer under current bottom layer
+  Proof atomicity of pathname lookups in context of mail server
+  
+  Maybe a good base for scalable commutativity
+    proof implementation scales
+    Need memory model
+ 
+- Adopt for distributed systems
+  Maybe can generalize horizon composition
+
+- Mail server security
+  Use sfscq infrastructure for mail server
