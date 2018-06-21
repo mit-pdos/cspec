@@ -409,3 +409,44 @@ Ltac especialize H :=
 
 Ltac rename_by_type type name :=
   match goal with | x : type |- _ => rename x into name end.
+
+
+Ltac propositional :=
+  repeat match goal with
+         | |- forall _, _ => intros
+         | [ H: _ /\ _ |- _ ] => destruct H
+         | [ H: ?P -> _, H': ?P |- _ ] =>
+           match type of P with
+           | Prop => specialize (H H')
+           end
+         | [ H: forall x, x = _ -> _ |- _ ] =>
+           specialize (H _ eq_refl)
+         | [ H: forall x, _ = x -> _ |- _ ] =>
+           specialize (H _ eq_refl)
+         | [ H: exists (varname : _), _ |- _ ] =>
+           let newvar := fresh varname in
+           destruct H as [newvar ?]
+         | [ H: ?P |- ?P ] => exact H
+         | _ => progress subst
+         end.
+
+Ltac induct H :=
+  induction H; repeat sigT_eq; propositional.
+Ltac invert H :=
+  inversion H; repeat sigT_eq; propositional.
+
+Local Lemma abstract_away_helper : forall A (P: A -> Prop) (x y:A),
+    P y ->
+    y = x ->
+    P x.
+Proof.
+  intros; subst; auto.
+Qed.
+
+Ltac abstract_term t :=
+  match goal with
+  | |- ?g => let p := eval pattern t in g in
+               match p with
+               | ?P ?x => eapply (abstract_away_helper P)
+               end
+  end.

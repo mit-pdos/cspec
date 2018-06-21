@@ -394,22 +394,19 @@ Section Movers.
       repeat maybe_proc_inv.
       repeat exec_tid_inv.
 
-      eexists; split.
+      abstract_tr.
       eapply ExecPrefixOne with (tid := tid0).
         autorewrite with t in *; eauto.
         eauto.
         simpl. autorewrite with t. eauto.
-      simpl; eauto.
-
-      edestruct H; eauto; subst; simpl; eauto.
-
+      rewrite prepend_app; auto.
     + autorewrite with t in *.
       edestruct exec_tid_right_mover; intuition eauto.
       edestruct IHexec; eauto.
         rewrite thread_upd_upd_ne; eauto.
       intuition idtac.
 
-      eexists; split.
+      abstract_tr.
       eapply ExecPrefixOne with (tid := tid0).
         autorewrite with t; eauto.
         eauto.
@@ -434,7 +431,7 @@ Section Movers.
     eapply exec_left_mover with (P := any) in H2; eauto.
     repeat deex.
 
-    eexists; split.
+    abstract_tr.
     eapply ExecPrefixOne with (tid := tid).
       autorewrite with t; eauto.
       eauto.
@@ -465,7 +462,7 @@ Section Movers.
     eapply trace_incl_ts_s_proof_helper in H2.
     repeat deex.
 
-    eexists; split.
+    abstract_tr.
     eapply ExecPrefixOne with (tid := tid).
       autorewrite with t; eauto.
       eauto 10.
@@ -637,7 +634,7 @@ Section YSA.
     cut (exists tr' v1 s1 evs1,
       atomic_exec op_step (l v) tid s' v1 s1 evs1 /\
       exec_prefix op_step s1 ts [[ tid := Proc (rx v1) ]] tr' /\
-      trace_eq tr (prepend tid evs1 tr')); intros.
+      tr = (prepend tid evs1 tr')); intros.
     {
       repeat deex.
       eexists; split.
@@ -673,15 +670,13 @@ Section YSA.
       reflexivity.
 
       repeat deex.
-      do 4 eexists; intuition idtac.
+      descend; intuition idtac.
 
-      eauto.
-      eauto.
-      rewrite app_nil_l in *.
+      abstract_term evs1; eauto.
       eauto.
 
     - rewrite exec_equiv_ret_bind in H3.
-      do 4 eexists; intuition idtac.
+      descend; intuition idtac.
       eauto.
       eauto.
       eauto.

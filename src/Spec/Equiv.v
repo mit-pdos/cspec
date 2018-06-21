@@ -13,70 +13,6 @@ Global Set Implicit Arguments.
 Global Generalizable All Variables.
 
 
-(** Matching traces *)
-
-Definition trace_eq (t1 t2 : trace) :=
-  t1 = t2.
-
-Instance trace_eq_equiv :
-  Equivalence trace_eq.
-Proof.
-  split.
-  - firstorder.
-  - unfold trace_eq, Symmetric; intros.
-    symmetry; eauto.
-  - unfold trace_eq, Transitive; intros.
-    congruence.
-Qed.
-
-Lemma trace_eq_prepend : forall `(evs : list event) tr0 tr1 tid,
-  trace_eq tr0 tr1 ->
-  trace_eq (prepend tid evs tr0) (prepend tid evs tr1).
-Proof.
-  unfold trace_eq.
-  induction evs; simpl; intros; eauto.
-  destruct a; eauto.
-  erewrite IHevs; eauto.
-Qed.
-
-Hint Resolve trace_eq_prepend.
-
-
-Lemma trace_eq_prepend_empty : forall tid `(evs : list event) tr,
-  trace_eq (prepend tid evs tr) TraceEmpty ->
-  trace_eq (prepend tid evs TraceEmpty) TraceEmpty /\
-  trace_eq tr TraceEmpty.
-Proof.
-  unfold trace_eq; induction evs; simpl in *; intros.
-  - split; eauto.
-  - inversion H.
-Qed.
-
-Lemma trace_eq_prepend' : forall tr1 tr2 evs evs' tid,
-  trace_eq tr1 tr2 ->
-  trace_eq (prepend tid evs TraceEmpty) (prepend tid evs' TraceEmpty) ->
-  trace_eq (prepend tid evs tr1) (prepend tid evs' tr2).
-Proof.
-  induction evs; simpl in *; intros.
-  - induction evs'; simpl in *; intros; eauto.
-    inversion H0.
-  - induction evs'; simpl in *; intros; eauto.
-    * inversion H0.
-    * inversion H0; subst; eauto.
-      unfold trace_eq. cbn. f_equal.
-      rewrite IHevs; eauto.
-Qed.
-
-
-Lemma trace_eq_refl : forall tr,
-  trace_eq tr tr.
-Proof.
-  reflexivity.
-Qed.
-
-Hint Resolve trace_eq_refl.
-
-
 (** A strong notion of execution equivalence, independent of semantics *)
 
 Definition exec_equiv_ts {opT} (ts1 ts2 : @threads_state opT) :=
@@ -1061,8 +997,7 @@ Qed.
 Definition trace_incl_ts_s {opT State} op_step (s s' : State) (ts1 ts2 : @threads_state opT) :=
   forall tr,
     exec_prefix op_step s ts1 tr ->
-    exists tr', exec_prefix op_step s' ts2 tr' /\
-      trace_eq tr tr'.
+     exec_prefix op_step s' ts2 tr.
 
 Definition trace_incl_ts {opT State} op_step (ts1 ts2 : @threads_state opT) :=
   forall (s : State),
@@ -1072,8 +1007,7 @@ Definition trace_incl_ts_s_N n {opT State} op_step (s s' : State) (ts1 ts2 : @th
   forall tr n',
     n' <= n ->
     exec op_step s ts1 tr n' ->
-    exists tr', exec_prefix op_step s' ts2 tr' /\
-      trace_eq tr tr'.
+    exec_prefix op_step s' ts2 tr.
 
 Definition trace_incl_ts_N n {opT State} op_step (ts1 ts2 : @threads_state opT) :=
   forall (s : State),
@@ -1082,26 +1016,17 @@ Definition trace_incl_ts_N n {opT State} op_step (ts1 ts2 : @threads_state opT) 
 Instance trace_incl_ts_s_preorder :
   PreOrder (@trace_incl_ts_s opT State op_step s s).
 Proof.
-  split.
-  - unfold Reflexive.
-    unfold trace_incl_ts_s; intros.
-    eexists; intuition eauto.
-  - unfold Transitive.
-    unfold trace_incl_ts_s; intros.
-    eapply H in H1. deex.
-    eapply H0 in H1. deex.
-    eexists; intuition eauto.
-    etransitivity; eauto.
+  constructor; repeat (hnf; intros).
+  - unfold exec_prefix in *; propositional; eauto.
+  - unfold trace_incl_ts_s, exec_prefix in *; eauto 10.
 Qed.
 
 Instance trace_incl_ts_preorder :
   PreOrder (@trace_incl_ts opT State op_step).
 Proof.
-  split.
-  - unfold Reflexive, trace_incl_ts; intros.
-    reflexivity.
-  - unfold Transitive, trace_incl_ts; intros.
-    etransitivity; eauto.
+  constructor; hnf; intros.
+  - hnf; reflexivity.
+  - hnf; etransitivity; eauto.
 Qed.
 
 Instance exec_equiv_ts_to_trace_incl_ts :
@@ -1119,10 +1044,9 @@ Theorem trace_incl_ts_s_trans : forall `(s0 : State) s1 s2 `(op_step : OpSemanti
   trace_incl_ts_s op_step s0 s2 ts1 ts3.
 Proof.
   unfold trace_incl_ts_s; intros.
-  apply H in H1. deex.
-  apply H0 in H1. deex.
-  eexists; intuition eauto.
-  etransitivity; eauto.
+  apply H in H1.
+  apply H0 in H1.
+  intuition eauto.
 Qed.
 
 Instance trace_incl_ts_s_N_refl :
@@ -1130,7 +1054,7 @@ Instance trace_incl_ts_s_N_refl :
 Proof.
   unfold Reflexive.
   unfold trace_incl_ts_s_N; intros.
-  eexists; intuition eauto.
+  eauto.
 Qed.
 
 Instance trace_incl_ts_N_refl :
@@ -1280,12 +1204,10 @@ Proof.
   intros.
   intros p1 p2 H12 p3 p4 H34 H; subst.
   unfold trace_incl_s, trace_incl_ts_s; intros.
-  apply H12 in H0. deex.
-  apply H in H0. deex.
-  apply H34 in H0. deex.
-  eexists; split.
+  apply H12 in H0.
+  apply H in H0.
+  apply H34 in H0.
   eauto.
-  repeat ( etransitivity; eauto ).
 Qed.
 
 Instance trace_incl_s_proper_flip :
@@ -1296,12 +1218,10 @@ Proof.
   intros.
   intros p1 p2 H12 p3 p4 H34 H; subst.
   unfold trace_incl_s, trace_incl_ts_s; intros.
-  apply H12 in H0. deex.
-  apply H in H0. deex.
-  apply H34 in H0. deex.
-  eexists; split.
+  apply H12 in H0.
+  apply H in H0.
+  apply H34 in H0.
   eauto.
-  repeat ( etransitivity; eauto ).
 Qed.
 
 Instance trace_incl_exec_equiv_proper :
@@ -1315,14 +1235,12 @@ Proof.
            trace_incl_ts, trace_incl_ts_s; intros.
     apply H in H2.
     apply H1 in H2.
-    deex.
     apply H0 in H2.
     eauto.
   - unfold trace_incl, trace_incl_opt,
            trace_incl_ts, trace_incl_ts_s; intros.
     apply H in H2.
     apply H1 in H2.
-    deex.
     apply H0 in H2.
     eauto.
 Qed.
@@ -1338,13 +1256,11 @@ Proof.
   - unfold trace_incl_s, trace_incl_ts_s; intros.
     apply H in H2.
     apply H1 in H2.
-    deex.
     apply H0 in H2.
     eauto.
   - unfold trace_incl_s, trace_incl_ts_s; intros.
     apply H in H2.
     apply H1 in H2.
-    deex.
     apply H0 in H2.
     eauto.
 Qed.
@@ -1382,9 +1298,7 @@ Lemma trace_incl_ts_s_proof_helper :
                                  | inl _ => NoProc
                                  | inr p' => Proc p'
                                  end]]) tr ->
-    exists tr',
-      exec_prefix op_step s0 ts [[tid := Proc p2]] tr' /\
-      trace_eq (prepend tid evs tr) tr') ->
+      exec_prefix op_step s0 ts [[tid := Proc p2]] (prepend tid evs tr)) ->
   trace_incl_ts_s op_step s s
     (ts [[ tid := Proc p1 ]])
     (ts [[ tid := Proc p2 ]]).
@@ -1410,13 +1324,11 @@ Proof.
     * rewrite thread_upd_upd_ne; eauto.
     * intuition idtac.
       autorewrite with t in *.
-      eexists; split.
 
       eapply ExecPrefixOne with (tid := tid0).
         autorewrite with t; eauto.
         eauto.
         rewrite thread_upd_upd_ne; eauto.
-      eauto.
 Grab Existential Variables.
   all: exact tt.
 Qed.
@@ -1429,9 +1341,7 @@ Lemma trace_incl_proof_helper :
                                  | inl _ => NoProc
                                  | inr p' => Proc p'
                                  end]]) tr ->
-    exists tr',
-      exec_prefix op_step s ts [[tid := Proc p2]] tr' /\
-      trace_eq (prepend tid evs tr) tr') ->
+      exec_prefix op_step s ts [[tid := Proc p2]] (prepend tid evs tr)) ->
   trace_incl op_step
     p1 p2.
 Proof.
@@ -1453,7 +1363,7 @@ Lemma trace_incl_s_proof_helper :
                                  end]]) tr ->
     exists tr',
       exec_prefix op_step s0 ts [[tid := Proc p2]] tr' /\
-      trace_eq (prepend tid evs tr) tr') ->
+      prepend tid evs tr = tr') ->
   trace_incl_s s tid op_step
     p1 p2.
 Proof.
@@ -1461,7 +1371,9 @@ Proof.
   intros.
 
   eapply trace_incl_ts_s_proof_helper.
-  eauto.
+  intros.
+  eapply H in H2; eauto.
+  propositional; auto.
 Qed.
 
 Theorem trace_incl_op :
@@ -1474,15 +1386,16 @@ Proof.
   eapply trace_incl_proof_helper; intros.
   repeat exec_tid_inv.
 
-  eexists; split.
-
   eapply ExecPrefixOne with (tid := tid).
     autorewrite with t; eauto.
     eauto 20.
     autorewrite with t; eauto.
-
-  simpl; eauto.
 Qed.
+
+Ltac abstract_tr :=
+  match goal with
+  | |- exec_prefix _ _ _ ?tr => abstract_term tr
+  end.
 
 Theorem trace_incl_atomize_ret_l :
   forall `(f : T1 -> T2)
@@ -1498,8 +1411,7 @@ Proof.
   repeat exec_tid_inv.
 
   eapply trace_incl_ts_s_proof_helper in H0.
-  deex.
-  eexists; split.
+  abstract_tr.
   eapply ExecPrefixOne with (tid := tid).
     autorewrite with t; eauto.
     eauto.
@@ -1538,34 +1450,28 @@ Proof.
     * edestruct H; eauto.
       intuition idtac.
 
-      eexists; split.
       eapply ExecPrefixOne with (tid := tid).
         autorewrite with t; eauto.
         eauto.
         autorewrite with t; eauto.
-      eauto.
 
     * edestruct IHexec; eauto.
       intuition idtac.
 
-      eexists; split.
       eapply ExecPrefixOne with (tid := tid).
         autorewrite with t; eauto.
         eauto.
         autorewrite with t; eauto.
-      eauto.
 
   + edestruct IHexec.
     rewrite thread_upd_upd_ne; eauto.
     intuition idtac.
 
     autorewrite with t in *.
-    eexists; split.
     eapply ExecPrefixOne with (tid := tid0).
       autorewrite with t; eauto.
       eauto.
       rewrite thread_upd_upd_ne; eauto.
-    eauto.
 Qed.
 
 Theorem trace_incl_s_bind_a : forall `(p : proc opT T) `(p2 : T -> proc _ T') p2' `(op_step : OpSemantics opT State) s tid,
@@ -1595,22 +1501,18 @@ Proof.
     * edestruct H2; eauto.
       intuition idtac.
 
-      eexists; split.
       eapply ExecPrefixOne with (tid := tid).
         autorewrite with t; eauto.
         eauto.
         autorewrite with t; eauto.
-      eauto.
 
     * edestruct IHexec; eauto.
       intuition idtac.
 
-      eexists; split.
       eapply ExecPrefixOne with (tid := tid).
         autorewrite with t; eauto.
         eauto.
         autorewrite with t; eauto.
-      eauto.
 
   + edestruct IHexec.
     eauto.
@@ -1618,12 +1520,10 @@ Proof.
     intuition idtac.
 
     autorewrite with t in *.
-    eexists; split.
     eapply ExecPrefixOne with (tid := tid0).
       autorewrite with t; eauto.
       eauto.
       rewrite thread_upd_upd_ne; eauto.
-    eauto.
 
 Grab Existential Variables.
   all: exact tt.
@@ -1656,24 +1556,20 @@ Proof.
       omega.
       intuition idtac.
 
-      eexists; split.
       eapply ExecPrefixOne with (tid := tid).
         autorewrite with t; eauto.
         eauto.
         autorewrite with t; eauto.
-      eauto.
 
     * edestruct IHexec.
       2: eauto.
       omega.
       intuition idtac.
 
-      eexists; split.
       eapply ExecPrefixOne with (tid := tid).
         autorewrite with t; eauto.
         eauto.
         autorewrite with t; eauto.
-      eauto.
 
   + edestruct IHexec.
     omega.
@@ -1681,12 +1577,10 @@ Proof.
     intuition idtac.
 
     autorewrite with t in *.
-    eexists; split.
     eapply ExecPrefixOne with (tid := tid0).
       autorewrite with t; eauto.
       eauto.
       rewrite thread_upd_upd_ne; eauto.
-    eauto.
 Qed.
 
 Instance trace_incl_opt_N_refl :
@@ -1753,10 +1647,10 @@ Proof.
   - unfold Transitive; intros.
     unfold trace_incl_rx in *; intros.
     repeat ( intro; intros ).
-    eapply H with (n := n') in H4; try omega. repeat deex.
+    eapply H with (n := n') in H4; try omega.
     destruct H4.
-    eapply H0 with (n := x0) in H4; try omega. repeat deex.
-    eexists; intuition eauto. etransitivity; eauto.
+    eapply H0 with (n := x0) in H4; try omega.
+    eauto.
     2: intros; reflexivity.
     reflexivity. reflexivity.
     reflexivity. 2: reflexivity.
@@ -1790,8 +1684,7 @@ Proof.
   repeat exec_tid_inv.
   atomic_exec_inv.
 
-  eexists; intuition idtac.
-
+  abstract_tr.
   eapply ExecPrefixOne with (tid := tid).
     autorewrite with t; eauto.
     eauto.
@@ -1801,7 +1694,6 @@ Proof.
     autorewrite with t; eauto.
     eauto.
     autorewrite with t.
-
   eauto.
 
   rewrite prepend_app. eauto.
@@ -1819,8 +1711,6 @@ Proof.
   eapply trace_incl_proof_helper; intros.
   repeat exec_tid_inv.
 
-  eexists; intuition idtac.
-
   generalize dependent p2.
   generalize dependent tr.
 
@@ -1829,18 +1719,16 @@ Proof.
     induction H; intros; subst
   end.
 
+  all: abstract_tr.
   all: try solve [ eapply ExecPrefixOne with (tid := tid);
-      [ autorewrite with t; eauto
-      | eauto
-      | autorewrite with t; eauto ] ].
+                     [ autorewrite with t; eauto
+                     | eauto
+                     | autorewrite with t; eauto ];
+                     eauto ].
+  all: try reflexivity.
 
   rewrite prepend_app.
-  apply exec_equiv_norx_bind_bind.
-  eauto.
-
-  rewrite exec_equiv_until.
-  eauto.
-
+  rewrite exec_equiv_norx_bind_bind.
   eauto.
 Qed.
 
@@ -1873,24 +1761,19 @@ Proof.
   * repeat maybe_proc_inv.
     repeat exec_tid_inv.
     eapply H in H3; try omega.
-    deex.
-    eexists; intuition idtac.
     eapply ExecPrefixOne with (tid := tid).
       autorewrite with t; eauto.
       eauto.
       autorewrite with t; eauto.
-    eauto.
 
   * edestruct IHexec.
       omega.
       rewrite thread_upd_upd_ne; eauto.
 
-    eexists; intuition idtac.
     eapply ExecPrefixOne with (tid := tid0).
       rewrite thread_upd_ne in * by auto. eauto.
       eauto.
     rewrite thread_upd_upd_ne by eauto.
-    eassumption.
     eauto.
 Qed.
 
@@ -1940,9 +1823,7 @@ Proof.
         H' : forall _, trace_incl_rx_N _ _ _ _ |- _ =>
         eapply H' in H; try omega
       end.
-      deex.
 
-      eexists; intuition idtac.
       eapply ExecPrefixOne with (tid := tid).
         autorewrite with t; eauto.
         eauto.
@@ -1950,7 +1831,6 @@ Proof.
         unfold until1.
         rewrite exec_equiv_bind_bind.
         eassumption.
-      eauto.
 
       3: reflexivity.
       omega.
@@ -1974,13 +1854,10 @@ Proof.
         3: reflexivity. omega.
         intros. eapply trace_incl_N_le; eauto; omega.
 
-      eexists; intuition idtac.
-
       eapply ExecPrefixOne with (tid := tid0).
         autorewrite with t; eauto.
         eassumption.
-        rewrite thread_upd_upd_ne by eauto; eassumption.
-      eauto.
+        rewrite thread_upd_upd_ne by eauto; eauto.
 Qed.
 
 Theorem trace_incl_rx_until :
@@ -2023,11 +1900,9 @@ Proof.
   repeat ( intro; intros ).
   assert (trace_incl_rx op_step p1 p1) by reflexivity.
   eapply H4 in H3; [ | reflexivity | eassumption | omega ].
-  deex.
   edestruct H; try eassumption.
   eexists; intuition idtac.
   eassumption.
-  etransitivity; eauto.
 Qed.
 
 
@@ -2038,9 +1913,7 @@ Definition traces_match_ts {opLoT opMidT State} lo_step hi_step
                            (ts2 : @threads_state opMidT) :=
   forall (s : State) tr1,
     exec_prefix lo_step s ts1 tr1 ->
-    exists tr2,
-      exec_prefix hi_step s ts2 tr2 /\
-      trace_eq tr1 tr2.
+      exec_prefix hi_step s ts2 tr1.
 
 Instance traces_match_ts_proper :
   Proper (@trace_incl_ts opLoT State lo_step ==>
@@ -2053,14 +1926,10 @@ Proof.
   intros ts2 ts2' H2.
   unfold Basics.flip, Basics.impl.
   unfold traces_match_ts; intros.
-  apply H1 in H0. deex.
-  apply H in H0. deex.
+  apply H1 in H0.
+  apply H in H0.
   apply H2 in H0.
-  eexists; split. eauto.
-  unfold trace_eq.
-  rewrite <- H4.
-  rewrite H3.
-  reflexivity.
+  eauto.
 Qed.
 
 

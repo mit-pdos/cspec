@@ -265,6 +265,19 @@ Section Compiler.
 
   Variable compile_is_correct : compile_correct.
 
+  (* TODO: move this near traces/prepend *)
+  Lemma prepend_empty_eq : forall tid evs evs',
+      prepend tid evs TraceEmpty = prepend tid evs' TraceEmpty ->
+      evs = evs'.
+  Proof.
+    intros.
+    generalize dependent evs'.
+    induct evs.
+    - destruct evs'; simpl in *; congruence.
+    - destruct evs'; simpl in *; try congruence.
+      invert H.
+      f_equal; eauto.
+  Qed.
 
   Lemma atomic_compile_ok_exec_tid : forall T (p1 : proc _ T) p2,
     atomic_compile_ok p1 p2 ->
@@ -272,7 +285,7 @@ Section Compiler.
       exec_tid lo_step tid s p1 s' result evs ->
       exists result' evs',
         exec_tid hi_step tid s p2 s' result' evs' /\
-        trace_eq (prepend tid evs TraceEmpty) (prepend tid evs' TraceEmpty) /\
+        evs = evs' /\
         match result with
         | inl v => match result' with
           | inl v' => v = v'
@@ -293,15 +306,12 @@ Section Compiler.
 
     - edestruct IHexec_tid; eauto; repeat deex.
       do 2 eexists; intuition idtac.
-
-      constructor; eauto.
       eauto.
 
-      destruct result; destruct x; try solve [ exfalso; eauto ];
+      destruct result, x; try solve [ exfalso; eauto ];
         subst; eauto.
 
     - do 2 eexists; intuition idtac.
-        eauto.
         eauto.
         simpl.
 
@@ -330,15 +340,12 @@ Section Compiler.
 
       edestruct IHexec.
       shelve.
-      intuition idtac.
 
-      eexists; split.
       eapply ExecPrefixOne with (tid := tid).
         eauto.
         eauto.
         eauto.
 
-      eapply trace_eq_prepend'; eauto.
       Unshelve.
 
       destruct result, x; simpl in *; try solve [ exfalso; eauto ].

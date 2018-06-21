@@ -30,9 +30,7 @@ Section TraceAbs.
       initP sl ->
       exec_prefix lo_step sl ts1 tr1 ->
       absR sl sm ->
-      exists tr2,
-        exec_prefix mid_step sm ts2 tr2 /\
-        trace_eq tr1 tr2.
+      exec_prefix mid_step sm ts2 tr1.
 
 End TraceAbs.
 
@@ -183,9 +181,7 @@ Module LayerImplAbs
       traces_match_abs absR s1.initP l1.step l2.step (compile_ts ts) ts.
   Proof.
     unfold compile_ts, traces_match_abs; intros.
-    eexists; intuition idtac.
     eapply trace_incl_abs; eauto.
-    eauto.
   Qed.
 
 End LayerImplAbs.
@@ -422,14 +418,12 @@ Module LayerImplMoversProtocol
       eapply a.raw_step_ok; eauto.
       destruct result; eauto.
 
-    eexists; intuition idtac.
     eapply ExecPrefixOne.
       eauto.
       eapply exec_tid_step_impl.
       intros; apply a.raw_step_ok; eauto.
       eapply follows_protocol_preserves_exec_tid'; eauto.
       eauto.
-    eauto.
   Qed.
 
   Theorem compile_traces_match :
@@ -452,10 +446,9 @@ Module LayerImplMoversProtocol
     edestruct compile_traces_match_l1.
       eassumption.
       eassumption.
-      eassumption.
+      eauto.
       reflexivity.
     eexists; intuition eauto.
-    etransitivity; eauto.
   Qed.
 
 End LayerImplMoversProtocol.
@@ -561,8 +554,6 @@ Module Link
     edestruct x.compile_traces_match; intuition eauto.
       eapply y.compile_ts_no_atomics; eauto.
     edestruct y.compile_traces_match; intuition eauto.
-    eexists; intuition eauto.
-    etransitivity; eauto.
   Qed.
 
 End Link.
@@ -614,8 +605,6 @@ Module LinkWithRule
       eapply y.compile_ts_follows_protocol; eauto.
       eapply y.compile_ts_no_atomics; eauto.
     edestruct y.compile_traces_match; intuition eauto.
-    eexists; intuition eauto.
-    etransitivity; eauto.
   Qed.
 
 End LinkWithRule.
