@@ -4,6 +4,7 @@ Require Import RelationClasses.
 Require Import Morphisms.
 Require Import Helpers.Helpers.
 Require Import Helpers.ListStuff.
+Require Import Helpers.FinMap.
 Require Import List.
 Require Import Omega.
 
@@ -42,41 +43,6 @@ Proof.
     split; intros.
     + apply H0. apply H. eauto.
     + apply H. apply H0. eauto.
-Qed.
-
-Theorem exec_equiv_ts_app_None : forall `(ts : @threads_state opT),
-  exec_equiv_ts ts (ts ++ [NoProc]).
-Proof.
-  split; intros;
-    unfold exec_prefix in *; repeat deex; exists n.
-  - induction H.
-    + eapply ExecOne with (tid := tid); eauto.
-      eapply thread_get_app_NoProc in H; eauto.
-      erewrite <- thread_upd_app_NoProc; eauto.
-    + eapply ExecExpired.
-  - remember (ts ++ [NoProc]); generalize dependent ts;
-      induction H; intros; subst.
-    + eapply ExecOne with (tid := tid); eauto.
-      eapply thread_get_app_NoProc; eauto.
-      eapply IHexec.
-      erewrite thread_upd_app_NoProc; eauto.
-      eapply thread_get_app_NoProc in H. eauto.
-    + eapply ExecExpired.
-Qed.
-
-Theorem exec_equiv_ts_pad : forall n `(ts : @threads_state opT),
-  exec_equiv_ts ts (pad ts n NoProc).
-Proof.
-  intros.
-  rewrite pad_is_append.
-  generalize (n - length ts); intros.
-  rewrite <- rev_repeat.
-  induction n0; simpl.
-  - rewrite app_nil_r. reflexivity.
-  - rewrite app_assoc.
-    etransitivity.
-    2: eapply exec_equiv_ts_app_None.
-    eauto.
 Qed.
 
 Instance exec_equiv_opt_equivalence :
@@ -162,14 +128,14 @@ Proof.
       repeat exec_tid_inv.
       simpl. eauto.
 
-    * rewrite thread_upd_upd_ne in * by eauto.
+    * rewrite thread_upd_ne_comm in * by eauto.
       edestruct IHexec. eauto.
 
       eexists.
       eapply ExecOne with (tid := tid0).
         rewrite thread_upd_ne in * by auto. eauto.
         eauto.
-      rewrite thread_upd_upd_ne by auto.
+      rewrite thread_upd_ne_comm by auto.
       eauto.
 
   - replace tr with (prepend tid nil tr) by reflexivity.
@@ -224,13 +190,13 @@ Proof.
         eauto.
       }
 
-    * rewrite thread_upd_upd_ne in * by eauto.
+    * rewrite thread_upd_ne_comm in * by eauto.
       edestruct IHexec; eauto.
       eexists.
       eapply ExecOne with (tid := tid0).
         rewrite thread_upd_ne in * by auto. eauto.
         eauto.
-      rewrite thread_upd_upd_ne by auto.
+      rewrite thread_upd_ne_comm by auto.
       eauto.
 
   - match goal with
@@ -269,13 +235,13 @@ Proof.
         eauto.
       }
 
-    * rewrite thread_upd_upd_ne in * by eauto.
+    * rewrite thread_upd_ne_comm in * by eauto.
       edestruct IHexec; eauto.
       eexists.
       eapply ExecOne with (tid := tid0).
         rewrite thread_upd_ne in * by auto. eauto.
         eauto.
-      rewrite thread_upd_upd_ne by auto.
+      rewrite thread_upd_ne_comm by auto.
       eauto.
 Qed.
 
@@ -319,9 +285,9 @@ Proof.
     * eapply ExecPrefixOne with (tid := tid0).
         rewrite thread_upd_ne in * by auto. eauto.
         eauto.
-      rewrite thread_upd_upd_ne by eauto.
+      rewrite thread_upd_ne_comm by eauto.
       eapply IHexec.
-      rewrite thread_upd_upd_ne; eauto.
+      rewrite thread_upd_ne_comm; eauto.
 
   - match goal with
     | H : exec_prefix _ _ (thread_upd ?ts ?tid (Proc ?p)) _ |- _ =>
@@ -336,9 +302,9 @@ Proof.
     * eapply ExecPrefixOne with (tid := tid0).
         autorewrite with t in *; eauto.
         eauto.
-        rewrite thread_upd_upd_ne by eauto.
+        rewrite thread_upd_ne_comm by eauto.
       eapply IHexec.
-      rewrite thread_upd_upd_ne; auto.
+      rewrite thread_upd_ne_comm; auto.
 Qed.
 
 Theorem exec_equiv_ret_bind : forall `(v : T) `(p : T -> proc opT T'),
@@ -428,9 +394,9 @@ Proof.
     * eapply ExecPrefixOne with (tid := tid0).
         autorewrite with t in *; eauto.
         eauto.
-      rewrite thread_upd_upd_ne by auto.
+      rewrite thread_upd_ne_comm by auto.
       eapply IHexec.
-      rewrite thread_upd_upd_ne; eauto.
+      rewrite thread_upd_ne_comm; eauto.
 
   - match goal with
     | H : exec_prefix _ _ (thread_upd ?ts ?tid (Proc ?p)) _ |- _ =>
@@ -454,11 +420,11 @@ Proof.
 
       destruct result; eauto.
 
-    * rewrite thread_upd_upd_ne in * by eauto.
+    * rewrite thread_upd_ne_comm in * by eauto.
       eapply ExecPrefixOne with (tid := tid0).
         rewrite thread_upd_ne in * by auto. eauto.
         eauto.
-      rewrite thread_upd_upd_ne by auto.
+      rewrite thread_upd_ne_comm by auto.
       eauto.
 Qed.
 
@@ -499,9 +465,9 @@ Proof.
     * eapply ExecPrefixOne with (tid := tid0).
         autorewrite with t in *; eauto.
         eauto.
-      rewrite thread_upd_upd_ne by auto.
+      rewrite thread_upd_ne_comm by auto.
       eapply IHexec.
-      rewrite thread_upd_upd_ne; eauto.
+      rewrite thread_upd_ne_comm; eauto.
 
   - match goal with
     | H : exec_prefix _ _ (thread_upd ?ts ?tid (Proc ?pp)) _ |- _ =>
@@ -527,9 +493,9 @@ Proof.
     * eapply ExecPrefixOne with (tid := tid0).
         autorewrite with t in *; eauto.
         eauto.
-      rewrite thread_upd_upd_ne by auto.
+      rewrite thread_upd_ne_comm by auto.
       eapply IHexec.
-      rewrite thread_upd_upd_ne; eauto.
+      rewrite thread_upd_ne_comm; eauto.
 Qed.
 
 Theorem exec_equiv_bind_bind' : forall `(p1 : proc opT T1) `(p2 : T1 -> proc _ T2) `(p3 : T1 -> T2 -> proc _ T3),
@@ -599,12 +565,8 @@ Theorem exec_equiv_ts_upd_same : forall `(ts : @threads_state opT) p tid,
   ts [[ tid ]] = p ->
   exec_equiv_ts ts (ts [[ tid := p ]]).
 Proof.
-  destruct p; intros.
-  - rewrite thread_upd_same by eauto. reflexivity.
-  - destruct (lt_dec tid (length ts)).
-    + rewrite thread_upd_same' by eauto. reflexivity.
-    + rewrite thread_upd_same'' by omega.
-      eapply exec_equiv_ts_pad.
+  intros.
+  autorewrite with t; reflexivity.
 Qed.
 
 Instance exec_prefix_proper_exec_equiv :
@@ -731,9 +693,9 @@ Proof.
     * eapply ExecOne with (tid := tid0).
         autorewrite with t in *; eauto.
         eauto.
-      rewrite thread_upd_upd_ne by auto.
+      rewrite thread_upd_ne_comm by auto.
       eapply IHexec.
-      rewrite thread_upd_upd_ne; eauto.
+      rewrite thread_upd_ne_comm; eauto.
 
   - match goal with
     | H : exec _ _ (thread_upd ?ts ?tid (Proc ?p)) _ _ |- _ =>
@@ -755,11 +717,11 @@ Proof.
 
       destruct result0; eauto.
 
-    * rewrite thread_upd_upd_ne in * by eauto.
+    * rewrite thread_upd_ne_comm in * by eauto.
       eapply ExecOne with (tid := tid0).
         rewrite thread_upd_ne in * by auto. eauto.
         eauto.
-      rewrite thread_upd_upd_ne by auto.
+      rewrite thread_upd_ne_comm by auto.
       eauto.
 Qed.
 
@@ -791,9 +753,9 @@ Proof.
     * eapply ExecOne with (tid := tid0).
         autorewrite with t in *; eauto.
         eauto.
-      rewrite thread_upd_upd_ne by auto.
+      rewrite thread_upd_ne_comm by auto.
       eapply IHexec.
-      rewrite thread_upd_upd_ne; eauto.
+      rewrite thread_upd_ne_comm; eauto.
 
   - match goal with
     | H : exec _ _ (thread_upd ?ts ?tid (Proc ?p)) _ _ |- _ =>
@@ -816,11 +778,11 @@ Proof.
 
       destruct result; eauto.
 
-    * rewrite thread_upd_upd_ne in * by eauto.
+    * rewrite thread_upd_ne_comm in * by eauto.
       eapply ExecOne with (tid := tid0).
         rewrite thread_upd_ne in * by auto. eauto.
         eauto.
-      rewrite thread_upd_upd_ne by auto.
+      rewrite thread_upd_ne_comm by auto.
       eauto.
 Qed.
 
@@ -1294,14 +1256,14 @@ Proof.
 
   + edestruct IHexec.
     * eauto.
-    * rewrite thread_upd_upd_ne; eauto.
+    * rewrite thread_upd_ne_comm; eauto.
     * intuition idtac.
       autorewrite with t in *.
 
       eapply ExecPrefixOne with (tid := tid0).
         autorewrite with t; eauto.
         eauto.
-        rewrite thread_upd_upd_ne; eauto.
+        rewrite thread_upd_ne_comm; eauto.
 Grab Existential Variables.
   all: exact tt.
 Qed.
@@ -1437,14 +1399,14 @@ Proof.
         autorewrite with t; eauto.
 
   + edestruct IHexec.
-    rewrite thread_upd_upd_ne; eauto.
+    rewrite thread_upd_ne_comm; eauto.
     intuition idtac.
 
     autorewrite with t in *.
     eapply ExecPrefixOne with (tid := tid0).
       autorewrite with t; eauto.
       eauto.
-      rewrite thread_upd_upd_ne; eauto.
+      rewrite thread_upd_ne_comm; eauto.
 Qed.
 
 Theorem trace_incl_s_bind_a : forall `(p : proc opT T) `(p2 : T -> proc _ T') p2' `(op_step : OpSemantics opT State) s tid,
@@ -1489,14 +1451,14 @@ Proof.
 
   + edestruct IHexec.
     eauto.
-    rewrite thread_upd_upd_ne; eauto.
+    rewrite thread_upd_ne_comm; eauto.
     intuition idtac.
 
     autorewrite with t in *.
     eapply ExecPrefixOne with (tid := tid0).
       autorewrite with t; eauto.
       eauto.
-      rewrite thread_upd_upd_ne; eauto.
+      rewrite thread_upd_ne_comm; eauto.
 
 Grab Existential Variables.
   all: exact tt.
@@ -1546,14 +1508,14 @@ Proof.
 
   + edestruct IHexec.
     omega.
-    rewrite thread_upd_upd_ne; eauto.
+    rewrite thread_upd_ne_comm; eauto.
     intuition idtac.
 
     autorewrite with t in *.
     eapply ExecPrefixOne with (tid := tid0).
       autorewrite with t; eauto.
       eauto.
-      rewrite thread_upd_upd_ne; eauto.
+      rewrite thread_upd_ne_comm; eauto.
 Qed.
 
 Instance trace_incl_opt_N_refl :
@@ -1741,12 +1703,12 @@ Proof.
 
   * edestruct IHexec.
       omega.
-      rewrite thread_upd_upd_ne; eauto.
+      rewrite thread_upd_ne_comm; eauto.
 
     eapply ExecPrefixOne with (tid := tid0).
       rewrite thread_upd_ne in * by auto. eauto.
       eauto.
-    rewrite thread_upd_upd_ne by eauto.
+    rewrite thread_upd_ne_comm by eauto.
     eauto.
 Qed.
 
@@ -1823,14 +1785,14 @@ Proof.
 
     + edestruct IHn.
         intros. eapply trace_incl_rx_N_le; eauto; omega.
-        4: rewrite thread_upd_upd_ne in H6 by eauto; eassumption.
+        4: rewrite thread_upd_ne_comm in H6 by eauto; eassumption.
         3: reflexivity. omega.
         intros. eapply trace_incl_N_le; eauto; omega.
 
       eapply ExecPrefixOne with (tid := tid0).
         autorewrite with t; eauto.
         eassumption.
-        rewrite thread_upd_upd_ne by eauto; eauto.
+        rewrite thread_upd_ne_comm by eauto; eauto.
 Qed.
 
 Theorem trace_incl_rx_until :
@@ -1903,225 +1865,4 @@ Proof.
   apply H in H0.
   apply H2 in H0.
   eauto.
-Qed.
-
-
-(** Helpers for connecting different [threads_state]s *)
-
-Definition proc_match `(R : forall T, proc opT T -> proc opT' T -> Prop)
-                      `(ts1 : @threads_state opT)
-                      `(ts2 : @threads_state opT') :=
-  length ts1 = length ts2 /\
-  forall tid,
-    (ts1 [[ tid ]] = NoProc /\ ts2 [[ tid ]] = NoProc) \/
-    exists T (p1 : proc _ T) p2,
-    ts1 [[ tid ]] = Proc p1 /\ ts2 [[ tid ]] = Proc p2 /\ R T p1 p2.
-
-Lemma proc_match_del : forall `(ts1 : @threads_state opT)
-                              `(ts2 : @threads_state opT') R tid,
-  proc_match R ts1 ts2 ->
-  proc_match R (ts1 [[ tid := NoProc ]]) (ts2 [[ tid := NoProc ]]).
-Proof.
-  unfold proc_match; intros.
-  intuition idtac.
-  - repeat rewrite length_thread_upd.
-    congruence.
-  - specialize (H1 tid0).
-    destruct (tid == tid0); subst.
-    + repeat rewrite thread_upd_eq; intuition eauto.
-    + repeat rewrite thread_upd_ne by auto. intuition eauto.
-Qed.
-
-Lemma proc_match_upd : forall `(ts1 : @threads_state opT)
-                              `(ts2 : @threads_state opT') R tid
-                              T (p1 : proc _ T) p2,
-  proc_match R ts1 ts2 ->
-  R _ p1 p2 ->
-  proc_match R (ts1 [[ tid := Proc p1 ]]) (ts2 [[ tid := Proc p2 ]]).
-Proof.
-  unfold proc_match; intros.
-  intuition idtac.
-  - repeat rewrite length_thread_upd.
-    congruence.
-  - specialize (H2 tid0).
-    destruct (tid == tid0); subst.
-    + repeat rewrite thread_upd_eq.
-      right.
-      do 3 eexists.
-      intuition eauto.
-    + repeat rewrite thread_upd_ne by auto. intuition eauto.
-Qed.
-
-Lemma proc_match_nil : forall `(R : forall T, proc opT T -> proc opT' T -> Prop),
-  proc_match R nil nil.
-Proof.
-  unfold proc_match; intros.
-  intuition eauto.
-  left.
-  repeat rewrite thread_get_nil; eauto.
-Qed.
-
-Lemma proc_match_cons_Proc : forall `(ts1 : @threads_state opT)
-                                    `(ts2 : @threads_state opT') R
-                                    T (p1 : proc _ T) p2,
-  proc_match R ts1 ts2 ->
-  R _ p1 p2 ->
-  proc_match R (Proc p1 :: ts1) (Proc p2 :: ts2).
-Proof.
-  unfold proc_match; intros.
-  intuition idtac.
-  - simpl; omega.
-  - destruct tid.
-    + right. do 3 eexists. intuition eauto.
-    + repeat rewrite thread_get_S. eauto.
-Qed.
-
-Lemma proc_match_cons_NoProc : forall `(ts1 : @threads_state opT)
-                                      `(ts2 : @threads_state opT') R,
-  proc_match R ts1 ts2 ->
-  proc_match R (NoProc :: ts1) (NoProc :: ts2).
-Proof.
-  unfold proc_match; intros.
-  intuition idtac.
-  - simpl; omega.
-  - destruct tid.
-    + left. intuition eauto.
-    + repeat rewrite thread_get_S. eauto.
-Qed.
-
-Lemma proc_match_cons_inv : forall `(ts1 : @threads_state opT)
-                                   `(ts2 : @threads_state opT') R
-                                   v1 v2,
-  proc_match R (v1 :: ts1) (v2 :: ts2) ->
-  proc_match R ts1 ts2 /\
-  (v1 = NoProc /\ v2 = NoProc \/
-   exists T (p1 : proc _ T) p2,
-   v1 = Proc p1 /\ v2 = Proc p2 /\ R T p1 p2).
-Proof.
-  unfold proc_match; simpl; intros.
-  intuition idtac; try omega.
-  - specialize (H1 (S tid)).
-    repeat rewrite thread_get_S in H1.
-    eauto.
-  - specialize (H1 0).
-    repeat rewrite thread_get_0 in H1.
-    eauto.
-Qed.
-
-Definition proc_match_upto n `(R : forall T, proc opT T -> proc opT T -> Prop)
-                             (ts1 ts2 : @threads_state opT) :=
-  length ts1 = length ts2 /\
-  forall tid,
-    (tid < n ->
-     (ts1 [[ tid ]] = NoProc /\ ts2 [[ tid ]] = NoProc) \/
-     exists T (p1 : proc _ T) p2,
-     ts1 [[ tid ]] = Proc p1 /\ ts2 [[ tid ]] = Proc p2 /\ R T p1 p2) /\
-    (tid >= n ->
-     ts1 [[ tid ]] = ts2 [[ tid ]]).
-
-Theorem proc_match_upto_0_eq : forall `(ts1 : @threads_state opT) ts2 R,
-  proc_match_upto 0 R ts1 ts2 ->
-  ts1 = ts2.
-Proof.
-  unfold proc_match_upto;
-    induction ts1.
-  - destruct ts2; simpl in *; intuition eauto. congruence.
-  - destruct ts2; simpl in *; intuition eauto. congruence.
-    f_equal.
-    + specialize (H1 0); intuition idtac.
-      rewrite thread_get_0 in H2.
-      rewrite thread_get_0 in H2.
-      eauto.
-    + apply IHts1 with (R := R); intuition.
-      omega.
-      specialize (H1 (S tid)); intuition idtac.
-      apply H3. eauto.
-Qed.
-
-Theorem proc_match_upto_0 : forall `(ts : @threads_state opT) R,
-  proc_match_upto 0 R ts ts.
-Proof.
-  unfold proc_match_upto; intros.
-  intuition idtac.
-  omega.
-Qed.
-
-Theorem proc_match_upto_all : forall `(ts : @threads_state opT) ts' R,
-  proc_match_upto (length ts) R ts ts' <->
-  proc_match R ts ts'.
-Proof.
-  unfold proc_match_upto, proc_match; split; intros.
-  - intuition idtac.
-    specialize (H1 tid); intuition idtac.
-    destruct (lt_dec tid (length ts)); intuition eauto.
-    left; split.
-    apply thread_get_oob. omega.
-    apply thread_get_oob. omega.
-  - intuition idtac.
-    specialize (H1 tid); intuition idtac.
-    repeat rewrite thread_get_oob by omega.
-    eauto.
-Qed.
-
-Lemma proc_match_upto_Sn : forall `(ts : @threads_state opT) ts' R n,
-  n < length ts ->
-  proc_match_upto (S n) R ts ts' ->
-  proc_match_upto n R ts (ts' [[ n := ts [[ n ]] ]]).
-Proof.
-  unfold proc_match_upto; intuition idtac.
-  - rewrite H1 in *. rewrite length_thread_upd.
-    edestruct Nat.max_spec; intuition eauto. omega.
-  - specialize (H2 tid). destruct H2. destruct H2.
-    omega.
-    left. intuition idtac. destruct (n == tid); subst; autorewrite with t; eauto.
-    repeat deex. right. do 3 eexists. intuition eauto.
-    destruct (n == tid); try omega; subst; autorewrite with t; eauto.
-  - destruct (n == tid); subst; autorewrite with t; eauto.
-    specialize (H2 tid). intuition idtac.
-    eapply H4. omega.
-Qed.
-
-Lemma proc_match_upto_Sn' : forall `(ts : @threads_state opT) ts' R n,
-  n >= length ts ->
-  proc_match_upto (S n) R ts ts' ->
-  proc_match_upto n R ts ts'.
-Proof.
-  unfold proc_match_upto; intuition idtac.
-  - specialize (H2 tid). destruct H2. destruct H2. omega.
-    eauto. eauto.
-  - repeat rewrite thread_get_oob by omega.
-    eauto.
-Qed.
-
-Theorem proc_match_pick : forall tid `(ts1 : @threads_state opT)
-                                     `(ts2 : @threads_state opT') R,
-  proc_match R ts1 ts2 ->
-    (ts1 [[ tid ]] = NoProc /\ ts2 [[ tid ]] = NoProc) \/
-    exists T (p1 : proc _ T) p2,
-    ts1 [[ tid ]] = Proc p1 /\ ts2 [[ tid ]] = Proc p2 /\ R T p1 p2.
-Proof.
-  unfold proc_match; intuition eauto.
-Qed.
-
-Theorem proc_match_upto_pick : forall tid n
-                                     `(ts1 : @threads_state opT) ts2 R,
-  proc_match_upto n R ts1 ts2 ->
-    (tid < n ->
-     (ts1 [[ tid ]] = NoProc /\ ts2 [[ tid ]] = NoProc) \/
-     exists T (p1 : proc _ T) p2,
-     ts1 [[ tid ]] = Proc p1 /\ ts2 [[ tid ]] = Proc p2 /\ R T p1 p2) /\
-    (tid >= n ->
-     ts1 [[ tid ]] = ts2 [[ tid ]]).
-Proof.
-  unfold proc_match_upto; intuition idtac.
-  - specialize (H1 tid). intuition eauto.
-  - specialize (H1 tid). intuition eauto.
-Qed.
-
-Theorem proc_match_len : forall `(ts1 : @threads_state opT)
-                                `(ts2 : @threads_state opT') R,
-  proc_match R ts1 ts2 ->
-  length ts1 = length ts2.
-Proof.
-  unfold proc_match; intuition eauto.
 Qed.

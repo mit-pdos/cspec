@@ -2,7 +2,7 @@ Require Import ConcurProc.
 Require Import Helpers.
 Require Import Relation_Operators.
 Require Import Compile.
-Require Import Equiv.
+Require Import Equiv ProcMatch.
 
 Global Set Implicit Arguments.
 Global Generalizable All Variables.

@@ -309,9 +309,9 @@ Module AtomicReader' <:
       + edestruct IHl; [ | | eauto | ]; repeat step_inv.
         all: try inversion H7; subst; try congruence.
        -- inversion H; subst; eauto.
-       -- eapply Forall_forall; intros.
+       -- eapply List.Forall_forall; intros.
           eapply in_app_or in H1; intuition idtac.
-          * eapply Forall_forall in H0; eauto.
+          * eapply List.Forall_forall in H0; eauto.
           * repeat match goal with
             | H : In _ _ |- _ => inversion H; clear H; subst
             end; eauto.
@@ -353,7 +353,7 @@ Module AtomicReader' <:
         repeat atomic_exec_inv.
         repeat step_inv.
 
-        eapply Forall_forall; intros.
+        eapply List.Forall_forall; intros.
         eapply FMap.is_permutation_in; eauto.
       }
 

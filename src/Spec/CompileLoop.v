@@ -1,5 +1,5 @@
 Require Import ConcurProc.
-Require Import Equiv.
+Require Import Equiv ProcMatch.
 Require Import Helpers.Helpers.
 Require Import FunctionalExtensionality.
 Require Import Omega.
@@ -84,54 +84,38 @@ Section Compiler.
     - inversion H.
   Qed.
 
-  Fixpoint compile_ts (ts : threads_state) : threads_state :=
-    match ts with
-    | nil => nil
-    | t :: ts' =>
-      match t with
-      | NoProc => NoProc
-      | Proc p => Proc (compile p)
-      end :: compile_ts ts'
-    end.
+  Definition compile_ts ts :=
+    thread_map compile ts.
+
+  Hint Resolve compile_ok_compile.
 
   Theorem compile_ts_ok :
     forall ts,
       no_atomics_ts ts ->
       proc_match compile_ok (compile_ts ts) ts.
   Proof.
-    induction ts; intros.
-    - unfold proc_match; simpl; intuition eauto.
-      left.
-      repeat rewrite thread_get_nil; eauto.
-    - apply no_atomics_ts_cons in H; intuition idtac.
-      unfold proc_match in *; cbn; intuition eauto.
-      destruct tid; subst.
-      + repeat rewrite thread_get_0.
-        destruct a.
-        * simpl in *.
-          right.
-          do 3 eexists; intuition eauto.
-          eapply compile_ok_compile; eauto.
-        * left; eauto.
-      + repeat rewrite thread_get_S.
-        eapply H3.
+    intros.
+    apply proc_match_sym.
+    unfold proc_match; intros.
+    unfold compile_ts.
+    destruct_with_eqn (ts tid).
+    rewrite thread_map_get.
+    destruct_with_eqn (ts tid); try congruence.
+    invert Heqm; eauto.
+    rewrite thread_map_get.
+    simpl_match; auto.
   Qed.
+
+  Hint Resolve compile_no_atomics.
 
   Theorem compile_ts_no_atomics :
     forall ts,
       no_atomics_ts ts ->
       no_atomics_ts (compile_ts ts).
   Proof.
-    induction ts; intros.
-    - constructor.
-    - simpl.
-      apply no_atomics_ts_cons in H; intuition idtac.
-      constructor; [ | assumption ].
-      destruct a; eauto.
-      simpl.
-      eapply compile_no_atomics; eauto.
+    unfold no_atomics_ts, compile_ts; intros.
+    eapply thread_map_Forall; eauto.
   Qed.
-
 
   Variable State : Type.
   Variable lo_step : OpSemantics opLoT State.
@@ -257,7 +241,7 @@ Section Compiler.
 
     - simpl.
       eapply IHexec.
-      erewrite <- thread_upd_same with (ts := ts2).
+      erewrite <- thread_upd_same_eq with (ts := ts2).
       eapply proc_match_upd; eauto.
       eauto.
 

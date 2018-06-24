@@ -1,6 +1,7 @@
 Require Import ConcurProc.
-Require Import Equiv.
+Require Import Equiv ProcMatch.
 Require Import Helpers.Helpers.
+Require Import Helpers.FinMap.
 Require Import FunctionalExtensionality.
 Require Import Omega.
 Require Import List.
@@ -38,29 +39,19 @@ Section ProcStructure.
     end.
 
   Definition no_atomics_ts (ts : threads_state) :=
-    Forall no_atomics_opt ts.
-
+    thread_Forall no_atomics ts.
 
   Theorem no_atomics_ts_equiv : forall ts,
     no_atomics_ts ts <->
     (forall tid, no_atomics_opt ts [[ tid ]]).
   Proof.
-    unfold no_atomics_ts, thread_get; split; intros.
-    - destruct (nth_error ts tid) eqn:He; simpl; eauto.
-      eapply Forall_forall in H; eauto.
-      eapply nth_error_In; eauto.
-    - eapply Forall_forall; intros.
-      eapply In_nth_error in H0; deex.
-      specialize (H n).
+    unfold no_atomics_ts, thread_Forall; split; intros.
+    - destruct_with_eqn (ts tid); simpl; eauto.
+      eapply thread_Forall_some in H; eauto.
+    - unfold no_atomics_opt in *.
+      eapply thread_Forall_forall; intros.
+      specialize (H tid).
       rewrite H0 in *; eauto.
-  Qed.
-
-  Theorem no_atomics_ts_cons : forall p ts,
-    no_atomics_ts (p :: ts) ->
-    no_atomics_opt p /\ no_atomics_ts ts.
-  Proof.
-    intros.
-    inversion H; intuition.
   Qed.
 
   Theorem no_atomics_thread_get : forall `(p : proc _ T) ts tid,
@@ -68,22 +59,18 @@ Section ProcStructure.
     ts [[ tid ]] = Proc p ->
     no_atomics p.
   Proof.
-    unfold no_atomics_ts, thread_get; intros.
-    destruct (nth_error ts tid) eqn:He; try congruence.
-    eapply Forall_forall in H.
-    2: eapply nth_error_In; eauto.
-    subst; eauto.
+    unfold no_atomics_ts; intros.
+    (* TODO: this is awkward; should thread_Forall just be an unfoldable
+    definition instead? *)
+    eapply thread_Forall_some; eauto.
   Qed.
 
   Theorem no_atomics_thread_upd_NoProc : forall ts tid,
     no_atomics_ts ts ->
     no_atomics_ts ts [[ tid := NoProc ]].
   Proof.
-    intros.
-    eapply no_atomics_ts_equiv; intros.
-    destruct (tid0 == tid); subst; autorewrite with t.
-    simpl; eauto.
-    eapply no_atomics_ts_equiv in H; eauto.
+    unfold no_atomics_ts; intros.
+    eauto using thread_Forall_upd_none.
   Qed.
 
   Theorem no_atomics_thread_upd_Proc : forall ts tid `(p : proc _ T),
@@ -91,11 +78,8 @@ Section ProcStructure.
     no_atomics p ->
     no_atomics_ts ts [[ tid := Proc p ]].
   Proof.
-    intros.
-    eapply no_atomics_ts_equiv; intros.
-    destruct (tid0 == tid); subst; autorewrite with t.
-    simpl; eauto.
-    eapply no_atomics_ts_equiv in H; eauto.
+    unfold no_atomics_ts; intros.
+    eauto using thread_Forall_upd_some.
   Qed.
 
   Theorem no_atomics_exec_tid : forall `(step : OpSemantics opT State) tid s `(p : proc _ T) s' p' evs,
@@ -199,43 +183,34 @@ Section Compiler.
       no_atomics p ->
       no_atomics (compile p).
   Proof.
-    induction p; simpl; intros; eauto.
-    - inversion H0; clear H0; repeat sigT_eq. eauto.
-    - inversion H0; clear H0; repeat sigT_eq. eauto.
-    - inversion H.
+    induct p; simpl; eauto.
+    - invert H0; eauto.
+    - invert H0; eauto.
+    - invert H.
   Qed.
 
-  Fixpoint compile_ts (ts : threads_state) : threads_state :=
-    match ts with
-    | nil => nil
-    | t :: ts' =>
-      match t with
-      | NoProc => NoProc
-      | Proc p => Proc (compile p)
-      end :: compile_ts ts'
-    end.
+  Hint Resolve compile_no_atomics.
+
+  Definition compile_ts ts :=
+    thread_map compile ts.
+
+  Hint Resolve compile_ok_compile.
 
   Theorem compile_ts_ok :
     forall ts,
       no_atomics_ts ts ->
       proc_match compile_ok (compile_ts ts) ts.
   Proof.
-    induction ts; intros.
-    - unfold proc_match; simpl; intuition eauto.
-      left.
-      repeat rewrite thread_get_nil; eauto.
-    - apply no_atomics_ts_cons in H; intuition idtac.
-      unfold proc_match in *; cbn; intuition eauto.
-      destruct tid; subst.
-      + repeat rewrite thread_get_0.
-        destruct a.
-        * simpl in *.
-          right.
-          do 3 eexists; intuition eauto.
-          eapply compile_ok_compile; eauto.
-        * left; eauto.
-      + repeat rewrite thread_get_S.
-        eapply H3.
+    intros.
+    apply proc_match_sym.
+    unfold proc_match; intros.
+    unfold compile_ts.
+    destruct_with_eqn (ts tid).
+    rewrite thread_map_get.
+    destruct_with_eqn (ts tid); try congruence.
+    invert Heqm; eauto.
+    rewrite thread_map_get.
+    simpl_match; auto.
   Qed.
 
   Theorem compile_ts_no_atomics :
@@ -243,16 +218,9 @@ Section Compiler.
       no_atomics_ts ts ->
       no_atomics_ts (compile_ts ts).
   Proof.
-    induction ts; intros.
-    - constructor.
-    - simpl.
-      apply no_atomics_ts_cons in H; intuition idtac.
-      constructor; [ | assumption ].
-      destruct a; eauto.
-      simpl.
-      eapply compile_no_atomics; eauto.
+    unfold no_atomics_ts, compile_ts; intros.
+    eapply thread_map_Forall; eauto.
   Qed.
-
 
   Variable State : Type.
   Variable lo_step : OpSemantics opLoT State.
@@ -264,20 +232,6 @@ Section Compiler.
       hi_step op tid s v s' evs.
 
   Variable compile_is_correct : compile_correct.
-
-  (* TODO: move this near traces/prepend *)
-  Lemma prepend_empty_eq : forall tid evs evs',
-      prepend tid evs TraceEmpty = prepend tid evs' TraceEmpty ->
-      evs = evs'.
-  Proof.
-    intros.
-    generalize dependent evs'.
-    induct evs.
-    - destruct evs'; simpl in *; congruence.
-    - destruct evs'; simpl in *; try congruence.
-      invert H.
-      f_equal; eauto.
-  Qed.
 
   Lemma atomic_compile_ok_exec_tid : forall T (p1 : proc _ T) p2,
     atomic_compile_ok p1 p2 ->
@@ -431,45 +385,15 @@ Section Atomization.
     reflexivity.
   Qed.
 
-  Theorem atomize_ok_upto_trace_incl :
-    forall n ts1' ts1,
-    proc_match_upto n atomize_ok ts1 ts1' ->
-      trace_incl_ts op_step ts1 ts1'.
-  Proof.
-    induction n; intros.
-    - apply proc_match_upto_0_eq in H; subst.
-      reflexivity.
-    - destruct (lt_dec n (length ts1)).
-      + etransitivity.
-        instantiate (1 := thread_upd ts1' n (thread_get ts1 n)).
-        * eapply IHn.
-          eapply proc_match_upto_Sn in H; eauto.
-        * eapply proc_match_upto_pick with (tid := n) in H; intuition idtac.
-          edestruct H0. omega.
-         -- intuition idtac.
-            rewrite H2.
-            rewrite <- exec_equiv_ts_upd_same; eauto.
-            reflexivity.
-         -- repeat deex.
-            rewrite H.
-            rewrite atomize_ok_trace_incl; eauto.
-            rewrite thread_upd_same; eauto.
-            reflexivity.
-      + eapply IHn.
-        eapply proc_match_upto_Sn'.
-        omega.
-        eauto.
-  Qed.
-
   Theorem atomize_ok_trace_incl_ts :
     forall ts1' ts1,
     proc_match atomize_ok ts1 ts1' ->
-      trace_incl_ts op_step ts1 ts1'.
+    trace_incl_ts op_step ts1 ts1'.
   Proof.
     intros.
-    eapply atomize_ok_upto_trace_incl.
-    eapply proc_match_upto_all.
-    eauto.
+    eapply trace_incl_ts_proc_match.
+    eapply proc_match_subrelation;
+      eauto using atomize_ok_trace_incl.
   Qed.
 
 End Atomization.
@@ -496,9 +420,6 @@ Proof.
       edestruct H0; eauto.
 Qed.
 
-Hint Resolve proc_match_cons_Proc.
-Hint Resolve proc_match_cons_NoProc.
-
 Theorem atomize_proc_match :
   forall `(ts1 : @threads_state opLoT)
          `(ts2 : @threads_state opMidT)
@@ -508,21 +429,19 @@ Theorem atomize_proc_match :
     proc_match (atomize_ok compile_op) ts1 ts1' /\
     proc_match (atomic_compile_ok compile_op) ts1' ts2.
 Proof.
-  induction ts1; intros.
-  - eapply proc_match_len in H.
-    destruct ts2; simpl in *; try omega.
-    eexists; split.
-    eapply proc_match_nil.
-    eapply proc_match_nil.
-  - eapply proc_match_len in H as H'.
-    destruct ts2; simpl in *; try omega.
-
-    eapply proc_match_cons_inv in H.
-    edestruct IHts1; intuition eauto.
-    + exists (NoProc :: x); subst; intuition eauto.
-    + repeat deex.
-      edestruct (atomize_proc_match_helper H4).
-      eexists (Proc _ :: x); intuition eauto.
+  intros.
+  exists (thread_map (compile (atomize compile_op)) ts2).
+  eapply proc_match_subrelation in H;
+    [ | intros; eapply atomize_proc_match_helper; eauto ].
+  split.
+  - eapply proc_match_map2.
+    eapply proc_match_subrelation; eauto; simpl; propositional.
+  - unfold proc_match; intros.
+    specialize (H tid).
+    rewrite thread_map_get.
+    destruct matches in *|-; propositional;
+      repeat simpl_match; repeat maybe_proc_inv;
+        eauto.
 Qed.
 
 Theorem compile_traces_match_ts :

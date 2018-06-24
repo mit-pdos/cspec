@@ -346,7 +346,7 @@ Section Movers.
           eapply enabled_stable_exec_tid; eauto.
           destruct H; eauto.
           eapply pred_stable_exec_tid; eauto.
-        rewrite thread_upd_upd_ne; eauto.
+        rewrite thread_upd_ne_comm; eauto.
         repeat deex.
 
         eapply exec_tid_left_mover in H2; eauto.
@@ -357,7 +357,7 @@ Section Movers.
         eapply ExecPrefixOne with (tid := tid0).
           autorewrite with t; eauto.
           eauto.
-          rewrite thread_upd_upd_ne; eauto.
+          rewrite thread_upd_ne_comm; eauto.
 
     - edestruct H1; repeat deex.
       edestruct H; clear H; eauto.
@@ -403,14 +403,14 @@ Section Movers.
     + autorewrite with t in *.
       edestruct exec_tid_right_mover; intuition eauto.
       edestruct IHexec; eauto.
-        rewrite thread_upd_upd_ne; eauto.
+        rewrite thread_upd_ne_comm; eauto.
       intuition idtac.
 
       abstract_tr.
       eapply ExecPrefixOne with (tid := tid0).
         autorewrite with t; eauto.
         eauto.
-        rewrite thread_upd_upd_ne; eauto.
+        rewrite thread_upd_ne_comm; eauto.
       subst; simpl; eauto.
 
     + edestruct H; eauto; subst; simpl; eauto.

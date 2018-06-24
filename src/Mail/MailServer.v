@@ -115,8 +115,8 @@ Definition pop3_server_thread : proc _ unit :=
   Until (fun _ => false) (fun _ => do_pop3_req) None.
 
 Definition mail_server nsmtp npop3 :=
-  repeat (Proc smtp_server_thread) nsmtp ++
-  repeat (Proc pop3_server_thread) npop3.
+  threads_from_list (repeat (existT _ _ smtp_server_thread) nsmtp ++
+                            repeat (existT _ _ pop3_server_thread) npop3).
 
 
 
@@ -195,8 +195,8 @@ Definition do_bench_loop msg nsmtpiter npop3iter niter :=
       end)
     (Some niter).
 
-Definition mail_perf nprocs niter nsmtpiter npop3iter :=
-  repeat (Proc (do_bench_loop bench_msg nsmtpiter npop3iter niter)) nprocs.
+Definition mail_perf nprocs niter nsmtpiter npop3iter : threads_state :=
+  threads_from_list (repeat (existT _ _ (do_bench_loop bench_msg nsmtpiter npop3iter niter)) nprocs).
 
 Module c1 :=
   Link
@@ -287,9 +287,9 @@ Module c0 :=
     c10 MailServerComposedImpl.
 
 Definition ms_bottom nsmtp npop3 nsmtpiter npop3iter :=
-  c0.compile_ts (mail_perf nsmtp npop3 nsmtpiter npop3iter).
+  threads_to_list (c0.compile_ts (mail_perf nsmtp npop3 nsmtpiter npop3iter)).
 
 Definition ms_bottom_server nsmtp npop3 :=
-  c0.compile_ts (mail_server nsmtp npop3).
+  threads_to_list (c0.compile_ts (mail_server nsmtp npop3)).
 
 Print Assumptions c0.compile_traces_match.

@@ -1,5 +1,5 @@
 Require Import ConcurProc.
-Require Import Equiv.
+Require Import Equiv ProcMatch.
 Require Import Compile.
 Require Import Abstraction.
 Require Import Movers.

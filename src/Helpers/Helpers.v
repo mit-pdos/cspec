@@ -433,7 +433,7 @@ Ltac propositional :=
 Ltac induct H :=
   induction H; repeat sigT_eq; propositional.
 Ltac invert H :=
-  inversion H; repeat sigT_eq; propositional.
+  inversion H; repeat sigT_eq; propositional; repeat sigT_eq.
 
 Local Lemma abstract_away_helper : forall A (P: A -> Prop) (x y:A),
     P y ->

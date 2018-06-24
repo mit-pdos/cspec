@@ -5,6 +5,7 @@ Require Import FunctionalExtensionality.
 Require Import Omega.
 Require Import Helpers.Helpers.
 Require Import Helpers.ListStuff.
+Require Import Helpers.FinMap.
 Require Import List.
 Require Import Bool.
 
@@ -30,6 +31,26 @@ Section Trace.
     | e :: evs' =>
       TraceEvent tid e (prepend tid evs' tr)
     end.
+
+  Theorem prepend_empty_eq : forall tid evs evs',
+      prepend tid evs TraceEmpty = prepend tid evs' TraceEmpty ->
+      evs = evs'.
+  Proof.
+    intros.
+    generalize dependent evs'.
+    induct evs.
+    - destruct evs'; simpl in *; congruence.
+    - destruct evs'; simpl in *; try congruence.
+      invert H.
+      f_equal; eauto.
+  Qed.
+
+  Lemma prepend_app : forall `(evs1 : list event) evs2 tr tid,
+    prepend tid (evs1 ++ evs2) tr = prepend tid evs1 (prepend tid evs2 tr).
+  Proof.
+    induction evs1; simpl; intros; eauto.
+    rewrite IHevs1; eauto.
+  Qed.
 
 End Trace.
 
@@ -57,16 +78,196 @@ Section Proc.
   | Proc : forall T, proc T -> maybe_proc
   | NoProc.
 
-  Definition threads_state := list maybe_proc.
-
-  Definition thread_get (ts : threads_state) (tid : nat) :=
-    match nth_error ts tid with
-    | Some x => x
+  Definition threads_state := Map.t {T & proc T}.
+  Definition thread_get (ts:threads_state) (tid:nat) : maybe_proc :=
+    match Map.get ts tid with
+    | Some (existT _ _ p) => Proc p
     | None => NoProc
     end.
+  Definition thread_upd (ts:threads_state) (tid:nat) (mp:maybe_proc) : threads_state :=
+    match mp with
+    | Proc p => Map.upd ts tid (Some (existT _ _ p))
+    | NoProc => Map.upd ts tid None
+    end.
+  Coercion thread_get : threads_state >-> Funclass.
 
-  Definition thread_upd (ts : threads_state) (tid : nat) (s : maybe_proc) : threads_state :=
-    list_upd (pad ts (S tid) NoProc) tid s.
+  Definition thread_Forall (P: forall T, proc T -> Prop) (ts:threads_state) :=
+    Map.Forall (fun '(existT _ _ p) => P _ p) ts.
+
+  Section ThreadState.
+
+    Ltac t := unfold thread_get, thread_upd, thread_Forall;
+              intros;
+              repeat match goal with
+                     | [ p: maybe_proc |- _ ] => destruct p
+                     end;
+              autorewrite with upd;
+              auto.
+
+    (* reproduce FinMap library *)
+    Theorem thread_upd_eq : forall ts tid p,
+        thread_upd ts tid p tid = p.
+    Proof.
+      t.
+    Qed.
+
+    Theorem thread_upd_ne : forall ts tid tid' p,
+        tid <> tid' ->
+        thread_upd ts tid p tid' = ts tid'.
+    Proof.
+      t.
+    Qed.
+
+    Theorem thread_upd_upd_eq : forall ts tid p p',
+        thread_upd (thread_upd ts tid p) tid p' = thread_upd ts tid p'.
+    Proof.
+      t.
+    Qed.
+
+    Theorem thread_upd_ne_comm : forall ts tid tid' p p',
+        tid <> tid' ->
+        thread_upd (thread_upd ts tid p) tid' p' =
+        thread_upd (thread_upd ts tid' p') tid p.
+    Proof.
+      t; apply Map.upd_ne_comm; auto.
+    Qed.
+
+    Theorem thread_upd_same_eq : forall (ts:threads_state) tid p,
+        ts tid = p ->
+        thread_upd ts tid p = ts.
+    Proof.
+      t; apply Map.upd_same_eq.
+      destruct_with_eqn (Map.get ts tid); simpl in *; try congruence.
+      destruct s; simpl in *.
+      invert H; auto.
+
+      destruct_with_eqn (Map.get ts tid); simpl in *; auto.
+      destruct s; congruence.
+    Qed.
+
+    Definition threads_empty : threads_state := Map.empty _.
+
+    Theorem threads_empty_get : forall tid,
+        threads_empty tid = NoProc.
+    Proof.
+      t.
+    Qed.
+
+    Theorem thread_Forall_some : forall P (ts: threads_state) a T (p: proc T),
+        thread_Forall P ts ->
+        ts a = Proc p ->
+        P _ p.
+    Proof.
+      t.
+      destruct_with_eqn (Map.get ts a); try congruence.
+      eapply Map.Forall_some in H; eauto.
+      destruct s.
+      invert H0.
+    Qed.
+
+    Theorem thread_Forall_upd_some : forall P ts tid T (v: proc T),
+        thread_Forall P ts ->
+        P _ v ->
+        thread_Forall P (thread_upd ts tid (Proc v)).
+    Proof.
+      t; eauto using Map.Forall_upd_some.
+    Qed.
+
+    Theorem thread_Forall_upd_none : forall P ts tid,
+        thread_Forall P ts ->
+        thread_Forall P (thread_upd ts tid NoProc).
+    Proof.
+      t; eauto using Map.Forall_upd_none.
+    Qed.
+
+    Theorem Forall_forall : forall (P: forall T, proc T -> Prop) (ts: threads_state),
+        (forall tid T (p: proc T), ts tid = Proc p -> P T p) ->
+        thread_Forall P ts.
+    Proof.
+      t.
+      eapply Map.Forall_forall; intros.
+      destruct v.
+      specialize (H a _ p); simpl_match; eauto.
+    Qed.
+
+    Theorem thread_Forall_forall : forall (P: forall T, proc T -> Prop)
+                                     (ts: threads_state),
+        (forall tid T (p: proc T), ts tid = Proc p -> P _ p) ->
+        thread_Forall P ts.
+    Proof.
+      t.
+      eapply Map.Forall_forall; intros.
+      destruct v; eauto.
+      eapply H.
+      rewrite H0; eauto.
+    Qed.
+
+    Theorem thread_mapping_finite : forall (ts: threads_state) tid,
+        tid > Map.max ts ->
+        ts tid = NoProc.
+    Proof.
+      t.
+      rewrite Map.mapping_finite by auto; auto.
+    Qed.
+
+    Theorem thread_ext_eq : forall (ts1 ts2: threads_state),
+        (forall tid, ts1 tid = ts2 tid) ->
+        ts1 = ts2.
+    Proof.
+      t.
+      apply Map.t_ext_eq; intros.
+      specialize (H a).
+      destruct (Map.get ts1 a), (Map.get ts2 a);
+        repeat match goal with
+               | [ s: {_ & _} |- _ ] => destruct s
+               end;
+        try congruence.
+      invert H; auto.
+    Qed.
+
+    Theorem thread_upd_max_bound : forall (ts:threads_state) tid p,
+        tid <= Map.max ts ->
+        Map.max (thread_upd ts tid p) <= Map.max ts.
+    Proof.
+      t.
+      rewrite Map.upd_max_bound; auto.
+      rewrite Map.upd_max_bound; auto.
+    Qed.
+
+    Theorem thread_upd_max_extend_bound : forall (ts:threads_state) tid p,
+        tid >= Map.max ts ->
+        Map.max (thread_upd ts tid p) <= tid.
+    Proof.
+      t.
+      rewrite Map.upd_max_extend_bound; auto.
+      rewrite Map.upd_max_extend_bound; auto.
+    Qed.
+
+    Theorem threads_empty_max :
+      Map.max threads_empty = 0.
+    Proof.
+      t.
+    Qed.
+
+    Definition threads_from_list (l: list {T & proc T}) : threads_state :=
+      Map.from_list l.
+
+    Theorem threads_from_list_get : forall l tid,
+        threads_from_list l tid = match List.nth_error l tid with
+                                  | Some (existT _ _ p) => Proc p
+                                  | None => NoProc
+                                  end.
+    Proof.
+      t.
+    Qed.
+
+    Definition threads_to_list (ts: threads_state) : list maybe_proc :=
+      List.map (fun mp => match mp with
+                       | Some (existT _ _ p) => Proc p
+                       | None => NoProc
+                       end) (Map.to_list ts).
+
+  End ThreadState.
 
 
   Definition until1 T (c : T -> bool)
@@ -138,7 +339,7 @@ Section Proc.
   Inductive exec : State -> threads_state -> trace -> nat -> Prop :=
 
   | ExecOne : forall T tid (ts : threads_state) trace p s s' evs result ctr,
-    thread_get ts tid = @Proc T p ->
+    ts tid = @Proc T p ->
     exec_tid tid s p s' result evs ->
     exec s' (thread_upd ts tid
               match result with
@@ -357,457 +558,26 @@ Section StepImpl.
 End StepImpl.
 
 
-Definition threads_empty {opT} : @threads_state opT := nil.
-
-
-Lemma nth_error_nil : forall T x,
-  nth_error (@nil T) x = None.
-Proof.
-  induction x; simpl; eauto.
-Qed.
-
-Lemma pad_eq : forall n `(ts : @threads_state opT) tid,
-  ts [[ tid ]] = (pad ts n NoProc) [[ tid ]].
-Proof.
-  unfold thread_get.
-  induction n; simpl; eauto.
-  destruct ts.
-  - destruct tid; simpl; eauto.
-    rewrite <- IHn. rewrite nth_error_nil. auto.
-  - destruct tid; simpl; eauto.
-Qed.
-
-Lemma pad_length_noshrink : forall n `(l : list T) v,
-  length l <= length (pad l n v).
-Proof.
-  intros.
-  generalize dependent l.
-  induction n; simpl; eauto.
-  destruct l; simpl; eauto.
-  - specialize (IHn []). omega.
-  - specialize (IHn l). omega.
-Qed.
-
-Lemma pad_length_grow : forall n `(l : list T) v,
-  n <= length (pad l n v).
-Proof.
-  intros.
-  generalize dependent l.
-  induction n; simpl; intros; try omega.
-  destruct l; simpl; eauto.
-  - specialize (IHn []). omega.
-  - specialize (IHn l). omega.
-Qed.
-
-Lemma pad_length_noshrink' : forall x n `(l : list T) v,
-  x <= length l ->
-  x <= length (pad l n v).
-Proof.
-  intros.
-  pose proof (pad_length_noshrink n l v).
-  omega.
-Qed.
-
-Lemma pad_noop : forall n T (l : list T) v,
-  n <= length l ->
-  pad l n v = l.
-Proof.
-  induction n; simpl; intros; eauto.
-  destruct l; simpl in *.
-  omega.
-  rewrite IHn; eauto.
-  omega.
-Qed.
-
-Lemma thread_get_Some_length : forall tid `(ts : @threads_state opT) `(p : proc _ T),
-  ts [[ tid ]] = Proc p ->
-  tid < length ts.
-Proof.
-  unfold thread_get.
-  induction tid; simpl; intros.
-  - destruct ts; try congruence. simpl. omega.
-  - destruct ts; try congruence. simpl.
-    specialize (IHtid _ _ _ _ H).
-    omega.
-Qed.
-
-Lemma length_hint_lt_le : forall n m,
-  S n <= m ->
-  n < m.
-Proof.
-  intros; omega.
-Qed.
-
-Hint Resolve pad_length_noshrink.
-Hint Resolve pad_length_grow.
-Hint Resolve length_hint_lt_le.
-Hint Resolve pad_length_noshrink'.
-Hint Resolve thread_get_Some_length.
-Hint Resolve lt_le_S.
-
-
-Lemma prepend_app : forall `(evs1 : list event) evs2 tr tid,
-  prepend tid (evs1 ++ evs2) tr = prepend tid evs1 (prepend tid evs2 tr).
-Proof.
-  induction evs1; simpl; intros; eauto.
-  rewrite IHevs1; eauto.
-Qed.
-
-Lemma list_upd_eq : forall tid `(ts : @threads_state opT) p,
-  tid < length ts ->
-  (list_upd ts tid p) [[ tid ]] = p.
-Proof.
-  unfold thread_get.
-  induction tid; simpl; intros; eauto.
-  - destruct ts; simpl in *; eauto. omega.
-  - destruct ts; simpl in *. omega.
-    eapply IHtid. omega.
-Qed.
-
-Lemma list_upd_ne : forall tid' tid `(ts : @threads_state opT) p,
-  tid < length ts ->
-  tid' <> tid ->
-  (list_upd ts tid p) [[ tid' ]] = ts [[ tid' ]].
-Proof.
-  unfold thread_get.
-  induction tid'; simpl; intros; eauto.
-  - destruct tid; try congruence.
-    destruct ts; simpl in *. congruence.
-    auto.
-  - destruct ts; simpl in *. congruence.
-    destruct tid; auto.
-    eapply IHtid'. omega. omega.
-Qed.
-
-Lemma list_upd_noop : forall tid `(ts : @threads_state opT) `(p : proc _ T),
-  ts [[ tid ]] = Proc p ->
-  list_upd ts tid (Proc p) = ts.
-Proof.
-  unfold thread_get.
-  induction tid; simpl; intros.
-  - destruct ts; try congruence. simpl. congruence.
-  - destruct ts; try congruence. simpl. f_equal. eauto.
-Qed.
-
-Lemma list_upd_noop_NoProc : forall tid `(ts : @threads_state opT),
-  ts [[ tid ]] = NoProc ->
-  tid < length ts ->
-  list_upd ts tid NoProc = ts.
-Proof.
-  unfold thread_get.
-  induction tid; simpl; intros.
-  - destruct ts; try congruence. simpl. congruence.
-    simpl. subst. congruence.
-  - destruct ts; try congruence. simpl. congruence.
-    simpl. f_equal. eapply IHtid. 2: simpl in *; omega.
-    eauto.
-Qed.
-
-Lemma thread_upd_same : forall tid `(ts : @threads_state opT) `(p : proc _ T),
-  ts [[ tid ]] = Proc p ->
-  ts [[ tid := Proc p ]] = ts.
-Proof.
-  unfold thread_upd; intros.
-  rewrite pad_noop by eauto.
-  rewrite list_upd_noop; eauto.
-Qed.
-
-Lemma thread_upd_same' : forall tid `(ts : @threads_state opT),
-  tid < length ts ->
-  ts [[ tid ]] = NoProc ->
-  ts [[ tid := NoProc ]] = ts.
-Proof.
-  unfold thread_upd; intros.
-  rewrite pad_noop by eauto.
-  rewrite list_upd_noop_NoProc; eauto.
-Qed.
-
-Lemma thread_upd_eq : forall tid `(ts : @threads_state opT) p,
-  ts [[ tid := p ]] [[ tid ]] = p.
-Proof.
-  unfold thread_upd; intros.
-  apply list_upd_eq.
-  pose proof (pad_length_grow (S tid) ts NoProc).
-  omega.
-Qed.
-
-Lemma thread_get_pad : forall tid `(ts : @threads_state opT) n,
-  (pad ts n NoProc) [[ tid ]] = ts [[ tid ]].
-Proof.
-  unfold thread_get.
-  induction tid; simpl.
-  - destruct ts; simpl.
-    destruct n; simpl; eauto.
-    destruct n; simpl; eauto.
-  - destruct ts; simpl; eauto.
-    + destruct n; simpl; eauto. rewrite IHtid. rewrite nth_error_nil. auto.
-    + destruct n; simpl; eauto.
-Qed.
-
-Lemma thread_upd_ne : forall tid `(ts : @threads_state opT) p tid',
-  tid <> tid' ->
-  ts [[ tid := p ]] [[ tid' ]] = ts [[ tid' ]].
-Proof.
-  unfold thread_upd.
-  intros.
-  rewrite list_upd_ne; auto.
-  rewrite thread_get_pad. eauto.
-Qed.
-
-Lemma list_upd_pad : forall `(ts : @threads_state opT) tid n p,
-  tid < length ts ->
-  pad (list_upd ts tid p) n NoProc = list_upd (pad ts n NoProc) tid p.
-Proof.
-  induction ts; simpl; intros.
-  - omega.
-  - destruct tid; simpl.
-    + destruct n; simpl; eauto.
-    + destruct n; simpl; eauto.
-      f_equal.
-      eapply IHts.
-      omega.
-Qed.
-
-Lemma list_upd_comm : forall `(ts : @threads_state opT) tid1 p1 tid2 p2,
-  tid1 < length ts ->
-  tid2 < length ts ->
-  tid1 <> tid2 ->
-  list_upd (list_upd ts tid1 p1) tid2 p2 = list_upd (list_upd ts tid2 p2) tid1 p1.
-Proof.
-  induction ts; simpl; intros; eauto.
-  - destruct tid1; destruct tid2; try omega; simpl; eauto.
-    f_equal. apply IHts; omega.
-Qed.
-
-Lemma list_upd_upd_eq : forall `(ts : @threads_state opT) tid p1 p2,
-  tid < length ts ->
-  list_upd (list_upd ts tid p1) tid p2 = list_upd ts tid p2.
-Proof.
-  induction ts; simpl; eauto; intros.
-  destruct tid; simpl; eauto.
-  f_equal.
-  eapply IHts.
-  omega.
-Qed.
-
-Lemma pad_comm : forall T n m (l : list T) v,
-  pad (pad l n v) m v = pad (pad l m v) n v.
-Proof.
-  induction n; simpl; intros; eauto.
-  destruct l; simpl; eauto.
-  - destruct m; simpl; eauto. rewrite IHn. eauto.
-  - destruct m; simpl; eauto. rewrite IHn; eauto.
-Qed.
-
-Lemma pad_idem : forall T n (l : list T) v,
-  pad (pad l n v) n v = pad l n v.
-Proof.
-  induction n; simpl; intros; eauto.
-  destruct l; simpl; eauto.
-  - rewrite IHn. eauto.
-  - rewrite IHn. eauto.
-Qed.
-
-Lemma thread_upd_upd_ne : forall tid tid' `(ts : @threads_state opT) p p',
-  tid <> tid' ->
-  ts [[ tid := p ]] [[ tid' := p' ]] =
-  ts [[ tid' := p' ]] [[ tid := p ]].
-Proof.
-  unfold thread_upd.
-  intros.
-  repeat rewrite list_upd_pad by eauto.
-  rewrite list_upd_comm by eauto.
-  f_equal.
-  f_equal.
-  apply pad_comm.
-Qed.
-
-Lemma thread_upd_upd_eq : forall tid `(ts : @threads_state opT) p1 p2,
-  ts [[ tid := p1 ]] [[ tid := p2 ]] =
-  ts [[ tid := p2 ]].
-Proof.
-  unfold thread_upd; intros.
-  rewrite list_upd_pad by eauto.
-  rewrite pad_idem.
-  rewrite list_upd_upd_eq by eauto.
-  reflexivity.
-Qed.
-
-Lemma thread_upd_inv : forall `(ts : @threads_state opT) tid1 `(p : proc _ T) tid2 `(p' : proc _ T'),
-  ts [[ tid1 := Proc p ]] [[ tid2 ]] = Proc p' ->
-  tid1 = tid2 /\ Proc p = Proc p' \/
-  tid1 <> tid2 /\ ts [[ tid2 ]] = Proc p'.
-Proof.
-  intros.
-  destruct (tid1 == tid2).
-  - left; intuition eauto; subst.
-    rewrite thread_upd_eq in H. congruence.
-  - right; intuition eauto.
-    rewrite thread_upd_ne in H; eauto.
-Qed.
-
 Lemma thread_empty_inv : forall opT tid `(p' : proc _ T),
   (@threads_empty opT) [[ tid ]] = Proc p' ->
   False.
 Proof.
-  unfold threads_empty; intros.
-  destruct tid; compute in H; congruence.
+  intros.
+  rewrite threads_empty_get in H; congruence.
 Qed.
-
-Lemma thread_get_S : forall `(ts : @threads_state opT) tid a,
-  (a :: ts) [[ S tid ]] = ts [[ tid ]].
-Proof.
-  reflexivity.
-Qed.
-
-Lemma thread_get_0 : forall `(ts : @threads_state opT) a,
-  (a :: ts) [[ 0 ]] = a.
-Proof.
-  reflexivity.
-Qed.
-
-Lemma thread_upd_S : forall `(ts : @threads_state opT) tid a p,
-  (a :: ts) [[ S tid := p ]] = a :: (ts [[ tid := p ]]).
-Proof.
-  reflexivity.
-Qed.
-
-Lemma thread_upd_0 : forall `(ts : @threads_state opT) a p,
-  (a :: ts) [[ 0 := p ]] = p :: ts.
-Proof.
-  reflexivity.
-Qed.
-
-Lemma thread_get_nil : forall opT tid,
-  @thread_get opT nil tid = NoProc.
-Proof.
-  unfold thread_get; intros.
-  rewrite nth_error_nil.
-  reflexivity.
-Qed.
-
-Lemma thread_upd_nil_S : forall opT tid p,
-  @thread_upd opT nil (S tid) p = NoProc :: (nil [[ tid := p ]]).
-Proof.
-  reflexivity.
-Qed.
-
-Lemma length_thread_upd : forall tid `(ts : @threads_state opT) p,
-  length (ts [[ tid := p ]]) = Nat.max (S tid) (length ts).
-Proof.
-  induction tid; simpl; intros.
-  - destruct ts; cbn; eauto.
-  - destruct ts.
-    + rewrite thread_upd_nil_S.
-      simpl length. rewrite IHtid.
-      simpl. omega.
-    + rewrite thread_upd_S.
-      simpl length. rewrite IHtid.
-      simpl. omega.
-Qed.
-
-Lemma thread_get_repeat_NoProc : forall opT n tid,
-  (repeat (@NoProc opT) n) [[ tid ]] = NoProc.
-Proof.
-  induction n; simpl; intros.
-  - rewrite thread_get_nil. eauto.
-  - destruct tid.
-    + rewrite thread_get_0. eauto.
-    + rewrite thread_get_S. eauto.
-Qed.
-
-Lemma thread_upd_same'' : forall tid `(ts : @threads_state opT),
-  tid >= length ts ->
-  ts [[ tid := NoProc ]] = pad ts (S tid) NoProc.
-Proof.
-  unfold thread_upd; intros.
-  rewrite list_upd_noop_NoProc; eauto.
-  rewrite pad_is_append.
-
-  generalize dependent tid.
-  induction ts; intros.
-  - rewrite app_nil_l.
-    rewrite thread_get_repeat_NoProc. eauto.
-  - destruct tid.
-    + simpl in *. omega.
-    + simpl app. rewrite thread_get_S. eapply IHts. simpl in *. omega.
-Qed.
-
-Lemma thread_get_oob : forall tid `(ts : @threads_state opT),
-  tid >= length ts ->
-  ts [[ tid ]] = NoProc.
-Proof.
-  induction tid; simpl; intros.
-  - destruct ts; simpl in *; eauto.
-    omega.
-  - destruct ts.
-    rewrite thread_get_nil; eauto.
-    rewrite thread_get_S. eapply IHtid.
-    simpl in *; omega.
-Qed.
-
-Hint Rewrite thread_upd_upd_eq : t.
-Hint Rewrite thread_upd_eq : t.
-Hint Rewrite thread_upd_ne using (solve [ auto ]) : t.
 
 Hint Extern 1 (exec_tid _ _ _ _ _ _ _) => econstructor.
 Hint Extern 1 (atomic_exec _ _ _ _ _ _ _) => econstructor.
-
-
-Lemma thread_get_app_NoProc : forall `(ts : @threads_state opT) tid `(p : proc _ T),
-  ts [[ tid ]] = Proc p <->
-  (ts ++ [NoProc]) [[ tid ]] = Proc p.
-Proof.
-  split; intros.
-  - generalize dependent tid.
-    induction ts; simpl; intros.
-    + exfalso.
-      unfold thread_get in H.
-      rewrite nth_error_nil in H.
-      congruence.
-    + destruct tid; cbn in *; eauto.
-  - generalize dependent tid.
-    induction ts; simpl; intros.
-    + destruct tid; cbn in *.
-      congruence.
-      rewrite thread_get_S in H.
-      exfalso.
-      unfold thread_get in H.
-      rewrite nth_error_nil in H.
-      congruence.
-    + destruct tid; cbn in *; eauto.
-Qed.
-
-Lemma thread_upd_app_NoProc : forall `(ts : @threads_state opT) tid p,
-  tid < length ts ->
-  ts [[ tid := p ]] ++ [NoProc] = (ts ++ [NoProc]) [[ tid := p ]].
-Proof.
-  induction ts; simpl; intros; try omega.
-  destruct tid.
-  - repeat rewrite thread_upd_0.
-    reflexivity.
-  - repeat rewrite thread_upd_S.
-    simpl; f_equal.
-    rewrite IHts; auto.
-    omega.
-Qed.
-
-Lemma thread_upd_app_length : forall `(ts : @threads_state opT) p p' ts',
-  (ts ++ p :: ts') [[ length ts := p' ]] = ts ++ p' :: ts'.
-Proof.
-  induction ts; simpl; intros.
-  - rewrite thread_upd_0; eauto.
-  - rewrite thread_upd_S.
-    f_equal.
-    eauto.
-Qed.
-
 
 Ltac maybe_proc_inv := match goal with
   | H : ?a = ?a |- _ =>
     clear H
   | H : Proc _ = Proc _ |- _ =>
     inversion H; clear H; subst
+  | H : Proc _ = NoProc |- _ =>
+    solve [ exfalso; inversion H ]
+  | H : NoProc = Proc _ |- _ =>
+    solve [ exfalso; inversion H ]
   | H : existT _ _ _ = existT _ _ _ |- _ =>
     sigT_eq
   | H : existT _ _ _ = existT _ _ _ |- _ =>
@@ -827,3 +597,59 @@ Ltac atomic_exec_inv :=
     inversion H; clear H; subst; repeat maybe_proc_inv
   end;
   autorewrite with t in *.
+
+Definition thread_map opT1 opT2
+           (f: forall T, proc opT1 T -> proc opT2 T)
+           (ts:@threads_state opT1) : @threads_state opT2 :=
+  Map.map (fun '(existT _ _ p) => existT _ _ (f _ p)) ts.
+
+Theorem thread_map_get : forall `(f: forall T, proc opT1 T -> proc opT2 T) ts tid,
+    thread_map f ts tid = match ts tid with
+                          | Proc p => Proc (f _ p)
+                          | NoProc => NoProc
+                          end.
+Proof.
+  unfold thread_map, thread_get; simpl; intros.
+  destruct_with_eqn (Map.get ts tid); autorewrite with upd; auto.
+  destruct s; autorewrite with upd; eauto.
+  rewrite Map.map_get_match; simpl_match; auto.
+Qed.
+
+Theorem thread_map_Forall : forall `(f: forall T, proc opT1 T -> proc opT2 T)
+                              (P: forall T, proc opT1 T -> Prop)
+                              (Q: forall T, proc opT2 T -> Prop)
+                              ts,
+    thread_Forall P ts ->
+    (forall T (p: proc opT1 T), P _ p -> Q _ (f _ p)) ->
+    thread_Forall Q (thread_map f ts).
+Proof.
+  unfold thread_map, thread_Forall; intros.
+  eapply Map.map_Forall; eauto; intros.
+  destruct v; eauto.
+Qed.
+
+Theorem thread_max_eq : forall opT1 opT2
+                          (ts1: @threads_state opT1) (ts2: @threads_state opT2),
+    (forall tid, ts1 tid = NoProc <-> ts2 tid = NoProc) ->
+    Map.max ts1 = Map.max ts2.
+Proof.
+  unfold thread_get; intros.
+  apply Map.max_eq; intros.
+  specialize (H a); destruct H.
+  destruct (Map.get ts1 a), (Map.get ts2 a);
+    repeat match goal with
+           | [ s: {_ & _} |- _ ] => destruct s
+           end;
+    (intuition auto);
+    congruence.
+Qed.
+
+Arguments threads_empty {opT}.
+Global Opaque thread_get thread_upd threads_empty.
+(* reproduce upd database from FinMap *)
+Hint Rewrite thread_upd_eq : t.
+Hint Rewrite thread_upd_ne using solve [ auto ] : t.
+Hint Rewrite thread_upd_upd_eq : t.
+Hint Rewrite thread_upd_same_eq using solve [ auto ] : t.
+Hint Rewrite thread_mapping_finite using solve [ auto ] : t.
+Hint Rewrite threads_empty_max : t.

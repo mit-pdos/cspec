@@ -892,8 +892,8 @@ Definition test_thread :=
     (fun _ => _ <- Op Inc; _ <- Op Dec; Ret tt)
     None.
 
-Definition test_threads :=
-  repeat (Proc test_thread) 16.
+Definition test_threads : threads_state :=
+  threads_from_list (repeat (existT _ _ test_thread) 16).
 
-Definition compiled_threads :=
-  c.compile_ts test_threads.
+Definition compiled_threads : list (maybe_proc _) :=
+  threads_to_list (c.compile_ts test_threads).
