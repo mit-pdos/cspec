@@ -653,3 +653,22 @@ Hint Rewrite thread_upd_upd_eq : t.
 Hint Rewrite thread_upd_same_eq using solve [ auto ] : t.
 Hint Rewrite thread_mapping_finite using solve [ auto ] : t.
 Hint Rewrite threads_empty_max : t.
+
+(* compare thread ids and perform cleanup *)
+Ltac cmp_ts tid1 tid2 :=
+  destruct (tid1 == tid2); subst;
+  autorewrite with t in *.
+
+(* abstract the thread state in an exec goal (to deal with different update
+forms) *)
+Ltac abstract_ts :=
+  match goal with
+    |- exec_prefix _ _ ?ts _ => abstract_term ts
+  end.
+
+(* abstract the trace in an exec goal (to deal with different calls to
+prepend/list append) *)
+Ltac abstract_tr :=
+  match goal with
+  | |- exec_prefix _ _ _ ?tr => abstract_term tr
+  end.

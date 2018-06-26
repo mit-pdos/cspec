@@ -110,11 +110,6 @@ Proof.
   eauto.
 Qed.
 
-(* TODO: move this somewhere else *)
-Ltac cmp_ts tid1 tid2 :=
-  destruct (tid1 == tid2); subst;
-  autorewrite with t in *.
-
 Theorem exec_equiv_ret_None : forall opT `(v : T),
   @exec_equiv_opt opT (Proc (Ret v)) NoProc.
 Proof.
@@ -270,14 +265,12 @@ Proof.
   auto.
 Qed.
 
+(* the ExecPrefix tactic solves exec_prefix goals by splitting them into one
+execution step and leaving the exec_prefix for [auto] *)
+
 Hint Resolve thread_upd_other_eq : exec_prefix.
 Hint Resolve thread_upd_ne_comm : exec_prefix.
 Hint Extern 2 (_ <> _) => apply not_eq_sym : exec_prefix.
-
-Ltac abstract_ts :=
-  match goal with
-    |- exec_prefix _ _ ?ts _ => abstract_term ts
-  end.
 
 Hint Extern 0 (exec_prefix _ _ _ _) =>
 match goal with

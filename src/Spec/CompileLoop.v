@@ -202,25 +202,6 @@ Section Compiler.
       destruct (Bool.bool_dec (c x) true); eauto.
   Qed.
 
-  (* TODO: move this to Helpers *)
-  Local Ltac _especialize H :=
-    lazymatch type of H with
-    | forall (x:?T), _ => let x := fresh x in
-                    lazymatch type of T with
-                    | Prop => unshelve (evar (x:T);
-                          specialize (H x);
-                          subst x)
-                    | _ => evar (x:T);
-                          specialize (H x);
-                          subst x
-                    end
-    end.
-
-  Ltac epose_proof H :=
-    let H' := fresh in
-    pose proof H as H';
-    repeat (_especialize H').
-
   Theorem compile_traces_match_ts :
     forall ts1 ts2,
       proc_match compile_ok ts1 ts2 ->
