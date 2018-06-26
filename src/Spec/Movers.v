@@ -38,11 +38,11 @@ Section StatePred.
   Qed.
 
   Theorem pred_stable_exec_tid :
-    forall s0 s1 tid tid' `(p : proc _ T) r evs,
+    forall s0 s1 tid tid' `(p : proc _ T) r spawned evs,
       pred_stable ->
       tid <> tid' ->
       P tid s0 ->
-      exec_tid op_step tid' s0 p s1 r evs ->
+      exec_tid op_step tid' s0 p s1 r spawned evs ->
       P tid s1.
   Proof.
     intros.
@@ -67,7 +67,9 @@ Theorem pred_stable_exec_any_others : forall `(op_step : OpSemantics opT State) 
       P tid s /\ exec_any op_step tid s p r s0 /\ exec_others op_step tid s0 s').
 Proof.
   unfold pred_stable; intros; repeat deex.
-  do 2 eexists; intuition eauto.
+  descend; intuition eauto.
+  Grab Existential Variables.
+  exact (fun _ => Ret tt).
 Qed.
 
 Hint Resolve pred_stable_any.
@@ -232,37 +234,40 @@ Section Movers.
     - edestruct IHatomic_exec; intuition eauto.
   Qed.
 
-  Lemma exec_tid_right_mover : forall tid0 tid1 s s0 `(p : proc opT T) s1 result' evs evsM v0,
+  Lemma exec_tid_right_mover :
+    forall tid0 tid1 s s0 `(p : proc opT T)
+      s1 result' spawned evs evsM v0,
     right_mover ->
     tid0 <> tid1 ->
     op_step opMover tid0 s v0 s0 evsM ->
-    exec_tid op_step tid1 s0 p s1 result' evs ->
+    exec_tid op_step tid1 s0 p s1 result' spawned evs ->
     exists s0',
       evsM = nil /\
-      exec_tid op_step tid1 s p s0' result' evs /\
+      exec_tid op_step tid1 s p s0' result' spawned evs /\
       op_step opMover tid0 s0' v0 s1 evsM.
   Proof.
     intros.
+    unfold right_mover in H.
+    edestruct H; eauto; propositional.
     induction H2; simpl; eauto.
-    - edestruct H; eauto.
-    - edestruct H; eauto.
-      edestruct H4; intuition eauto.
+    - edestruct H4; intuition eauto.
     - edestruct atomic_exec_right_mover; intuition eauto.
     - edestruct IHexec_tid; intuition eauto.
-    - edestruct H; eauto.
   Qed.
 
-  Lemma exec_tid_left_mover : forall tid0 tid1 s s0 `(p : proc opT T) s1 result' evs evsM v0 P,
+  Lemma exec_tid_left_mover :
+    forall tid0 tid1 s s0 `(p : proc opT T)
+      s1 result' spawned evs evsM v0 P,
     left_mover_pred P ->
     pred_stable op_step P ->
     P tid0 s ->
     tid0 <> tid1 ->
-    exec_tid op_step tid1 s p s0 result' evs ->
+    exec_tid op_step tid1 s p s0 spawned result' evs ->
     op_step opMover tid0 s0 v0 s1 evsM ->
     exists s0',
       evsM = nil /\
       op_step opMover tid0 s v0 s0' evsM /\
-      exec_tid op_step tid1 s0' p s1 result' evs.
+      exec_tid op_step tid1 s0' p s1 spawned result' evs.
   Proof.
     intros.
     induction H3; simpl; eauto.
@@ -278,6 +283,8 @@ Section Movers.
       intuition eauto.
     - edestruct atomic_exec_left_mover; intuition eauto.
     - edestruct IHexec_tid; intuition eauto.
+    - edestruct H; eauto.
+      edestruct H5; eauto.
     - edestruct H; eauto.
       edestruct H5; eauto.
   Qed.
@@ -298,10 +305,10 @@ Section Movers.
 
   Lemma enabled_stable_exec_tid :
     enabled_stable ->
-    forall tid tid' s `(p : proc opT T) r s' evs,
+    forall tid tid' s `(p : proc opT T) r s' spawned evs,
       tid <> tid' ->
       enabled_in tid s ->
-      exec_tid op_step tid' s p s' r evs ->
+      exec_tid op_step tid' s p s' r spawned evs ->
       enabled_in tid s'.
   Proof.
     intros.
@@ -309,6 +316,16 @@ Section Movers.
   Qed.
 
   Hint Resolve enabled_stable_exec_tid.
+
+  Lemma thread_upd_from_same : forall opT (ts: @threads_state opT) tid p1 tid' p2,
+      ts tid = p1 ->
+      ts [[tid := p1]] [[tid' := p2]] = ts [[tid' := p2]].
+  Proof.
+    intros.
+    rewrite thread_upd_same_eq with (tid:=tid) by auto; auto.
+  Qed.
+
+  Hint Resolve thread_upd_from_same : exec_prefix.
 
   Lemma exec_left_mover : forall s ts tid `(rx : _ -> proc opT T) tr P,
     left_mover_pred P ->
@@ -327,37 +344,32 @@ Section Movers.
       remember (thread_upd ts tid p);
       generalize dependent ts;
       unfold exec_prefix in H; repeat deex;
-      induction H; intros; subst
+      induction H; intros; subst; NoProc_upd
     end.
 
-    - destruct (tid == tid0); subst.
-      + autorewrite with t in *.
-        repeat maybe_proc_inv.
+    - cmp_ts tid tid0.
+      + repeat maybe_proc_inv.
         repeat exec_tid_inv.
 
         edestruct H; clear H; eauto.
-        edestruct H4; clear H4; eauto.
+        edestruct H5; clear H5; eauto.
         subst.
-        do 2 eexists; intuition eauto.
+        descend; intuition eauto.
+        abstract_ts; eauto with exec_prefix.
 
-      + autorewrite with t in *.
-
-        edestruct IHexec; intuition idtac.
+      + edestruct IHexec; intuition idtac.
           eapply enabled_stable_exec_tid; eauto.
           destruct H; eauto.
           eapply pred_stable_exec_tid; eauto.
-        rewrite thread_upd_ne_comm; eauto.
+          eauto with exec_prefix.
         repeat deex.
 
         eapply exec_tid_left_mover in H2; eauto.
         repeat deex.
 
-        do 2 eexists; intuition eauto.
+        descend; intuition eauto.
 
-        eapply ExecPrefixOne with (tid := tid0).
-          autorewrite with t; eauto.
-          eauto.
-          rewrite thread_upd_ne_comm; eauto.
+        ExecPrefix tid0 tid'.
 
     - edestruct H1; repeat deex.
       edestruct H; clear H; eauto.
@@ -379,6 +391,8 @@ Section Movers.
     intros.
     eapply trace_incl_proof_helper; intros.
     repeat exec_tid_inv.
+    rewrite thread_upd_same_eq with (tid:=tid') in H3 by auto.
+    clear dependent tid'.
 
     match goal with
     | H : exec_prefix _ _ (thread_upd ?ts ?tid ?pp) _ |- _ =>
@@ -386,33 +400,20 @@ Section Movers.
       generalize dependent ts;
       generalize dependent s;
       destruct H as [? H];
-      induction H; simpl; intros; subst; eauto
+      induction H; simpl; intros; subst; eauto; NoProc_upd
     end.
 
-    destruct (tid == tid0); subst.
-    + autorewrite with t in *.
-      repeat maybe_proc_inv.
+    cmp_ts tid tid0.
+    + repeat maybe_proc_inv.
       repeat exec_tid_inv.
 
       abstract_tr.
-      eapply ExecPrefixOne with (tid := tid0).
-        autorewrite with t in *; eauto.
-        eauto.
-        simpl. autorewrite with t. eauto.
+      ExecPrefix tid0 tid'.
       rewrite prepend_app; auto.
-    + autorewrite with t in *.
-      edestruct exec_tid_right_mover; intuition eauto.
-      edestruct IHexec; eauto.
-        rewrite thread_upd_ne_comm; eauto.
-      intuition idtac.
-
+    + edestruct exec_tid_right_mover; eauto; propositional.
       abstract_tr.
-      eapply ExecPrefixOne with (tid := tid0).
-        autorewrite with t; eauto.
-        eauto.
-        rewrite thread_upd_ne_comm; eauto.
-      subst; simpl; eauto.
-
+      ExecPrefix tid0 tid'.
+      reflexivity.
     + edestruct H; eauto; subst; simpl; eauto.
   Qed.
 
@@ -428,18 +429,15 @@ Section Movers.
     intros.
     eapply trace_incl_proof_helper; intros.
     repeat exec_tid_inv.
-    eapply exec_left_mover with (P := any) in H2; eauto.
+    eapply exec_left_mover with (P := any) in H4; eauto.
     repeat deex.
 
     abstract_tr.
-    eapply ExecPrefixOne with (tid := tid).
-      autorewrite with t; eauto.
-      eauto.
-      autorewrite with t. eauto.
+    ExecPrefix tid tid'.
     rewrite app_nil_r; eauto.
 
     eapply left_mover_left_mover_pred; eauto.
-    firstorder.
+    hnf; auto.
   Qed.
 
   Theorem trace_incl_atomize_op_ret_left_mover :
@@ -455,26 +453,25 @@ Section Movers.
     intros.
     eapply trace_incl_proof_helper; intros.
     repeat exec_tid_inv.
-    rewrite exec_equiv_bind_bind in H2.
-    eapply exec_left_mover with (P := any) in H2; eauto.
+    rewrite exec_equiv_bind_bind in H4.
+    eapply exec_left_mover with (P := any) in H4; eauto.
     repeat deex.
 
-    eapply trace_incl_ts_s_proof_helper in H2.
+    eapply trace_incl_ts_s_proof_helper in H4.
     repeat deex.
 
     abstract_tr.
-    eapply ExecPrefixOne with (tid := tid).
-      autorewrite with t; eauto.
-      eauto 10.
-      autorewrite with t. eauto.
+    ExecPrefix tid tid'.
     rewrite app_nil_r; eauto.
 
     intros.
     repeat exec_tid_inv.
-    eauto.
+    abstract_ts.
+    eassumption.
+    rewrite thread_upd_same_eq with (tid:=tid'0) by auto; auto.
 
     eapply left_mover_left_mover_pred; eauto.
-    firstorder.
+    hnf; auto.
   Qed.
 
 End Movers.
@@ -639,12 +636,10 @@ Section YSA.
       repeat deex.
       eexists; split.
 
-      eapply ExecPrefixOne with (tid := tid).
-        autorewrite with t; eauto.
-        eauto.
-        autorewrite with t; eauto.
-      rewrite prepend_app.
+      ExecPrefix tid tid'.
+      rewrite thread_upd_same_eq with (tid:=tid') in * by auto.
       eauto.
+      rewrite prepend_app; auto.
     }
 
     edestruct H0; clear H0; eauto.
@@ -658,15 +653,16 @@ Section YSA.
     generalize dependent T.
     generalize dependent s'.
     generalize dependent tr.
-    induction H4; intros.
+    induction H6; intros.
 
-    - repeat rewrite exec_equiv_bind_bind in H4.
-      eapply exec_left_mover in H4; eauto; repeat deex.
+    - repeat rewrite exec_equiv_bind_bind in H6.
+      eapply exec_left_mover in H6; eauto; repeat deex.
 
-      edestruct H3.
+      edestruct H5.
       eauto.
       eassumption.
-      eauto 20.
+      rewrite thread_upd_same_eq with (tid:=tid') in * by auto.
+      descend; split; eauto.
       reflexivity.
 
       repeat deex.
@@ -675,13 +671,14 @@ Section YSA.
       abstract_term evs1; eauto.
       eauto.
 
-    - rewrite exec_equiv_ret_bind in H3.
+    - rewrite exec_equiv_ret_bind in H5.
+      rewrite thread_upd_same_eq with (tid:=tid') in * by auto.
       descend; intuition idtac.
       eauto.
       eauto.
       eauto.
   Grab Existential Variables.
-    all: exact tt.
+  exact (Ret tt).
   Qed.
 
 
@@ -696,7 +693,7 @@ Section YSA.
     atomic_exec_inv.
     eauto.
   Grab Existential Variables.
-    all: exact tt.
+    all: exact (Ret tt).
   Qed.
 
   Lemma pred_stable_exec_any_atomic_ret :
@@ -754,7 +751,7 @@ Section YSA.
 
       2: intros; intuition eauto.
       2: simpl.
-      2: eauto 20.
+      2: descend; split; eauto.
 
       eauto.
 
@@ -762,7 +759,7 @@ Section YSA.
       reflexivity.
 
   Grab Existential Variables.
-    all: exact tt.
+  all: exact (Ret tt).
   Qed.
 
   Lemma ysa_movers_right_movers :

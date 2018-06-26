@@ -15,6 +15,9 @@ Require Import Compile.
 Require Import CompileLoop.
 Require Import Protocol.
 
+Require Import Coq.Program.Equality.
+
+
 Import ListNotations.
 
 Global Set Implicit Arguments.
@@ -33,6 +36,17 @@ Section HorizontalComposition.
   Variable initP : sliceState -> Prop.
 
   Definition validIndexT := { i : indexT | indexValid i }.
+
+  Global Instance validIndexT_dec : EqualDec validIndexT.
+  Proof.
+    hnf; intros.
+    destruct x as [x ?], y as [y ?].
+    destruct (x == y); subst; [ left | right ].
+    - f_equal.
+      apply proof_irrelevance.
+    - intro.
+      invert H; congruence.
+  Qed.
 
   Inductive CheckResult :=
   | Missing
@@ -98,6 +112,13 @@ Section HorizontalComposition.
     eapply FMap.mapsto_add in m; eauto.
   Qed.
 
+  Theorem hget_hadd_eq_general : forall i s s',
+      hget (hadd i s s') i = s.
+  Proof.
+    destruct i; intros.
+    apply hget_hadd_eq.
+  Qed.
+
   Theorem hget_hadd_ne : forall S s i i' H0 H1,
     i <> i' ->
     hget (hadd (exist _ i H0) s S) (exist _ i' H1) = hget S (exist _ i' H1).
@@ -108,6 +129,19 @@ Section HorizontalComposition.
     end.
     eapply FMap.mapsto_add_ne in m; eauto.
     eapply FMap.mapsto_unique; eauto.
+  Qed.
+
+  Theorem hget_hadd_ne_general : forall i i' s S,
+      i <> i' ->
+      hget (hadd i s S) i' = hget S i'.
+  Proof.
+    intros.
+    destruct i, i'.
+    destruct (x == x0); subst.
+    exfalso.
+    apply H.
+    f_equal; auto using proof_irrelevance.
+    apply hget_hadd_ne; auto.
   Qed.
 
   Theorem hadd_hget_eq : forall S i H0 H1,
@@ -190,7 +224,47 @@ Section HorizontalComposition.
     | Bind p1 p2 => Bind (SliceProc i p1) (fun r => SliceProc i (p2 r))
     | Until cond p init => Until cond (fun x => SliceProc i (p x)) init
     | Atomic p => Atomic (SliceProc i p)
+    | Spawn p => Spawn (SliceProc i p)
     end.
+
+  Theorem SliceProc_eq : forall i T (p p': proc _ T),
+      SliceProc i p = SliceProc i p' ->
+      p = p'.
+  Proof.
+    induction p; intros;
+      try solve [ destruct p'; simpl in *; try congruence; invert H; auto ].
+    - destruct p'; simpl in *; try congruence.
+      invert H0; eauto.
+      f_equal; eauto.
+      extensionality r.
+      invert H0.
+      apply equal_f with r in H5.
+      eauto.
+    - destruct p'; simpl in *; try congruence.
+      invert H0.
+      f_equal.
+      extensionality x.
+      apply equal_f with x in H3.
+      eauto.
+    - destruct p'; simpl in *; try congruence.
+      invert H.
+      f_equal.
+      eauto.
+    - dependent destruction p'; simpl in *; try congruence.
+      invert H.
+      erewrite IHp; eauto.
+  Qed.
+
+  Theorem SliceProc_spawn : forall i (p1: proc _ unit) T' (p2: proc _ T'),
+      Spawn (SliceProc i p2) = SliceProc i p1 ->
+      p1 = Spawn p2.
+  Proof.
+    intros.
+    dependent destruction p1; simpl in *; intros; try congruence.
+    invert H.
+    eapply SliceProc_eq in H2.
+    f_equal; auto.
+  Qed.
 
 End HorizontalComposition.
 
@@ -514,13 +588,27 @@ Section HorizontalCompositionMovers.
         eexists; split; eauto.
   Qed.
 
+  Lemma hadd_hget_eq' : forall (i: validIndexT indexValid) (s: horizState _ _ sliceState),
+      s = hadd i (hget s i) s.
+  Proof.
+    intros.
+    destruct_validIndex.
+    rewrite hadd_hget_eq; auto.
+  Qed.
+
+  Hint Resolve hadd_hget_eq'.
+
   Lemma exec_tid_slice :
-    forall S1 S2 tid `(p : proc _ T) r evs,
-      exec_tid (horizStep indexT indexValid sliceStep) tid S1 p S2 r evs ->
+    forall S1 S2 tid `(p : proc _ T) r spawned evs,
+      exec_tid (horizStep indexT indexValid sliceStep) tid S1 p S2 r spawned evs ->
       forall `(p' : proc _ T) i,
         p = SliceProc i p' ->
-        exists s' r',
-          exec_tid sliceStep tid (hget S1 i) p' s' r' evs /\
+        exists spawned' s' r',
+        spawned = match spawned' with
+                  | Proc p => Proc (SliceProc i p)
+                  | NoProc => NoProc
+                  end /\
+          exec_tid sliceStep tid (hget S1 i) p' s' r' spawned' evs /\
           S2 = hadd i s' S1 /\
           match r with
           | inl v => r' = inl v
@@ -528,37 +616,39 @@ Section HorizontalCompositionMovers.
           end.
   Proof.
     induction 1; intros; subst.
-    - destruct p'; simpl in *; try congruence.
-      inversion H; clear H; subst; repeat sigT_eq.
-      do 2 eexists; split; eauto.
-      split; eauto.
-      destruct_validIndex.
-      rewrite hadd_hget_eq; eauto.
-    - destruct p'; simpl in *; try congruence.
-      inversion H0; clear H0; subst; repeat sigT_eq.
-      inversion H; clear H; subst; repeat sigT_eq.
+    - exists NoProc; simpl.
+      destruct p'; simpl in *; try congruence.
+      invert H.
+      descend; simpl; intuition eauto.
+    - exists NoProc; simpl.
+      destruct p'; simpl in *; try congruence.
+      invert H0.
+      invert H.
       eauto 10.
-    - destruct p'; simpl in *; try congruence.
+    - exists NoProc; simpl.
+      destruct p'; simpl in *; try congruence.
       inversion H0; clear H0; subst; repeat sigT_eq.
       eapply atomic_exec_horizStep in H; eauto; deex.
       eauto 10.
     - destruct p'; simpl in *; try congruence.
       inversion H0; clear H0; subst; repeat sigT_eq.
       edestruct IHexec_tid; eauto; repeat deex.
-      do 2 eexists; split; eauto.
+      descend; intuition eauto.
       destruct result; subst; eauto.
       deex; eauto.
-    - destruct p'; simpl in *; try congruence.
-      inversion H; clear H; subst; repeat sigT_eq.
-      do 2 eexists; split; eauto.
-      split; eauto.
-      destruct_validIndex.
-      rewrite hadd_hget_eq; eauto.
-      eexists; split; eauto.
+    - exists NoProc; simpl.
+      destruct p'; simpl in *; try congruence.
+      invert H.
+      descend; intuition eauto.
+      descend; intuition eauto.
       unfold until1; simpl.
       f_equal.
-      apply functional_extensionality; intros.
-      destruct (Bool.bool_dec (c0 x) true); eauto.
+      extensionality x.
+      destruct matches.
+    - dependent destruction p'; simpl in *; try congruence.
+      invert H.
+      eexists (Proc _).
+      descend; intuition eauto.
   Qed.
 
   Lemma exec_any_slice :
@@ -611,7 +701,7 @@ Section HorizontalCompositionMovers.
       rewrite hget_hadd_ne in * by eauto.
       eauto.
   Unshelve.
-    all: try exact tt.
+    all: try exact (Ret tt).
   Qed.
 
   Hint Resolve exec_any_slice.
@@ -815,17 +905,55 @@ Module LayerImplMoversProtocolHT
       econstructor; eauto.
   Qed.
 
+  Existing Instance i.indexCmp.
+
+  Hint Rewrite hget_hadd_eq_general : h.
+  Hint Rewrite hget_hadd_ne_general using solve [ auto ] : h.
+
+  Lemma step_high_to_step_low :
+    forall s s' (i: validIndexT i.indexValid) T (op: hp.ho.opT T) tid r evs,
+      restricted_step hl1raw.step hp.step_allow op tid s r s' evs ->
+      (exists (op': o1.opT T) r' evs',
+          restricted_step l1raw.step p.step_allow op' tid (hget s i) r' (hget s' i) evs') \/
+      hget s i = hget s' i.
+  Proof.
+    intros.
+    unfold restricted_step in *; propositional.
+    unfold hp.step_allow, hl1raw.step in *.
+    invert H0; clear H0.
+    - destruct (i == idx); subst;
+        autorewrite with h;
+        eauto 10.
+    - eauto.
+  Qed.
+
+  Lemma exec_ops_high : forall s s' (i: validIndexT i.indexValid),
+      exec_ops (restricted_step hl1raw.step hp.step_allow) s s' ->
+      exec_ops (restricted_step l1raw.step p.step_allow) (hget s i) (hget s' i).
+  Proof.
+    unfold exec_ops; intros.
+    induction H; propositional.
+    reflexivity.
+
+    transitivity (hget y i); auto.
+    eapply step_high_to_step_low with (i:=i) in H;
+      (intuition propositional);
+      eauto.
+    - econstructor; [ | reflexivity ].
+      descend; eauto.
+    - replace (hget y i).
+      reflexivity.
+  Qed.
+
   Theorem op_follows_protocol : forall tid s `(op : ho2.opT T),
     follows_protocol_proc hl1raw.step hp.step_allow tid s (compile_op op).
   Proof.
     destruct op; simpl.
-    - pose proof (a.op_follows_protocol).
-      specialize (H tid (hget s i) _ op).
-      remember (a.compile_op op).
-      clear Heqp.
+    - pose proof (a.op_follows_protocol tid (hget s i) op).
+      generalize dependent (a.compile_op op); intros; clear dependent op.
       remember (hget s i).
-      clear op.
       generalize dependent s.
+      generalize dependent i.
       induction H; intros; subst; simpl.
       + constructor. eauto.
       + constructor. eauto.
@@ -839,8 +967,24 @@ Module LayerImplMoversProtocolHT
         inversion H1; clear H1; subst; repeat sigT_eq; simpl in *.
         * econstructor; eauto.
         * econstructor; eauto.
-      + constructor. eauto.
+      + constructor; intros.
+        eapply H0; eauto.
       + constructor.
+      + constructor; intros.
+        assert (forall tid', tid <> tid' ->
+                        follows_protocol_proc hl1raw.step hp.step_allow
+                                              tid' s0 (SliceProc i p)).
+        eauto.
+        rename H into Hspawn.
+        unfold spawn_follows_protocol; intros.
+        specialize (H1 tid' ltac:(auto)).
+        specialize (H0 tid' ltac:(auto)).
+        specialize (Hspawn tid' ltac:(auto)).
+
+        assert (exec_ops (restricted_step l1raw.step p.step_allow)
+                         (hget s0 i) (hget s' i)).
+        eapply exec_ops_high; eauto.
+        eauto.
     - constructor; constructor.
   Qed.
 

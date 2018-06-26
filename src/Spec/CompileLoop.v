@@ -28,6 +28,7 @@ Section Compiler.
     | Bind p1 p2 => Bind (compile p1) (fun r => compile (p2 r))
     | Atomic p => Atomic (compile p)
     | Until c p v => Until c (fun r => compile (p r)) v
+    | Spawn p => Spawn (compile p)
     end.
 
   Inductive compile_ok : forall T (p1 : proc opLoT T) (p2 : proc opMidT T), Prop :=
@@ -50,6 +51,9 @@ Section Compiler.
   | CompileUntil : forall `(p1 : option T -> proc opLoT T) (p2 : option T -> proc opMidT T) (c : T -> bool) v,
     (forall v', compile_ok (p1 v') (p2 v')) ->
     compile_ok (Until c p1 v) (Until c p2 v)
+  | CompileSpawn : forall T (p1: proc opLoT T) (p2: proc opMidT T),
+      compile_ok p1 p2 ->
+      compile_ok (Spawn p1) (Spawn p2)
   .
 
   Hint Constructors compile_ok.
@@ -63,11 +67,10 @@ Section Compiler.
     - destruct (compile_op op) as [x iv] eqn:He1.
       destruct x as [body cond] eqn:He2.
       eauto.
-    - inversion H0; clear H0; repeat sigT_eq.
-      eauto.
-    - inversion H0; clear H0; repeat sigT_eq.
-      eauto.
-    - inversion H.
+    - invert H0; eauto.
+    - invert H0; eauto.
+    - invert H.
+    - invert H; eauto.
   Qed.
 
   Theorem compile_no_atomics :
@@ -79,9 +82,10 @@ Section Compiler.
     - destruct (compile_op op) as [x iv] eqn:He1.
       destruct x as [body cond] eqn:He2.
       eauto.
-    - inversion H0; clear H0; repeat sigT_eq. eauto.
-    - inversion H0; clear H0; repeat sigT_eq. eauto.
-    - inversion H.
+    - invert H0; eauto.
+    - invert H0; eauto.
+    - invert H.
+    - invert H; eauto.
   Qed.
 
   Definition compile_ts ts :=
@@ -122,7 +126,7 @@ Section Compiler.
   Variable hi_step : OpSemantics opMidT State.
 
   Definition noop_or_success :=
-    forall `(opM : opMidT T) opL cond iv tid s r s',
+    forall T (opM : opMidT T) opL cond iv tid s r s',
       (opL, cond, iv) = compile_op opM ->
       forall v evs,
         lo_step (opL v) tid s r s' evs ->
@@ -134,15 +138,17 @@ Section Compiler.
 
   Lemma compile_ok_exec_tid : forall T (p1 : proc _ T) p2,
     compile_ok p1 p2 ->
-    forall tid s s' result evs,
-      exec_tid lo_step tid s p1 s' result evs ->
+    forall tid s s' result spawned evs,
+      exec_tid lo_step tid s p1 s' result spawned evs ->
       (exists p1',
         s' = s /\
         result = inr p1' /\
         compile_ok p1' p2 /\
+        spawned = NoProc /\
         evs = nil) \/
-      (exists result',
-        exec_tid hi_step tid s p2 s' result' evs /\
+      (exists spawned' result',
+        exec_tid hi_step tid s p2 s' result' spawned' evs /\
+        proc_optR compile_ok spawned spawned' /\
         match result with
         | inl v => match result' with
           | inl v' => v = v'
@@ -163,19 +169,21 @@ Section Compiler.
       eapply is_noop_or_success in H6; eauto.
       intuition idtac; subst.
       + left.
-        eexists; intuition idtac.
+        descend; intuition idtac.
         rewrite H1.
         destruct (Bool.bool_dec false true); try congruence.
         eauto.
       + right.
-        eexists; intuition idtac.
+        descend; intuition idtac.
+        eauto.
         eauto.
         simpl.
         rewrite H1.
         destruct (Bool.bool_dec true true); try congruence.
     - right.
       exec_tid_inv.
-      eexists; intuition idtac.
+      descend; intuition idtac.
+      eauto.
       eauto.
       simpl; eauto.
     - left.
@@ -189,17 +197,21 @@ Section Compiler.
         eauto.
       + repeat deex; subst.
         right.
-        eexists; intuition idtac.
+        descend; intuition idtac.
+        eauto.
         eauto.
         destruct result0; destruct result'; subst; eauto;
           try solve [ exfalso; eauto ].
     - right.
       exec_tid_inv.
-      eexists; intuition idtac.
+      descend; intuition idtac.
       eauto.
       simpl; eauto.
       constructor; eauto; intros.
       destruct (Bool.bool_dec (c x) true); eauto.
+    - right.
+      exec_tid_inv.
+      descend; intuition eauto.
   Qed.
 
   Theorem compile_traces_match_ts :
@@ -212,47 +224,42 @@ Section Compiler.
     destruct H0.
     induction H; eauto; intros.
 
-    eapply proc_match_pick with (tid := tid) in H2 as H2'.
+    eapply proc_match_pick with (tid := tid) in H3 as H2'.
     intuition idtac; try congruence.
     repeat deex.
-    rewrite H in H3; inversion H3; clear H3; subst; repeat sigT_eq.
+    rewrite H in H4; invert H4.
 
-    edestruct compile_ok_exec_tid; eauto;
-      repeat deex.
+    eapply compile_ok_exec_tid in H1; eauto.
+    (intuition eauto); propositional.
 
     - simpl.
+      rewrite thread_upd_same_eq with (tid:=tid') in * by auto.
       eapply IHexec.
-      erewrite <- thread_upd_same_eq with (ts := ts2).
-      eapply proc_match_upd; eauto.
-      eauto.
-
-    - destruct result.
+      erewrite <- thread_upd_same_eq with (ts := ts2) (tid := tid) by eassumption.
+      apply proc_match_upd; eauto.
+    - assert (ts2 tid' = NoProc) by eauto using proc_match_none.
+      destruct result.
       + epose_proof IHexec.
-          eapply proc_match_del; eauto.
-        eapply ExecPrefixOne with (tid := tid).
-          eauto.
-          eauto.
-          destruct result'; eauto; exfalso; eauto.
+        eapply proc_match_del; eauto.
+        apply proc_match_upd_opt; eauto.
+        ExecPrefix tid tid'.
+        destruct result'; propositional; eauto.
 
-      + destruct result'; subst.
+      + destruct result'; propositional.
         * epose_proof IHexec.
             eapply proc_match_upd; eauto.
+            apply proc_match_upd_opt; eauto.
 
-          rewrite exec_equiv_ret_None in H6.
+          rewrite exec_equiv_ret_None in H8.
 
           abstract_tr.
-          eapply ExecPrefixOne with (tid := tid).
-            eauto.
-            eauto.
-            eauto.
-          auto.
+          ExecPrefix tid tid'.
+          reflexivity.
 
         * epose_proof IHexec.
             eapply proc_match_upd; eauto.
-          eapply ExecPrefixOne with (tid := tid).
-            eauto.
-            eauto.
-            eauto.
+            apply proc_match_upd_opt; eauto.
+          ExecPrefix tid tid'.
   Qed.
 
 End Compiler.

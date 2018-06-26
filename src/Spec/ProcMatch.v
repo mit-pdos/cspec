@@ -253,3 +253,22 @@ Proof.
     rewrite H in *; auto.
   - eauto using proc_match_max_eq.
 Qed.
+
+Inductive proc_optR opT opT' (R: forall T, proc opT T -> proc opT' T -> Prop) :
+  maybe_proc opT -> maybe_proc opT' -> Prop :=
+| ProcOptR : forall T p1 p2, R T p1 p2 -> proc_optR R (Proc p1) (Proc p2)
+| ProcOptR_NoProc : proc_optR R NoProc NoProc.
+
+Hint Constructors proc_optR.
+
+Theorem proc_match_upd_opt : forall `(ts1: @threads_state opT) `(ts2: @threads_state opT')
+                               R tid p1 p2,
+    proc_match R ts1 ts2 ->
+    proc_optR R p1 p2 ->
+    proc_match R (ts1 [[tid := p1]]) (ts2 [[tid := p2]]).
+Proof.
+  intros.
+  invert H0.
+  auto using proc_match_upd.
+  auto using proc_match_del.
+Qed.

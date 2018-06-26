@@ -7,7 +7,7 @@ import Control.Exception
 import Data.Atomics
 import Data.IORef
 import Data.Maybe
-import GHC.Prim
+import GHC.Base
 import System.Posix.Files
 import System.Posix.IO
 import System.Directory
@@ -61,7 +61,7 @@ dirPath u dir = (userPath u) ++ "/" ++ dir
 filePath :: String -> String -> String -> String
 filePath u dir fn = (dirPath u dir) ++ "/" ++ fn
 
-run_proc :: State -> Coq_proc (MailFSMergedOp__Coq_xopT a) GHC.Prim.Any -> IO a
+run_proc :: State -> Coq_proc (MailFSMergedOp__Coq_xopT a) GHC.Base.Any -> IO a
 run_proc s (Ret v) = do
   -- debugmsg $ "Ret"
   return $ unsafeCoerce v
@@ -82,6 +82,10 @@ run_proc s (Until c p v0) = do
   else do
     debugmsg $ "Until false"
     run_proc s (Until c p (unsafeCoerce (Just v)))
+run_proc s (Spawn p) = do
+  debugmsg "Spawn"
+  _ <- forkIO $ run_proc s p >> return ()
+  return $ unsafeCoerce ()
 
 run_proc (S tid _ _ _) (Op MailFSMergedOp__GetTID) = do
   return $ unsafeCoerce tid

@@ -397,6 +397,57 @@ Module LayerImplMoversProtocol
     eapply a.op_follows_protocol.
   Qed.
 
+  Lemma follows_protocol_s_spawn:
+    forall (ts : threads_state) (s : s.State) (T : Type) (tid tid' : nat)
+      (p : proc o1.opT T) (s' : s.State) (evs : list event)
+      (result : T + proc o1.opT T) (spawned : maybe_proc o1.opT),
+      tid <> tid' ->
+      ts tid' = NoProc ->
+      follows_protocol_s l1raw.step p.step_allow ts s ->
+      exec_tid l1raw.step tid s p s' result spawned evs ->
+      follows_protocol_proc l1raw.step p.step_allow tid s p ->
+      follows_protocol_s l1raw.step p.step_allow ts [[tid' := spawned]] s.
+  Proof.
+    intros.
+    destruct spawned; cycle 1.
+    rewrite thread_upd_same_eq with (tid:=tid') in * by auto; eauto.
+    unfold follows_protocol_s; intros.
+    cmp_ts tid0 tid'; repeat maybe_proc_inv; eauto.
+    remember (Proc p1).
+    generalize dependent p1.
+    generalize dependent tid'.
+    induction H2; propositional; eauto; NoProc_upd;
+      repeat maybe_proc_inv.
+    invert H3.
+    eapply IHexec_tid; eauto.
+    invert H3; eauto.
+  Qed.
+
+  Lemma no_atomics_ts_exec_spawn:
+    forall (ts : threads_state) (s : s.State),
+      no_atomics_ts ts ->
+      forall (T : Type) (tid tid' : nat) (p : proc o1.opT T) (s' : s.State)
+        (evs : list event) (result : T + proc o1.opT T) (T0 : Type)
+        (p0 : proc o1.opT T0),
+        ts tid = Proc p ->
+        exec_tid l1raw.step tid s p s' result (Proc p0) evs ->
+        no_atomics_ts ts [[tid' := Proc p0]].
+  Proof.
+    intros.
+    eapply no_atomics_thread_upd_Proc; auto.
+    assert (no_atomics p).
+    unfold no_atomics_ts in H0.
+    eapply thread_Forall_some with (a:=tid) in H0; eauto.
+    clear dependent ts.
+
+    (* goal is now simplified to just be about one process *)
+    remember (Proc p0).
+    generalize dependent p0.
+    induction H1; intros; repeat maybe_proc_inv; propositional.
+    invert H2; eauto.
+    invert H2.
+  Qed.
+
   Theorem compile_traces_match_l1raw :
     forall ts,
       follows_protocol ts ->
@@ -409,21 +460,31 @@ Module LayerImplMoversProtocol
     specialize (H sm).
     destruct H2.
     induction H1; eauto.
-    specialize (H tid _ p) as Htid.
-    intuition idtac; repeat deex.
+    cmp_ts tid tid'.
+    pose proof (H tid _ p ltac:(eauto)) as Htid.
 
-    edestruct IHexec.
-      eapply follows_protocol_s_exec_tid_upd; eauto.
+    prove_hyps IHexec.
+    - eapply follows_protocol_s_exec_tid_upd; eauto.
       intros; eapply a.allowed_stable; eauto.
       eapply a.raw_step_ok; eauto.
-      destruct result; eauto.
 
-    eapply ExecPrefixOne.
-      eauto.
+      destruct spawned.
+      eauto using follows_protocol_s_spawn.
+      rewrite thread_upd_same_eq with (tid:=tid') in * by auto; eauto.
+
+      autorewrite with t; auto.
+
+      destruct spawned; eauto using no_atomics_ts_exec_spawn,
+                        no_atomics_thread_upd_NoProc.
+    - destruct spawned.
+      destruct matches; eauto using no_atomics_ts_exec_spawn.
+      rewrite thread_upd_same_eq with (tid:=tid') in * by auto;
+        destruct matches;
+        eauto.
+    - ExecPrefix tid tid'.
       eapply exec_tid_step_impl.
       intros; apply a.raw_step_ok; eauto.
       eapply follows_protocol_preserves_exec_tid'; eauto.
-      eauto.
   Qed.
 
   Theorem compile_traces_match :

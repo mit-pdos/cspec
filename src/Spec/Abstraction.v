@@ -26,7 +26,9 @@ Section StateAbstraction.
   Variable lo_step : OpSemantics opLoT StateLo.
   Variable hi_step : OpSemantics opLoT StateHi.
 
-  Definition op_abs := forall `(op : opLoT T) s1 s1' s2 tid r evs,
+  Hint Constructors exec_tid.
+
+  Definition op_abs := forall T (op : opLoT T) s1 s1' s2 tid r evs,
     absR s1 s2 ->
     lo_step op tid s1 r s1' evs ->
       exists s2',
@@ -44,8 +46,7 @@ Section StateAbstraction.
   Proof.
     intros.
     generalize dependent s2.
-    induction H0; intros.
-    all: try solve [ eexists; eauto ].
+    induct H0; eauto.
     - edestruct IHatomic_exec1; intuition eauto.
       edestruct IHatomic_exec2; intuition eauto.
     - eapply op_abs_holds in H; eauto; deex.
@@ -53,21 +54,19 @@ Section StateAbstraction.
     - edestruct IHatomic_exec; intuition eauto.
   Qed.
 
-  Theorem exec_tid_abs : forall `(p : proc opLoT T) s1 s1' s2 tid res evs,
+  Theorem exec_tid_abs : forall `(p : proc opLoT T) s1 s1' s2 tid res spawned evs,
     absR s1 s2 ->
-    exec_tid lo_step tid s1 p s1' res evs ->
+    exec_tid lo_step tid s1 p s1' res spawned evs ->
       exists s2',
         absR s1' s2' /\
-        exec_tid hi_step tid s2 p s2' res evs.
+        exec_tid hi_step tid s2 p s2' res spawned evs.
   Proof.
     intros.
-    induction H0.
-    all: try solve [ eexists; eauto ].
+    induct H0; eauto.
     - eapply op_abs_holds in H0; eauto; deex.
       eexists; eauto.
     - eapply atomic_exec_abs in H0; eauto; deex.
       eexists; eauto.
-    - destruct IHexec_tid; intuition eauto.
   Qed.
 
   Theorem trace_incl_abs :
@@ -79,10 +78,9 @@ Section StateAbstraction.
     intros.
     generalize dependent s2.
     destruct H0 as [? H0].
-    induction H0; intros.
-    - eapply exec_tid_abs in H0; eauto; deex.
+    induct H0; eauto.
+    - eapply exec_tid_abs in H3; propositional; eauto.
       eauto using ExecPrefixOne.
-    - eauto.
   Qed.
 
 End StateAbstraction.

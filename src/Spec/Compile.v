@@ -28,6 +28,9 @@ Section ProcStructure.
   | NoAtomicsUntil : forall `(p : option T -> proc opT T) (c : T -> bool) v,
     (forall v, no_atomics (p v)) ->
     no_atomics (Until c p v)
+  | NoAtomicsSpawn : forall `(p: proc opT T),
+    no_atomics p ->
+    no_atomics (Spawn p)
   .
 
   Hint Constructors no_atomics.
@@ -60,8 +63,6 @@ Section ProcStructure.
     no_atomics p.
   Proof.
     unfold no_atomics_ts; intros.
-    (* TODO: this is awkward; should thread_Forall just be an unfoldable
-    definition instead? *)
     eapply thread_Forall_some; eauto.
   Qed.
 
@@ -82,9 +83,10 @@ Section ProcStructure.
     eauto using thread_Forall_upd_some.
   Qed.
 
-  Theorem no_atomics_exec_tid : forall `(step : OpSemantics opT State) tid s `(p : proc _ T) s' p' evs,
+  Theorem no_atomics_exec_tid :
+    forall `(step : OpSemantics opT State) tid s `(p : proc _ T) s' p' spawned evs,
     no_atomics p ->
-    exec_tid step tid s p s' (inr p') evs ->
+    exec_tid step tid s p s' (inr p') spawned evs ->
     no_atomics p'.
   Proof.
     intros.
@@ -134,6 +136,9 @@ Section Compiler.
   | CompileUntil : forall `(p1 : option T -> proc opLoT T) (p2 : option T -> proc opMidT T) (c : T -> bool) v,
     (forall v', compile_ok (p1 v') (p2 v')) ->
     compile_ok (Until c p1 v) (Until c p2 v)
+  | CompileSpawn : forall T (p1: proc opLoT T) (p2: proc opMidT T),
+      compile_ok p1 p2 ->
+      compile_ok (Spawn p1) (Spawn p2)
   .
 
   Inductive atomic_compile_ok : forall T (p1 : proc opLoT T) (p2 : proc opMidT T), Prop :=
@@ -149,6 +154,9 @@ Section Compiler.
   | ACompileUntil : forall `(p1 : option T -> proc opLoT T) (p2 : option T -> proc opMidT T) (c : T -> bool) v,
     (forall v', atomic_compile_ok (p1 v') (p2 v')) ->
     atomic_compile_ok (Until c p1 v) (Until c p2 v)
+  | ACompileSpawn : forall T (p1: proc opLoT T) (p2: proc opMidT T),
+      atomic_compile_ok p1 p2 ->
+      atomic_compile_ok (Spawn p1) (Spawn p2)
   .
 
   Hint Constructors compile_ok.
@@ -162,6 +170,7 @@ Section Compiler.
     | Bind p1 p2 => Bind (compile p1) (fun r => compile (p2 r))
     | Atomic p => Atomic (compile p)
     | Until c p v => Until c (fun r => compile (p r)) v
+    | Spawn p => Spawn (compile p)
     end.
 
 
@@ -170,12 +179,11 @@ Section Compiler.
       no_atomics p ->
       compile_ok (compile p) p.
   Proof.
-    induction p; simpl; intros; eauto.
-    - inversion H0; clear H0; repeat sigT_eq.
-      eauto.
-    - inversion H0; clear H0; repeat sigT_eq.
-      eauto.
-    - inversion H.
+    induct p; simpl; eauto.
+    - invert H0; eauto.
+    - invert H0; eauto.
+    - invert H.
+    - invert H; eauto.
   Qed.
 
   Theorem compile_no_atomics :
@@ -183,10 +191,12 @@ Section Compiler.
       no_atomics p ->
       no_atomics (compile p).
   Proof.
+    (* TODO: this eauto takes forever to fail *)
     induct p; simpl; eauto.
     - invert H0; eauto.
     - invert H0; eauto.
     - invert H.
+    - invert H; eauto.
   Qed.
 
   Hint Resolve compile_no_atomics.
@@ -227,7 +237,7 @@ Section Compiler.
   Variable hi_step : OpSemantics opMidT State.
 
   Definition compile_correct :=
-    forall `(op : opMidT T) tid s v s' evs,
+    forall T (op : opMidT T) tid s v s' evs,
       atomic_exec lo_step (compile_op op) tid s v s' evs ->
       hi_step op tid s v s' evs.
 
@@ -235,11 +245,12 @@ Section Compiler.
 
   Lemma atomic_compile_ok_exec_tid : forall T (p1 : proc _ T) p2,
     atomic_compile_ok p1 p2 ->
-    forall tid s s' result evs,
-      exec_tid lo_step tid s p1 s' result evs ->
-      exists result' evs',
-        exec_tid hi_step tid s p2 s' result' evs' /\
+    forall tid s s' result spawned evs,
+      exec_tid lo_step tid s p1 s' result spawned evs ->
+      exists result' spawned' evs',
+        exec_tid hi_step tid s p2 s' result' spawned' evs' /\
         evs = evs' /\
+        proc_optR atomic_compile_ok spawned spawned' /\
         match result with
         | inl v => match result' with
           | inl v' => v = v'
@@ -252,25 +263,26 @@ Section Compiler.
         end.
   Proof.
     intros.
-    induction H0.
-    all: inversion H; clear H; repeat sigT_eq; eauto.
-
-    - eapply compile_is_correct in H0.
-      do 2 eexists; intuition eauto.
+    induct H0.
+    all: invert H; eauto 10.
 
     - edestruct IHexec_tid; eauto; repeat deex.
-      do 2 eexists; intuition idtac.
-      eauto.
+      descend; intuition eauto.
+      destruct matches; propositional; eauto.
 
-      destruct result, x; try solve [ exfalso; eauto ];
-        subst; eauto.
+    - descend; intuition eauto.
 
-    - do 2 eexists; intuition idtac.
-        eauto.
-        simpl.
+      constructor; propositional; eauto.
+      destruct matches.
+  Qed.
 
-      constructor; eauto; intros.
-      destruct (Bool.bool_dec (c x) true); eauto.
+  Lemma proc_match_none : forall tid `(ts1: @threads_state opT) `(ts2: @threads_state opT') R,
+      proc_match R ts1 ts2 ->
+      ts1 tid = NoProc ->
+      ts2 tid = NoProc.
+  Proof.
+    intros.
+    specialize (H tid); simpl_match; auto.
   Qed.
 
   Theorem atomic_compile_ok_traces_match_ts :
@@ -283,28 +295,19 @@ Section Compiler.
     unfold exec_prefix in H0; repeat deex.
     induction H; intros; eauto.
 
-    - eapply proc_match_pick with (tid := tid) in H2 as H'.
+    - eapply proc_match_pick with (tid := tid) in H3 as H'.
       intuition try congruence.
       repeat deex.
-      rewrite H3 in H; inversion H; clear H; subst.
+      replace (ts tid) in H; invert H.
       repeat maybe_proc_inv.
 
       edestruct atomic_compile_ok_exec_tid; eauto.
       repeat deex.
-
-      edestruct IHexec.
-      shelve.
-
-      eapply ExecPrefixOne with (tid := tid).
-        eauto.
-        eauto.
-        eauto.
-
-      Unshelve.
-
-      destruct result, x; simpl in *; try solve [ exfalso; eauto ].
-      eapply proc_match_del; eauto.
-      eapply proc_match_upd; eauto.
+      assert (ts2 tid' = NoProc) by eauto using proc_match_none.
+      ExecPrefix tid tid'.
+      eapply IHexec.
+      destruct matches; propositional;
+        eauto using proc_match_del, proc_match_upd, proc_match_upd_opt.
   Qed.
 
 End Compiler.
@@ -335,6 +338,9 @@ Section Atomization.
   | AtomizeUntil : forall T (p1 p2 : option T -> proc opLoT T) (c : T -> bool) v,
     (forall v', atomize_ok (p1 v') (p2 v')) ->
     atomize_ok (Until c p1 v) (Until c p2 v)
+  | AtomizeSpawn : forall T (p1 p2: proc opLoT T),
+      atomize_ok p1 p2 ->
+      atomize_ok (Spawn p1) (Spawn p2)
   .
 
 
@@ -350,7 +356,6 @@ Section Atomization.
              (Bind (atomize compile_op op) p2rest).
 
   Variable atomize_is_correct : atomize_correct.
-
 
   Theorem atomize_ok_trace_incl_0 :
     forall T p1 p2,
@@ -369,6 +374,13 @@ Section Atomization.
       intros. eapply trace_incl_to_trace_incl_rx; intros.
       eapply H0; intros.
       reflexivity.
+      eapply trace_incl_bind_a; intros.
+      eauto.
+    - etransitivity.
+      eapply trace_incl_rx_to_trace_incl.
+      eapply trace_incl_rx_spawn.
+      eapply trace_incl_to_trace_incl_rx; intros.
+      eapply IHatomize_ok; reflexivity.
       eapply trace_incl_bind_a; intros.
       eauto.
   Qed.
@@ -418,6 +430,7 @@ Proof.
     constructor. eauto. intros. specialize (H1 x). intuition eauto.
   - split; constructor; intuition eauto;
       edestruct H0; eauto.
+  - split; constructor; intuition eauto.
 Qed.
 
 Theorem atomize_proc_match :

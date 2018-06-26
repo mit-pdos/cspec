@@ -1,11 +1,14 @@
+Require Export Trace.
+Require Import Helpers.Helpers.
+Require Import Helpers.ListStuff.
+Require Import Helpers.FinMap.
+Require Import Helpers.Instances.
+
 Require Import Relations.Relation_Operators.
 Require Import RelationClasses.
 Require Import Morphisms.
 Require Import FunctionalExtensionality.
 Require Import Omega.
-Require Import Helpers.Helpers.
-Require Import Helpers.ListStuff.
-Require Import Helpers.FinMap.
 Require Import List.
 Require Import Bool.
 
@@ -13,49 +16,6 @@ Import ListNotations.
 
 Global Set Implicit Arguments.
 Global Generalizable All Variables.
-
-
-Section Trace.
-
-  Inductive event :=
-  | Event : forall T (v : T), event.
-
-  Inductive trace :=
-  | TraceEvent : forall (tid : nat) (ev : event), trace -> trace
-  | TraceEmpty : trace.
-
-
-  Fixpoint prepend tid (evs : list event) (tr : trace) : trace :=
-    match evs with
-    | nil => tr
-    | e :: evs' =>
-      TraceEvent tid e (prepend tid evs' tr)
-    end.
-
-  Theorem prepend_empty_eq : forall tid evs evs',
-      prepend tid evs TraceEmpty = prepend tid evs' TraceEmpty ->
-      evs = evs'.
-  Proof.
-    intros.
-    generalize dependent evs'.
-    induct evs.
-    - destruct evs'; simpl in *; congruence.
-    - destruct evs'; simpl in *; try congruence.
-      invert H.
-      f_equal; eauto.
-  Qed.
-
-  Lemma prepend_app : forall `(evs1 : list event) evs2 tr tid,
-    prepend tid (evs1 ++ evs2) tr = prepend tid evs1 (prepend tid evs2 tr).
-  Proof.
-    induction evs1; simpl; intros; eauto.
-    rewrite IHevs1; eauto.
-  Qed.
-
-End Trace.
-
-Arguments Event {T}.
-
 
 Section Proc.
 
@@ -67,7 +27,9 @@ Section Proc.
   | Ret : forall T (v : T), proc T
   | Bind : forall T (T1 : Type) (p1 : proc T1) (p2 : T1 -> proc T), proc T
   | Until : forall T (c : T -> bool) (p : option T -> proc T) (v : option T), proc T
-  | Atomic : forall T (p : proc T), proc T.
+  | Atomic : forall T (p : proc T), proc T
+  | Spawn : forall T (p: proc T), proc unit
+  .
 
 
   Definition OpSemantics := forall T, opT T -> nat -> State -> T -> State -> list event -> Prop.
@@ -300,48 +262,55 @@ Section Proc.
 
   Inductive exec_tid : forall T (tid : nat),
     State -> proc T ->
-    State -> T + proc T -> list event -> Prop :=
+    State -> T + proc T -> maybe_proc -> list event -> Prop :=
 
   | ExecTidRet : forall tid T (v : T) s,
     exec_tid tid s (Ret v)
                  s (inl v)
-                 nil
+                 NoProc nil
 
   | ExecTidOp : forall tid T (v : T) s s' op evs,
     op_step op tid s v s' evs ->
     exec_tid tid s (Op op)
                  s' (inl v)
-                 evs
+                 NoProc evs
 
   | ExecTidAtomic : forall tid T (v : T) ap s s' evs,
     atomic_exec ap tid s v s' evs ->
     exec_tid tid s (Atomic ap)
                  s' (inl v)
-                 evs
+                 NoProc evs
 
-  | ExecTidBind : forall tid T1 (p1 : proc T1) T2 (p2 : T1 -> proc T2) s s' result evs,
+  | ExecTidBind : forall tid T1 (p1 : proc T1) T2 (p2 : T1 -> proc T2) s s' result spawned evs,
     exec_tid tid s p1
-                 s' result evs ->
+                 s' result spawned evs ->
     exec_tid tid s (Bind p1 p2)
                  s' (inr
                      match result with
                      | inl r => p2 r
                      | inr p1' => Bind p1' p2
                      end
-                    ) evs
+                    ) spawned evs
 
   | ExecTidUntil : forall tid T (p : option T -> proc T) (c : T -> bool) v s,
     exec_tid tid s (Until c p v)
                  s (inr (until1 c p v))
-                 nil.
+                 NoProc nil
+
+  | ExecTidSpawn : forall tid T (p: proc T) s,
+    exec_tid tid s (Spawn p)
+                 s (inl tt)
+                 (Proc p) nil
+  .
 
 
   Inductive exec : State -> threads_state -> trace -> nat -> Prop :=
 
-  | ExecOne : forall T tid (ts : threads_state) trace p s s' evs result ctr,
+  | ExecOne : forall T tid tid' (ts : threads_state) trace p s s' evs result ctr spawned,
     ts tid = @Proc T p ->
-    exec_tid tid s p s' result evs ->
-    exec s' (thread_upd ts tid
+    ts tid' = NoProc ->
+    exec_tid tid s p s' result spawned evs ->
+    exec s' (thread_upd (thread_upd ts tid' spawned) tid
               match result with
               | inl _ => NoProc
               | inr p' => Proc p'
@@ -360,11 +329,13 @@ Section Proc.
        : forall (T : Type) 
            (tid : nat) (ts : threads_state) (tr : trace)
            (p : proc T) (s s' : State)
-           (evs : list event) (result : T + proc T),
+           (evs : list event) (result : T + proc T)
+           (tid' : nat) spawned,
          thread_get ts tid = Proc p ->
-         exec_tid tid s p s' result evs ->
+         thread_get ts tid' = NoProc ->
+         exec_tid tid s p s' result spawned evs ->
          exec_prefix s'
-           (thread_upd ts tid
+           (thread_upd (thread_upd ts tid' spawned) tid
              (match result with
               | inl _ => NoProc
               | inr p' => Proc p'
@@ -394,12 +365,12 @@ Section Proc.
     exec_any tid s0 p r s' ->
     exec_any tid s p r s'
   | ExecAnyThisDone :
-    forall T (p : proc T) (r : T) (s' : State) evs,
-    exec_tid tid s p s' (inl r) evs ->
+    forall T (p : proc T) (r : T) (s' : State) spawned evs,
+    exec_tid tid s p s' (inl r) spawned evs ->
     exec_any tid s p r s'
   | ExecAnyThisMore :
-    forall T (p p' : proc T) (s' s0 : State) r evs,
-    exec_tid tid s p s0 (inr p') evs ->
+    forall T (p p' : proc T) (s' s0 : State) r spawned evs,
+    exec_tid tid s p s0 (inr p') spawned evs ->
     exec_any tid s0 p' r s' ->
     exec_any tid s p r s'
   .
@@ -412,6 +383,24 @@ Section Proc.
           op_step op' tid' s0 r' s1 evs)
       s s'.
 
+  Global Instance exec_others_pre tid : PreOrder (exec_others tid).
+  Proof.
+    unfold exec_others.
+    constructor; hnf; intros.
+    reflexivity.
+    etransitivity; eauto.
+  Qed.
+
+  Lemma exec_others_one : forall tid s s' tid' T (op: opT T) r evs,
+      tid <> tid' ->
+      op_step op tid' s r s' evs ->
+      exec_others tid s s'.
+  Proof.
+    unfold exec_others; intros.
+    econstructor; [ | reflexivity ].
+    eauto 10.
+  Qed.
+
   Lemma exec_any_op : forall `(op : opT T) tid r s s',
     exec_any tid s (Op op) r s' ->
       exists s0 evs,
@@ -420,16 +409,17 @@ Section Proc.
   Proof.
     intros.
     remember (Op op).
-    induction H; subst.
-    - edestruct IHexec_any; eauto; intuition idtac.
-      deex.
-      do 2 eexists; split; eauto.
-      econstructor; eauto.
-      do 5 eexists; split; eauto.
-    - exists s; eexists; split.
-      eapply rt1n_refl.
-      inversion H; subst; repeat sigT_eq; eauto.
-    - inversion H.
+    induct H;
+      repeat match goal with
+             | [ H: forall _, Op _ = Op _ -> _ |- _ ] =>
+               specialize (H _ eq_refl)
+             end;
+      propositional.
+    - descend; split; [ | eauto ].
+      etransitivity; eauto using exec_others_one.
+    - invert H.
+      descend; split; [ reflexivity | eauto ].
+    - invert H.
   Qed.
 
   Lemma exec_others_trans :
@@ -438,27 +428,23 @@ Section Proc.
       exec_others tid s1 s2 ->
       exec_others tid s0 s2.
   Proof.
-    induction 1; intros; eauto.
-    intuition idtac.
-    repeat deex.
-    econstructor; eauto 20.
+    etransitivity; eauto.
   Qed.
 
   Lemma exec_tid_exec_others :
-    forall tid tid' `(p : proc T) s s' result evs,
+    forall tid tid' `(p : proc T) s s' result spawned evs,
       tid <> tid' ->
-      exec_tid tid' s p s' result evs ->
+      exec_tid tid' s p s' result spawned evs ->
       exec_others tid s s'.
   Proof.
-    induction 2; intros; eauto;
-      try solve [ constructor ].
+    induction 2; propositional; eauto;
+      try reflexivity.
     - econstructor; eauto 10.
-      eapply rt1n_refl.
-    - induction H0; intros; eauto 10;
-        try solve [ constructor ].
+      reflexivity.
+    - induct H0; eauto 10; try reflexivity.
       eapply exec_others_trans; eauto.
       econstructor; eauto 10.
-      eapply rt1n_refl.
+      constructor.
   Qed.
 
   Lemma exec_others_exec_any :
@@ -467,11 +453,7 @@ Section Proc.
       exec_any tid s' p v s'' ->
       exec_any tid s p v s''.
   Proof.
-    induction 1; intros; eauto.
-    repeat deex.
-    intuition idtac.
-    eapply ExecAnyOther; try eassumption.
-    eauto.
+    induction 1; propositional; eauto using ExecAnyOther.
   Qed.
 
 End Proc.
@@ -530,12 +512,12 @@ Section StepImpl.
   Qed.
 
   Theorem exec_tid_step_impl :
-    forall tid s `(p : proc _ T) s' r evs,
-      exec_tid op_step1 tid s p s' r evs ->
-      exec_tid op_step2 tid s p s' r evs.
+    forall tid s `(p : proc _ T) s' r spawned evs,
+      exec_tid op_step1 tid s p s' r spawned evs ->
+      exec_tid op_step2 tid s p s' r spawned evs.
   Proof.
     intros.
-    induction H; eauto.
+    induct H; eauto.
     eapply atomic_exec_step_impl in H; eauto.
   Qed.
 
@@ -545,13 +527,11 @@ Section StepImpl.
       exec_any op_step2 tid s p r s'.
   Proof.
     intros.
-    induction H; eauto.
+    induct H; eauto.
     eapply exec_tid_step_impl in H; eauto.
     eapply exec_tid_step_impl in H; eauto.
   Unshelve.
     all: intros; eauto.
-    all: try exact true.
-    all: try exact None.
     exact (Ret r0).
   Qed.
 
@@ -570,14 +550,14 @@ Hint Extern 1 (exec_tid _ _ _ _ _ _ _) => econstructor.
 Hint Extern 1 (atomic_exec _ _ _ _ _ _ _) => econstructor.
 
 Ltac maybe_proc_inv := match goal with
-  | H : ?a = ?a |- _ =>
-    clear H
-  | H : Proc _ = Proc _ |- _ =>
-    inversion H; clear H; subst
   | H : Proc _ = NoProc |- _ =>
     solve [ exfalso; inversion H ]
   | H : NoProc = Proc _ |- _ =>
     solve [ exfalso; inversion H ]
+  | H : ?a = ?a |- _ =>
+    clear H
+  | H : Proc _ = Proc _ |- _ =>
+    inversion H; clear H; subst
   | H : existT _ _ _ = existT _ _ _ |- _ =>
     sigT_eq
   | H : existT _ _ _ = existT _ _ _ |- _ =>
@@ -586,7 +566,7 @@ Ltac maybe_proc_inv := match goal with
 
 Ltac exec_tid_inv :=
   match goal with
-  | H : exec_tid _ _ _ _ _ _ _ |- _ =>
+  | H : exec_tid _ _ _ _ _ _ _ _ |- _ =>
     inversion H; clear H; subst; repeat maybe_proc_inv
   end;
   autorewrite with t in *.
@@ -648,15 +628,16 @@ Arguments threads_empty {opT}.
 Global Opaque thread_get thread_upd threads_empty.
 (* reproduce upd database from FinMap *)
 Hint Rewrite thread_upd_eq : t.
-Hint Rewrite thread_upd_ne using solve [ auto ] : t.
+Hint Rewrite thread_upd_ne using congruence : t.
 Hint Rewrite thread_upd_upd_eq : t.
-Hint Rewrite thread_upd_same_eq using solve [ auto ] : t.
-Hint Rewrite thread_mapping_finite using solve [ auto ] : t.
+Hint Rewrite thread_upd_same_eq using congruence : t.
+Hint Rewrite thread_mapping_finite using congruence : t.
 Hint Rewrite threads_empty_max : t.
 
 (* compare thread ids and perform cleanup *)
 Ltac cmp_ts tid1 tid2 :=
   destruct (tid1 == tid2); subst;
+  try congruence;
   autorewrite with t in *.
 
 (* abstract the thread state in an exec goal (to deal with different update
