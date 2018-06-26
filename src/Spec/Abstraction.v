@@ -81,7 +81,7 @@ Section StateAbstraction.
     destruct H0 as [? H0].
     induction H0; intros.
     - eapply exec_tid_abs in H0; eauto; deex.
-      eapply ExecPrefixOne with (tid := tid); eauto.
+      eauto using ExecPrefixOne.
     - eauto.
   Qed.
 
