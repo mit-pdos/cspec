@@ -46,7 +46,7 @@ Section ProcStructure.
 
   Theorem no_atomics_ts_equiv : forall ts,
     no_atomics_ts ts <->
-    (forall tid, no_atomics_opt ts [[ tid ]]).
+    (forall tid, no_atomics_opt (ts [[ tid ]])).
   Proof.
     unfold no_atomics_ts, thread_Forall; split; intros.
     - destruct_with_eqn (ts tid); simpl; eauto.
@@ -68,7 +68,7 @@ Section ProcStructure.
 
   Theorem no_atomics_thread_upd_NoProc : forall ts tid,
     no_atomics_ts ts ->
-    no_atomics_ts ts [[ tid := NoProc ]].
+    no_atomics_ts (ts [[ tid := NoProc ]]).
   Proof.
     unfold no_atomics_ts; intros.
     eauto using thread_Forall_upd_none.
@@ -77,7 +77,7 @@ Section ProcStructure.
   Theorem no_atomics_thread_upd_Proc : forall ts tid `(p : proc _ T),
     no_atomics_ts ts ->
     no_atomics p ->
-    no_atomics_ts ts [[ tid := Proc p ]].
+    no_atomics_ts (ts [[ tid := Proc p ]]).
   Proof.
     unfold no_atomics_ts; intros.
     eauto using thread_Forall_upd_some.

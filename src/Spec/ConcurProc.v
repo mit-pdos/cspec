@@ -479,11 +479,10 @@ Notation "x <- p1 ; p2" := (Bind p1 (fun x => p2))
   (at level 60, right associativity).
 
 Notation "ts [[ tid ]]" := (thread_get ts tid)
-  (at level 8, left associativity).
+  (at level 12, left associativity).
 
 Notation "ts [[ tid := p ]]" := (thread_upd ts tid p)
-  (at level 8, left associativity).
-
+                                  (at level 12, left associativity).
 
 Section StepImpl.
 

@@ -406,7 +406,7 @@ Module LayerImplMoversProtocol
       follows_protocol_s l1raw.step p.step_allow ts s ->
       exec_tid l1raw.step tid s p s' result spawned evs ->
       follows_protocol_proc l1raw.step p.step_allow tid s p ->
-      follows_protocol_s l1raw.step p.step_allow ts [[tid' := spawned]] s.
+      follows_protocol_s l1raw.step p.step_allow (ts [[tid' := spawned]]) s.
   Proof.
     intros.
     destruct spawned; cycle 1.
@@ -431,7 +431,7 @@ Module LayerImplMoversProtocol
         (p0 : proc o1.opT T0),
         ts tid = Proc p ->
         exec_tid l1raw.step tid s p s' result (Proc p0) evs ->
-        no_atomics_ts ts [[tid' := Proc p0]].
+        no_atomics_ts (ts [[tid' := Proc p0]]).
   Proof.
     intros.
     eapply no_atomics_thread_upd_Proc; auto.

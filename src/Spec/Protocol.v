@@ -277,10 +277,10 @@ Section Protocol.
       ts [[ tid ]] = Proc p ->
       exec_tid lo_step tid s p s' result spawned evs ->
       no_atomics_ts ts ->
-      follows_protocol_s ts [[ tid := match result with
+      follows_protocol_s (ts [[ tid := match result with
                                       | inl _ => NoProc
                                       | inr p' => Proc p'
-                                      end ]] s'.
+                                      end ]]) s'.
   Proof.
     unfold follows_protocol_s; intros.
     destruct (tid0 == tid); subst.

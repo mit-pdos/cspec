@@ -332,10 +332,10 @@ Section Movers.
     pred_stable op_step P ->
     enabled_in tid s ->
     P tid s ->
-    exec_prefix op_step s ts [[ tid := Proc (x <- Op opMover; rx x) ]] tr ->
+    exec_prefix op_step s (ts [[ tid := Proc (x <- Op opMover; rx x) ]]) tr ->
     exists s' r,
       op_step opMover tid s r s' nil /\
-      exec_prefix op_step s' ts [[ tid := Proc (rx r) ]] tr.
+      exec_prefix op_step s' (ts [[ tid := Proc (rx r) ]]) tr.
   Proof.
     intros.
 
@@ -630,7 +630,7 @@ Section YSA.
 
     cut (exists tr' v1 s1 evs1,
       atomic_exec op_step (l v) tid s' v1 s1 evs1 /\
-      exec_prefix op_step s1 ts [[ tid := Proc (rx v1) ]] tr' /\
+      exec_prefix op_step s1 (ts [[ tid := Proc (rx v1) ]]) tr' /\
       tr = (prepend tid evs1 tr')); intros.
     {
       repeat deex.

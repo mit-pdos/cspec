@@ -1277,7 +1277,7 @@ Lemma trace_incl_ts_s_proof_helper :
                                  | inl _ => NoProc
                                  | inr p' => Proc p'
                                                             end]]) tr ->
-    exec_prefix op_step s0 ts [[tid := Proc p2]] (prepend tid evs tr)) ->
+    exec_prefix op_step s0 (ts [[tid := Proc p2]]) (prepend tid evs tr)) ->
   trace_incl_ts_s op_step s s
     (ts [[ tid := Proc p1 ]])
     (ts [[ tid := Proc p2 ]]).
@@ -1316,7 +1316,7 @@ Lemma trace_incl_proof_helper :
                                  | inl _ => NoProc
                                  | inr p' => Proc p'
                                  end]]) tr ->
-      exec_prefix op_step s ts [[tid := Proc p2]] (prepend tid evs tr)) ->
+      exec_prefix op_step s (ts [[tid := Proc p2]]) (prepend tid evs tr)) ->
   trace_incl op_step
     p1 p2.
 Proof.
@@ -1339,7 +1339,7 @@ Lemma trace_incl_s_proof_helper :
                                  | inr p' => Proc p'
                                  end]]) tr ->
     exists tr',
-      exec_prefix op_step s0 ts [[tid := Proc p2]] tr' /\
+      exec_prefix op_step s0 (ts [[tid := Proc p2]]) tr' /\
       prepend tid evs tr = tr') ->
   trace_incl_s s tid op_step
     p1 p2.
