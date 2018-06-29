@@ -114,13 +114,13 @@ Definition smtp_server_thread : proc _ unit :=
 Definition pop3_server_thread : proc _ unit :=
   Until (fun _ => false) (fun _ => do_pop3_req) None.
 
-Fixpoint SpawnN (n:nat) opT T (p:proc opT T) : proc opT unit :=
+Fixpoint SpawnN (n:nat) Op T (p:proc Op T) : proc Op unit :=
   match n with
   | 0 => Ret tt
   | S n' => Bind (Spawn p) (fun _ => SpawnN n' p)
   end.
 
-Definition threads_from_proc opT T (p: proc opT T) : threads_state opT :=
+Definition threads_from_proc Op T (p: proc Op T) : threads_state Op :=
   threads_from_list (existT _ T p :: nil).
 
 Definition mail_server nsmtp npop3 : threads_state _ :=

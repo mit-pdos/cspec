@@ -35,10 +35,10 @@ Inductive stat_result :=
 
 Module LinkAPI <: Layer.
 
-  Definition opT := linkOpT.
+  Definition Op := linkOpT.
   Definition State := FS.
 
-  Inductive xstep : forall T, opT T -> nat -> State -> T -> State -> Prop :=
+  Inductive xstep : forall T, Op T -> nat -> State -> T -> State -> Prop :=
   | StepAdd : forall dir name target tid fs,
     xstep (LinkAdd dir name target) tid
       fs

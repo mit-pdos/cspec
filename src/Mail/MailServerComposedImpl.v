@@ -13,7 +13,7 @@ Module MailServerComposedImpl' <:
 
   Import MailServerComposedOp.
 
-  Definition compile_op T (op : MailServerComposedOp.opT T) : proc MailServerHOp.opT T :=
+  Definition compile_op T (op : MailServerComposedOp.Op T) : proc MailServerHOp.Op T :=
     match op with
     | Deliver u m => Prim (Slice u (MailServerOp.Deliver m))
     | Pickup u => Prim (Slice u (MailServerOp.Pickup))

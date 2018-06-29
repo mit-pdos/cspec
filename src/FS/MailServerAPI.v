@@ -22,10 +22,10 @@ Definition upd (s : mailState) (u : string) v :=
 
 Module MailServerAPI <: Layer.
 
-  Definition opT := mailOpT.
+  Definition Op := mailOpT.
   Definition State := mailState.
 
-  Inductive xstep : forall T, opT T -> nat -> State -> T -> State -> Prop :=
+  Inductive xstep : forall T, Op T -> nat -> State -> T -> State -> Prop :=
   | StepDeliver : forall user msg msgs state tid,
     state user = msgs ->
     xstep (Deliver user msg) tid
@@ -38,7 +38,7 @@ Module MailServerAPI <: Layer.
       state
       (Some (FSet.elements msgs))
       state
-  | StepFail : forall T (op : opT (option T)) state tid,
+  | StepFail : forall T (op : Op (option T)) state tid,
     xstep op tid
       state
       None

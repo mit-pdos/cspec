@@ -37,7 +37,7 @@ End TraceAbs.
 
 Module Type Ops.
 
-  Axiom opT : Type -> Type.
+  Axiom Op : Type -> Type.
 
 End Ops.
 
@@ -52,21 +52,21 @@ End State.
 
 Module Type Layer (o : Ops) (s : State).
 
-  Axiom step : OpSemantics o.opT s.State.
+  Axiom step : OpSemantics o.Op s.State.
 
 End Layer.
 
 
 Module Type ProcRule (o : Ops).
 
-  Axiom follows_protocol : threads_state o.opT -> Prop.
+  Axiom follows_protocol : threads_state o.Op -> Prop.
 
 End ProcRule.
 
 
 Module Type Protocol (o : Ops) (s : State).
 
-  Axiom step_allow : forall T, o.opT T -> nat -> s.State -> Prop.
+  Axiom step_allow : forall T, o.Op T -> nat -> s.State -> Prop.
 
 End Protocol.
 
@@ -76,7 +76,7 @@ Module Type LayerImpl
   (o2 : Ops) (s2 : State) (l2 : Layer o2 s2).
 
   Axiom absR : s1.State -> s2.State -> Prop.
-  Axiom compile_ts : threads_state o2.opT -> threads_state o1.opT.
+  Axiom compile_ts : threads_state o2.Op -> threads_state o1.Op.
   Axiom compile_ts_no_atomics :
     forall ts,
       no_atomics_ts ts ->
@@ -102,7 +102,7 @@ Module Type LayerImplRequiresRule
   (r : ProcRule o2).
 
   Axiom absR : s1.State -> s2.State -> Prop.
-  Axiom compile_ts : threads_state o2.opT -> threads_state o1.opT.
+  Axiom compile_ts : threads_state o2.Op -> threads_state o1.Op.
   Axiom compile_ts_no_atomics :
     forall ts,
       no_atomics_ts ts ->
@@ -163,10 +163,10 @@ Module LayerImplAbs
   Definition absR := a.absR.
   Definition absInitP := a.absInitP.
 
-  Definition compile_ts (ts : threads_state o.opT) := ts.
+  Definition compile_ts (ts : threads_state o.Op) := ts.
 
   Theorem compile_ts_no_atomics :
-    forall (ts : threads_state o.opT),
+    forall (ts : threads_state o.Op),
       no_atomics_ts ts ->
       no_atomics_ts (compile_ts ts).
   Proof.
@@ -192,12 +192,12 @@ Module Type LayerImplMoversT
   (o1 : Ops) (l1 : Layer o1 s)
   (o2 : Ops) (l2 : Layer o2 s).
 
-  Axiom compile_op : forall T, o2.opT T -> proc o1.opT T.
+  Axiom compile_op : forall T, o2.Op T -> proc o1.Op T.
 
-  Axiom compile_op_no_atomics : forall T (op : o2.opT T),
+  Axiom compile_op_no_atomics : forall T (op : o2.Op T),
     no_atomics (compile_op op).
 
-  Axiom ysa_movers : forall T (op : o2.opT T),
+  Axiom ysa_movers : forall T (op : o2.Op T),
     ysa_movers l1.step (compile_op op).
 
   Axiom compile_correct :
@@ -235,7 +235,7 @@ Module LayerImplMovers
     eapply a.compile_op_no_atomics.
   Qed.
 
-  Theorem op_atomic : forall `(op : o2.opT T) `(rx : _ -> proc _ R),
+  Theorem op_atomic : forall `(op : o2.Op T) `(rx : _ -> proc _ R),
     trace_incl l1.step
       (Bind (a.compile_op op) rx)
       (Bind (atomize a.compile_op op) rx).
@@ -288,11 +288,11 @@ Module Type LayerImplMoversProtocolT
 
   Include (LayerImplMoversT s o1 l1 o2 l2).
 
-  Axiom op_follows_protocol : forall tid s `(op : o2.opT T),
+  Axiom op_follows_protocol : forall tid s `(op : o2.Op T),
     follows_protocol_proc l1raw.step p.step_allow tid s (compile_op op).
 
   Axiom allowed_stable :
-    forall `(op : o1.opT T) `(op' : o1.opT T') tid tid' s s' r evs,
+    forall `(op : o1.Op T) `(op' : o1.Op T') tid tid' s s' r evs,
       tid <> tid' ->
       p.step_allow op tid s ->
       l1.step op' tid' s r s' evs ->
@@ -300,7 +300,7 @@ Module Type LayerImplMoversProtocolT
 
   (* This means that l1.step is either restricted_step or nilpotent_step *)
   Axiom raw_step_ok :
-    forall `(op : o1.opT T) tid s r s' evs,
+    forall `(op : o1.Op T) tid s r s' evs,
       restricted_step l1raw.step p.step_allow op tid s r s' evs ->
       l1.step op tid s r s' evs.
 
@@ -337,7 +337,7 @@ Module LayerImplMoversProtocol
     eapply a.compile_op_no_atomics.
   Qed.
 
-  Theorem op_atomic : forall `(op : o2.opT T) `(rx : _ -> proc _ R),
+  Theorem op_atomic : forall `(op : o2.Op T) `(rx : _ -> proc _ R),
     trace_incl l1.step
       (Bind (a.compile_op op) rx)
       (Bind (atomize a.compile_op op) rx).
@@ -379,7 +379,7 @@ Module LayerImplMoversProtocol
     eapply Compile.compile_ts_ok; eauto.
   Qed.
 
-  Definition follows_protocol (ts : threads_state o1.opT) :=
+  Definition follows_protocol (ts : threads_state o1.Op) :=
     forall s,
       follows_protocol_s l1raw.step p.step_allow ts s.
 
@@ -399,8 +399,8 @@ Module LayerImplMoversProtocol
 
   Lemma follows_protocol_s_spawn:
     forall (ts : threads_state _) (s : s.State) (T : Type) (tid tid' : nat)
-      (p : proc o1.opT T) (s' : s.State) (evs : list event)
-      (result : T + proc o1.opT T) (spawned : maybe_proc o1.opT),
+      (p : proc o1.Op T) (s' : s.State) (evs : list event)
+      (result : T + proc o1.Op T) (spawned : maybe_proc o1.Op),
       tid <> tid' ->
       ts tid' = NoProc ->
       follows_protocol_s l1raw.step p.step_allow ts s ->
@@ -426,9 +426,9 @@ Module LayerImplMoversProtocol
   Lemma no_atomics_ts_exec_spawn:
     forall (ts : threads_state _) (s : s.State),
       no_atomics_ts ts ->
-      forall (T : Type) (tid tid' : nat) (p : proc o1.opT T) (s' : s.State)
-        (evs : list event) (result : T + proc o1.opT T) (T0 : Type)
-        (p0 : proc o1.opT T0),
+      forall (T : Type) (tid tid' : nat) (p : proc o1.Op T) (s' : s.State)
+        (evs : list event) (result : T + proc o1.Op T) (T0 : Type)
+        (p0 : proc o1.Op T0),
         ts tid = Proc p ->
         exec_tid l1raw.step tid s p s' result (Proc p0) evs ->
         no_atomics_ts (ts [[tid' := Proc p0]]).
@@ -520,7 +520,7 @@ Module Type LayerImplLoopT
   (o1 : Ops) (l1 : Layer o1 s)
   (o2 : Ops) (l2 : Layer o2 s).
 
-  Axiom compile_op : forall T, o2.opT T -> (option T -> o1.opT T) * (T -> bool) * option T.
+  Axiom compile_op : forall T, o2.Op T -> (option T -> o1.Op T) * (T -> bool) * option T.
   Axiom noop_or_success :
     noop_or_success compile_op l1.step l2.step.
 

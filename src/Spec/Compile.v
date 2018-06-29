@@ -14,21 +14,21 @@ Global Generalizable All Variables.
 
 Section ProcStructure.
 
-  Variable opT : Type -> Type.
+  Variable Op : Type -> Type.
 
-  Inductive no_atomics : forall T (p : proc opT T), Prop :=
-  | NoAtomicsOp : forall `(op : opT T),
+  Inductive no_atomics : forall T (p : proc Op T), Prop :=
+  | NoAtomicsOp : forall `(op : Op T),
     no_atomics (Prim op)
   | NoAtomicsRet : forall `(x : T),
     no_atomics (Ret x)
-  | NoAtomicsBind : forall `(pa : proc opT T1) `(pb : T1 -> proc _ T2),
+  | NoAtomicsBind : forall `(pa : proc Op T1) `(pb : T1 -> proc _ T2),
     no_atomics pa ->
     (forall x, no_atomics (pb x)) ->
     no_atomics (Bind pa pb)
-  | NoAtomicsUntil : forall `(p : option T -> proc opT T) (c : T -> bool) v,
+  | NoAtomicsUntil : forall `(p : option T -> proc Op T) (c : T -> bool) v,
     (forall v, no_atomics (p v)) ->
     no_atomics (Until c p v)
-  | NoAtomicsSpawn : forall `(p: proc opT T),
+  | NoAtomicsSpawn : forall `(p: proc Op T),
     no_atomics p ->
     no_atomics (Spawn p)
   .
@@ -84,7 +84,7 @@ Section ProcStructure.
   Qed.
 
   Theorem no_atomics_exec_tid :
-    forall `(step : OpSemantics opT State) tid s `(p : proc _ T) s' p' spawned evs,
+    forall `(step : OpSemantics Op State) tid s `(p : proc _ T) s' p' spawned evs,
     no_atomics p ->
     exec_tid step tid s p s' (inr p') spawned evs ->
     no_atomics p'.
@@ -276,7 +276,7 @@ Section Compiler.
       destruct matches.
   Qed.
 
-  Lemma proc_match_none : forall tid `(ts1: threads_state opT) `(ts2: threads_state opT') R,
+  Lemma proc_match_none : forall tid `(ts1: threads_state Op) `(ts2: threads_state Op') R,
       proc_match R ts1 ts2 ->
       ts1 tid = NoProc ->
       ts2 tid = NoProc.

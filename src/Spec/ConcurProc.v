@@ -19,11 +19,11 @@ Global Generalizable All Variables.
 
 Section Proc.
 
-  Variable opT : Type -> Type.
+  Variable Op : Type -> Type.
   Variable State : Type.
 
   Inductive proc : Type -> Type :=
-  | Prim : forall T (op : opT T), proc T
+  | Prim : forall T (op : Op T), proc T
   | Ret : forall T (v : T), proc T
   | Bind : forall T (T1 : Type) (p1 : proc T1) (p2 : T1 -> proc T), proc T
   | Until : forall T (c : T -> bool) (p : option T -> proc T) (v : option T), proc T
@@ -32,7 +32,7 @@ Section Proc.
   .
 
 
-  Definition OpSemantics := forall T, opT T -> nat -> State -> T -> State -> list event -> Prop.
+  Definition OpSemantics := forall T, Op T -> nat -> State -> T -> State -> list event -> Prop.
   Variable op_step : OpSemantics.
 
 
@@ -359,7 +359,7 @@ Section Proc.
     forall T (p : proc T) (r : T) (s' : State), Prop :=
   | ExecAnyOther :
     forall T (p : proc T) (r : T) (s' : State)
-           T' (op' : opT T') tid' s0 r0 evs,
+           T' (op' : Op T') tid' s0 r0 evs,
     tid <> tid' ->
     op_step op' tid' s r0 s0 evs ->
     exec_any tid s0 p r s' ->
@@ -378,7 +378,7 @@ Section Proc.
   Definition exec_others (tid : nat) (s s' : State) : Prop :=
     clos_refl_trans_1n _
       (fun s0 s1 =>
-        exists tid' `(op' : opT T') r' evs,
+        exists tid' `(op' : Op T') r' evs,
           tid' <> tid /\
           op_step op' tid' s0 r' s1 evs)
       s s'.
@@ -391,7 +391,7 @@ Section Proc.
     etransitivity; eauto.
   Qed.
 
-  Lemma exec_others_one : forall tid s s' tid' T (op: opT T) r evs,
+  Lemma exec_others_one : forall tid s s' tid' T (op: Op T) r evs,
       tid <> tid' ->
       op_step op tid' s r s' evs ->
       exec_others tid s s'.
@@ -401,7 +401,7 @@ Section Proc.
     eauto 10.
   Qed.
 
-  Lemma exec_any_op : forall `(op : opT T) tid r s s',
+  Lemma exec_any_op : forall `(op : Op T) tid r s s',
     exec_any tid s (Prim op) r s' ->
       exists s0 evs,
         exec_others tid s s0 /\
@@ -458,14 +458,14 @@ Section Proc.
 
 End Proc.
 
-Arguments Prim {opT T}.
-Arguments Ret {opT T}.
-Arguments Bind {opT T T1}.
-Arguments Until {opT T}.
-Arguments Atomic {opT T}.
+Arguments Prim {Op T}.
+Arguments Ret {Op T}.
+Arguments Bind {Op T T1}.
+Arguments Until {Op T}.
+Arguments Atomic {Op T}.
 
-Arguments Proc {opT T}.
-Arguments NoProc {opT}.
+Arguments Proc {Op T}.
+Arguments NoProc {Op}.
 
 Hint Constructors exec.
 Hint Constructors exec_any.
@@ -489,13 +489,13 @@ Section StepImpl.
   Hint Constructors exec_tid.
   Hint Constructors atomic_exec.
 
-  Variable opT : Type -> Type.
+  Variable Op : Type -> Type.
   Variable State : Type.
-  Variable op_step1 : OpSemantics opT State.
-  Variable op_step2 : OpSemantics opT State.
+  Variable op_step1 : OpSemantics Op State.
+  Variable op_step2 : OpSemantics Op State.
 
   Variable StepImpl :
-    forall `(op : opT TT) tid s r s' evs,
+    forall `(op : Op TT) tid s r s' evs,
       op_step1 op tid s r s' evs ->
       op_step2 op tid s r s' evs.
 
@@ -535,8 +535,8 @@ Section StepImpl.
 End StepImpl.
 
 
-Lemma thread_empty_inv : forall opT tid `(p' : proc _ T),
-  (@threads_empty opT) [[ tid ]] = Proc p' ->
+Lemma thread_empty_inv : forall Op tid `(p' : proc _ T),
+  (@threads_empty Op) [[ tid ]] = Proc p' ->
   False.
 Proof.
   intros.
@@ -621,7 +621,7 @@ Proof.
     congruence.
 Qed.
 
-Arguments threads_empty {opT}.
+Arguments threads_empty {Op}.
 Global Opaque thread_get thread_upd threads_empty.
 (* reproduce upd database from FinMap *)
 Hint Rewrite thread_upd_eq : t.

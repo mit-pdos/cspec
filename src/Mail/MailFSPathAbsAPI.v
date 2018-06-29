@@ -87,7 +87,7 @@ Module MailFSPathAbsAPI <: Layer MailFSStringOp MailFSPathAbsState.
     apply in_filter_dir_eq; auto.
   Qed.
 
-  Inductive xstep : forall T, opT T -> nat -> State -> T -> State -> list event -> Prop :=
+  Inductive xstep : forall T, Op T -> nat -> State -> T -> State -> list event -> Prop :=
   | StepCreateWriteTmpOk : forall fs tid tmpfn data lock,
     xstep (CreateWriteTmp tmpfn data) tid
       (mk_state fs lock)

@@ -54,7 +54,7 @@ Module MailFSStringAbsAPI <: Layer MailFSOp MailFSStringAbsState.
   Import MailFSOp.
   Import MailFSStringAbsState.
 
-  Inductive xstep : forall T, opT T -> nat -> State -> T -> State -> list event -> Prop :=
+  Inductive xstep : forall T, Op T -> nat -> State -> T -> State -> list event -> Prop :=
   | StepCreateWriteTmpOK : forall tmp mbox tid data lock,
     xstep (CreateWriteTmp data) tid
       (mk_state tmp mbox lock)

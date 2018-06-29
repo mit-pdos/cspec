@@ -11,7 +11,7 @@ Module MailFSPathImpl' <:
     MailFSPathOp MailFSPathAPI
     MailFSStringOp MailFSPathAbsAPI.
 
-  Definition compile_op T (op : MailFSStringOp.opT T) : proc _ T :=
+  Definition compile_op T (op : MailFSStringOp.Op T) : proc _ T :=
     match op with
     | MailFSStringOp.LinkMail tmpfn mailfn => Prim (MailFSPathOp.Link (tmp_string, tmpfn) (mail_string, mailfn))
     | MailFSStringOp.List => Prim (MailFSPathOp.List mail_string)

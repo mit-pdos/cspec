@@ -6,24 +6,24 @@ Module MailFSPathOp <: Ops.
 
   Definition extopT := MailServerAPI.MailServerOp.extopT.
 
-  Inductive xopT : Type -> Type :=
-  | CreateWrite : forall (tmpfn : string * string) (data : string), xopT bool
-  | Link : forall (tmpfn : string * string) (mboxfn : string * string), xopT bool
-  | Unlink : forall (fn : string * string), xopT unit
+  Inductive xOp : Type -> Type :=
+  | CreateWrite : forall (tmpfn : string * string) (data : string), xOp bool
+  | Link : forall (tmpfn : string * string) (mboxfn : string * string), xOp bool
+  | Unlink : forall (fn : string * string), xOp unit
 
-  | GetTID : xopT nat
-  | Random : xopT nat
+  | GetTID : xOp nat
+  | Random : xOp nat
 
-  | List : forall (dir : string), xopT (list string)
-  | Read : forall (fn : string * string), xopT (option string)
+  | List : forall (dir : string), xOp (list string)
+  | Read : forall (fn : string * string), xOp (option string)
 
-  | Lock : xopT unit
-  | Unlock : xopT unit
+  | Lock : xOp unit
+  | Unlock : xOp unit
 
-  | Ext : forall `(op : extopT T), xopT T
+  | Ext : forall `(op : extopT T), xOp T
   .
 
-  Definition opT := xopT.
+  Definition Op := xOp.
 
 End MailFSPathOp.
 Module MailFSPathHOp := HOps MailFSPathOp UserIdx.
@@ -35,7 +35,7 @@ Module MailFSPathAPI <: Layer MailFSPathOp MailFSPathAbsState.
   Import MailFSPathAbsState.
   Import MailFSPathAbsAPI.
 
-  Inductive xstep : forall T, opT T -> nat -> State -> T -> State -> list event -> Prop :=
+  Inductive xstep : forall T, Op T -> nat -> State -> T -> State -> list event -> Prop :=
   | StepCreateWriteOK : forall fs tid tmpfn data lock,
     xstep (CreateWrite tmpfn data) tid
       (mk_state fs lock)

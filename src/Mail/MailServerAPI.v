@@ -49,14 +49,14 @@ Module MailServerOp <: Ops.
   | PickUser : extopT string
   .
 
-  Inductive xopT : Type -> Type :=
-  | Deliver : forall (m : string), xopT bool
-  | Pickup : xopT (list ((nat*nat) * string))
-  | Delete : forall (id : nat*nat), xopT unit
-  | Ext : forall `(op : extopT T), xopT T
+  Inductive xOp : Type -> Type :=
+  | Deliver : forall (m : string), xOp bool
+  | Pickup : xOp (list ((nat*nat) * string))
+  | Delete : forall (id : nat*nat), xOp unit
+  | Ext : forall `(op : extopT T), xOp T
   .
 
-  Definition opT := xopT.
+  Definition Op := xOp.
 
 End MailServerOp.
 Module MailServerHOp := HOps MailServerOp UserIdx.
@@ -78,7 +78,7 @@ Module MailServerAPI <: Layer MailServerOp MailServerState.
   Import MailServerOp.
   Import MailServerState.
 
-  Inductive xstep : forall T, opT T -> nat -> State -> T -> State -> list event -> Prop :=
+  Inductive xstep : forall T, Op T -> nat -> State -> T -> State -> list event -> Prop :=
   | StepDeliverOK : forall m mbox fn tid,
     ~ FMap.In fn mbox ->
     xstep (Deliver m) tid

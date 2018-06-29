@@ -30,7 +30,7 @@ Module MailFSStringImpl' <:
     l <- Prim (MailFSStringOp.List);
     Ret (map decode_tid_fn l).
 
-  Definition compile_op T (op : MailFSOp.opT T) : proc MailFSStringOp.opT T :=
+  Definition compile_op T (op : MailFSOp.Op T) : proc MailFSStringOp.Op T :=
     match op with
     | MailFSOp.LinkMail m => linkmail_core m
     | MailFSOp.List => list_core

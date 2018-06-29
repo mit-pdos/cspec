@@ -31,7 +31,7 @@ debugmsg s =
   else
     return ()
 
-run_proc :: State -> Coq_proc (TASOp__Coq_xopT a) GHC.Prim.Any -> IO a
+run_proc :: State -> Coq_proc (TASOp__Coq_xOp a) GHC.Prim.Any -> IO a
 run_proc s (Ret v) = do
   -- debugmsg $ "Ret"
   return $ unsafeCoerce v

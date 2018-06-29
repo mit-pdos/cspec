@@ -17,7 +17,7 @@ Module TryDeliverImpl' <:
     ok <- Prim (MailFSOp.LinkMail ts);
     Ret ok.
 
-  Definition compile_op T (op : TryDeliverOp.opT T) : proc MailFSOp.opT T :=
+  Definition compile_op T (op : TryDeliverOp.Op T) : proc MailFSOp.Op T :=
     match op with
     | TryDeliverOp.CreateWriteTmp data => Prim (MailFSOp.CreateWriteTmp data)
     | TryDeliverOp.LinkMail => linkmail_core

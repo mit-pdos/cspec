@@ -36,7 +36,7 @@ Module AtomicReader' <:
     _ <- Prim MailboxOp.Unlock;
     Ret tt.
 
-  Definition compile_op T (op : MailServerOp.opT T) : proc _ T :=
+  Definition compile_op T (op : MailServerOp.Op T) : proc _ T :=
     match op with
     | MailServerOp.Deliver m => Prim (MailboxOp.Deliver m)
     | MailServerOp.Pickup => pickup_core
@@ -452,7 +452,7 @@ Module AtomicReader' <:
 
 
   Theorem allowed_stable :
-    forall `(op : MailboxOp.opT T) `(op' : MailboxOp.opT T') tid tid' s s' r evs,
+    forall `(op : MailboxOp.Op T) `(op' : MailboxOp.Op T') tid tid' s s' r evs,
       tid <> tid' ->
       MailboxProtocol.step_allow op tid s ->
       MailboxRestrictedAPI.step op' tid' s r s' evs ->

@@ -39,7 +39,7 @@ Definition read (user : string) : proc _ _ :=
   filenames <?- readdir cwd ([maildir; user]);
   read_files cwd ([maildir; user]) filenames.
 
-Definition compile_op T (op : MailServerLinkAPI.opT T) : proc MailLinkAPI.opT T :=
+Definition compile_op T (op : MailServerLinkAPI.Op T) : proc MailLinkAPI.Op T :=
   match op with
   | Deliver user msg => deliver user msg
   | Read user => read user
@@ -68,7 +68,7 @@ Hint Constructors mailfs_step_allowed.
 Hint Constructors follows_protocol_proc.
 
 Theorem restricted_step_preserves_invariant :
-  forall tid `(op : LinkAPI.opT T) s r s',
+  forall tid `(op : LinkAPI.Op T) s r s',
     restricted_step LinkAPI.step mailfs_step_allowed op tid s r s' ->
     invariant s ->
     invariant s'.
@@ -87,7 +87,7 @@ Proof.
 Admitted.
 
 Theorem restricted_step_preserves_root :
-  forall tid `(op : LinkAPI.opT T) s r s',
+  forall tid `(op : LinkAPI.Op T) s r s',
     restricted_step LinkAPI.step mailfs_step_allowed op tid s r s' ->
     FSRoot s = FSRoot s'.
 Proof.

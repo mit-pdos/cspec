@@ -13,13 +13,13 @@ Global Generalizable All Variables.
 
 Section StatePred.
 
-  Variable opT : Type -> Type.
+  Variable Op : Type -> Type.
   Variable State : Type.
-  Variable op_step : OpSemantics opT State.
+  Variable op_step : OpSemantics Op State.
   Variable P : forall (tid : nat) (s : State), Prop.
 
   Definition pred_stable :=
-    forall tid tid' s s' `(op : opT T) r evs,
+    forall tid tid' s s' `(op : Op T) r evs,
       P tid s ->
       tid' <> tid ->
       op_step op tid' s r s' evs ->
@@ -55,13 +55,13 @@ End StatePred.
 
 Definition any {State} (tid : nat) (s : State) : Prop := True.
 
-Theorem pred_stable_any : forall `(op_step : OpSemantics opT State),
+Theorem pred_stable_any : forall `(op_step : OpSemantics Op State),
   pred_stable op_step any.
 Proof.
   firstorder.
 Qed.
 
-Theorem pred_stable_exec_any_others : forall `(op_step : OpSemantics opT State) `(p : proc _ T) P r,
+Theorem pred_stable_exec_any_others : forall `(op_step : OpSemantics Op State) `(p : proc _ T) P r,
   pred_stable op_step
     (fun tid s' => exists s s0,
       P tid s /\ exec_any op_step tid s p r s0 /\ exec_others op_step tid s0 s').
@@ -78,12 +78,12 @@ Hint Resolve pred_stable_exec_any_others.
 
 Section Movers.
 
-  Variable opT : Type -> Type.
+  Variable Op : Type -> Type.
   Variable State : Type.
-  Variable op_step : OpSemantics opT State.
+  Variable op_step : OpSemantics Op State.
 
   Variable moverT : Type.
-  Variable opMover : opT moverT.
+  Variable opMover : Op moverT.
 
   Definition enabled_in (tid : nat) (s : State) :=
     exists rM sM evs,
@@ -93,13 +93,13 @@ Section Movers.
     forall tid s,
       enabled_in tid s.
 
-  Definition enabled_after `(p : proc opT T) :=
+  Definition enabled_after `(p : proc Op T) :=
     forall tid s v s' evs,
       atomic_exec op_step p tid s v s' evs ->
       enabled_in tid s'.
 
   Definition enabled_stable :=
-    forall tid tid' s `(op : opT T) r s' evs,
+    forall tid tid' s `(op : Op T) r s' evs,
       tid <> tid' ->
       enabled_in tid s ->
       op_step op tid' s r s' evs ->
@@ -121,7 +121,7 @@ Section Movers.
     forall tid0 s s0 v0 evs0,
       op_step opMover tid0 s v0 s0 evs0 ->
       evs0 = nil /\
-      ( forall `(op1 : opT T2) tid1 s1 v1 evs1,
+      ( forall `(op1 : Op T2) tid1 s1 v1 evs1,
           tid0 <> tid1 ->
           op_step op1 tid1 s0 v1 s1 evs1 ->
           exists s',
@@ -133,7 +133,7 @@ Section Movers.
     forall tid1 s0 s1 v1 evs1,
       op_step opMover tid1 s0 v1 s1 evs1 ->
       evs1 = nil /\
-      ( forall `(op0 : opT T0) tid0 s v0 evs0,
+      ( forall `(op0 : Op T0) tid0 s v0 evs0,
         tid0 <> tid1 ->
         op_step op0 tid0 s v0 s0 evs0 ->
         exists s',
@@ -145,7 +145,7 @@ Section Movers.
     forall tid1 s0 s1 v1 evs1,
       op_step opMover tid1 s0 v1 s1 evs1 ->
       evs1 = nil /\
-      ( forall `(op0 : opT T0) tid0 s v0 evs0,
+      ( forall `(op0 : Op T0) tid0 s v0 evs0,
         P tid1 s ->
         tid0 <> tid1 ->
         op_step op0 tid0 s v0 s0 evs0 ->
@@ -181,7 +181,7 @@ Section Movers.
   Qed.
 
 
-  Lemma atomic_exec_right_mover : forall tid0 tid1 s s0 `(ap : proc opT T) s1 v1 evsM evs v0,
+  Lemma atomic_exec_right_mover : forall tid0 tid1 s s0 `(ap : proc Op T) s1 v1 evsM evs v0,
     right_mover ->
     tid0 <> tid1 ->
     op_step opMover tid0 s v0 s0 evsM ->
@@ -203,7 +203,7 @@ Section Movers.
     - edestruct IHatomic_exec; intuition eauto.
   Qed.
 
-  Lemma atomic_exec_left_mover : forall tid0 tid1 s s0 `(ap : proc opT T) s1 v1 evs evsM v0 P,
+  Lemma atomic_exec_left_mover : forall tid0 tid1 s s0 `(ap : proc Op T) s1 v1 evs evsM v0 P,
     left_mover_pred P ->
     pred_stable op_step P ->
     P tid0 s ->
@@ -235,7 +235,7 @@ Section Movers.
   Qed.
 
   Lemma exec_tid_right_mover :
-    forall tid0 tid1 s s0 `(p : proc opT T)
+    forall tid0 tid1 s s0 `(p : proc Op T)
       s1 result' spawned evs evsM v0,
     right_mover ->
     tid0 <> tid1 ->
@@ -256,7 +256,7 @@ Section Movers.
   Qed.
 
   Lemma exec_tid_left_mover :
-    forall tid0 tid1 s s0 `(p : proc opT T)
+    forall tid0 tid1 s s0 `(p : proc Op T)
       s1 result' spawned evs evsM v0 P,
     left_mover_pred P ->
     pred_stable op_step P ->
@@ -291,7 +291,7 @@ Section Movers.
 
   Lemma enabled_stable_atomic_exec :
     enabled_stable ->
-    forall tid tid' s `(p : proc opT T) r s' evs,
+    forall tid tid' s `(p : proc Op T) r s' evs,
       tid <> tid' ->
       enabled_in tid s ->
       atomic_exec op_step p tid' s r s' evs ->
@@ -305,7 +305,7 @@ Section Movers.
 
   Lemma enabled_stable_exec_tid :
     enabled_stable ->
-    forall tid tid' s `(p : proc opT T) r s' spawned evs,
+    forall tid tid' s `(p : proc Op T) r s' spawned evs,
       tid <> tid' ->
       enabled_in tid s ->
       exec_tid op_step tid' s p s' r spawned evs ->
@@ -317,7 +317,7 @@ Section Movers.
 
   Hint Resolve enabled_stable_exec_tid.
 
-  Lemma thread_upd_from_same : forall opT (ts: threads_state opT) tid p1 tid' p2,
+  Lemma thread_upd_from_same : forall Op (ts: threads_state Op) tid p1 tid' p2,
       ts tid = p1 ->
       ts [[tid := p1]] [[tid' := p2]] = ts [[tid' := p2]].
   Proof.
@@ -327,7 +327,7 @@ Section Movers.
 
   Hint Resolve thread_upd_from_same : exec_prefix.
 
-  Lemma exec_left_mover : forall s ts tid `(rx : _ -> proc opT T) tr P,
+  Lemma exec_left_mover : forall s ts tid `(rx : _ -> proc Op T) tr P,
     left_mover_pred P ->
     pred_stable op_step P ->
     enabled_in tid s ->
@@ -382,8 +382,8 @@ Section Movers.
 
   Theorem trace_incl_atomize_op_right_mover :
     right_mover ->
-    forall `(p : _ -> proc opT TP)
-           `(rx : _ -> proc opT TF),
+    forall `(p : _ -> proc Op TP)
+           `(rx : _ -> proc Op TF),
     trace_incl op_step
       (Bind (Bind (Prim opMover) (fun r => (Atomic (p r)))) rx)
       (Bind (Atomic (Bind (Prim opMover) p)) rx).
@@ -418,8 +418,8 @@ Section Movers.
   Qed.
 
   Theorem trace_incl_atomize_op_left_mover :
-    forall `(p : proc opT TP)
-           `(rx : _ -> proc opT TF),
+    forall `(p : proc Op TP)
+           `(rx : _ -> proc Op TF),
     left_mover ->
     enabled_after p ->
     trace_incl op_step
@@ -441,9 +441,9 @@ Section Movers.
   Qed.
 
   Theorem trace_incl_atomize_op_ret_left_mover :
-    forall `(p : proc opT TP)
+    forall `(p : proc Op TP)
            `(f : TP -> _ -> TR)
-           `(rx : _ -> proc opT TF),
+           `(rx : _ -> proc Op TF),
     left_mover ->
     enabled_after p ->
     trace_incl op_step
@@ -482,26 +482,26 @@ Hint Resolve left_mover_left_mover_pred.
 Hint Resolve always_enabled_to_stable.
 Hint Resolve always_enabled_to_enabled_in.
 
-Arguments left_mover {opT State} op_step {moverT}.
-Arguments left_mover_pred {opT State} op_step {moverT}.
-Arguments right_mover {opT State} op_step {moverT}.
-Arguments both_mover {opT State} op_step {moverT}.
-Arguments enabled_after {opT State} op_step {moverT} opMover {T} p.
-Arguments enabled_in {opT State} op_step {moverT}.
-Arguments always_enabled {opT State} op_step {moverT}.
+Arguments left_mover {Op State} op_step {moverT}.
+Arguments left_mover_pred {Op State} op_step {moverT}.
+Arguments right_mover {Op State} op_step {moverT}.
+Arguments both_mover {Op State} op_step {moverT}.
+Arguments enabled_after {Op State} op_step {moverT} opMover {T} p.
+Arguments enabled_in {Op State} op_step {moverT}.
+Arguments always_enabled {Op State} op_step {moverT}.
 
 
 Section YSA.
 
-  Variable opT : Type -> Type.
+  Variable Op : Type -> Type.
   Variable State : Type.
-  Variable op_step : OpSemantics opT State.
+  Variable op_step : OpSemantics Op State.
 
   (** Something similar to the Yield Sufficiency Automaton from the GC paper *)
 
-  Inductive left_movers (P : nat -> State -> Prop) : forall T, proc opT T -> Prop :=
+  Inductive left_movers (P : nat -> State -> Prop) : forall T, proc Op T -> Prop :=
   | LeftMoversOne :
-    forall `(opMover : opT oT) `(rx : _ -> proc _ T),
+    forall `(opMover : Op oT) `(rx : _ -> proc _ T),
     left_mover_pred op_step opMover P ->
     (forall tid s,
       P tid s ->
@@ -519,13 +519,13 @@ Section YSA.
     forall `(v : T),
     left_movers P (Ret v).
 
-  Inductive at_most_one_non_mover (P : nat -> State -> Prop) : forall T, proc opT T -> Prop :=
+  Inductive at_most_one_non_mover (P : nat -> State -> Prop) : forall T, proc Op T -> Prop :=
   | ZeroNonMovers :
     forall `(p : proc _ T),
     left_movers P p ->
     at_most_one_non_mover P p
   | OneNonMover :
-    forall `(op : opT T) `(rx : _ -> proc _ R),
+    forall `(op : Op T) `(rx : _ -> proc _ R),
     (forall r,
       left_movers
         (fun tid s' =>
@@ -536,13 +536,13 @@ Section YSA.
         (rx r)) ->
     at_most_one_non_mover P (Bind (Prim op) rx)
   | OneFinalNonMover :
-    forall `(op : opT T),
+    forall `(op : Op T),
     at_most_one_non_mover P (Prim op)
   .
 
-  Inductive right_movers (P : nat -> State -> Prop) : forall T, proc opT T -> Prop :=
+  Inductive right_movers (P : nat -> State -> Prop) : forall T, proc Op T -> Prop :=
   | RightMoversOne :
-    forall `(opMover : opT oT) `(rx : _ -> proc _ T),
+    forall `(opMover : Op oT) `(rx : _ -> proc _ T),
     right_mover op_step opMover ->
     (forall r,
       right_movers
@@ -558,7 +558,7 @@ Section YSA.
     at_most_one_non_mover P p ->
     right_movers P p.
 
-  Definition ysa_movers `(p : proc opT T) :=
+  Definition ysa_movers `(p : proc Op T) :=
     right_movers
       any
       p.
@@ -683,7 +683,7 @@ Section YSA.
 
 
   Lemma exec_any_atomic_op :
-    forall `(op : opT T) s r s' tid,
+    forall `(op : Op T) s r s' tid,
       exec_any op_step tid s (Atomic (Prim op)) r s' ->
       exec_any op_step tid s (Prim op) r s'.
   Proof.
@@ -763,7 +763,7 @@ Section YSA.
   Qed.
 
   Lemma ysa_movers_right_movers :
-    forall `(p : proc opT T),
+    forall `(p : proc Op T),
       right_movers any p ->
       ysa_movers p.
   Proof.

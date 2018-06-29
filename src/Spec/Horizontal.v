@@ -789,7 +789,7 @@ Module Type HIndex.
 End HIndex.
 
 Module HOps (o : Ops) (i : HIndex) <: Ops.
-  Definition opT := horizOpT i.indexValid o.opT.
+  Definition Op := horizOpT i.indexValid o.Op.
 End HOps.
 
 Module HState (s : State) (i : HIndex) <: State.
@@ -805,7 +805,7 @@ End HLayer.
 Module HProtocol (o : Ops) (s : State) (p : Protocol o s) (i : HIndex).
   Module ho := HOps o i.
   Module hs := HState s i.
-  Definition step_allow T (hop : ho.opT T) (tid : nat) (S : hs.State) : Prop :=
+  Definition step_allow T (hop : ho.Op T) (tid : nat) (S : hs.State) : Prop :=
     match hop with
     | Slice i op =>
       p.step_allow op tid (hget S i)
@@ -867,13 +867,13 @@ Module LayerImplMoversProtocolHT
   Module hl2 := HLayer o2 s l2 i.
   Module hp := HProtocol o1 s p i.
 
-  Definition compile_op T (op : ho2.opT T) : proc ho1.opT T :=
+  Definition compile_op T (op : ho2.Op T) : proc ho1.Op T :=
     match op with
     | Slice i op => SliceProc i (a.compile_op op)
     | CheckSlice i => Prim (CheckSlice i)
     end.
 
-  Theorem compile_op_no_atomics : forall T (op : ho2.opT T),
+  Theorem compile_op_no_atomics : forall T (op : ho2.Op T),
     no_atomics (compile_op op).
   Proof.
     destruct op; simpl; eauto.
@@ -884,7 +884,7 @@ Module LayerImplMoversProtocolHT
     induction 1; simpl; eauto.
   Qed.
 
-  Theorem ysa_movers : forall T (op : ho2.opT T),
+  Theorem ysa_movers : forall T (op : ho2.Op T),
     ysa_movers hl1.step (compile_op op).
   Proof.
     destruct op; simpl; eauto.
@@ -911,9 +911,9 @@ Module LayerImplMoversProtocolHT
   Hint Rewrite hget_hadd_ne_general using solve [ auto ] : h.
 
   Lemma step_high_to_step_low :
-    forall s s' (i: validIndexT i.indexValid) T (op: hp.ho.opT T) tid r evs,
+    forall s s' (i: validIndexT i.indexValid) T (op: hp.ho.Op T) tid r evs,
       restricted_step hl1raw.step hp.step_allow op tid s r s' evs ->
-      (exists (op': o1.opT T) r' evs',
+      (exists (op': o1.Op T) r' evs',
           restricted_step l1raw.step p.step_allow op' tid (hget s i) r' (hget s' i) evs') \/
       hget s i = hget s' i.
   Proof.
@@ -945,7 +945,7 @@ Module LayerImplMoversProtocolHT
       reflexivity.
   Qed.
 
-  Theorem op_follows_protocol : forall tid s `(op : ho2.opT T),
+  Theorem op_follows_protocol : forall tid s `(op : ho2.Op T),
     follows_protocol_proc hl1raw.step hp.step_allow tid s (compile_op op).
   Proof.
     destruct op; simpl.
@@ -989,7 +989,7 @@ Module LayerImplMoversProtocolHT
   Qed.
 
   Theorem allowed_stable :
-    forall `(op : ho1.opT T) `(op' : ho1.opT T') tid tid' s s' r evs,
+    forall `(op : ho1.Op T) `(op' : ho1.Op T') tid tid' s s' r evs,
       tid <> tid' ->
       hp.step_allow op tid s ->
       hl1.step op' tid' s r s' evs ->
@@ -1016,7 +1016,7 @@ Module LayerImplMoversProtocolHT
   Qed.
 
   Theorem raw_step_ok :
-    forall `(op : ho1.opT T) tid s r s' evs,
+    forall `(op : ho1.Op T) tid s r s' evs,
       restricted_step hl1raw.step hp.step_allow op tid s r s' evs ->
       hl1.step op tid s r s' evs.
   Proof.
@@ -1047,13 +1047,13 @@ Module LayerImplMoversHT
   Module hl1 := HLayer o1 s l1 i.
   Module hl2 := HLayer o2 s l2 i.
 
-  Definition compile_op T (op : ho2.opT T) : proc ho1.opT T :=
+  Definition compile_op T (op : ho2.Op T) : proc ho1.Op T :=
     match op with
     | Slice i op => SliceProc i (a.compile_op op)
     | CheckSlice i => Prim (CheckSlice i)
     end.
 
-  Theorem compile_op_no_atomics : forall T (op : ho2.opT T),
+  Theorem compile_op_no_atomics : forall T (op : ho2.Op T),
     no_atomics (compile_op op).
   Proof.
     destruct op; simpl; eauto.
@@ -1064,7 +1064,7 @@ Module LayerImplMoversHT
     induction 1; simpl; eauto.
   Qed.
 
-  Theorem ysa_movers : forall T (op : ho2.opT T),
+  Theorem ysa_movers : forall T (op : ho2.Op T),
     ysa_movers hl1.step (compile_op op).
   Proof.
     destruct op; simpl; eauto.
@@ -1101,8 +1101,8 @@ Module LayerImplLoopHT
   Module hl1 := HLayer o1 s l1 i.
   Module hl2 := HLayer o2 s l2 i.
 
-  Definition compile_op T (op : ho2.opT T) :
-    (option T -> ho1.opT T) * (T -> bool) * option T :=
+  Definition compile_op T (op : ho2.Op T) :
+    (option T -> ho1.Op T) * (T -> bool) * option T :=
     match op with
     | Slice idx op' =>
       let '(p, cond, i) := a.compile_op op' in

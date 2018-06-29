@@ -475,7 +475,7 @@ Module MailFSMergedOpImpl' <:
 
   Import MailFSPathOp.
 
-  Definition compile_op T (op : MailFSPathHOp.opT T) : proc MailFSMergedOp.opT T :=
+  Definition compile_op T (op : MailFSPathHOp.Op T) : proc MailFSMergedOp.Op T :=
     match op with
     | Slice (exist _ u _) op' =>
       match op' with

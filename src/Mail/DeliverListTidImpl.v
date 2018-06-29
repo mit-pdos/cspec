@@ -60,7 +60,7 @@ Module DeliverListTidImpl' <:
     ok <- Prim (DeliverListTidOp.LinkMail newname);
     Ret ok.
 
-  Definition compile_op T (op : DeliverOp.opT T) : proc _ T :=
+  Definition compile_op T (op : DeliverOp.Op T) : proc _ T :=
     match op with
     | DeliverOp.CreateWriteTmp data => Prim (DeliverListTidOp.CreateWriteTmp data)
     | DeliverOp.LinkMail => linkmail_core
@@ -180,7 +180,7 @@ Module DeliverListTidImpl' <:
   Qed.
 
   Theorem allowed_stable :
-    forall `(op : DeliverListTidOp.opT T) `(op' : DeliverListTidOp.opT T') tid tid' s s' r evs,
+    forall `(op : DeliverListTidOp.Op T) `(op' : DeliverListTidOp.Op T') tid tid' s s' r evs,
       tid <> tid' ->
       DeliverListTidProtocol.step_allow op tid s ->
       DeliverListTidRestrictedAPI.step op' tid' s r s' evs ->

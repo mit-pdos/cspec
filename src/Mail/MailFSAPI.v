@@ -7,24 +7,24 @@ Module MailFSOp <: Ops.
 
   Definition extopT := MailServerAPI.MailServerOp.extopT.
 
-  Inductive xopT : Type -> Type :=
-  | CreateWriteTmp : forall (data : string), xopT bool
-  | LinkMail : forall (mboxfn : nat), xopT bool
-  | UnlinkTmp : xopT unit
+  Inductive xOp : Type -> Type :=
+  | CreateWriteTmp : forall (data : string), xOp bool
+  | LinkMail : forall (mboxfn : nat), xOp bool
+  | UnlinkTmp : xOp unit
 
-  | GetTID : xopT nat
-  | Random : xopT nat
+  | GetTID : xOp nat
+  | Random : xOp nat
 
-  | List : xopT (list (nat * nat))
-  | Read : forall (fn : nat * nat), xopT (option string)
-  | Delete : forall (fn : nat * nat), xopT unit
-  | Lock : xopT unit
-  | Unlock : xopT unit
+  | List : xOp (list (nat * nat))
+  | Read : forall (fn : nat * nat), xOp (option string)
+  | Delete : forall (fn : nat * nat), xOp unit
+  | Lock : xOp unit
+  | Unlock : xOp unit
 
-  | Ext : forall `(op : extopT T), xopT T
+  | Ext : forall `(op : extopT T), xOp T
   .
 
-  Definition opT := xopT.
+  Definition Op := xOp.
 
 End MailFSOp.
 Module MailFSHOp := HOps MailFSOp UserIdx.
@@ -35,7 +35,7 @@ Module MailFSAPI <: Layer MailFSOp MailboxTmpAbsState.
   Import MailFSOp.
   Import MailboxTmpAbsState.
 
-  Inductive xstep : forall T, opT T -> nat -> State -> T -> State -> list event -> Prop :=
+  Inductive xstep : forall T, Op T -> nat -> State -> T -> State -> list event -> Prop :=
   | StepCreateWriteTmpOk : forall tmp mbox tid data lock,
     xstep (CreateWriteTmp data) tid
       (mk_state tmp mbox lock)

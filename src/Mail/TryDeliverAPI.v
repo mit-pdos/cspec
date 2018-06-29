@@ -7,21 +7,21 @@ Module TryDeliverOp <: Ops.
 
   Definition extopT := MailServerAPI.MailServerOp.extopT.
 
-  Inductive xopT : Type -> Type :=
-  | CreateWriteTmp : forall (data : string), xopT bool
-  | LinkMail : xopT bool
-  | UnlinkTmp : xopT unit
+  Inductive xOp : Type -> Type :=
+  | CreateWriteTmp : forall (data : string), xOp bool
+  | LinkMail : xOp bool
+  | UnlinkTmp : xOp unit
 
-  | List : xopT (list (nat * nat))
-  | Read : forall (fn : nat * nat), xopT (option string)
-  | Delete : forall (fn : nat * nat), xopT unit
-  | Lock : xopT unit
-  | Unlock : xopT unit
+  | List : xOp (list (nat * nat))
+  | Read : forall (fn : nat * nat), xOp (option string)
+  | Delete : forall (fn : nat * nat), xOp unit
+  | Lock : xOp unit
+  | Unlock : xOp unit
 
-  | Ext : forall `(op : extopT T), xopT T
+  | Ext : forall `(op : extopT T), xOp T
   .
 
-  Definition opT := xopT.
+  Definition Op := xOp.
 
 End TryDeliverOp.
 Module TryDeliverHOp := HOps TryDeliverOp UserIdx.
@@ -32,7 +32,7 @@ Module TryDeliverAPI <: Layer TryDeliverOp MailboxTmpAbsState.
   Import TryDeliverOp.
   Import MailboxTmpAbsState.
 
-  Inductive xstep : forall T, opT T -> nat -> State -> T -> State -> list event -> Prop :=
+  Inductive xstep : forall T, Op T -> nat -> State -> T -> State -> list event -> Prop :=
   | StepCreateWriteTmpOK : forall tmp mbox tid data lock,
     xstep (CreateWriteTmp data) tid
       (mk_state tmp mbox lock)

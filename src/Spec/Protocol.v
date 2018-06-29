@@ -12,18 +12,18 @@ Global Generalizable All Variables.
 Section ExecOps.
 
   Variable State:Type.
-  Variable opT:Type -> Type.
-  Variable op_step: OpSemantics opT State.
+  Variable Op:Type -> Type.
+  Variable op_step: OpSemantics Op State.
 
   Definition exec_ops (s s' : State) : Prop :=
     clos_refl_trans_1n _
                        (fun s0 s1 =>
-                          exists tid `(op' : opT T') r' evs,
+                          exists tid `(op' : Op T') r' evs,
                             op_step op' tid s0 r' s1 evs)
                        s s'.
 
   Lemma exec_ops_one : forall s s',
-      forall T (op: opT T) tid r evs,
+      forall T (op: Op T) tid r evs,
         op_step op tid s r s' evs ->
         exec_ops s s'.
   Proof.
@@ -53,15 +53,15 @@ Hint Resolve exec_ops_reflexive.
 
 Section Protocol.
 
-  Variable opT : Type -> Type.
+  Variable Op : Type -> Type.
   Variable State : Type.
 
-  Definition OpProtocol := forall T, opT T -> nat -> State -> Prop.
+  Definition OpProtocol := forall T, Op T -> nat -> State -> Prop.
 
-  Variable lo_step : OpSemantics opT State.
+  Variable lo_step : OpSemantics Op State.
   Variable op_allow : OpProtocol.
 
-  Definition nilpotent_step : OpSemantics opT State :=
+  Definition nilpotent_step : OpSemantics Op State :=
     fun T op tid s r s' evs =>
       ( op_allow op tid s /\
         lo_step op tid s r s' evs ) \/
@@ -69,12 +69,12 @@ Section Protocol.
         s' = s /\
         evs = nil ).
 
-  Definition restricted_step : OpSemantics opT State :=
+  Definition restricted_step : OpSemantics Op State :=
     fun T op tid s r s' evs =>
       op_allow op tid s /\
       lo_step op tid s r s' evs.
 
-  Definition spawn_follows_protocol (follows_protocol_proc: nat -> State -> forall T (p: proc opT T), Prop) tid (s: State) T (p: proc _ T) :=
+  Definition spawn_follows_protocol (follows_protocol_proc: nat -> State -> forall T (p: proc Op T), Prop) tid (s: State) T (p: proc _ T) :=
     (forall tid',
         tid <> tid' ->
         forall s',
@@ -83,7 +83,7 @@ Section Protocol.
 
   Theorem spawn_follows_protocol_stable : forall follows_protocol_proc
                                       tid s T (p: proc _ T) s'
-                                      tid' T' (op: opT T') r evs,
+                                      tid' T' (op: Op T') r evs,
       tid <> tid' ->
       spawn_follows_protocol follows_protocol_proc tid s p ->
       restricted_step op tid' s r s' evs ->
@@ -95,7 +95,7 @@ Section Protocol.
   Qed.
 
   Theorem follows_protocol_implies_spawn_follows_protocol_subset :
-    forall (follows_protocol_proc: nat -> State -> forall T (p: proc opT T), Prop)
+    forall (follows_protocol_proc: nat -> State -> forall T (p: proc Op T), Prop)
       tid s T (p: proc _ T),
       (forall tid s, follows_protocol_proc tid s _ p) ->
       spawn_follows_protocol follows_protocol_proc tid s p.
@@ -116,9 +116,9 @@ Section Protocol.
   Qed.
 
   Inductive follows_protocol_proc : forall (tid : nat) (s : State),
-    forall T (p : proc opT T), Prop :=
+    forall T (p : proc Op T), Prop :=
   | FollowsProtocolProcOp :
-    forall tid s T (op : opT T),
+    forall tid s T (op : Op T),
     op_allow op tid s ->
     follows_protocol_proc tid s (Prim op)
   | FollowsProtocolProcBind :
@@ -142,13 +142,13 @@ Section Protocol.
         follows_protocol_proc tid s (Spawn p)
   .
 
-  Definition follows_protocol_s (ts : threads_state opT) (s : State) :=
+  Definition follows_protocol_s (ts : threads_state Op) (s : State) :=
     forall tid T (p : proc _ T),
       ts [[ tid ]] = Proc p ->
       follows_protocol_proc tid s p.
 
   Variable allowed_stable :
-    forall `(op : opT T) `(op' : opT T') tid tid' s s' r evs,
+    forall `(op : Op T) `(op' : Op T') tid tid' s s' r evs,
       tid <> tid' ->
       op_allow op tid s ->
       restricted_step op' tid' s r s' evs ->
@@ -207,7 +207,7 @@ Section Protocol.
   Hint Constructors follows_protocol_proc.
 
   Theorem exec_tid_preserves_follows_protocol :
-    forall `(p : proc opT T) tid s s' p' spawned evs,
+    forall `(p : proc Op T) tid s s' p' spawned evs,
     follows_protocol_proc tid s p ->
     exec_tid lo_step tid s p s' (inr p') spawned evs ->
     follows_protocol_proc tid s' p'.
@@ -240,7 +240,7 @@ Section Protocol.
   Qed.
 
   Theorem follows_protocol_stable :
-    forall `(p : proc opT T) `(op' : opT T') tid tid' s s' r evs,
+    forall `(p : proc Op T) `(op' : Op T') tid tid' s s' r evs,
       tid <> tid' ->
       follows_protocol_proc tid s p ->
       restricted_step op' tid' s r s' evs ->
@@ -256,7 +256,7 @@ Section Protocol.
   Hint Resolve follows_protocol_stable.
 
   Theorem exec_tid'_preserves_follows_protocol :
-    forall `(p : proc opT T) `(p' : proc opT T') tid tid' s s' r spawned evs,
+    forall `(p : proc Op T) `(p' : proc Op T') tid tid' s s' r spawned evs,
       tid <> tid' ->
       follows_protocol_proc tid s p ->
       exec_tid restricted_step tid' s p' s' r spawned evs ->
@@ -297,7 +297,7 @@ Section Protocol.
   Qed.
 
   Variable opMidT : Type -> Type.
-  Variable compile_op : forall T, opMidT T -> proc opT T.
+  Variable compile_op : forall T, opMidT T -> proc Op T.
   Variable compile_op_follows_protocol :
     forall tid s T (op : opMidT T), follows_protocol_proc tid s (compile_op op).
 

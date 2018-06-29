@@ -21,7 +21,7 @@ Module MailServerLockAbsAPI <: Layer MailServerOp MailServerLockAbsState.
   Import MailServerOp.
   Import MailServerLockAbsState.
   
-  Inductive xstep : forall T, opT T -> nat -> State -> T -> State -> list event -> Prop :=
+  Inductive xstep : forall T, Op T -> nat -> State -> T -> State -> list event -> Prop :=
   | StepDeliverOK : forall m mbox fn tid lock,
     ~ FMap.In fn mbox ->
     xstep (Deliver m) tid

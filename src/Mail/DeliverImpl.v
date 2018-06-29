@@ -24,7 +24,7 @@ Module AtomicDeliver' <:
       Ret false
     end.
 
-  Definition compile_op T (op : MailboxOp.opT T) : proc _ T :=
+  Definition compile_op T (op : MailboxOp.Op T) : proc _ T :=
     match op with
     | MailboxOp.Deliver m => deliver_core m
     | MailboxOp.List => Prim (DeliverOp.List)
@@ -235,7 +235,7 @@ Module AtomicDeliver' <:
   Qed.
 
   Theorem allowed_stable :
-    forall `(op : DeliverOp.opT T) `(op' : DeliverOp.opT T') tid tid' s s' r evs,
+    forall `(op : DeliverOp.Op T) `(op' : DeliverOp.Op T') tid tid' s s' r evs,
       tid <> tid' ->
       DeliverProtocol.step_allow op tid s ->
       DeliverRestrictedAPI.step op' tid' s r s' evs ->

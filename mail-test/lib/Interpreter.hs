@@ -61,7 +61,7 @@ dirPath u dir = (userPath u) ++ "/" ++ dir
 filePath :: String -> String -> String -> String
 filePath u dir fn = (dirPath u dir) ++ "/" ++ fn
 
-run_proc :: State -> Coq_proc (MailFSMergedOp__Coq_xopT a) GHC.Base.Any -> IO a
+run_proc :: State -> Coq_proc (MailFSMergedOp__Coq_xOp a) GHC.Base.Any -> IO a
 run_proc s (Ret v) = do
   -- debugmsg $ "Ret"
   return $ unsafeCoerce v

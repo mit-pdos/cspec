@@ -18,7 +18,7 @@ import MailFSMergedAPI
 import MailServer
 
 
-run_thread :: SMTPServer -> POP3Server -> Coq_maybe_proc (MailFSMergedOp__Coq_xopT a) -> IO ()
+run_thread :: SMTPServer -> POP3Server -> Coq_maybe_proc (MailFSMergedOp__Coq_xOp a) -> IO ()
 run_thread _ _ NoProc = return ()
 run_thread smtp pop3 (Proc p) = do
   pid <- getProcessID

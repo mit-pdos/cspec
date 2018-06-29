@@ -27,39 +27,39 @@ Global Generalizable All Variables.
 
 Module TASOp <: Ops.
 
-  Inductive xopT : Type -> Type :=
-  | TestAndSet : xopT bool
-  | Clear : xopT unit
-  | Read : xopT nat
-  | Write : nat -> xopT unit
-  | Flush : xopT unit.
+  Inductive xOp : Type -> Type :=
+  | TestAndSet : xOp bool
+  | Clear : xOp unit
+  | Read : xOp nat
+  | Write : nat -> xOp unit
+  | Flush : xOp unit.
 
-  Definition opT := xopT.
+  Definition Op := xOp.
 
 End TASOp.
 
 
 Module LockOp <: Ops.
 
-  Inductive xopT : Type -> Type :=
-  | Acquire : xopT bool
-  | Release : xopT unit
-  | Read : xopT nat
-  | Write : nat -> xopT unit
-  | Flush : xopT unit.
+  Inductive xOp : Type -> Type :=
+  | Acquire : xOp bool
+  | Release : xOp unit
+  | Read : xOp nat
+  | Write : nat -> xOp unit
+  | Flush : xOp unit.
 
-  Definition opT := xopT.
+  Definition Op := xOp.
 
 End LockOp.
 
 
 Module CounterOp <: Ops.
 
-  Inductive xopT : Type -> Type :=
-  | Inc : xopT nat
-  | Dec : xopT nat.
+  Inductive xOp : Type -> Type :=
+  | Inc : xOp nat
+  | Dec : xOp nat.
 
-  Definition opT := xopT.
+  Definition Op := xOp.
 
 End CounterOp.
 
@@ -102,7 +102,7 @@ End CounterState.
 
 (** Layer definitions *)
 
-Definition bg_step `(step: OpSemantics opT State) (bg: State -> State -> Prop) : OpSemantics opT State :=
+Definition bg_step `(step: OpSemantics Op State) (bg: State -> State -> Prop) : OpSemantics Op State :=
   fun _ op tid s r s' evs =>
     exists s0 s1, bg s0 s /\
           step _ op tid s r s1 evs /\
@@ -124,7 +124,7 @@ Module TASAPI <: Layer TASOp TASState.
   Import TASOp.
   Import TASState.
 
-  Inductive xstep : forall T, opT T -> nat -> State -> T -> State -> list event -> Prop :=
+  Inductive xstep : forall T, Op T -> nat -> State -> T -> State -> list event -> Prop :=
   | StepTAS : forall tid v l,
       xstep TestAndSet tid (mkTASState v l) l (mkTASState v true) nil
   | StepClear : forall tid v l,
@@ -146,7 +146,7 @@ Module TASDelayNondetAPI <: Layer TASOp TASState.
   Import TASOp.
   Import TASState.
 
-  Inductive xstep : forall T, opT T -> nat -> State -> T -> State -> list event -> Prop :=
+  Inductive xstep : forall T, Op T -> nat -> State -> T -> State -> list event -> Prop :=
   | StepTAS : forall tid v l,
       xstep TestAndSet tid (mkTASState v l) l (mkTASState v true) nil
   | StepClear : forall tid v l,
@@ -231,7 +231,7 @@ Module TASLockAPI <: Layer TASOp LockState.
   Import TASOp.
   Import LockState.
 
-  Inductive xstep : forall T, opT T -> nat -> State -> T -> State -> list event -> Prop :=
+  Inductive xstep : forall T, Op T -> nat -> State -> T -> State -> list event -> Prop :=
   | StepTAS0 : forall tid v,
       xstep TestAndSet tid (mkState v None) false (mkState v (Some tid)) nil
   | StepTAS1 : forall tid tid' v,
@@ -258,7 +258,7 @@ Module RawLockAPI <: Layer LockOp LockState.
   Import LockOp.
   Import LockState.
 
-  Inductive xstep : forall T, opT T -> nat -> State -> T -> State -> list event -> Prop :=
+  Inductive xstep : forall T, Op T -> nat -> State -> T -> State -> list event -> Prop :=
   | StepAcquire : forall tid v r,
       xstep Acquire tid (mkState v None) r (mkState v (Some tid)) nil
   | StepRelease : forall tid v l,
@@ -283,7 +283,7 @@ Module LockProtocol <: Protocol LockOp LockState.
   Import LockOp.
   Import LockState.
 
-  Inductive xstep_allow : forall T, opT T -> nat -> State -> Prop :=
+  Inductive xstep_allow : forall T, Op T -> nat -> State -> Prop :=
   | StepAcquire : forall tid s,
       xstep_allow Acquire tid s
   | StepRelease : forall tid v,
@@ -316,7 +316,7 @@ Module LockedCounterAPI <: Layer CounterOp LockState.
   Import CounterOp.
   Import LockState.
 
-  Inductive xstep : forall T, opT T -> nat -> State -> T -> State -> list event -> Prop :=
+  Inductive xstep : forall T, Op T -> nat -> State -> T -> State -> list event -> Prop :=
   | StepInc : forall tid v0 v v' r,
       mem_bg v0 v ->
       r = mem_read v tid ->
@@ -340,7 +340,7 @@ Module CounterAPI <: Layer CounterOp CounterState.
   Import CounterOp.
   Import CounterState.
 
-  Inductive xstep : forall T, opT T -> nat -> State -> T -> State -> list event -> Prop :=
+  Inductive xstep : forall T, Op T -> nat -> State -> T -> State -> list event -> Prop :=
   | StepInc : forall tid v,
       xstep Inc tid v v (v + 1) nil
   | StepDec : forall tid v,
@@ -363,7 +363,7 @@ Module LockingCounter' <:
   Import LockOp.
   Import CounterOp.
 
-  Definition inc_core : proc LockOp.opT _ :=
+  Definition inc_core : proc LockOp.Op _ :=
     _ <- Prim Acquire;
       v <- Prim Read;
       _ <- Prim (Write (v + 1));
@@ -371,7 +371,7 @@ Module LockingCounter' <:
       _ <- Prim Release;
       Ret v.
 
-  Definition dec_core : proc LockOp.opT _ :=
+  Definition dec_core : proc LockOp.Op _ :=
     _ <- Prim Acquire;
       v <- Prim Read;
       _ <- Prim (Write (v - 1));
@@ -379,14 +379,14 @@ Module LockingCounter' <:
       _ <- Prim Release;
       Ret v.
 
-  Definition compile_op T (op : CounterOp.opT T)
-    : proc LockOp.opT T :=
+  Definition compile_op T (op : CounterOp.Op T)
+    : proc LockOp.Op T :=
     match op with
     | Inc => inc_core
     | Dec => dec_core
     end.
 
-  Theorem compile_op_no_atomics : forall T (op : CounterOp.opT T),
+  Theorem compile_op_no_atomics : forall T (op : CounterOp.Op T),
       no_atomics (compile_op op).
   Proof.
     destruct op; econstructor; eauto.
@@ -468,7 +468,7 @@ Module LockingCounter' <:
   Hint Resolve read_right_mover.
   Hint Resolve write_right_mover.
 
-  Theorem ysa_movers : forall T (op : CounterOp.opT T),
+  Theorem ysa_movers : forall T (op : CounterOp.Op T),
       ysa_movers LockAPI.step (compile_op op).
   Proof.
     destruct op; unfold ysa_movers; simpl.
@@ -587,14 +587,14 @@ Module LockingCounter' <:
   Hint Resolve inc_follows_protocol.
   Hint Resolve dec_follows_protocol.
 
-  Theorem op_follows_protocol : forall tid s `(op : CounterOp.opT T),
+  Theorem op_follows_protocol : forall tid s `(op : CounterOp.Op T),
       follows_protocol_proc RawLockAPI.step LockProtocol.step_allow tid s (compile_op op).
   Proof.
     destruct op; eauto.
   Qed.
 
   Theorem allowed_stable :
-    forall `(op : LockOp.opT T) `(op' : LockOp.opT T') tid tid' s s' r evs,
+    forall `(op : LockOp.Op T) `(op' : LockOp.Op T') tid tid' s s' r evs,
       tid <> tid' ->
       LockAPI.step_allow op tid s ->
       LockAPI.step op' tid' s r s' evs ->
@@ -786,7 +786,7 @@ Module LockImpl' <:
   Import TASOp.
   Import LockOp.
 
-  Definition compile_op T (op : LockOp.opT T) : (option T -> TASOp.opT T) * (T -> bool) * option T :=
+  Definition compile_op T (op : LockOp.Op T) : (option T -> TASOp.Op T) * (T -> bool) * option T :=
     match op with
     | Acquire => (fun _ => TestAndSet, acquire_cond, None)
     | Release => (fun _ => Clear, once_cond, None)

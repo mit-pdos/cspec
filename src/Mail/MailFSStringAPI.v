@@ -7,24 +7,24 @@ Module MailFSStringOp <: Ops.
 
   Definition extopT := MailServerAPI.MailServerOp.extopT.
 
-  Inductive xopT : Type -> Type :=
-  | CreateWriteTmp : forall (tmpfn : string) (data : string), xopT bool
-  | LinkMail : forall (tmpfn : string) (mboxfn : string), xopT bool
-  | UnlinkTmp : forall (tmpfn : string), xopT unit
+  Inductive xOp : Type -> Type :=
+  | CreateWriteTmp : forall (tmpfn : string) (data : string), xOp bool
+  | LinkMail : forall (tmpfn : string) (mboxfn : string), xOp bool
+  | UnlinkTmp : forall (tmpfn : string), xOp unit
 
-  | GetTID : xopT nat
-  | Random : xopT nat
+  | GetTID : xOp nat
+  | Random : xOp nat
 
-  | List : xopT (list string)
-  | Read : forall (fn : string), xopT (option string)
-  | Delete : forall (fn : string), xopT unit
-  | Lock : xopT unit
-  | Unlock : xopT unit
+  | List : xOp (list string)
+  | Read : forall (fn : string), xOp (option string)
+  | Delete : forall (fn : string), xOp unit
+  | Lock : xOp unit
+  | Unlock : xOp unit
 
-  | Ext : forall `(op : extopT T), xopT T
+  | Ext : forall `(op : extopT T), xOp T
   .
 
-  Definition opT := xopT.
+  Definition Op := xOp.
 
 End MailFSStringOp.
 Module MailFSStringHOp := HOps MailFSStringOp UserIdx.
@@ -35,7 +35,7 @@ Module MailFSStringAPI <: Layer MailFSStringOp MailFSStringAbsState.
   Import MailFSStringOp.
   Import MailFSStringAbsState.
 
-  Inductive xstep : forall T, opT T -> nat -> State -> T -> State -> list event -> Prop :=
+  Inductive xstep : forall T, Op T -> nat -> State -> T -> State -> list event -> Prop :=
   | StepCreateWriteTmpOK : forall tmp mbox tid tmpfn data lock,
     xstep (CreateWriteTmp tmpfn data) tid
       (mk_state tmp mbox lock)

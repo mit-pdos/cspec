@@ -12,7 +12,7 @@ import ConcurProc
 import CounterExample
 
 
-run_thread :: State -> Coq_maybe_proc (TASOp__Coq_xopT a) -> IO ()
+run_thread :: State -> Coq_maybe_proc (TASOp__Coq_xOp a) -> IO ()
 run_thread _ NoProc = return ()
 run_thread s (Proc p) = do
   tid <- myThreadId
@@ -20,7 +20,7 @@ run_thread s (Proc p) = do
   run_proc s p
   return ()
 
-spawn_thread :: State -> Coq_maybe_proc (TASOp__Coq_xopT a) -> IO ()
+spawn_thread :: State -> Coq_maybe_proc (TASOp__Coq_xOp a) -> IO ()
 spawn_thread s p = do
   putStrLn $ "Spawning.."
   tid <- forkIO (run_thread s p)

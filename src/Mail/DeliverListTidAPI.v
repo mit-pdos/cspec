@@ -7,22 +7,22 @@ Module DeliverListTidOp <: Ops.
 
   Definition extopT := MailServerAPI.MailServerOp.extopT.
   
-  Inductive xopT : Type -> Type :=
-  | CreateWriteTmp : forall (data : string), xopT bool
-  | LinkMail : forall (mboxfn : nat), xopT bool
-  | UnlinkTmp : xopT unit
+  Inductive xOp : Type -> Type :=
+  | CreateWriteTmp : forall (data : string), xOp bool
+  | LinkMail : forall (mboxfn : nat), xOp bool
+  | UnlinkTmp : xOp unit
 
-  | List : xopT (list (nat * nat))
-  | ListTid : xopT (list nat)
-  | Read : forall (fn : nat * nat), xopT (option string)
-  | Delete : forall (fn : nat * nat), xopT unit
-  | Lock : xopT unit
-  | Unlock : xopT unit
+  | List : xOp (list (nat * nat))
+  | ListTid : xOp (list nat)
+  | Read : forall (fn : nat * nat), xOp (option string)
+  | Delete : forall (fn : nat * nat), xOp unit
+  | Lock : xOp unit
+  | Unlock : xOp unit
 
-  | Ext : forall `(op : extopT T), xopT T
+  | Ext : forall `(op : extopT T), xOp T
   .
 
-  Definition opT := xopT.
+  Definition Op := xOp.
 
 End DeliverListTidOp.
 Module DeliverListTidHOp := HOps DeliverListTidOp UserIdx.
@@ -33,7 +33,7 @@ Module DeliverListTidAPI <: Layer DeliverListTidOp MailboxTmpAbsState.
   Import DeliverListTidOp.
   Import MailboxTmpAbsState.
 
-  Inductive xstep : forall T, opT T -> nat -> State -> T -> State -> list event -> Prop :=
+  Inductive xstep : forall T, Op T -> nat -> State -> T -> State -> list event -> Prop :=
   | StepCreateWriteTmp : forall tmp mbox tid data lock,
     xstep (CreateWriteTmp data) tid
       (mk_state tmp mbox lock)
@@ -143,7 +143,7 @@ Module DeliverListTidProtocol <: Protocol DeliverListTidOp MailboxTmpAbsState.
   Import DeliverListTidOp.
   Import MailboxTmpAbsState.
 
-  Inductive xstep_allow : forall T, opT T -> nat -> State -> Prop :=
+  Inductive xstep_allow : forall T, Op T -> nat -> State -> Prop :=
   | AllowCreateWriteTmp : forall tid s data,
     xstep_allow (CreateWriteTmp data) tid s
   | AllowLinkMail : forall tid tmp mbox mailfn lock,

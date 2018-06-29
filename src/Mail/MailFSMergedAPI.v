@@ -7,25 +7,25 @@ Module MailFSMergedOp <: Ops.
 
   Definition extopT := MailServerAPI.MailServerOp.extopT.
 
-  Inductive xopT : Type -> Type :=
-  | CreateWrite : forall (fn : string * string * string) (data : string), xopT bool
-  | Link : forall (fn : string * string * string) (fn : string * string * string), xopT bool
-  | Unlink : forall (fn : string * string * string), xopT unit
+  Inductive xOp : Type -> Type :=
+  | CreateWrite : forall (fn : string * string * string) (data : string), xOp bool
+  | Link : forall (fn : string * string * string) (fn : string * string * string), xOp bool
+  | Unlink : forall (fn : string * string * string), xOp unit
 
-  | GetTID : xopT nat
-  | Random : xopT nat
+  | GetTID : xOp nat
+  | Random : xOp nat
 
-  | List : forall (dir : string * string), xopT (list string)
-  | Read : forall (fn : string * string * string), xopT (option string)
+  | List : forall (dir : string * string), xOp (list string)
+  | Read : forall (fn : string * string * string), xOp (option string)
 
-  | Lock : forall (u : string), xopT unit
-  | Unlock : forall (u : string), xopT unit
-  | Exists : forall (u : string), xopT (CheckResult UserIdx.indexValid)
+  | Lock : forall (u : string), xOp unit
+  | Unlock : forall (u : string), xOp unit
+  | Exists : forall (u : string), xOp (CheckResult UserIdx.indexValid)
 
-  | Ext : forall `(op : extopT T), xopT T
+  | Ext : forall `(op : extopT T), xOp T
   .
 
-  Definition opT := xopT.
+  Definition Op := xOp.
 
 End MailFSMergedOp.
 
@@ -61,7 +61,7 @@ Module MailFSMergedAPI <: Layer MailFSMergedOp MailFSMergedState.
   Import MailFSMergedOp.
   Import MailFSMergedState.
 
-  Inductive xstep : forall T, opT T -> nat -> State -> T -> State -> list event -> Prop :=
+  Inductive xstep : forall T, Op T -> nat -> State -> T -> State -> list event -> Prop :=
   | StepCreateWriteOK : forall fs tid tmpfn data lock,
     xstep (CreateWrite tmpfn data) tid
       (mk_state fs lock)
@@ -192,7 +192,7 @@ Module MailFSMergedAbsAPI <: Layer MailFSPathHOp MailFSMergedState.
   Import MailFSPathHOp.
   Import MailFSMergedState.
 
-  Inductive xstep : forall T, opT T -> nat -> State -> T -> State -> list event -> Prop :=
+  Inductive xstep : forall T, Op T -> nat -> State -> T -> State -> list event -> Prop :=
   | StepCreateWriteOK : forall fs tid dir fn data lock u P,
     xstep (Slice (exist _ u P) (CreateWrite (dir, fn) data)) tid
       (mk_state fs lock)

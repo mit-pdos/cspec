@@ -15,7 +15,7 @@ Module LinkRetryImpl' <:
   Definition retry_cond (r : bool) := r.
   Definition once_cond {T} (r : T) := true.
 
-  Definition compile_op T (op : DeliverOp.opT T) : (option T -> TryDeliverOp.opT T) * (T -> bool) * option T :=
+  Definition compile_op T (op : DeliverOp.Op T) : (option T -> TryDeliverOp.Op T) * (T -> bool) * option T :=
     match op with
     | DeliverOp.CreateWriteTmp data => (fun _ => TryDeliverOp.CreateWriteTmp data, once_cond, None)
     | DeliverOp.LinkMail => (fun _ => TryDeliverOp.LinkMail, retry_cond, None)

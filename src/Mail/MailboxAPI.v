@@ -6,17 +6,17 @@ Module MailboxOp <: Ops.
 
   Definition extopT := MailServerAPI.MailServerOp.extopT.
 
-  Inductive xopT : Type -> Type :=
-  | Deliver : forall (m : string), xopT bool
-  | List : xopT (list (nat*nat))
-  | Read : forall (fn : nat*nat), xopT (option string)
-  | Delete : forall (fn : nat*nat), xopT unit
-  | Lock : xopT unit
-  | Unlock : xopT unit
-  | Ext : forall `(op : extopT T), xopT T
+  Inductive xOp : Type -> Type :=
+  | Deliver : forall (m : string), xOp bool
+  | List : xOp (list (nat*nat))
+  | Read : forall (fn : nat*nat), xOp (option string)
+  | Delete : forall (fn : nat*nat), xOp unit
+  | Lock : xOp unit
+  | Unlock : xOp unit
+  | Ext : forall `(op : extopT T), xOp T
   .
 
-  Definition opT := xopT.
+  Definition Op := xOp.
 
 End MailboxOp.
 Module MailboxHOp := HOps MailboxOp UserIdx.
@@ -27,7 +27,7 @@ Module MailboxAPI <: Layer MailboxOp MailServerLockAbsState.
   Import MailboxOp.
   Import MailServerLockAbsState.
 
-  Inductive xstep : forall T, opT T -> nat -> State -> T -> State -> list event -> Prop :=
+  Inductive xstep : forall T, Op T -> nat -> State -> T -> State -> list event -> Prop :=
   | StepDeliverOK : forall m mbox tid fn lock,
     ~ FMap.In fn mbox ->
     xstep (Deliver m) tid
@@ -103,7 +103,7 @@ Module MailboxProtocol <: Protocol MailboxOp MailServerLockAbsState.
   Import MailboxOp.
   Import MailServerLockAbsState.
 
-  Inductive xstep_allow : forall T, opT T -> nat -> State -> Prop :=
+  Inductive xstep_allow : forall T, Op T -> nat -> State -> Prop :=
   | AllowDeliver : forall m tid s,
     xstep_allow (Deliver m) tid s
   | AllowList : forall tid s,

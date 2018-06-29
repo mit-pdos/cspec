@@ -8,15 +8,15 @@ Module MailServerComposedOp <: Ops.
   Import MailServerOp.
   Definition user := validIndexT UserIdx.indexValid.
 
-  Inductive xopT : Type -> Type :=
-  | Deliver : forall (u : user) (m : string), xopT bool
-  | Pickup : forall (u : user), xopT (list ((nat*nat) * string))
-  | CheckUser : forall (u : string), xopT (CheckResult UserIdx.indexValid)
-  | Delete : forall (u : user) (id : nat*nat), xopT unit
-  | Ext : forall `(op : extopT T), xopT T
+  Inductive xOp : Type -> Type :=
+  | Deliver : forall (u : user) (m : string), xOp bool
+  | Pickup : forall (u : user), xOp (list ((nat*nat) * string))
+  | CheckUser : forall (u : string), xOp (CheckResult UserIdx.indexValid)
+  | Delete : forall (u : user) (id : nat*nat), xOp unit
+  | Ext : forall `(op : extopT T), xOp T
   .
 
-  Definition opT := xopT.
+  Definition Op := xOp.
 
 End MailServerComposedOp.
 
@@ -29,7 +29,7 @@ Module MailServerComposedAPI <: Layer MailServerComposedOp MailServerComposedSta
   Import MailServerComposedOp.
   Import MailServerComposedState.
 
-  Inductive xstep : forall T, opT T -> nat -> State -> T -> State -> list event -> Prop :=
+  Inductive xstep : forall T, Op T -> nat -> State -> T -> State -> list event -> Prop :=
   | StepDeliverOK : forall m s u fn tid,
     ~ FMap.In fn (hget s u) ->
     xstep (Deliver u m) tid

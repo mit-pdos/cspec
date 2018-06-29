@@ -22,7 +22,7 @@ Module MailFSImpl' <:
     l <- Prim (MailFSOp.List);
     Ret (map snd (filter (same_tid tid) l)).
 
-  Definition compile_op T (op : DeliverListTidOp.opT T) : proc _ T :=
+  Definition compile_op T (op : DeliverListTidOp.Op T) : proc _ T :=
     match op with
     | DeliverListTidOp.LinkMail m => Prim (MailFSOp.LinkMail m)
     | DeliverListTidOp.List => Prim (MailFSOp.List)

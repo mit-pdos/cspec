@@ -80,7 +80,7 @@ Module LinkDirAPI <: Layer.
   | ListUser (user : string) : mfs_opT (option (list string))
   | LookupUser (user : string) (fn : string) : mfs_opT (option nat).
 
-  Definition opT := mfs_opT.
+  Definition Op := mfs_opT.
 
   Definition initP (s : State) := True.
 
@@ -99,7 +99,7 @@ Module LinkDirAPI <: Layer.
           MFSLinks fs d')
       (MFSFiles fs).
 
-  Inductive xstep : forall T, opT T -> nat -> State -> T -> State -> Prop :=
+  Inductive xstep : forall T, Op T -> nat -> State -> T -> State -> Prop :=
 (*
   | StepFindAvailable : forall pfx d state res tid,
     DirContents.find res ((MFSLinks state) d) = None ->
@@ -125,7 +125,7 @@ End LinkDirAPI.
 
 Module LinkDirStableAPI <: Layer.
 
-  Definition opT := LinkAPI.opT.
+  Definition Op := LinkAPI.Op.
   Definition State := LinkAPI.State.
   Definition initP := LinkAPI.initP.
 
@@ -217,7 +217,7 @@ Module Dirs <: LayerImpl LinkDirAPI LinkAPI.
 
 
   Theorem restricted_step_preserves_root :
-    forall tid `(op : LinkAPI.opT T) s r s',
+    forall tid `(op : LinkAPI.Op T) s r s',
       restricted_step LinkAPI.step LinkDirStableAPI.op_allow op tid s r s' ->
       FSRoot s = FSRoot s'.
   Proof.
@@ -409,7 +409,7 @@ Definition invariant (fs : FS) :=
 
 Module MailLinkAPI <: Layer.
 
-  Definition opT := linkOpT.
+  Definition Op := linkOpT.
   Definition State := FS.
 
   Definition step T (op : linkOpT T) tid s r s' :=
@@ -425,10 +425,10 @@ End MailLinkAPI.
 
 Module MailServerLinkAPI <: Layer.
 
-  Definition opT := mailOpT.
+  Definition Op := mailOpT.
   Definition State := FS.
 
-  Inductive xstep : forall T, opT T -> nat -> State -> T -> State -> Prop :=
+  Inductive xstep : forall T, Op T -> nat -> State -> T -> State -> Prop :=
   | StepDeliver : forall user msg state tid userdirnum msgf name state',
     path_eval_root state [maildir; user] (DirNode userdirnum) ->
     starts_with_tid tid name ->
@@ -450,7 +450,7 @@ Module MailServerLinkAPI <: Layer.
       state
       (Some msgs)
       state
-  | StepFail : forall T (op : opT (option T)) state tid,
+  | StepFail : forall T (op : Op (option T)) state tid,
     xstep op tid
       state
       None

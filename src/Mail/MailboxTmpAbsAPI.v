@@ -23,7 +23,7 @@ Module MailboxTmpAbsAPI <: Layer MailboxOp MailboxTmpAbsState.
   Import MailboxTmpAbsState.
 
 
-  Inductive xstep : forall T, opT T -> nat -> State -> T -> State -> list event -> Prop :=
+  Inductive xstep : forall T, Op T -> nat -> State -> T -> State -> list event -> Prop :=
   | StepDeliverOK : forall m tmp tmp' mbox tid fn lock,
     ~ FMap.In fn mbox ->
     xstep (Deliver m) tid

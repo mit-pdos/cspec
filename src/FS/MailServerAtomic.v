@@ -43,7 +43,7 @@ Module MailAtomic <: LayerImpl MailLinkAPI MailServerLinkAPI.
     filenames <?- readdir cwd ([maildir; user]);
     read_files cwd ([maildir; user]) filenames.
 
-  Definition compile_op T (op : MailServerLinkAPI.opT T) : proc MailLinkAPI.opT T :=
+  Definition compile_op T (op : MailServerLinkAPI.Op T) : proc MailLinkAPI.Op T :=
     match op with
     | Deliver user msg => deliver user msg
     | Read user => read user
