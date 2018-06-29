@@ -42,8 +42,6 @@ mainArgs [nprocs, niter, nsmtpiter, npop3iter] = do
     (ms_bottom (read nprocs) (read niter) (read nsmtpiter) (read npop3iter))
   putStrLn "Waiting for child processes.."
   mapM_ (getProcessStatus True False) pids
-  putStrLn "Looping forever..."
-  forever $ return ()
 
 mainArgs _ = do
   exec <- getProgName
