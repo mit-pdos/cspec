@@ -467,8 +467,6 @@ Arguments Atomic {opT T}.
 Arguments Proc {opT T}.
 Arguments NoProc {opT}.
 
-Arguments threads_state {opT}.
-
 Hint Constructors exec.
 Hint Constructors exec_any.
 Hint Resolve exec_to_exec_prefix.
@@ -580,7 +578,7 @@ Ltac atomic_exec_inv :=
 
 Definition thread_map opT1 opT2
            (f: forall T, proc opT1 T -> proc opT2 T)
-           (ts:@threads_state opT1) : @threads_state opT2 :=
+           (ts:threads_state opT1) : threads_state opT2 :=
   Map.map (fun '(existT _ _ p) => existT _ _ (f _ p)) ts.
 
 Theorem thread_map_get : forall `(f: forall T, proc opT1 T -> proc opT2 T) ts tid,
@@ -609,7 +607,7 @@ Proof.
 Qed.
 
 Theorem thread_max_eq : forall opT1 opT2
-                          (ts1: @threads_state opT1) (ts2: @threads_state opT2),
+                          (ts1: threads_state opT1) (ts2: threads_state opT2),
     (forall tid, ts1 tid = NoProc <-> ts2 tid = NoProc) ->
     Map.max ts1 = Map.max ts2.
 Proof.

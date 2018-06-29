@@ -120,10 +120,10 @@ Fixpoint SpawnN (n:nat) opT T (p:proc opT T) : proc opT unit :=
   | S n' => Bind (Spawn p) (fun _ => SpawnN n' p)
   end.
 
-Definition threads_from_proc opT T (p: proc opT T) : @threads_state opT :=
+Definition threads_from_proc opT T (p: proc opT T) : threads_state opT :=
   threads_from_list (existT _ T p :: nil).
 
-Definition mail_server nsmtp npop3 : threads_state :=
+Definition mail_server nsmtp npop3 : threads_state _ :=
   threads_from_proc
     (Bind (SpawnN nsmtp smtp_server_thread)
            (fun _ => SpawnN npop3 pop3_server_thread)).
@@ -203,7 +203,7 @@ Definition do_bench_loop msg nsmtpiter npop3iter niter :=
       end)
     (Some niter).
 
-Definition mail_perf nprocs niter nsmtpiter npop3iter : threads_state :=
+Definition mail_perf nprocs niter nsmtpiter npop3iter : threads_state _ :=
   threads_from_proc
     (SpawnN nprocs (do_bench_loop bench_msg nsmtpiter npop3iter niter)).
 

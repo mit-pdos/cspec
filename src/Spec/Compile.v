@@ -41,7 +41,7 @@ Section ProcStructure.
     | Proc p => no_atomics p
     end.
 
-  Definition no_atomics_ts (ts : threads_state) :=
+  Definition no_atomics_ts (ts : threads_state _) :=
     thread_Forall no_atomics ts.
 
   Theorem no_atomics_ts_equiv : forall ts,
@@ -276,7 +276,7 @@ Section Compiler.
       destruct matches.
   Qed.
 
-  Lemma proc_match_none : forall tid `(ts1: @threads_state opT) `(ts2: @threads_state opT') R,
+  Lemma proc_match_none : forall tid `(ts1: threads_state opT) `(ts2: threads_state opT') R,
       proc_match R ts1 ts2 ->
       ts1 tid = NoProc ->
       ts2 tid = NoProc.
@@ -434,8 +434,8 @@ Proof.
 Qed.
 
 Theorem atomize_proc_match :
-  forall `(ts1 : @threads_state opLoT)
-         `(ts2 : @threads_state opMidT)
+  forall `(ts1 : threads_state opLoT)
+         `(ts2 : threads_state opMidT)
          compile_op,
   proc_match (compile_ok compile_op) ts1 ts2 ->
   exists ts1',
@@ -458,8 +458,8 @@ Proof.
 Qed.
 
 Theorem compile_traces_match_ts :
-  forall `(ts1 : @threads_state opLoT)
-         `(ts2 : @threads_state opMidT)
+  forall `(ts1 : threads_state opLoT)
+         `(ts2 : threads_state opMidT)
          `(lo_step : OpSemantics opLoT State) hi_step compile_op,
   compile_correct compile_op lo_step hi_step ->
   atomize_correct compile_op lo_step ->

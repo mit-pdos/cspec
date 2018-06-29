@@ -16,13 +16,13 @@ Global Generalizable All Variables.
 
 (** A strong notion of execution equivalence, independent of semantics *)
 
-Definition exec_equiv_ts {opT} (ts1 ts2 : @threads_state opT) :=
+Definition exec_equiv_ts {opT} (ts1 ts2 : threads_state opT) :=
   forall State op_step (s : State) tr,
     exec_prefix op_step s ts1 tr <->
     exec_prefix op_step s ts2 tr.
 
 Definition exec_equiv_opt `(p1 : maybe_proc opT) p2 :=
-  forall (ts : threads_state) tid,
+  forall (ts : threads_state _) tid,
     exec_equiv_ts (ts [[ tid := p1 ]]) (ts [[ tid := p2 ]]).
 
 Definition exec_equiv `(p1 : proc opT T) (p2 : proc _ T) :=
@@ -110,7 +110,7 @@ Proof.
   eauto.
 Qed.
 
-Lemma thread_upd_aba : forall opT (ts: @threads_state opT) tid1 tid2 p1 p2 p3,
+Lemma thread_upd_aba : forall opT (ts: threads_state opT) tid1 tid2 p1 p2 p3,
     tid1 <> tid2 ->
     ts [[tid1 := p1]] [[tid2 := p2]] [[tid1 := p3]] =
     ts [[tid1 := p3]] [[tid2 := p2]].
@@ -121,7 +121,7 @@ Proof.
 Qed.
 
 Lemma thread_upd_aba' :
-  forall opT (ts: @threads_state opT) tid1 tid2 p1 p2 p3,
+  forall opT (ts: threads_state opT) tid1 tid2 p1 p2 p3,
     tid1 <> tid2 ->
     ts [[tid1 := p1]] [[tid2 := p2]] [[tid1 := p3]] =
     ts [[tid2 := p2]] [[tid1 := p3]].
@@ -133,7 +133,7 @@ Proof.
 Qed.
 
 Lemma thread_spawn_none :
-  forall opT (ts: @threads_state opT) T (p: proc opT T) tid tid' ,
+  forall opT (ts: threads_state opT) T (p: proc opT T) tid tid' ,
     tid <> tid' ->
     ts tid' = NoProc ->
     ts [[tid := Proc p]] [[tid' := NoProc]] =
@@ -147,7 +147,7 @@ Qed.
 Hint Rewrite thread_spawn_none using congruence : t.
 
 Lemma thread_upd_abc_to_cab :
-  forall opT (ts: @threads_state opT) tid1 tid2 tid3 p1 p2 p3,
+  forall opT (ts: threads_state opT) tid1 tid2 tid3 p1 p2 p3,
     tid1 <> tid2 ->
     tid1 <> tid3 ->
     ts [[tid1 := p1]] [[tid2 := p2]] [[tid3 := p3]] =
@@ -318,7 +318,7 @@ Proof.
   eauto.
 Qed.
 
-Lemma thread_upd_other_eq : forall opT (ts:@threads_state opT)
+Lemma thread_upd_other_eq : forall opT (ts:threads_state opT)
                               tid T (p: proc _ T) tid' T' (p': proc _ T'),
     tid' <> tid ->
     ts tid' = Proc p ->
@@ -330,7 +330,7 @@ Proof.
 Qed.
 
 Lemma thread_upd_other_and_spawn_eq :
-  forall opT (ts:@threads_state opT)
+  forall opT (ts:threads_state opT)
     tid T (p: proc _ T) tid' spawned tid'' T' (p': proc _ T'),
     tid' <> tid'' ->
     tid <> tid'' ->
@@ -342,7 +342,7 @@ Proof.
 Qed.
 
 Lemma thread_upd_spawn_delay :
-  forall opT (ts: @threads_state opT) tid T (p: proc _ T) tid' spawned tid'' p',
+  forall opT (ts: threads_state opT) tid T (p: proc _ T) tid' spawned tid'' p',
     tid'' <> tid ->
     tid <> tid' ->
     ts [[tid := Proc p]] [[tid' := spawned]] [[tid'' := p']] =
@@ -382,7 +382,7 @@ Ltac ExecPrefix tid_arg tid'_arg :=
   cbv beta iota.
 
 Theorem exec_equiv_rx_proof_helper : forall `(p1 : proc opT T) p2,
-    (forall tid tid' `(s : State) s' op_step (ts: threads_state) tr spawned evs `(rx : _ -> proc _ TR) result,
+    (forall tid tid' `(s : State) s' op_step (ts: threads_state _) tr spawned evs `(rx : _ -> proc _ TR) result,
         exec_tid op_step tid s (Bind p1 rx) s' result spawned evs ->
         ts tid' = NoProc ->
         tid <> tid' ->
@@ -391,7 +391,7 @@ Theorem exec_equiv_rx_proof_helper : forall `(p1 : proc opT T) p2,
                                                                 | inr p' => Proc p'
                                                                 end]]) tr ->
         exec_prefix op_step s (ts [[tid := Proc (Bind p2 rx)]]) (prepend tid evs tr)) ->
-    (forall tid tid' `(s : State) s' op_step (ts: threads_state) tr evs spawned `(rx : _ -> proc _ TR) result,
+    (forall tid tid' `(s : State) s' op_step (ts: threads_state _) tr evs spawned `(rx : _ -> proc _ TR) result,
         exec_tid op_step tid s (Bind p2 rx) s' result spawned evs ->
         ts tid' = NoProc ->
         tid <> tid' ->
@@ -630,7 +630,7 @@ Proof.
   eapply H2.
 Qed.
 
-Theorem exec_equiv_ts_upd_same : forall `(ts : @threads_state opT) p tid,
+Theorem exec_equiv_ts_upd_same : forall `(ts : threads_state opT) p tid,
   ts [[ tid ]] = p ->
   exec_equiv_ts ts (ts [[ tid := p ]]).
 Proof.
@@ -663,13 +663,13 @@ Qed.
 
 (** A version of [exec_equiv] for [exec] instead of [exec_prefix]. *)
 
-Definition exec_equiv_ts_N (n1 n2 : nat) {opT} (ts1 ts2 : @threads_state opT) :=
+Definition exec_equiv_ts_N (n1 n2 : nat) {opT} (ts1 ts2 : threads_state opT) :=
   forall State op_step (s : State) tr,
     exec op_step s ts1 tr n1 <->
     exec op_step s ts2 tr n2.
 
 Definition exec_equiv_opt_N n1 n2 `(p1 : maybe_proc opT) p2 :=
-  forall (ts : threads_state) tid,
+  forall (ts : threads_state _) tid,
     exec_equiv_ts_N n1 n2 (ts [[ tid := p1 ]]) (ts [[ tid := p2 ]]).
 
 Definition exec_equiv_N n1 n2 `(p1 : proc opT T) (p2 : proc _ T) :=
@@ -971,22 +971,22 @@ Qed.
 
 (** Trace inclusion for an entire threads_state *)
 
-Definition trace_incl_ts_s {opT State} op_step (s s' : State) (ts1 ts2 : @threads_state opT) :=
+Definition trace_incl_ts_s {opT State} op_step (s s' : State) (ts1 ts2 : threads_state opT) :=
   forall tr,
     exec_prefix op_step s ts1 tr ->
      exec_prefix op_step s' ts2 tr.
 
-Definition trace_incl_ts {opT State} op_step (ts1 ts2 : @threads_state opT) :=
+Definition trace_incl_ts {opT State} op_step (ts1 ts2 : threads_state opT) :=
   forall (s : State),
     trace_incl_ts_s op_step s s ts1 ts2.
 
-Definition trace_incl_ts_s_N n {opT State} op_step (s s' : State) (ts1 ts2 : @threads_state opT) :=
+Definition trace_incl_ts_s_N n {opT State} op_step (s s' : State) (ts1 ts2 : threads_state opT) :=
   forall tr n',
     n' <= n ->
     exec op_step s ts1 tr n' ->
     exec_prefix op_step s' ts2 tr.
 
-Definition trace_incl_ts_N n {opT State} op_step (ts1 ts2 : @threads_state opT) :=
+Definition trace_incl_ts_N n {opT State} op_step (ts1 ts2 : threads_state opT) :=
   forall (s : State),
     trace_incl_ts_s_N n op_step s s ts1 ts2.
 
@@ -1015,7 +1015,7 @@ Proof.
   eauto.
 Qed.
 
-Theorem trace_incl_ts_s_trans : forall `(s0 : State) s1 s2 `(op_step : OpSemantics opT State) `(ts1 : @threads_state opT) ts2 ts3,
+Theorem trace_incl_ts_s_trans : forall `(s0 : State) s1 s2 `(op_step : OpSemantics opT State) `(ts1 : threads_state opT) ts2 ts3,
   trace_incl_ts_s op_step s0 s1 ts1 ts2 ->
   trace_incl_ts_s op_step s1 s2 ts2 ts3 ->
   trace_incl_ts_s op_step s0 s2 ts1 ts3.
@@ -1051,7 +1051,7 @@ Definition trace_incl_s `(s : State) tid `(op_step : OpSemantics opT State) `(p1
       (ts [[ tid := Proc p2 ]]).
 
 Definition trace_incl_opt {opT} `(op_step : OpSemantics opT State) p1 p2 :=
-  forall (ts : @threads_state opT) tid,
+  forall (ts : threads_state opT) tid,
     trace_incl_ts op_step
       (ts [[ tid := p1 ]])
       (ts [[ tid := p2 ]]).
@@ -1067,7 +1067,7 @@ Definition trace_incl_s_N n `(s : State) tid `(op_step : OpSemantics opT State) 
       (ts [[ tid := Proc p2 ]]).
 
 Definition trace_incl_opt_N n {opT} `(op_step : OpSemantics opT State) p1 p2 :=
-  forall (ts : @threads_state opT) tid,
+  forall (ts : threads_state opT) tid,
     trace_incl_ts_N n op_step
       (ts [[ tid := p1 ]])
       (ts [[ tid := p2 ]]).
@@ -1268,7 +1268,7 @@ Qed.
 
 Lemma trace_incl_ts_s_proof_helper :
   forall `(p1 : proc opT T) (p2 : proc _ T) ts tid `(op_step : OpSemantics opT State) s,
-  (forall (ts: threads_state) tid' s0 s' result tr spawned evs,
+  (forall (ts: threads_state _) tid' s0 s' result tr spawned evs,
       exec_others op_step tid s s0 ->
       ts tid' = NoProc ->
       tid <> tid' ->
@@ -1308,7 +1308,7 @@ Qed.
 
 Lemma trace_incl_proof_helper :
   forall `(p1 : proc opT T) p2 `(op_step : OpSemantics opT State),
-  (forall tid tid' (ts: threads_state) s s' result tr spawned evs,
+  (forall tid tid' (ts: threads_state _) s s' result tr spawned evs,
     exec_tid op_step tid s p1 s' result spawned evs ->
     ts tid' = NoProc ->
     tid <> tid' ->
@@ -1329,7 +1329,7 @@ Qed.
 
 Lemma trace_incl_s_proof_helper :
   forall `(p1 : proc opT T) p2 `(op_step : OpSemantics opT State) s tid,
-  (forall (ts: threads_state) tid' s0 s' result tr spawned evs,
+  (forall (ts: threads_state _) tid' s0 s' result tr spawned evs,
     exec_others op_step tid s s0 ->
     ts tid' = NoProc ->
     tid <> tid' ->
@@ -1776,7 +1776,7 @@ Qed.
 
 Theorem trace_incl_rx_to_exec_prefix :
   forall `(op_step: OpSemantics opT State) T (p1 p2: proc _ T)
-    (ts: threads_state) s tid tr,
+    (ts: threads_state _) s tid tr,
     trace_incl_rx op_step p1 p2 ->
     exec_prefix op_step s (ts [[tid := Proc p1]]) tr ->
     exec_prefix op_step s (ts [[tid := Proc p2]]) tr.
@@ -1856,8 +1856,8 @@ Qed.
 (** Correspondence between different layers *)
 
 Definition traces_match_ts {opLoT opMidT State} lo_step hi_step
-                           (ts1 : @threads_state opLoT)
-                           (ts2 : @threads_state opMidT) :=
+                           (ts1 : threads_state opLoT)
+                           (ts2 : threads_state opMidT) :=
   forall (s : State) tr1,
     exec_prefix lo_step s ts1 tr1 ->
       exec_prefix hi_step s ts2 tr1.

@@ -24,8 +24,8 @@ Section TraceAbs.
   Variable mid_step : OpSemantics opMidT StateMid.
 
   Definition traces_match_abs
-                           (ts1 : @threads_state opLoT)
-                           (ts2 : @threads_state opMidT) :=
+                           (ts1 : threads_state opLoT)
+                           (ts2 : threads_state opMidT) :=
     forall (sl : StateLo) (sm : StateMid) tr1,
       initP sl ->
       exec_prefix lo_step sl ts1 tr1 ->
@@ -59,7 +59,7 @@ End Layer.
 
 Module Type ProcRule (o : Ops).
 
-  Axiom follows_protocol : @threads_state o.opT -> Prop.
+  Axiom follows_protocol : threads_state o.opT -> Prop.
 
 End ProcRule.
 
@@ -76,7 +76,7 @@ Module Type LayerImpl
   (o2 : Ops) (s2 : State) (l2 : Layer o2 s2).
 
   Axiom absR : s1.State -> s2.State -> Prop.
-  Axiom compile_ts : @threads_state o2.opT -> @threads_state o1.opT.
+  Axiom compile_ts : threads_state o2.opT -> threads_state o1.opT.
   Axiom compile_ts_no_atomics :
     forall ts,
       no_atomics_ts ts ->
@@ -102,7 +102,7 @@ Module Type LayerImplRequiresRule
   (r : ProcRule o2).
 
   Axiom absR : s1.State -> s2.State -> Prop.
-  Axiom compile_ts : @threads_state o2.opT -> @threads_state o1.opT.
+  Axiom compile_ts : threads_state o2.opT -> threads_state o1.opT.
   Axiom compile_ts_no_atomics :
     forall ts,
       no_atomics_ts ts ->
@@ -163,10 +163,10 @@ Module LayerImplAbs
   Definition absR := a.absR.
   Definition absInitP := a.absInitP.
 
-  Definition compile_ts (ts : @threads_state o.opT) := ts.
+  Definition compile_ts (ts : threads_state o.opT) := ts.
 
   Theorem compile_ts_no_atomics :
-    forall (ts : @threads_state o.opT),
+    forall (ts : threads_state o.opT),
       no_atomics_ts ts ->
       no_atomics_ts (compile_ts ts).
   Proof.
@@ -379,7 +379,7 @@ Module LayerImplMoversProtocol
     eapply Compile.compile_ts_ok; eauto.
   Qed.
 
-  Definition follows_protocol (ts : @threads_state o1.opT) :=
+  Definition follows_protocol (ts : threads_state o1.opT) :=
     forall s,
       follows_protocol_s l1raw.step p.step_allow ts s.
 
@@ -398,7 +398,7 @@ Module LayerImplMoversProtocol
   Qed.
 
   Lemma follows_protocol_s_spawn:
-    forall (ts : threads_state) (s : s.State) (T : Type) (tid tid' : nat)
+    forall (ts : threads_state _) (s : s.State) (T : Type) (tid tid' : nat)
       (p : proc o1.opT T) (s' : s.State) (evs : list event)
       (result : T + proc o1.opT T) (spawned : maybe_proc o1.opT),
       tid <> tid' ->
@@ -424,7 +424,7 @@ Module LayerImplMoversProtocol
   Qed.
 
   Lemma no_atomics_ts_exec_spawn:
-    forall (ts : threads_state) (s : s.State),
+    forall (ts : threads_state _) (s : s.State),
       no_atomics_ts ts ->
       forall (T : Type) (tid tid' : nat) (p : proc o1.opT T) (s' : s.State)
         (evs : list event) (result : T + proc o1.opT T) (T0 : Type)

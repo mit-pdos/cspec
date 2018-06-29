@@ -317,7 +317,7 @@ Section Movers.
 
   Hint Resolve enabled_stable_exec_tid.
 
-  Lemma thread_upd_from_same : forall opT (ts: @threads_state opT) tid p1 tid' p2,
+  Lemma thread_upd_from_same : forall opT (ts: threads_state opT) tid p1 tid' p2,
       ts tid = p1 ->
       ts [[tid := p1]] [[tid' := p2]] = ts [[tid' := p2]].
   Proof.

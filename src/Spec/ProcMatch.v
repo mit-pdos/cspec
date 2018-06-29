@@ -8,8 +8,8 @@ Require Import Omega.
 (** Helpers for connecting different [threads_state]s *)
 
 Definition proc_match `(R : forall T, proc opT T -> proc opT' T -> Prop)
-                      `(ts1 : @threads_state opT)
-                      `(ts2 : @threads_state opT') :=
+                      `(ts1 : threads_state opT)
+                      `(ts2 : threads_state opT') :=
   forall tid,
     match ts1 tid with
     | Proc p1 =>
@@ -55,8 +55,8 @@ Proof.
     congruence.
 Qed.
 
-Lemma proc_match_del : forall `(ts1 : @threads_state opT)
-                              `(ts2 : @threads_state opT') R tid,
+Lemma proc_match_del : forall `(ts1 : threads_state opT)
+                              `(ts2 : threads_state opT') R tid,
   proc_match R ts1 ts2 ->
   proc_match R (ts1 [[ tid := NoProc ]]) (ts2 [[ tid := NoProc ]]).
 Proof.
@@ -66,8 +66,8 @@ Proof.
     autorewrite with t; eauto.
 Qed.
 
-Lemma proc_match_upd : forall `(ts1 : @threads_state opT)
-                              `(ts2 : @threads_state opT') R tid
+Lemma proc_match_upd : forall `(ts1 : threads_state opT)
+                              `(ts2 : threads_state opT') R tid
                               T (p1 : proc _ T) p2,
   proc_match R ts1 ts2 ->
   R _ p1 p2 ->
@@ -87,8 +87,8 @@ Proof.
   rewrite ?threads_empty_get; eauto.
 Qed.
 
-Theorem proc_match_pick : forall tid `(ts1 : @threads_state opT)
-                                     `(ts2 : @threads_state opT') R,
+Theorem proc_match_pick : forall tid `(ts1 : threads_state opT)
+                                     `(ts2 : threads_state opT') R,
   proc_match R ts1 ts2 ->
     (ts1 [[ tid ]] = NoProc /\ ts2 [[ tid ]] = NoProc) \/
     exists T (p1 : proc _ T) p2,
@@ -99,9 +99,9 @@ Proof.
   destruct_with_eqn (ts1 tid); propositional; eauto 10.
 Qed.
 
-Theorem proc_match_trans : forall `(ts1: @threads_state opT)
-                            `(ts2: @threads_state opT') R1
-                            `(ts3: @threads_state opT'') R2,
+Theorem proc_match_trans : forall `(ts1: threads_state opT)
+                            `(ts2: threads_state opT') R1
+                            `(ts3: threads_state opT'') R2,
   proc_match R1 ts1 ts2 ->
   proc_match R2 ts2 ts3 ->
   proc_match (fun T x z => exists y, R1 T x y /\ R2 T y z)  ts1 ts3.
@@ -114,7 +114,7 @@ Proof.
     repeat simpl_match; repeat maybe_proc_inv; eauto 10.
 Qed.
 
-Theorem proc_match_map : forall `(ts1: @threads_state opT)
+Theorem proc_match_map : forall `(ts1: threads_state opT)
                            `(f: forall T, proc opT T -> proc opT' T),
     proc_match (fun T p1 p2 => p2 = f T p1) ts1 (thread_map f ts1).
 Proof.
@@ -123,9 +123,9 @@ Proof.
   destruct matches; propositional; repeat simpl_match; eauto.
 Qed.
 
-Theorem proc_match_map1 : forall `(ts1: @threads_state opT)
+Theorem proc_match_map1 : forall `(ts1: threads_state opT)
                             `(f: forall T, proc opT T -> proc opT' T)
-                            `(ts2: @threads_state opT'') R,
+                            `(ts2: threads_state opT'') R,
     proc_match (fun T p1 p2 => R T (f T p1) p2) ts1 ts2 ->
     proc_match R (thread_map f ts1) ts2.
 Proof.
@@ -136,9 +136,9 @@ Proof.
   destruct matches; propositional; repeat simpl_match; eauto.
 Qed.
 
-Theorem proc_match_map2 : forall `(ts1: @threads_state opT)
+Theorem proc_match_map2 : forall `(ts1: threads_state opT)
                             `(f: forall T, proc opT' T -> proc opT'' T)
-                            `(ts2: @threads_state opT') R,
+                            `(ts2: threads_state opT') R,
     proc_match (fun T p1 p2 => R T p1 (f T p2)) ts1 ts2 ->
     proc_match R ts1 (thread_map f ts2).
 Proof.
@@ -151,13 +151,13 @@ Qed.
 
 (** proving equivalence based on per-process equivalence *)
 
-Fixpoint take_threads opT (src: @threads_state opT) n (dst: @threads_state opT) :=
+Fixpoint take_threads opT (src: threads_state opT) n (dst: threads_state opT) :=
   match n with
   | 0 => dst
   | S n => (take_threads src n dst) [[ n := src n ]]
   end.
 
-Lemma take_threads_complete_helper : forall opT (src dst: @threads_state opT) n tid,
+Lemma take_threads_complete_helper : forall opT (src dst: threads_state opT) n tid,
     tid < n ->
     take_threads src n dst tid = src tid.
 Proof.
@@ -169,7 +169,7 @@ Proof.
     apply IHn; omega.
 Qed.
 
-Lemma take_threads_unchanged_helper : forall opT (src dst: @threads_state opT) n tid,
+Lemma take_threads_unchanged_helper : forall opT (src dst: threads_state opT) n tid,
     tid >= n ->
     take_threads src n dst tid = dst tid.
 Proof.
@@ -180,7 +180,7 @@ Proof.
   apply IHn; omega.
 Qed.
 
-Theorem take_threads_max : forall opT (src dst: @threads_state opT) n,
+Theorem take_threads_max : forall opT (src dst: threads_state opT) n,
     n <= Map.max dst ->
     Map.max (take_threads src n dst) <= Map.max dst.
 Proof.
@@ -192,7 +192,7 @@ Proof.
   rewrite thread_upd_max_extend_bound; omega.
 Qed.
 
-Lemma take_threads_complete_general : forall opT (src dst: @threads_state opT) n,
+Lemma take_threads_complete_general : forall opT (src dst: threads_state opT) n,
     n > Map.max src ->
     Map.max dst <= Map.max src ->
     take_threads src n dst = src.
@@ -206,7 +206,7 @@ Proof.
   reflexivity.
 Qed.
 
-Theorem take_threads_complete : forall opT (src dst: @threads_state opT),
+Theorem take_threads_complete : forall opT (src dst: threads_state opT),
     Map.max src = Map.max dst ->
     src = take_threads src (1 + Map.max src) dst.
 Proof.
@@ -214,13 +214,13 @@ Proof.
   rewrite take_threads_complete_general; auto; omega.
 Qed.
 
-Lemma take_threads_none : forall opT (src dst: @threads_state opT),
+Lemma take_threads_none : forall opT (src dst: threads_state opT),
     dst = take_threads src 0 dst.
 Proof.
   reflexivity.
 Qed.
 
-Theorem trace_incl_ts_general : forall opT State (op_step: OpSemantics opT State) (ts1 ts2: threads_state),
+Theorem trace_incl_ts_general : forall opT State (op_step: OpSemantics opT State) (ts1 ts2: threads_state _),
     (forall tid, trace_incl_opt op_step (ts1 tid) (ts2 tid)) ->
     Map.max ts1 = Map.max ts2 ->
     trace_incl_ts op_step ts1 ts2.
@@ -261,7 +261,7 @@ Inductive proc_optR opT opT' (R: forall T, proc opT T -> proc opT' T -> Prop) :
 
 Hint Constructors proc_optR.
 
-Theorem proc_match_upd_opt : forall `(ts1: @threads_state opT) `(ts2: @threads_state opT')
+Theorem proc_match_upd_opt : forall `(ts1: threads_state opT) `(ts2: threads_state opT')
                                R tid p1 p2,
     proc_match R ts1 ts2 ->
     proc_optR R p1 p2 ->

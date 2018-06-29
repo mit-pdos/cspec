@@ -142,7 +142,7 @@ Section Protocol.
         follows_protocol_proc tid s (Spawn p)
   .
 
-  Definition follows_protocol_s (ts : @threads_state opT) (s : State) :=
+  Definition follows_protocol_s (ts : threads_state opT) (s : State) :=
     forall tid T (p : proc _ T),
       ts [[ tid ]] = Proc p ->
       follows_protocol_proc tid s p.

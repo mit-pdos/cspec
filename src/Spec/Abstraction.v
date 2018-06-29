@@ -70,7 +70,7 @@ Section StateAbstraction.
   Qed.
 
   Theorem trace_incl_abs :
-    forall s1 s2 (ts : @threads_state opLoT) tr,
+    forall s1 s2 (ts : threads_state opLoT) tr,
       absR s1 s2 ->
       exec_prefix lo_step s1 ts tr ->
       exec_prefix hi_step s2 ts tr.

@@ -892,7 +892,7 @@ Definition test_thread :=
     (fun _ => _ <- Op Inc; _ <- Op Dec; Ret tt)
     None.
 
-Definition test_threads : threads_state :=
+Definition test_threads : threads_state _ :=
   threads_from_list (repeat (existT _ _ test_thread) 16).
 
 Definition compiled_threads : list (maybe_proc _) :=
