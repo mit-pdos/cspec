@@ -15,10 +15,10 @@ Module AtomicReader' <:
   Fixpoint read_list (l : list (nat*nat)) (r : list ((nat*nat) * string)) :=
     match l with
     | nil =>
-      _ <- Op MailboxOp.Unlock;
+      _ <- Prim MailboxOp.Unlock;
       Ret r
     | fn :: l' =>
-      m <- Op (MailboxOp.Read fn);
+      m <- Prim (MailboxOp.Read fn);
       match m with
       | None => read_list l' r  
       | Some s => read_list l' (r ++ ((fn, s) :: nil))
@@ -26,22 +26,22 @@ Module AtomicReader' <:
     end.
 
   Definition pickup_core :=
-    _ <- Op MailboxOp.Lock;
-    l <- Op MailboxOp.List;
+    _ <- Prim MailboxOp.Lock;
+    l <- Prim MailboxOp.List;
     read_list l nil.
 
   Definition delete_core fn :=
-    _ <- Op MailboxOp.Lock;
-    _ <- Op (MailboxOp.Delete fn);
-    _ <- Op MailboxOp.Unlock;
+    _ <- Prim MailboxOp.Lock;
+    _ <- Prim (MailboxOp.Delete fn);
+    _ <- Prim MailboxOp.Unlock;
     Ret tt.
 
   Definition compile_op T (op : MailServerOp.opT T) : proc _ T :=
     match op with
-    | MailServerOp.Deliver m => Op (MailboxOp.Deliver m)
+    | MailServerOp.Deliver m => Prim (MailboxOp.Deliver m)
     | MailServerOp.Pickup => pickup_core
     | MailServerOp.Delete fn => delete_core fn
-    | MailServerOp.Ext extop => Op (MailboxOp.Ext extop)
+    | MailServerOp.Ext extop => Prim (MailboxOp.Ext extop)
     end.
 
   Lemma read_list_no_atomics : forall l r,

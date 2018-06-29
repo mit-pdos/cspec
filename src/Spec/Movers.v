@@ -332,7 +332,7 @@ Section Movers.
     pred_stable op_step P ->
     enabled_in tid s ->
     P tid s ->
-    exec_prefix op_step s (ts [[ tid := Proc (x <- Op opMover; rx x) ]]) tr ->
+    exec_prefix op_step s (ts [[ tid := Proc (x <- Prim opMover; rx x) ]]) tr ->
     exists s' r,
       op_step opMover tid s r s' nil /\
       exec_prefix op_step s' (ts [[ tid := Proc (rx r) ]]) tr.
@@ -385,8 +385,8 @@ Section Movers.
     forall `(p : _ -> proc opT TP)
            `(rx : _ -> proc opT TF),
     trace_incl op_step
-      (Bind (Bind (Op opMover) (fun r => (Atomic (p r)))) rx)
-      (Bind (Atomic (Bind (Op opMover) p)) rx).
+      (Bind (Bind (Prim opMover) (fun r => (Atomic (p r)))) rx)
+      (Bind (Atomic (Bind (Prim opMover) p)) rx).
   Proof.
     intros.
     eapply trace_incl_proof_helper; intros.
@@ -423,8 +423,8 @@ Section Movers.
     left_mover ->
     enabled_after p ->
     trace_incl op_step
-      (Bind (Bind (Atomic p) (fun _ => Op opMover)) rx)
-      (Bind (Atomic (Bind p (fun _ => Op opMover))) rx).
+      (Bind (Bind (Atomic p) (fun _ => Prim opMover)) rx)
+      (Bind (Atomic (Bind p (fun _ => Prim opMover))) rx).
   Proof.
     intros.
     eapply trace_incl_proof_helper; intros.
@@ -447,8 +447,8 @@ Section Movers.
     left_mover ->
     enabled_after p ->
     trace_incl op_step
-      (Bind (Bind (Atomic p) (fun a => Bind (Op opMover) (fun b => Ret (f a b)))) rx)
-      (Bind (Atomic (Bind p (fun a => Bind (Op opMover) (fun b => Ret (f a b))))) rx).
+      (Bind (Bind (Atomic p) (fun a => Bind (Prim opMover) (fun b => Ret (f a b)))) rx)
+      (Bind (Atomic (Bind p (fun a => Bind (Prim opMover) (fun b => Ret (f a b))))) rx).
   Proof.
     intros.
     eapply trace_incl_proof_helper; intros.
@@ -511,10 +511,10 @@ Section YSA.
         (fun tid s' =>
           exists s s0,
             P tid s /\
-            exec_any op_step tid s (Op opMover) r s0 /\
+            exec_any op_step tid s (Prim opMover) r s0 /\
             exec_others op_step tid s0 s')
         (rx r)) ->
-    left_movers P (Bind (Op opMover) rx)
+    left_movers P (Bind (Prim opMover) rx)
   | LeftMoversRet :
     forall `(v : T),
     left_movers P (Ret v).
@@ -531,13 +531,13 @@ Section YSA.
         (fun tid s' =>
           exists s s0,
             P tid s /\
-            exec_any op_step tid s (Op op) r s0 /\
+            exec_any op_step tid s (Prim op) r s0 /\
             exec_others op_step tid s0 s')
         (rx r)) ->
-    at_most_one_non_mover P (Bind (Op op) rx)
+    at_most_one_non_mover P (Bind (Prim op) rx)
   | OneFinalNonMover :
     forall `(op : opT T),
-    at_most_one_non_mover P (Op op)
+    at_most_one_non_mover P (Prim op)
   .
 
   Inductive right_movers (P : nat -> State -> Prop) : forall T, proc opT T -> Prop :=
@@ -549,10 +549,10 @@ Section YSA.
         (fun tid s' =>
           exists s s0,
             P tid s /\
-            exec_any op_step tid s (Op opMover) r s0 /\
+            exec_any op_step tid s (Prim opMover) r s0 /\
             exec_others op_step tid s0 s')
         (rx r)) ->
-    right_movers P (Bind (Op opMover) rx)
+    right_movers P (Bind (Prim opMover) rx)
   | RightMoversDone :
     forall `(p : proc _ T),
     at_most_one_non_mover P p ->
@@ -684,11 +684,11 @@ Section YSA.
 
   Lemma exec_any_atomic_op :
     forall `(op : opT T) s r s' tid,
-      exec_any op_step tid s (Atomic (Op op)) r s' ->
-      exec_any op_step tid s (Op op) r s'.
+      exec_any op_step tid s (Atomic (Prim op)) r s' ->
+      exec_any op_step tid s (Prim op) r s'.
   Proof.
     intros.
-    remember (Atomic (Op op)).
+    remember (Atomic (Prim op)).
     induction H; intros; subst; eauto; exec_tid_inv.
     atomic_exec_inv.
     eauto.

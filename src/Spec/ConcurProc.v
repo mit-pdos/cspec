@@ -23,7 +23,7 @@ Section Proc.
   Variable State : Type.
 
   Inductive proc : Type -> Type :=
-  | Op : forall T (op : opT T), proc T
+  | Prim : forall T (op : opT T), proc T
   | Ret : forall T (v : T), proc T
   | Bind : forall T (T1 : Type) (p1 : proc T1) (p2 : T1 -> proc T), proc T
   | Until : forall T (c : T -> bool) (p : option T -> proc T) (v : option T), proc T
@@ -252,7 +252,7 @@ Section Proc.
 
   | AtomicOp : forall T tid (v : T) s s' op evs,
     op_step op tid s v s' evs ->
-    atomic_exec (Op op) tid s v s' evs
+    atomic_exec (Prim op) tid s v s' evs
 
   | AtomicUntil : forall T (p : option T -> proc T) (c : T -> bool) v tid s r s' ev',
     atomic_exec (until1 c p v) tid s r s' ev' ->
@@ -271,7 +271,7 @@ Section Proc.
 
   | ExecTidOp : forall tid T (v : T) s s' op evs,
     op_step op tid s v s' evs ->
-    exec_tid tid s (Op op)
+    exec_tid tid s (Prim op)
                  s' (inl v)
                  NoProc evs
 
@@ -402,16 +402,16 @@ Section Proc.
   Qed.
 
   Lemma exec_any_op : forall `(op : opT T) tid r s s',
-    exec_any tid s (Op op) r s' ->
+    exec_any tid s (Prim op) r s' ->
       exists s0 evs,
         exec_others tid s s0 /\
         op_step op tid s0 r s' evs.
   Proof.
     intros.
-    remember (Op op).
+    remember (Prim op).
     induct H;
       repeat match goal with
-             | [ H: forall _, Op _ = Op _ -> _ |- _ ] =>
+             | [ H: forall _, Prim _ = Prim _ -> _ |- _ ] =>
                specialize (H _ eq_refl)
              end;
       propositional.
@@ -458,7 +458,7 @@ Section Proc.
 
 End Proc.
 
-Arguments Op {opT T}.
+Arguments Prim {opT T}.
 Arguments Ret {opT T}.
 Arguments Bind {opT T T1}.
 Arguments Until {opT T}.

@@ -197,7 +197,7 @@ Module Dirs <: LayerImpl LinkDirAPI LinkAPI.
       end ].
 
   Definition create_file_core (d : mfs_dir) (fn : string) :=
-    cwd <- Op LinkGetRoot;
+    cwd <- Prim LinkGetRoot;
     f <?- create cwd (dir_to_pn d) fn;
     Ret (Some f).
 
@@ -246,7 +246,7 @@ Module Dirs <: LayerImpl LinkDirAPI LinkAPI.
     | s : RawLockAPI.State |- _ =>
       destruct s
   *)
-    | H : exec_any _ _ _ _ (Op _) _ _ |- _ =>
+    | H : exec_any _ _ _ _ (Prim _) _ _ |- _ =>
       eapply exec_any_op in H; repeat deex
     | H : exec_others _ _ _ ?s _,
       Hi : context[FSRoot ?s] |- _ =>

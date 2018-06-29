@@ -50,15 +50,15 @@ run_proc s (Until c p v0) = do
     return v
   else
     run_proc s (Until c p (unsafeCoerce v))
-run_proc (S lck val) (Op TASOp__Read) = do
+run_proc (S lck val) (Prim TASOp__Read) = do
   v <- readIORef val
   -- debugmsg $ "ReadTAS " ++ (show v)
   return $ unsafeCoerce v
-run_proc (S lck val) (Op (TASOp__Write v)) = do
+run_proc (S lck val) (Prim (TASOp__Write v)) = do
   debugmsg $ "WriteTAS " ++ (show v)
   writeIORef val v
   return $ unsafeCoerce ()
-run_proc (S lck val) (Op TASOp__TestAndSet) = do
+run_proc (S lck val) (Prim TASOp__TestAndSet) = do
   ok <- tryTakeMVar lck
   -- debugmsg $ "TestAndSet " ++ (show ok)
   if isJust ok then
@@ -66,11 +66,11 @@ run_proc (S lck val) (Op TASOp__TestAndSet) = do
   else do
     yield
     return $ unsafeCoerce True
-run_proc (S lck val) (Op TASOp__Clear) = do
+run_proc (S lck val) (Prim TASOp__Clear) = do
   -- debugmsg $ "Clear"
   tryPutMVar lck ()
   return $ unsafeCoerce ()
-run_proc _ (Op TASOp__Flush) = do
+run_proc _ (Prim TASOp__Flush) = do
   -- we don't actually have weak memory (in fact Haskell does not define a
   -- memory model for IORefs), but if we had intrinsics we would call MFENCE
   return $ unsafeCoerce ()

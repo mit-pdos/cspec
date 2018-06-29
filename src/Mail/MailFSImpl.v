@@ -18,22 +18,22 @@ Module MailFSImpl' <:
       false.
 
   Definition listtid_core :=
-    tid <- Op (MailFSOp.GetTID);
-    l <- Op (MailFSOp.List);
+    tid <- Prim (MailFSOp.GetTID);
+    l <- Prim (MailFSOp.List);
     Ret (map snd (filter (same_tid tid) l)).
 
   Definition compile_op T (op : DeliverListTidOp.opT T) : proc _ T :=
     match op with
-    | DeliverListTidOp.LinkMail m => Op (MailFSOp.LinkMail m)
-    | DeliverListTidOp.List => Op (MailFSOp.List)
+    | DeliverListTidOp.LinkMail m => Prim (MailFSOp.LinkMail m)
+    | DeliverListTidOp.List => Prim (MailFSOp.List)
     | DeliverListTidOp.ListTid => listtid_core
-    | DeliverListTidOp.Read fn => Op (MailFSOp.Read fn)
-    | DeliverListTidOp.Delete fn => Op (MailFSOp.Delete fn)
-    | DeliverListTidOp.CreateWriteTmp data => Op (MailFSOp.CreateWriteTmp data)
-    | DeliverListTidOp.UnlinkTmp => Op (MailFSOp.UnlinkTmp)
-    | DeliverListTidOp.Lock => Op (MailFSOp.Lock)
-    | DeliverListTidOp.Unlock => Op (MailFSOp.Unlock)
-    | DeliverListTidOp.Ext extop => Op (MailFSOp.Ext extop)
+    | DeliverListTidOp.Read fn => Prim (MailFSOp.Read fn)
+    | DeliverListTidOp.Delete fn => Prim (MailFSOp.Delete fn)
+    | DeliverListTidOp.CreateWriteTmp data => Prim (MailFSOp.CreateWriteTmp data)
+    | DeliverListTidOp.UnlinkTmp => Prim (MailFSOp.UnlinkTmp)
+    | DeliverListTidOp.Lock => Prim (MailFSOp.Lock)
+    | DeliverListTidOp.Unlock => Prim (MailFSOp.Unlock)
+    | DeliverListTidOp.Ext extop => Prim (MailFSOp.Ext extop)
     end.
 
   Theorem compile_op_no_atomics :

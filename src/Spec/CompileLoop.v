@@ -22,9 +22,9 @@ Section Compiler.
   Fixpoint compile T (p : proc opMidT T) : proc opLoT T :=
     match p with
     | Ret t => Ret t
-    | Op op =>
+    | Prim op =>
       let '(body, cond, iv) := compile_op op in
-      Until cond (fun x => Op (body x)) iv
+      Until cond (fun x => Prim (body x)) iv
     | Bind p1 p2 => Bind (compile p1) (fun r => compile (p2 r))
     | Atomic p => Atomic (compile p)
     | Until c p v => Until c (fun r => compile (p r)) v
@@ -34,10 +34,10 @@ Section Compiler.
   Inductive compile_ok : forall T (p1 : proc opLoT T) (p2 : proc opMidT T), Prop :=
   | CompileOp : forall `(op : opMidT T) body cond iv v,
     compile_op op = (body, cond, iv) ->
-    compile_ok (Until cond (fun x => Op (body x)) v) (Op op)
+    compile_ok (Until cond (fun x => Prim (body x)) v) (Prim op)
   | CompileOp1 : forall `(op : opMidT T) body cond iv v,
     compile_op op = (body, cond, iv) ->
-    compile_ok (until1 cond (fun x => Op (body x)) v) (Op op)
+    compile_ok (until1 cond (fun x => Prim (body x)) v) (Prim op)
   | CompileRet : forall `(x : T),
     compile_ok (Ret x) (Ret x)
   | CompileExtraRet : forall `(x : T) `(p1 : T -> proc opLoT TF) p2,

@@ -12,37 +12,37 @@ Module MailFSStringImpl' <:
     MailFSOp MailFSStringAbsAPI.
     
   Definition createwritetmp_core data :=
-    tid <- Op (MailFSStringOp.GetTID);
-    r <- Op (MailFSStringOp.CreateWriteTmp (encode_tid_fn tid 0) data);
+    tid <- Prim (MailFSStringOp.GetTID);
+    r <- Prim (MailFSStringOp.CreateWriteTmp (encode_tid_fn tid 0) data);
     Ret r.
 
   Definition linkmail_core mboxfn :=
-    tid <- Op (MailFSStringOp.GetTID);
-    v <- Op (MailFSStringOp.LinkMail (encode_tid_fn tid 0) (encode_tid_fn tid mboxfn));
+    tid <- Prim (MailFSStringOp.GetTID);
+    v <- Prim (MailFSStringOp.LinkMail (encode_tid_fn tid 0) (encode_tid_fn tid mboxfn));
     Ret v.
 
   Definition unlinktmp_core :=
-    tid <- Op (MailFSStringOp.GetTID);
-    r <- Op (MailFSStringOp.UnlinkTmp (encode_tid_fn tid 0));
+    tid <- Prim (MailFSStringOp.GetTID);
+    r <- Prim (MailFSStringOp.UnlinkTmp (encode_tid_fn tid 0));
     Ret r.
 
   Definition list_core :=
-    l <- Op (MailFSStringOp.List);
+    l <- Prim (MailFSStringOp.List);
     Ret (map decode_tid_fn l).
 
   Definition compile_op T (op : MailFSOp.opT T) : proc MailFSStringOp.opT T :=
     match op with
     | MailFSOp.LinkMail m => linkmail_core m
     | MailFSOp.List => list_core
-    | MailFSOp.Read fn => Op (MailFSStringOp.Read (encode_tid_fn (fst fn) (snd fn)))
-    | MailFSOp.Delete fn => Op (MailFSStringOp.Delete (encode_tid_fn (fst fn) (snd fn)))
+    | MailFSOp.Read fn => Prim (MailFSStringOp.Read (encode_tid_fn (fst fn) (snd fn)))
+    | MailFSOp.Delete fn => Prim (MailFSStringOp.Delete (encode_tid_fn (fst fn) (snd fn)))
     | MailFSOp.CreateWriteTmp data => createwritetmp_core data
     | MailFSOp.UnlinkTmp => unlinktmp_core
-    | MailFSOp.Ext extop => Op (MailFSStringOp.Ext extop)
-    | MailFSOp.Lock => Op (MailFSStringOp.Lock)
-    | MailFSOp.Unlock => Op (MailFSStringOp.Unlock)
-    | MailFSOp.GetTID => Op (MailFSStringOp.GetTID)
-    | MailFSOp.Random => Op (MailFSStringOp.Random)
+    | MailFSOp.Ext extop => Prim (MailFSStringOp.Ext extop)
+    | MailFSOp.Lock => Prim (MailFSStringOp.Lock)
+    | MailFSOp.Unlock => Prim (MailFSStringOp.Unlock)
+    | MailFSOp.GetTID => Prim (MailFSStringOp.GetTID)
+    | MailFSOp.Random => Prim (MailFSStringOp.Random)
     end.
 
   

@@ -364,19 +364,19 @@ Module LockingCounter' <:
   Import CounterOp.
 
   Definition inc_core : proc LockOp.opT _ :=
-    _ <- Op Acquire;
-      v <- Op Read;
-      _ <- Op (Write (v + 1));
-      _ <- Op Flush;
-      _ <- Op Release;
+    _ <- Prim Acquire;
+      v <- Prim Read;
+      _ <- Prim (Write (v + 1));
+      _ <- Prim Flush;
+      _ <- Prim Release;
       Ret v.
 
   Definition dec_core : proc LockOp.opT _ :=
-    _ <- Op Acquire;
-      v <- Op Read;
-      _ <- Op (Write (v - 1));
-      _ <- Op Flush;
-      _ <- Op Release;
+    _ <- Prim Acquire;
+      v <- Prim Read;
+      _ <- Prim (Write (v - 1));
+      _ <- Prim Flush;
+      _ <- Prim Release;
       Ret v.
 
   Definition compile_op T (op : CounterOp.opT T)
@@ -514,7 +514,7 @@ Module LockingCounter' <:
     match goal with
     | s : LockState.State |- _ =>
       destruct s
-    | H : exec_any _ _ _ (Op _) _ _ |- _ =>
+    | H : exec_any _ _ _ (Prim _) _ _ |- _ =>
       eapply exec_any_op in H; repeat deex
     | H : exec_others _ _ _ _ |- _ =>
       eapply exec_others_preserves_lock in H; simpl in *; subst; [ | congruence ]
@@ -889,7 +889,7 @@ Import CounterOp.
 Definition test_thread :=
   Until
     (fun _ => false)
-    (fun _ => _ <- Op Inc; _ <- Op Dec; Ret tt)
+    (fun _ => _ <- Prim Inc; _ <- Prim Dec; Ret tt)
     None.
 
 Definition test_threads : threads_state _ :=

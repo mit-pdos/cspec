@@ -20,8 +20,8 @@ Hint Resolve starts_with_tid_proper_name.
 Module MailAtomic <: LayerImpl MailLinkAPI MailServerLinkAPI.
 
   Definition deliver (user : string) (m : message) : proc _ _ :=
-    cwd <- Op LinkGetRoot;
-    tid <- Op GetTID;
+    cwd <- Prim LinkGetRoot;
+    tid <- Prim GetTID;
     tmpname <?- find_available_name cwd [tmpdir] (tid_to_string tid);
     f <?- create cwd [tmpdir] tmpname;
     _ <?- write cwd ([tmpdir; tmpname]) m;
@@ -39,7 +39,7 @@ Module MailAtomic <: LayerImpl MailLinkAPI MailServerLinkAPI.
     end.
 
   Definition read (user : string) : proc _ _ :=
-    cwd <- Op LinkGetRoot;
+    cwd <- Prim LinkGetRoot;
     filenames <?- readdir cwd ([maildir; user]);
     read_files cwd ([maildir; user]) filenames.
 
