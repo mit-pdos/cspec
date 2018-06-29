@@ -1,4 +1,4 @@
-Require Import Spec.ConcurProc.
+Require Import Spec.ConcurExec.
 Require Import Spec.Equiv.
 Require Import Helpers.Helpers.
 Require Import Helpers.FinMap.

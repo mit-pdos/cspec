@@ -1,7 +1,7 @@
 Require Import Helpers.Helpers.
 Require Import Helpers.ListStuff.
 Require Import Helpers.Learn.
-Require Import ConcurProc.
+Require Import ConcurExec.
 Require Import Equiv.
 Require Import Omega.
 Require Import FunctionalExtensionality.

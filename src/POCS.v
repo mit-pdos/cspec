@@ -31,7 +31,7 @@ Require Export Helpers.Maps.
 Require Export Helpers.Ordering.
 Require Export Helpers.StringUtils.
 
-Require Export Spec.ConcurProc.
+Require Export Spec.ConcurExec.
 Require Export Spec.Equiv.
 Require Export Spec.Compile.
 Require Export Spec.Abstraction.

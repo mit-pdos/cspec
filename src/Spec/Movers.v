@@ -1,4 +1,4 @@
-Require Import ConcurProc.
+Require Import ConcurExec.
 Require Import Equiv.
 Require Import Helpers.Helpers.
 Require Import FunctionalExtensionality.

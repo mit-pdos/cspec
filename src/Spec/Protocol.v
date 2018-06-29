@@ -1,4 +1,4 @@
-Require Import ConcurProc.
+Require Import ConcurExec.
 Require Import Helpers.
 Require Import Relation_Operators.
 Require Import RelationClasses.
