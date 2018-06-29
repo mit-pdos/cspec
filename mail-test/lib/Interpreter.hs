@@ -84,7 +84,11 @@ run_proc s (Until c p v0) = do
     run_proc s (Until c p (unsafeCoerce (Just v)))
 run_proc s (Spawn p) = do
   debugmsg "Spawn"
-  _ <- forkIO $ run_proc s p >> return ()
+  _ <- forkProcess $ do
+    pid <- getProcessID
+    putStrLn $ "Spawned " ++ show pid
+    run_proc s p
+    return ()
   return $ unsafeCoerce ()
 
 run_proc (S tid _ _ _) (Op MailFSMergedOp__GetTID) = do

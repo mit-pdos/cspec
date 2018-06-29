@@ -114,11 +114,19 @@ Definition smtp_server_thread : proc _ unit :=
 Definition pop3_server_thread : proc _ unit :=
   Until (fun _ => false) (fun _ => do_pop3_req) None.
 
-Definition mail_server nsmtp npop3 :=
-  threads_from_list (repeat (existT _ _ smtp_server_thread) nsmtp ++
-                            repeat (existT _ _ pop3_server_thread) npop3).
+Fixpoint SpawnN (n:nat) opT T (p:proc opT T) : proc opT unit :=
+  match n with
+  | 0 => Ret tt
+  | S n' => Bind (Spawn p) (fun _ => SpawnN n' p)
+  end.
 
+Definition threads_from_proc opT T (p: proc opT T) : @threads_state opT :=
+  threads_from_list (existT _ T p :: nil).
 
+Definition mail_server nsmtp npop3 : threads_state :=
+  threads_from_proc
+    (Bind (SpawnN nsmtp smtp_server_thread)
+           (fun _ => SpawnN npop3 pop3_server_thread)).
 
 Definition pop3_one (u : validIndexT UserIdx.indexValid) (msgs : list ((nat*nat) * string)) :=
   Until
@@ -196,7 +204,8 @@ Definition do_bench_loop msg nsmtpiter npop3iter niter :=
     (Some niter).
 
 Definition mail_perf nprocs niter nsmtpiter npop3iter : threads_state :=
-  threads_from_list (repeat (existT _ _ (do_bench_loop bench_msg nsmtpiter npop3iter niter)) nprocs).
+  threads_from_proc
+    (SpawnN nprocs (do_bench_loop bench_msg nsmtpiter npop3iter niter)).
 
 Module c1 :=
   Link
@@ -287,6 +296,7 @@ Module c0 :=
     c10 MailServerComposedImpl.
 
 Definition ms_bottom nsmtp npop3 nsmtpiter npop3iter :=
+  (* TODO: these aren't actually the arguments mail_perf takes *)
   threads_to_list (c0.compile_ts (mail_perf nsmtp npop3 nsmtpiter npop3iter)).
 
 Definition ms_bottom_server nsmtp npop3 :=
