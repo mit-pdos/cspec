@@ -48,12 +48,12 @@ Section ProcStructure.
     no_atomics_ts ts <->
     (forall tid, no_atomics_opt (ts [[ tid ]])).
   Proof.
-    unfold no_atomics_ts, thread_Forall; split; intros.
+    unfold no_atomics_ts; split; intros.
     - destruct_with_eqn (ts tid); simpl; eauto.
       eapply thread_Forall_some in H; eauto.
     - unfold no_atomics_opt in *.
       eapply thread_Forall_forall; intros.
-      specialize (H tid).
+      specialize (H a).
       rewrite H0 in *; eauto.
   Qed.
 
@@ -71,7 +71,7 @@ Section ProcStructure.
     no_atomics_ts (ts [[ tid := NoProc ]]).
   Proof.
     unfold no_atomics_ts; intros.
-    eauto using thread_Forall_upd_none.
+    eauto using thread_Forall_thread_upd_none.
   Qed.
 
   Theorem no_atomics_thread_upd_Proc : forall ts tid `(p : proc _ T),
@@ -80,7 +80,7 @@ Section ProcStructure.
     no_atomics_ts (ts [[ tid := Proc p ]]).
   Proof.
     unfold no_atomics_ts; intros.
-    eauto using thread_Forall_upd_some.
+    eauto using thread_Forall_thread_upd_some.
   Qed.
 
   Theorem no_atomics_exec_tid :
@@ -216,10 +216,10 @@ Section Compiler.
     unfold proc_match; intros.
     unfold compile_ts.
     destruct_with_eqn (ts tid).
-    rewrite thread_map_get.
+    rewrite thread_map_get_match.
     destruct_with_eqn (ts tid); try congruence.
     invert Heqm; eauto.
-    rewrite thread_map_get.
+    rewrite thread_map_get_match.
     simpl_match; auto.
   Qed.
 
@@ -229,7 +229,7 @@ Section Compiler.
       no_atomics_ts (compile_ts ts).
   Proof.
     unfold no_atomics_ts, compile_ts; intros.
-    eapply thread_map_Forall; eauto.
+    eapply map_thread_Forall; eauto.
   Qed.
 
   Variable State : Type.
@@ -451,7 +451,7 @@ Proof.
     eapply proc_match_subrelation; eauto; simpl; propositional.
   - unfold proc_match; intros.
     specialize (H tid).
-    rewrite thread_map_get.
+    rewrite thread_map_get_match.
     destruct matches in *|-; propositional;
       repeat simpl_match; repeat maybe_proc_inv;
         eauto.

@@ -45,7 +45,7 @@ Qed.
 Theorem proc_match_max_eq : forall `(R : forall T, proc Op T -> proc Op' T -> Prop)
                            ts1 ts2,
     proc_match R ts1 ts2 ->
-    Map.max ts1 = Map.max ts2.
+    thread_max ts1 = thread_max ts2.
 Proof.
   intros.
   apply thread_max_eq; intros.
@@ -81,10 +81,10 @@ Proof.
 Qed.
 
 Lemma proc_match_nil : forall `(R : forall T, proc Op T -> proc Op' T -> Prop),
-  proc_match R threads_empty threads_empty.
+  proc_match R thread_empty thread_empty.
 Proof.
   unfold proc_match; intros.
-  rewrite ?threads_empty_get; eauto.
+  rewrite ?empty_is_empty; eauto.
 Qed.
 
 Theorem proc_match_pick : forall tid `(ts1 : threads_state Op)
@@ -119,7 +119,7 @@ Theorem proc_match_map : forall `(ts1: threads_state Op)
     proc_match (fun T p1 p2 => p2 = f T p1) ts1 (thread_map f ts1).
 Proof.
   unfold proc_match; intros.
-  rewrite thread_map_get.
+  rewrite thread_map_get_match.
   destruct matches; propositional; repeat simpl_match; eauto.
 Qed.
 
@@ -131,7 +131,7 @@ Theorem proc_match_map1 : forall `(ts1: threads_state Op)
 Proof.
   intros.
   unfold proc_match; intros.
-  rewrite thread_map_get.
+  rewrite thread_map_get_match.
   specialize (H tid).
   destruct matches; propositional; repeat simpl_match; eauto.
 Qed.
@@ -144,7 +144,7 @@ Theorem proc_match_map2 : forall `(ts1: threads_state Op)
 Proof.
   intros.
   unfold proc_match; intros.
-  rewrite thread_map_get.
+  rewrite thread_map_get_match.
   specialize (H tid).
   destruct_with_eqn (ts1 tid); propositional; repeat simpl_match; eauto.
 Qed.
@@ -181,20 +181,20 @@ Proof.
 Qed.
 
 Theorem take_threads_max : forall Op (src dst: threads_state Op) n,
-    n <= Map.max dst ->
-    Map.max (take_threads src n dst) <= Map.max dst.
+    n <= thread_max dst ->
+    thread_max (take_threads src n dst) <= thread_max dst.
 Proof.
   induction n; simpl; intros.
   auto.
   specialize (IHn ltac:(omega)).
-  destruct (le_dec n (Map.max (take_threads src n dst))).
-  rewrite thread_upd_max_bound; auto.
-  rewrite thread_upd_max_extend_bound; omega.
+  destruct (le_dec n (thread_max (take_threads src n dst))).
+  rewrite thread_upd_thread_max_bound; auto.
+  rewrite thread_upd_thread_max_extend_bound; omega.
 Qed.
 
 Lemma take_threads_complete_general : forall Op (src dst: threads_state Op) n,
-    n > Map.max src ->
-    Map.max dst <= Map.max src ->
+    n > thread_max src ->
+    thread_max dst <= thread_max src ->
     take_threads src n dst = src.
 Proof.
   intros.
@@ -202,13 +202,13 @@ Proof.
   destruct (lt_dec tid n).
   apply take_threads_complete_helper; auto.
   rewrite take_threads_unchanged_helper by omega.
-  rewrite ?thread_mapping_finite by omega.
+  rewrite ?mapping_finite by omega.
   reflexivity.
 Qed.
 
 Theorem take_threads_complete : forall Op (src dst: threads_state Op),
-    Map.max src = Map.max dst ->
-    src = take_threads src (1 + Map.max src) dst.
+    thread_max src = thread_max dst ->
+    src = take_threads src (1 + thread_max src) dst.
 Proof.
   intros.
   rewrite take_threads_complete_general; auto; omega.
@@ -222,12 +222,12 @@ Qed.
 
 Theorem trace_incl_ts_general : forall Op State (op_step: OpSemantics Op State) (ts1 ts2: threads_state _),
     (forall tid, trace_incl_opt op_step (ts1 tid) (ts2 tid)) ->
-    Map.max ts1 = Map.max ts2 ->
+    thread_max ts1 = thread_max ts2 ->
     trace_incl_ts op_step ts1 ts2.
 Proof.
   intros.
   rewrite (take_threads_complete ts2 ts1) by auto.
-  generalize dependent (1 + Map.max ts2).
+  generalize dependent (1 + thread_max ts2).
   induction n; simpl.
   reflexivity.
   etransitivity; eauto.

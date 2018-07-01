@@ -103,10 +103,10 @@ Section Compiler.
     unfold proc_match; intros.
     unfold compile_ts.
     destruct_with_eqn (ts tid).
-    rewrite thread_map_get.
+    rewrite thread_map_get_match.
     destruct_with_eqn (ts tid); try congruence.
     invert Heqm; eauto.
-    rewrite thread_map_get.
+    rewrite thread_map_get_match.
     simpl_match; auto.
   Qed.
 
@@ -118,7 +118,7 @@ Section Compiler.
       no_atomics_ts (compile_ts ts).
   Proof.
     unfold no_atomics_ts, compile_ts; intros.
-    eapply thread_map_Forall; eauto.
+    eapply map_thread_Forall; eauto.
   Qed.
 
   Variable State : Type.

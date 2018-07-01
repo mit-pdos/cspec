@@ -893,7 +893,7 @@ Definition test_thread :=
     None.
 
 Definition test_threads : threads_state _ :=
-  threads_from_list (repeat (existT _ _ test_thread) 16).
+  thread_from_list (repeat (existT _ _ test_thread) 16).
 
 Definition compiled_threads : list (maybe_proc _) :=
-  threads_to_list (c.compile_ts test_threads).
+  thread_to_list (c.compile_ts test_threads).

@@ -121,7 +121,7 @@ Fixpoint SpawnN (n:nat) Op T (p:proc Op T) : proc Op unit :=
   end.
 
 Definition threads_from_proc Op T (p: proc Op T) : threads_state Op :=
-  threads_from_list (existT _ T p :: nil).
+  thread_from_list (existT _ T p :: nil).
 
 Definition mail_server nsmtp npop3 : threads_state _ :=
   threads_from_proc
@@ -297,9 +297,9 @@ Module c0 :=
 
 Definition ms_bottom nsmtp npop3 nsmtpiter npop3iter :=
   (* TODO: these aren't actually the arguments mail_perf takes *)
-  threads_to_list (c0.compile_ts (mail_perf nsmtp npop3 nsmtpiter npop3iter)).
+  thread_to_list (c0.compile_ts (mail_perf nsmtp npop3 nsmtpiter npop3iter)).
 
 Definition ms_bottom_server nsmtp npop3 :=
-  threads_to_list (c0.compile_ts (mail_server nsmtp npop3)).
+  thread_to_list (c0.compile_ts (mail_server nsmtp npop3)).
 
 Print Assumptions c0.compile_traces_match.

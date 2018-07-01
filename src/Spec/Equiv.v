@@ -198,14 +198,14 @@ Proof.
     eexists.
     eapply ExecOne with (tid := tid).
     autorewrite with t; eauto.
-    rewrite thread_mapping_finite; auto.
+    rewrite mapping_finite; auto.
     econstructor.
     match goal with
-    | |- context[S (Map.max ?ts)] =>
-      rewrite thread_upd_same_eq with (tid := S (Map.max ts))
+    | |- context[S (thread_max ?ts)] =>
+      rewrite thread_upd_same_eq with (tid := S (thread_max ts))
     end.
     autorewrite with t; eauto.
-    rewrite thread_mapping_finite; eauto.
+    rewrite mapping_finite; eauto.
 Qed.
 
 Hint Constructors exec_tid.
