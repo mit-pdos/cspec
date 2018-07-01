@@ -1,8 +1,9 @@
 Require Import ProofIrrelevance.
 Require Import FunctionalExtensionality.
-Require Import Helpers.Helpers.
+Require Import ProofAutomation.
 Require Import Helpers.ListStuff.
 Require Import Helpers.Maps.
+Require Import Helpers.Instances.
 Require Import ConcurExec.
 Require Import Equiv.
 Require Import Omega.
@@ -36,17 +37,6 @@ Section HorizontalComposition.
   Variable initP : sliceState -> Prop.
 
   Definition validIndexT := { i : indexT | indexValid i }.
-
-  Global Instance validIndexT_dec : EqualDec validIndexT.
-  Proof.
-    hnf; intros.
-    destruct x as [x ?], y as [y ?].
-    destruct (x == y); subst; [ left | right ].
-    - f_equal.
-      apply proof_irrelevance.
-    - intro.
-      invert H; congruence.
-  Qed.
 
   Inductive CheckResult :=
   | Missing

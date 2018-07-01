@@ -1,8 +1,8 @@
-Require Import Helpers.Helpers.
+Require Import ProofAutomation.
 Require Import Helpers.FunMap.
 Require Import Helpers.ListStuff.
+Require Import Helpers.Instances.
 Require Import Relations.Relation_Operators.
-Require Import RelationClasses.
 Require Import FunctionalExtensionality.
 
 Import List.

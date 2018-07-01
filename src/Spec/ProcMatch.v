@@ -1,6 +1,7 @@
 Require Import Spec.ConcurExec.
 Require Import Spec.Equiv.
-Require Import Helpers.Helpers.
+Require Import ProofAutomation.
+Require Import Helpers.Instances.
 Require Import Helpers.FinMap.
 
 Require Import Omega.

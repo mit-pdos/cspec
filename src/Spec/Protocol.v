@@ -1,8 +1,8 @@
-Require Import ConcurExec.
-Require Import Helpers.
-Require Import Relation_Operators.
-Require Import RelationClasses.
+Require Import ProofAutomation.
 Require Import Helpers.Instances.
+
+Require Import ConcurExec.
+Require Import Relation_Operators.
 Require Import Compile.
 Require Import Equiv ProcMatch.
 

@@ -1,8 +1,7 @@
 Require Import ConcurExec.
 Require Import Relations.Relation_Operators.
-Require Import RelationClasses.
 Require Import Morphisms.
-Require Import Helpers.Helpers.
+Require Import ProofAutomation.
 Require Import Helpers.ListStuff.
 Require Import Helpers.FinMap.
 Require Import List.
@@ -371,7 +370,7 @@ Hint Rewrite thread_upd_aba' using congruence : t.
 
 Hint Extern 1 (exec_prefix _ _ _ _) =>
 match goal with
-| |- exec_prefix _ _ ?ts _ => first [ is_evar ts; fail 1 | abstract_term ts ]
+| |- exec_prefix _ _ ?ts _ => first [ is_evar ts; fail 1 | eapply ConcurExec.exec_prefix_ts_eq ]
 end : exec_prefix.
 
 Ltac ExecPrefix tid_arg tid'_arg :=
@@ -737,7 +736,7 @@ Qed.
 
 Hint Extern 1 (exec _ _ _ _ _) =>
 match goal with
-| |- exec _ _ ?ts _ _ => first [ is_evar ts; fail 1 | abstract_term ts ]
+| |- exec _ _ ?ts _ _ => first [ is_evar ts; fail 1 | eapply ConcurExec.exec_ts_eq ]
 end : exec_prefix.
 
 (* basically the same as ExecPrefix, but applies [ExecOne] instead of

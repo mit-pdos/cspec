@@ -1,7 +1,7 @@
 Require Export Trace.
 Require Export ConcurProc.
 Require Export FinMap.
-Require Import Helpers.Helpers.
+Require Import ProofAutomation.
 Require Import Helpers.ListStuff.
 Require Import Helpers.FinMap.
 Require Import Helpers.Instances.
@@ -367,16 +367,41 @@ Ltac cmp_ts tid1 tid2 :=
   try congruence;
   autorewrite with t in *.
 
+Local Lemma exec_prefix_ts_eq : forall Op State (op_step: OpSemantics Op State) s ts ts' tr,
+    exec_prefix op_step s ts' tr ->
+    ts = ts' ->
+    exec_prefix op_step s ts tr.
+Proof.
+  propositional.
+Qed.
+
+Local Lemma exec_ts_eq : forall Op State (op_step: OpSemantics Op State) s ts ts' tr ctr,
+    exec op_step s ts' tr ctr ->
+    ts = ts' ->
+    exec op_step s ts tr ctr.
+Proof.
+  propositional.
+Qed.
+
 (* abstract the thread state in an exec goal (to deal with different update
 forms) *)
 Ltac abstract_ts :=
   match goal with
-    |- exec_prefix _ _ ?ts _ => abstract_term ts
+  | |- exec_prefix _ _ ?ts _ => eapply exec_prefix_ts_eq
+  | |- exec _ _ ?ts _ _ => eapply exec_ts_eq
   end.
+
+Local Lemma exec_prefix_tr_eq : forall Op State (op_step: OpSemantics Op State) s ts tr tr',
+    exec_prefix op_step s ts tr' ->
+    tr = tr' ->
+    exec_prefix op_step s ts tr.
+Proof.
+  propositional.
+Qed.
 
 (* abstract the trace in an exec goal (to deal with different calls to
 prepend/list append) *)
 Ltac abstract_tr :=
   match goal with
-  | |- exec_prefix _ _ _ ?tr => abstract_term tr
+  | |- exec_prefix _ _ _ ?tr => eapply exec_prefix_tr_eq
   end.

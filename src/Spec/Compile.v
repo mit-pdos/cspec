@@ -1,6 +1,6 @@
 Require Import ConcurExec.
 Require Import Equiv ProcMatch.
-Require Import Helpers.Helpers.
+Require Import ProofAutomation.
 Require Import Helpers.FinMap.
 Require Import FunctionalExtensionality.
 Require Import Omega.

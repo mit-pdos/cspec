@@ -5,7 +5,8 @@ Require Import Arith.
 Require Import Omega.
 Require Import FunctionalExtensionality.
 Require Import ProofIrrelevance.
-Require Import Helpers.Helpers.
+Require Import ProofAutomation.
+Require Import Helpers.Instances.
 
 Require Import ConcurProc.
 

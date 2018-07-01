@@ -2,7 +2,7 @@ Require Import ConcurExec.
 Require Import Relations.Relation_Operators.
 Require Import RelationClasses.
 Require Import Morphisms.
-Require Import Helpers.Helpers.
+Require Import ProofAutomation.
 Require Import Helpers.ListStuff.
 Require Import List.
 Require Import Omega.

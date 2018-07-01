@@ -1,5 +1,6 @@
 ## Common library code
 CODE += $(wildcard src/Helpers/*.v)
+CODE += $(wildcard src/Helpers/ProofAutomation/*.v)
 CODE += $(wildcard src/Spec/*.v)
 CODE += $(wildcard src/*.v)
 CODE += $(wildcard src/Mail/*.v)

@@ -1,5 +1,5 @@
-Require Import Helpers.
 Require Import FunctionalExtensionality.
+Require Import Helpers.Instances.
 
 Set Implicit Arguments.
 

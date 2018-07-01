@@ -20,11 +20,11 @@
 Require Export List.
 Require Export Omega.
 
-(** [Helpers.Helpers] has some definitions to augment the standard library, as well as a
-variety of proof automation (Ltac) used to simplify writing proofs with the POCS
-infrastructure. *)
+(** [Helpers.ProofAutomation] has a variety of proof automation (Ltac) used to
+simplify writing proofs with the POCS infrastructure. *)
 
-Require Export Helpers.Helpers.
+Require Export Helpers.ProofAutomation.
+Require Export Helpers.Instances.
 Require Export Helpers.ListStuff.
 Require Export Helpers.Sets.
 Require Export Helpers.Maps.

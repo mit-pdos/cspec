@@ -1,6 +1,7 @@
-Require Import Helpers.Helpers.
+Require Import ProofAutomation.
 Require Import Helpers.ListStuff.
 Require Import Helpers.Learn.
+Require Import Helpers.Instances.
 Require Import ConcurExec.
 Require Import Equiv.
 Require Import Omega.

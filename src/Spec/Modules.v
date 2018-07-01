@@ -5,7 +5,7 @@ Require Import Abstraction.
 Require Import Movers.
 Require Import Protocol.
 Require Import CompileLoop.
-Require Import Helpers.Helpers.
+Require Import ProofAutomation.
 
 
 (** Combining trace matching with state abstraction. *)

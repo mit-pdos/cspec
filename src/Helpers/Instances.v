@@ -1,9 +1,51 @@
-Require Import RelationClasses.
+Require Export RelationClasses.
 Require Import Relation_Operators.
 Require Import Ordering.
 Require Import ProofIrrelevance.
 
-Require Import Helpers.Helpers.
+Require Import Arith.
+Require Import Bool.
+Require Import String.
+Require Import List.
+
+(** * Decidable equality.
+
+    [EqualDec] defines a notion of decidable equality for things
+    of type [A].  This means that there is a function, called
+    [equal_dec], which, given two things of type [A], will return
+    whether they are equal or not.
+  *)
+
+Class EqualDec A :=
+  equal_dec : forall x y : A, { x = y } + { x <> y }.
+
+(**
+    We define the notation [x == y] to mean our decidable equality
+    between [x] and [y].
+  *)
+
+Notation " x == y " := (equal_dec (x :>) (y :>)) (no associativity, at level 70).
+
+(**
+    Here, we define some types for which we know how to compute
+    decidable equality (namely, equality for [nat]s, and equality
+    for [bool]s).
+  *)
+
+Instance nat_equal_dec : EqualDec nat := eq_nat_dec.
+Instance bool_equal_dec : EqualDec bool := bool_dec.
+
+Instance string_equal_dec : EqualDec string := string_dec.
+Instance list_equal_dec A `{dec:EqualDec A} : EqualDec (list A) := list_eq_dec dec.
+
+Instance pair_equal_dec A B `{ea:EqualDec A} `{eb:EqualDec B} : EqualDec (A*B).
+  intro; intros.
+  destruct x; destruct y.
+  destruct (a == a0); subst.
+  destruct (b == b0); subst.
+  all: intuition congruence.
+Defined.
+
 
 Local Hint Constructors clos_refl_trans_1n.
 Instance clos_rt1n_pre A (R: A -> A -> Prop) : PreOrder (clos_refl_trans_1n A R).
@@ -33,5 +75,5 @@ Proof.
   - f_equal.
     apply proof_irrelevance.
   - intro.
-    invert H; congruence.
+    inversion H; congruence.
 Qed.
