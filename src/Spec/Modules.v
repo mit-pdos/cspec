@@ -57,13 +57,6 @@ Module Type Layer (o : Ops) (s : State).
 End Layer.
 
 
-Module Type ProcRule (o : Ops).
-
-  Axiom follows_protocol : threads_state o.Op -> Prop.
-
-End ProcRule.
-
-
 Module Type Protocol (o : Ops) (s : State).
 
   Axiom step_allow : forall T, o.Op T -> nat -> s.State -> Prop.
@@ -94,48 +87,6 @@ Module Type LayerImpl
   Hint Resolve absInitP.
 
 End LayerImpl.
-
-
-Module Type LayerImplRequiresRule
-  (o1 : Ops) (s1 : State) (l1 : Layer o1 s1)
-  (o2 : Ops) (s2 : State) (l2 : Layer o2 s2)
-  (r : ProcRule o2).
-
-  Axiom absR : s1.State -> s2.State -> Prop.
-  Axiom compile_ts : threads_state o2.Op -> threads_state o1.Op.
-  Axiom compile_ts_no_atomics :
-    forall ts,
-      no_atomics_ts ts ->
-      no_atomics_ts (compile_ts ts).
-  Axiom absInitP :
-    forall s1 s2,
-      s1.initP s1 ->
-      absR s1 s2 ->
-      s2.initP s2.
-  Axiom compile_traces_match :
-    forall ts,
-      r.follows_protocol ts ->
-      no_atomics_ts ts ->
-      traces_match_abs absR s1.initP l1.step l2.step (compile_ts ts) ts.
-
-  Hint Resolve absInitP.
-
-End LayerImplRequiresRule.
-
-
-Module Type LayerImplFollowsRule
-  (o1 : Ops) (s1 : State) (l1 : Layer o1 s1)
-  (o2 : Ops) (s2 : State) (l2 : Layer o2 s2)
-  (r : ProcRule o1).
-
-  Include (LayerImpl o1 s1 l1 o2 s2 l2).
-
-  Axiom compile_ts_follows_protocol :
-    forall ts,
-      no_atomics_ts ts ->
-      r.follows_protocol (compile_ts ts).
-
-End LayerImplFollowsRule.
 
 
 Module Type LayerImplAbsT
@@ -618,54 +569,3 @@ Module Link
   Qed.
 
 End Link.
-
-
-Module LinkWithRule
-  (oA : Ops) (sA : State) (a : Layer oA sA)
-  (oB : Ops) (sB : State) (b : Layer oB sB)
-  (oC : Ops) (sC : State) (c : Layer oC sC)
-  (r : ProcRule oB)
-  (x : LayerImplRequiresRule oA sA a oB sB b r)
-  (y : LayerImplFollowsRule oB sB b oC sC c r) <: LayerImpl oA sA a oC sC c.
-
-  Definition absR (s1 : sA.State) (s3 : sC.State) :=
-    exists s2, x.absR s1 s2 /\ y.absR s2 s3.
-
-  Definition compile_ts ts :=
-    x.compile_ts (y.compile_ts ts).
-
-  Theorem compile_ts_no_atomics :
-    forall ts,
-      no_atomics_ts ts ->
-      no_atomics_ts (compile_ts ts).
-  Proof.
-    intros.
-    eapply x.compile_ts_no_atomics.
-    eapply y.compile_ts_no_atomics.
-    eauto.
-  Qed.
-
-  Theorem absInitP :
-    forall s1 s2,
-      sA.initP s1 ->
-      absR s1 s2 ->
-      sC.initP s2.
-  Proof.
-    unfold absR; intros; deex.
-    eauto.
-  Qed.
-
-  Theorem compile_traces_match :
-    forall ts,
-      no_atomics_ts ts ->
-      traces_match_abs absR sA.initP a.step c.step (compile_ts ts) ts.
-  Proof.
-    unfold traces_match_abs; intros.
-    inversion H2; clear H2; intuition idtac.
-    edestruct x.compile_traces_match; intuition eauto.
-      eapply y.compile_ts_follows_protocol; eauto.
-      eapply y.compile_ts_no_atomics; eauto.
-    edestruct y.compile_traces_match; intuition eauto.
-  Qed.
-
-End LinkWithRule.
