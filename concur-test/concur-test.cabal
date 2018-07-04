@@ -21,5 +21,4 @@ executable concur-test
                      , Datatypes
                      , CounterExample
                      , Nat
-                     , Helpers
   default-language:    Haskell2010
