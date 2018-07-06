@@ -292,8 +292,7 @@ Section Compiler.
   Proof.
     unfold traces_match_ts; intros.
     generalize dependent ts2.
-    unfold exec_prefix in H0; repeat deex.
-    induction H; intros; eauto.
+    induction H0; intros; eauto.
 
     - eapply proc_match_pick with (tid := tid) in H3 as H'.
       intuition try congruence.
@@ -305,7 +304,7 @@ Section Compiler.
       repeat deex.
       assert (ts2 tid' = NoProc) by eauto using proc_match_none.
       ExecPrefix tid tid'.
-      eapply IHexec.
+      eapply IHexec_prefix.
       destruct matches; propositional;
         eauto using proc_match_del, proc_match_upd, proc_match_upd_opt.
   Qed.
@@ -368,21 +367,12 @@ Section Atomization.
     - eapply trace_incl_bind_a; eauto.
     - repeat rewrite exec_equiv_bind_bind.
       eauto.
-    - etransitivity.
-      eapply trace_incl_rx_to_trace_incl.
-      eapply trace_incl_rx_until.
-      intros. eapply trace_incl_to_trace_incl_rx; intros.
-      eapply H0; intros.
+    - eapply trace_incl_rx_until.
+      intros; eapply trace_incl_to_trace_incl_rx; intros.
+      eapply H0; eauto.
       reflexivity.
-      eapply trace_incl_bind_a; intros.
       eauto.
-    - etransitivity.
-      eapply trace_incl_rx_to_trace_incl.
-      eapply trace_incl_rx_spawn.
-      eapply trace_incl_to_trace_incl_rx; intros.
-      eapply IHatomize_ok; reflexivity.
-      eapply trace_incl_bind_a; intros.
-      eauto.
+    - eapply trace_incl_rx_spawn; eauto.
   Qed.
 
   Theorem atomize_ok_trace_incl :

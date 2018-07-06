@@ -99,26 +99,22 @@ Section Proc.
   .
 
 
-  Inductive exec : State -> threads_state Op -> trace -> nat -> Prop :=
+  (* TODO: rename to exec *)
+  Inductive exec_prefix : State -> threads_state Op -> trace -> Prop :=
 
-  | ExecOne : forall T tid tid' (ts : threads_state Op) trace p s s' evs result ctr spawned,
+  | ExecOne : forall T tid tid' (ts : threads_state Op) trace p s s' evs result spawned,
     ts tid = @Proc Op T p ->
     ts tid' = NoProc ->
     exec_tid tid s p s' result spawned evs ->
-    exec s' (thread_upd (thread_upd ts tid' spawned) tid
+    exec_prefix s' (thread_upd (thread_upd ts tid' spawned) tid
               match result with
               | inl _ => NoProc
               | inr p' => Proc p'
-              end) trace ctr ->
-    exec s ts (prepend tid evs trace) (S ctr)
+              end) trace ->
+    exec_prefix s ts (prepend tid evs trace)
 
-  | ExecExpired : forall (ts : threads_state Op) s,
-    exec s ts TraceEmpty 0.
-
-
-  Definition exec_prefix (s : State) (ts : threads_state Op) (tr : trace) : Prop :=
-    exists n,
-      exec s ts tr n.
+  | ExecStop : forall (ts : threads_state Op) s,
+    exec_prefix s ts TraceEmpty.
 
   Theorem ExecPrefixOne
        : forall (T : Type)
@@ -137,16 +133,8 @@ Section Proc.
               end)) tr ->
          exec_prefix s ts (prepend tid evs tr).
   Proof.
-    unfold exec_prefix; intros; deex.
-    eexists; eapply ExecOne; eauto.
-  Qed.
-
-
-  Theorem exec_to_exec_prefix : forall s ts tr ctr,
-    exec s ts tr ctr ->
-    exec_prefix s ts tr.
-  Proof.
-    unfold exec_prefix; eauto.
+    intros.
+    eapply ExecOne; eauto.
   Qed.
 
 
@@ -253,9 +241,8 @@ Section Proc.
 
 End Proc.
 
-Hint Constructors exec.
+Hint Constructors exec_prefix.
 Hint Constructors exec_any.
-Hint Resolve exec_to_exec_prefix.
 Hint Resolve exec_tid_exec_others.
 Hint Resolve exec_others_exec_any.
 Hint Resolve exec_others_trans.
@@ -375,20 +362,11 @@ Proof.
   propositional.
 Qed.
 
-Local Lemma exec_ts_eq : forall Op State (op_step: OpSemantics Op State) s ts ts' tr ctr,
-    exec op_step s ts' tr ctr ->
-    ts = ts' ->
-    exec op_step s ts tr ctr.
-Proof.
-  propositional.
-Qed.
-
 (* abstract the thread state in an exec goal (to deal with different update
 forms) *)
 Ltac abstract_ts :=
   match goal with
   | |- exec_prefix _ _ ?ts _ => eapply exec_prefix_ts_eq
-  | |- exec _ _ ?ts _ _ => eapply exec_ts_eq
   end.
 
 Local Lemma exec_prefix_tr_eq : forall Op State (op_step: OpSemantics Op State) s ts tr tr',

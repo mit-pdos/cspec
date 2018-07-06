@@ -221,8 +221,7 @@ Section Compiler.
   Proof.
     unfold traces_match_ts; intros.
     generalize dependent ts2.
-    destruct H0.
-    induction H; eauto; intros.
+    induction H0; eauto; intros.
 
     eapply proc_match_pick with (tid := tid) in H3 as H2'.
     intuition idtac; try congruence.
@@ -234,19 +233,19 @@ Section Compiler.
 
     - simpl.
       rewrite thread_upd_same_eq with (tid:=tid') in * by auto.
-      eapply IHexec.
+      eapply IHexec_prefix.
       erewrite <- thread_upd_same_eq with (ts := ts2) (tid := tid) by eassumption.
       apply proc_match_upd; eauto.
     - assert (ts2 tid' = NoProc) by eauto using proc_match_none.
       destruct result.
-      + epose_proof IHexec.
+      + epose_proof IHexec_prefix.
         eapply proc_match_del; eauto.
         apply proc_match_upd_opt; eauto.
         ExecPrefix tid tid'.
         destruct result'; propositional; eauto.
 
       + destruct result'; propositional.
-        * epose_proof IHexec.
+        * epose_proof IHexec_prefix.
             eapply proc_match_upd; eauto.
             apply proc_match_upd_opt; eauto.
 
@@ -256,7 +255,7 @@ Section Compiler.
           ExecPrefix tid tid'.
           reflexivity.
 
-        * epose_proof IHexec.
+        * epose_proof IHexec_prefix.
             eapply proc_match_upd; eauto.
             apply proc_match_upd_opt; eauto.
           ExecPrefix tid tid'.

@@ -343,7 +343,6 @@ Section Movers.
     | H : exec_prefix _ _ (thread_upd ?ts ?tid ?p) _ |- _ =>
       remember (thread_upd ts tid p);
       generalize dependent ts;
-      unfold exec_prefix in H; repeat deex;
       induction H; intros; subst; NoProc_upd
     end.
 
@@ -357,7 +356,7 @@ Section Movers.
         descend; intuition eauto.
         abstract_ts; eauto with exec_prefix.
 
-      + edestruct IHexec; intuition idtac.
+      + edestruct IHexec_prefix; intuition idtac.
           eapply enabled_stable_exec_tid; eauto.
           destruct H; eauto.
           eapply pred_stable_exec_tid; eauto.
@@ -399,7 +398,6 @@ Section Movers.
       remember (thread_upd ts tid pp);
       generalize dependent ts;
       generalize dependent s;
-      destruct H as [? H];
       induction H; simpl; intros; subst; eauto; NoProc_upd
     end.
 

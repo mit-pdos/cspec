@@ -77,10 +77,8 @@ Section StateAbstraction.
   Proof.
     intros.
     generalize dependent s2.
-    destruct H0 as [? H0].
     induct H0; eauto.
     - eapply exec_tid_abs in H3; propositional; eauto.
-      eauto using ExecPrefixOne.
   Qed.
 
 End StateAbstraction.
