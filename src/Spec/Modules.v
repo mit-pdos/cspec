@@ -28,9 +28,9 @@ Section TraceAbs.
                            (ts2 : threads_state opMidT) :=
     forall (sl : StateLo) (sm : StateMid) tr1,
       initP sl ->
-      exec_prefix lo_step sl ts1 tr1 ->
+      exec lo_step sl ts1 tr1 ->
       absR sl sm ->
-      exec_prefix mid_step sm ts2 tr1.
+      exec mid_step sm ts2 tr1.
 
 End TraceAbs.
 
@@ -413,7 +413,7 @@ Module LayerImplMoversProtocol
     cmp_ts tid tid'.
     pose proof (H tid _ p ltac:(eauto)) as Htid.
 
-    prove_hyps IHexec_prefix.
+    prove_hyps IHexec.
     - eapply follows_protocol_s_exec_tid_upd; eauto.
       intros; eapply a.allowed_stable; eauto.
       eapply a.raw_step_ok; eauto.
@@ -451,7 +451,7 @@ Module LayerImplMoversProtocol
   Proof.
     unfold traces_match_abs; intros.
     rewrite H2 in *; clear H2.
-    assert (exec_prefix l1.step sm (Compile.compile_ts a.compile_op ts) tr1). {
+    assert (exec l1.step sm (Compile.compile_ts a.compile_op ts) tr1). {
       eapply compile_traces_match_l1raw; eauto.
       eapply compile_ts_follows_protocol; eauto.
       eapply Compile.compile_ts_no_atomics; eauto.

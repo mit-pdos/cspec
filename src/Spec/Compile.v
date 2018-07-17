@@ -304,7 +304,7 @@ Section Compiler.
       repeat deex.
       assert (ts2 tid' = NoProc) by eauto using proc_match_none.
       ExecPrefix tid tid'.
-      eapply IHexec_prefix.
+      eapply IHexec.
       destruct matches; propositional;
         eauto using proc_match_del, proc_match_upd, proc_match_upd_opt.
   Qed.

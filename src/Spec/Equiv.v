@@ -17,8 +17,8 @@ Global Generalizable All Variables.
 
 Definition exec_equiv_ts {Op} (ts1 ts2 : threads_state Op) :=
   forall State op_step (s : State) tr,
-    exec_prefix op_step s ts1 tr <->
-    exec_prefix op_step s ts2 tr.
+    exec op_step s ts1 tr <->
+    exec op_step s ts2 tr.
 
 Definition exec_equiv_opt `(p1 : maybe_proc Op) p2 :=
   forall (ts : threads_state _) tid,
@@ -166,13 +166,13 @@ Ltac NoProc_upd :=
          | _ => idtac
          end.
 
-(* the ExecPrefix tactic solves exec_prefix goals by splitting them into one
-execution step and leaving the exec_prefix for [auto] *)
+(* the ExecPrefix tactic solves exec goals by splitting them into one
+execution step and leaving the exec for [auto] *)
 
 (* copy some basic hints from core *)
-Hint Extern 2 (_ <> _) => simple apply not_eq_sym; trivial : exec_prefix.
-Hint Extern 2 (_ = _) => simple apply eq_sym : exec_prefix.
-Hint Resolve eq_refl : exec_prefix.
+Hint Extern 2 (_ <> _) => simple apply not_eq_sym; trivial : exec.
+Hint Extern 2 (_ = _) => simple apply eq_sym : exec.
+Hint Resolve eq_refl : exec.
 
 Lemma thread_upd_other_eq : forall Op (ts:threads_state Op)
                               tid T (p: proc _ T) tid' T' (p': proc _ T'),
@@ -196,21 +196,21 @@ Proof.
   apply thread_upd_abc_to_cab; auto.
 Qed.
 
-Hint Resolve thread_upd_other_eq : exec_prefix.
-Hint Resolve thread_upd_spawn_delay : exec_prefix.
-Hint Resolve thread_upd_ne_comm : exec_prefix.
-Hint Constructors exec_tid atomic_exec : exec_prefix.
+Hint Resolve thread_upd_other_eq : exec.
+Hint Resolve thread_upd_spawn_delay : exec.
+Hint Resolve thread_upd_ne_comm : exec.
+Hint Constructors exec_tid atomic_exec : exec.
 
-Hint Extern 1 (exec_prefix _ _ _ _) =>
+Hint Extern 1 (exec _ _ _ _) =>
 match goal with
-| |- exec_prefix _ _ ?ts _ => first [ is_evar ts; fail 1 | eapply ConcurExec.exec_prefix_ts_eq ]
-end : exec_prefix.
+| |- exec _ _ ?ts _ => first [ is_evar ts; fail 1 | eapply ConcurExec.exec_ts_eq ]
+end : exec.
 
 Ltac ExecPrefix tid_arg tid'_arg :=
   eapply ExecPrefixOne with (tid:=tid_arg) (tid':=tid'_arg);
   autorewrite with t;
   (* need to exclude core for performance reasons *)
-  eauto 7 with nocore exec_prefix;
+  eauto 7 with nocore exec;
   cbv beta iota.
 
 Theorem exec_equiv_ret_None : forall Op `(v : T),
@@ -218,7 +218,7 @@ Theorem exec_equiv_ret_None : forall Op `(v : T),
 Proof.
   split; intros.
   - match goal with
-    | H : exec_prefix _ _ (thread_upd ?ts ?tid (Proc ?p)) _ |- _ =>
+    | H : exec _ _ (thread_upd ?ts ?tid (Proc ?p)) _ |- _ =>
       remember (thread_upd ts tid (Proc p));
       generalize dependent ts;
       induction H; intros; subst; eauto; NoProc_upd
@@ -231,7 +231,7 @@ Proof.
         eauto.
     * ExecPrefix tid0 tid'.
       abstract_ts.
-      eapply IHexec_prefix; eauto with exec_prefix.
+      eapply IHexec; eauto with exec.
       rewrite thread_upd_abc_to_cab; auto.
 
   - change tr with (prepend tid nil tr).
@@ -257,7 +257,7 @@ Proof.
   unfold exec_equiv; split; intros.
 
   - match goal with
-    | H : exec_prefix _ _ (thread_upd ?ts ?tid (Proc ?pp)) _ |- _ =>
+    | H : exec _ _ (thread_upd ?ts ?tid (Proc ?pp)) _ |- _ =>
       remember (thread_upd ts tid (Proc pp));
       generalize dependent ts;
       generalize dependent p;
@@ -287,7 +287,7 @@ Proof.
       ExecPrefix tid0 tid'.
 
   - match goal with
-    | H : exec_prefix _ _ (thread_upd ?ts ?tid (Proc ?pp)) _ |- _ =>
+    | H : exec _ _ (thread_upd ?ts ?tid (Proc ?pp)) _ |- _ =>
       remember (thread_upd ts tid (Proc pp));
       generalize dependent ts;
       generalize dependent p;
@@ -335,25 +335,25 @@ Theorem exec_equiv_rx_proof_helper : forall `(p1 : proc Op T) p2,
         exec_tid op_step tid s (Bind p1 rx) s' result spawned evs ->
         ts tid' = NoProc ->
         tid <> tid' ->
-        exec_prefix op_step s' (ts [[tid' := spawned]] [[tid := match result with
+        exec op_step s' (ts [[tid' := spawned]] [[tid := match result with
                                                                 | inl _ => NoProc
                                                                 | inr p' => Proc p'
                                                                 end]]) tr ->
-        exec_prefix op_step s (ts [[tid := Proc (Bind p2 rx)]]) (prepend tid evs tr)) ->
+        exec op_step s (ts [[tid := Proc (Bind p2 rx)]]) (prepend tid evs tr)) ->
     (forall tid tid' `(s : State) s' op_step (ts: threads_state _) tr evs spawned `(rx : _ -> proc _ TR) result,
         exec_tid op_step tid s (Bind p2 rx) s' result spawned evs ->
         ts tid' = NoProc ->
         tid <> tid' ->
-        exec_prefix op_step s' (ts [[tid' := spawned]] [[tid := match result with
+        exec op_step s' (ts [[tid' := spawned]] [[tid := match result with
                                                                 | inl _ => NoProc
                                                                 | inr p' => Proc p'
                                                                 end]]) tr ->
-        exec_prefix op_step s (ts [[tid := Proc (Bind p1 rx)]]) (prepend tid evs tr)) ->
+        exec op_step s (ts [[tid := Proc (Bind p1 rx)]]) (prepend tid evs tr)) ->
     exec_equiv_rx p1 p2.
 Proof.
   split; intros.
   - match goal with
-    | H : exec_prefix _ _ (thread_upd ?ts ?tid (Proc ?p)) _ |- _ =>
+    | H : exec _ _ (thread_upd ?ts ?tid (Proc ?p)) _ |- _ =>
       remember (thread_upd ts tid (Proc p));
       generalize dependent ts;
       induction H; intros; subst; eauto; NoProc_upd
@@ -366,7 +366,7 @@ Proof.
     * ExecPrefix tid0 tid'.
 
   - match goal with
-    | H : exec_prefix _ _ (thread_upd ?ts ?tid (Proc ?p)) _ |- _ =>
+    | H : exec _ _ (thread_upd ?ts ?tid (Proc ?p)) _ |- _ =>
       remember (thread_upd ts tid (Proc p));
       generalize dependent ts;
       induction H; intros; subst; eauto; NoProc_upd
@@ -426,7 +426,7 @@ Theorem exec_equiv_bind_bind : forall `(p1 : proc Op T1) `(p2 : T1 -> proc Op T2
 Proof.
   unfold exec_equiv; split; intros.
   - match goal with
-    | H : exec_prefix _ _ (thread_upd ?ts ?tid (Proc ?p)) _ |- _ =>
+    | H : exec _ _ (thread_upd ?ts ?tid (Proc ?p)) _ |- _ =>
       remember (thread_upd ts tid (Proc p));
       generalize dependent ts;
       generalize dependent p1;
@@ -445,7 +445,7 @@ Proof.
     * ExecPrefix tid0 tid'.
 
   - match goal with
-    | H : exec_prefix _ _ (thread_upd ?ts ?tid (Proc ?p)) _ |- _ =>
+    | H : exec _ _ (thread_upd ?ts ?tid (Proc ?p)) _ |- _ =>
       remember (thread_upd ts tid (Proc p));
       generalize dependent ts;
       generalize dependent p1;
@@ -478,7 +478,7 @@ Theorem exec_equiv_bind_a : forall `(p : proc Op T) `(p1 : T -> proc _ T') p2,
 Proof.
   unfold exec_equiv; split; intros.
   - match goal with
-    | H : exec_prefix _ _ (thread_upd ?ts ?tid (Proc ?pp)) _ |- _ =>
+    | H : exec _ _ (thread_upd ?ts ?tid (Proc ?pp)) _ |- _ =>
       remember (thread_upd ts tid (Proc pp));
       generalize dependent ts;
       generalize dependent p;
@@ -496,7 +496,7 @@ Proof.
     * ExecPrefix tid0 tid'.
 
   - match goal with
-    | H : exec_prefix _ _ (thread_upd ?ts ?tid (Proc ?pp)) _ |- _ =>
+    | H : exec _ _ (thread_upd ?ts ?tid (Proc ?pp)) _ |- _ =>
       remember (thread_upd ts tid (Proc pp));
       generalize dependent ts;
       generalize dependent p;
@@ -579,8 +579,8 @@ Proof.
   autorewrite with t; reflexivity.
 Qed.
 
-Instance exec_prefix_proper_exec_equiv :
-  Proper (eq ==> eq ==> exec_equiv_ts ==> eq ==> iff) (@exec_prefix Op State).
+Instance exec_proper_exec_equiv :
+  Proper (eq ==> eq ==> exec_equiv_ts ==> eq ==> iff) (@exec Op State).
 Proof.
   intros.
   intros ? ? ?; subst.
@@ -737,8 +737,8 @@ Qed.
 
 Definition trace_incl_ts_s {Op State} op_step (s s' : State) (ts1 ts2 : threads_state Op) :=
   forall tr,
-    exec_prefix op_step s ts1 tr ->
-    exec_prefix op_step s' ts2 tr.
+    exec op_step s ts1 tr ->
+    exec op_step s' ts2 tr.
 
 Definition trace_incl_ts {Op State} op_step (ts1 ts2 : threads_state Op) :=
   forall (s : State),
@@ -806,8 +806,8 @@ Definition trace_incl_ts_N n `(op_step: OpSemantics Op State) (ts1 ts2 : threads
   forall tr s n',
     n' <= n ->
     (* TODO: specify the number of steps *)
-    exec_prefix op_step s ts1 tr (* n' *) ->
-    exec_prefix op_step s ts2 tr.
+    exec op_step s ts1 tr (* n' *) ->
+    exec op_step s ts2 tr.
 
 Definition trace_incl_N n {Op T} `(op_step : OpSemantics Op State) (p1 p2 : proc Op T) :=
   forall (ts: threads_state Op) tid,
@@ -1007,11 +1007,11 @@ Lemma trace_incl_ts_s_proof_helper :
       ts tid' = NoProc ->
       tid <> tid' ->
       exec_tid op_step tid s0 p1 s' result spawned evs ->
-    exec_prefix op_step s' (ts [[tid' := spawned]] [[tid := match result with
+    exec op_step s' (ts [[tid' := spawned]] [[tid := match result with
                                  | inl _ => NoProc
                                  | inr p' => Proc p'
                                                             end]]) tr ->
-    exec_prefix op_step s0 (ts [[tid := Proc p2]]) (prepend tid evs tr)) ->
+    exec op_step s0 (ts [[tid := Proc p2]]) (prepend tid evs tr)) ->
   trace_incl_ts_s op_step s s
     (ts [[ tid := Proc p1 ]])
     (ts [[ tid := Proc p2 ]]).
@@ -1020,7 +1020,7 @@ Proof.
   intros.
 
   match goal with
-  | H : exec_prefix _ _ (thread_upd ?ts ?tid ?p) _ |- _ =>
+  | H : exec _ _ (thread_upd ?ts ?tid ?p) _ |- _ =>
     remember (thread_upd ts tid p);
     generalize dependent ts;
     induction H; intros; subst; eauto; NoProc_upd
@@ -1032,8 +1032,8 @@ Proof.
 
   + ExecPrefix tid0 tid'.
     abstract_ts.
-    eapply IHexec_prefix; intros; eauto with exec_prefix.
-    eauto with exec_prefix.
+    eapply IHexec; intros; eauto with exec.
+    eauto with exec.
 
     Grab Existential Variables.
     all: exact (Ret tt).
@@ -1045,11 +1045,11 @@ Lemma trace_incl_proof_helper :
     exec_tid op_step tid s p1 s' result spawned evs ->
     ts tid' = NoProc ->
     tid <> tid' ->
-    exec_prefix op_step s' (ts [[tid' := spawned]] [[tid := match result with
+    exec op_step s' (ts [[tid' := spawned]] [[tid := match result with
                                  | inl _ => NoProc
                                  | inr p' => Proc p'
                                  end]]) tr ->
-      exec_prefix op_step s (ts [[tid := Proc p2]]) (prepend tid evs tr)) ->
+      exec op_step s (ts [[tid := Proc p2]]) (prepend tid evs tr)) ->
   trace_incl op_step
     p1 p2.
 Proof.
@@ -1067,12 +1067,12 @@ Lemma trace_incl_s_proof_helper :
     ts tid' = NoProc ->
     tid <> tid' ->
     exec_tid op_step tid s0 p1 s' result spawned evs ->
-    exec_prefix op_step s' (ts [[tid' := spawned]] [[tid := match result with
+    exec op_step s' (ts [[tid' := spawned]] [[tid := match result with
                                  | inl _ => NoProc
                                  | inr p' => Proc p'
                                  end]]) tr ->
     exists tr',
-      exec_prefix op_step s0 (ts [[tid := Proc p2]]) tr' /\
+      exec op_step s0 (ts [[tid := Proc p2]]) tr' /\
       prepend tid evs tr = tr') ->
   trace_incl_s s tid op_step
     p1 p2.
@@ -1132,7 +1132,7 @@ Proof.
   intros.
 
   match goal with
-  | H : exec_prefix _ _ (thread_upd ?ts ?tid ?pp) _ |- _ =>
+  | H : exec _ _ (thread_upd ?ts ?tid ?pp) _ |- _ =>
     remember (thread_upd ts tid pp);
     generalize dependent ts;
     generalize dependent p;
@@ -1162,7 +1162,7 @@ Proof.
   intros.
 
   match goal with
-  | H : exec_prefix _ _ (thread_upd ?ts ?tid ?pp) _ |- _ =>
+  | H : exec _ _ (thread_upd ?ts ?tid ?pp) _ |- _ =>
     remember (thread_upd ts tid pp);
     generalize dependent ts;
     generalize dependent p;
@@ -1181,8 +1181,8 @@ Proof.
 
   + ExecPrefix tid0 tid'.
     abstract_ts.
-    eapply IHexec_prefix; intros; eauto with exec_prefix.
-    eauto with exec_prefix.
+    eapply IHexec; intros; eauto with exec.
+    eauto with exec.
 Qed.
 
 Instance trace_incl_rx_preorder :
@@ -1262,16 +1262,16 @@ Proof.
   - abstract_tr.
     ExecPrefix tid tid'.
     rewrite thread_upd_same_eq with (tid:=tid') in * by auto;
-      eauto with nocore exec_prefix.
+      eauto with nocore exec.
     reflexivity.
 Qed.
 
-Theorem trace_incl_rx_to_exec_prefix :
+Theorem trace_incl_rx_to_exec :
   forall `(op_step: OpSemantics Op State) T (p1 p2: proc _ T)
     (ts: threads_state _) s tid tr,
     trace_incl_rx op_step p1 p2 ->
-    exec_prefix op_step s (ts [[tid := Proc p1]]) tr ->
-    exec_prefix op_step s (ts [[tid := Proc p2]]) tr.
+    exec op_step s (ts [[tid := Proc p1]]) tr ->
+    exec op_step s (ts [[tid := Proc p2]]) tr.
 Proof.
   intros.
   eapply exec_equiv_bind_ret in H0.
@@ -1289,7 +1289,7 @@ Theorem trace_incl_rx_spawn
 Proof.
   repeat (hnf; intros).
   match goal with
-  | H : exec_prefix _ _ (thread_upd ?ts ?tid (Proc ?p)) _ |- _ =>
+  | H : exec _ _ (thread_upd ?ts ?tid (Proc ?p)) _ |- _ =>
     remember (thread_upd ts tid (Proc p));
       generalize dependent ts;
       induction H; intros; subst; eauto; NoProc_upd
@@ -1302,7 +1302,7 @@ Proof.
 
     eapply H0 in H4; try omega.
     rewrite thread_upd_ne_comm in H4 |- * by auto.
-    eapply trace_incl_rx_to_exec_prefix; eauto.
+    eapply trace_incl_rx_to_exec; eauto.
   - ExecPrefix tid0 tid'.
 Qed.
 
@@ -1350,7 +1350,7 @@ Proof.
   apply trace_incl_to_trace_incl_rx; intros.
   repeat (hnf; intros).
   match goal with
-  | H : exec_prefix _ _ (thread_upd ?ts ?tid (Proc ?p)) _ |- _ =>
+  | H : exec _ _ (thread_upd ?ts ?tid (Proc ?p)) _ |- _ =>
     remember (thread_upd ts tid (Proc p));
       generalize dependent ts;
       generalize dependent rx;
@@ -1381,8 +1381,8 @@ Definition traces_match_ts {opLoT opMidT State} lo_step hi_step
                            (ts1 : threads_state opLoT)
                            (ts2 : threads_state opMidT) :=
   forall (s : State) tr1,
-    exec_prefix lo_step s ts1 tr1 ->
-      exec_prefix hi_step s ts2 tr1.
+    exec lo_step s ts1 tr1 ->
+      exec hi_step s ts2 tr1.
 
 Instance traces_match_ts_proper :
   Proper (@trace_incl_ts opLoT State lo_step ==>
