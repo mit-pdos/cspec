@@ -73,6 +73,11 @@ dirPath u dir = userPath u ++ "/" ++ BSC8.unpack dir
 filePath :: BS.ByteString -> BS.ByteString -> BS.ByteString -> FilePath
 filePath u dir fn = dirPath u dir ++ "/" ++ BSC8.unpack fn
 
+pickUser :: IO BS.ByteString
+pickUser = do
+  u <- rdtsc
+  return $ BS.concat ["u", BSC8.pack $ show (u `mod` 100)]
+
 run_proc :: State -> Coq_proc (MailFSMergedOp__Coq_xOp a) GHC.Base.Any -> IO a
 run_proc _ (Ret v) = do
   -- debugmsg $ "Ret"
@@ -113,8 +118,8 @@ run_proc _ (Call MailFSMergedOp__Random) = do
 
 run_proc _ (Call (MailFSMergedOp__Ext (MailServerOp__PickUser))) = do
   debugmsg $ "PickUser"
-  u <- rdtsc
-  return $ unsafeCoerce $ "u" ++ (show $ u `mod` 100)
+  userDir <- pickUser
+  return $ unsafeCoerce userDir
 
 run_proc S{smtpserver} (Call (MailFSMergedOp__Ext (MailServerOp__AcceptSMTP))) = do
   debugmsg $ "AcceptSMTP"
