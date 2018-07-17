@@ -3,7 +3,6 @@ module Interpreter where
 
 -- Haskell libraries
 import Control.Concurrent
-import Control.DeepSeq
 import Control.Exception
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Char8 as BSC8
@@ -11,11 +10,10 @@ import GHC.Base
 import System.Posix.Files
 import System.Posix.IO
 import System.Directory
-import System.IO
 import System.IO.Error
 import System.CPUTime.Rdtsc
 import System.Lock.FLock
-import System.Posix.Process (forkProcess, getProcessID, getProcessStatus)
+import System.Posix.Process (forkProcess, getProcessID, getProcessStatus, ProcessStatus(..))
 import System.Posix.Types (ProcessID)
 
 -- Our own libraries
@@ -44,10 +42,21 @@ mkState smtp pop3 = do
   cref <- newMVar []
   return $ S (fromIntegral pid) smtp pop3 lockvar cref
 
+waitForProcess :: ProcessID -> IO ()
+waitForProcess pid = do
+  mTc <- getProcessStatus True False pid
+  case mTc of
+    Just (Exited _) -> return ()
+    Just (Terminated s _) -> putStrLn $ "process terminated by signal " ++ show s
+    Just (Stopped _) -> BSC8.putStrLn "process stopped"
+    Nothing -> BSC8.putStrLn "no status"
+
 waitForChildren :: State -> IO ()
 waitForChildren S{childrenRef} = do
   children <- readMVar childrenRef
-  mapM_ (getProcessStatus True False) children
+  mapM_ (\pid -> do
+            when verbose (putStrLn ("waiting for " ++ show pid))
+            waitForProcess pid) children
 
 verbose :: Bool
 verbose = False
@@ -77,6 +86,14 @@ pickUser :: IO BS.ByteString
 pickUser = do
   u <- rdtsc
   return $ BS.concat ["u", BSC8.pack $ show (u `mod` 100)]
+
+listMailDir :: BS.ByteString -> BS.ByteString -> IO [BS.ByteString]
+listMailDir u dir = do
+  files <- listDirectory (dirPath u dir)
+  return $ map BSC8.pack files
+
+readMail :: BS.ByteString -> BS.ByteString -> BS.ByteString -> IO BS.ByteString
+readMail u dir fn = BS.readFile (filePath u dir fn)
 
 run_proc :: State -> Coq_proc (MailFSMergedOp__Coq_xOp a) GHC.Base.Any -> IO a
 run_proc _ (Ret v) = do
@@ -216,16 +233,13 @@ run_proc _ (Call (MailFSMergedOp__Unlink ((u, dir), fn))) = do
 
 run_proc _ (Call (MailFSMergedOp__List (u, dir))) = do
   debugmsgs ["List ", u, "/", dir]
-  files <- listDirectory (dirPath u dir)
+  files <- listMailDir u dir
   return $ unsafeCoerce files
 
 run_proc _ (Call (MailFSMergedOp__Read ((u, dir), fn))) = do
   debugmsgs ["Read ", u, "/", dir, "/", fn]
   catch (do
-           h <- openFile (filePath u dir fn) ReadMode
-           contents <- hGetContents h
-           evaluate (rnf contents)
-           hClose h
+           contents <- readMail u dir fn
            return $ unsafeCoerce (Just contents))
         (\e -> case e of
                _ | isDoesNotExistError e -> do
