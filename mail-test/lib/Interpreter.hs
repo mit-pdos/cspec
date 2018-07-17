@@ -15,7 +15,8 @@ import System.IO
 import System.IO.Error
 import System.CPUTime.Rdtsc
 import System.Lock.FLock
-import System.Posix.Process
+import System.Posix.Process (forkProcess, getProcessID, getProcessStatus)
+import System.Posix.Types (ProcessID)
 
 -- Our own libraries
 import SMTP
@@ -33,13 +34,20 @@ data State =
   S { tid :: Integer
     , smtpserver :: SMTPServer
     , pop3server :: POP3Server
-    , lockvar :: !(MVar Lock) }
+    , lockvar :: !(MVar Lock)
+    , childrenRef :: MVar [ProcessID] }
 
 mkState :: SMTPServer -> POP3Server -> IO State
 mkState smtp pop3 = do
   lockvar <- newEmptyMVar
   pid <- getProcessID
-  return $ S (fromIntegral pid) smtp pop3 lockvar
+  cref <- newMVar []
+  return $ S (fromIntegral pid) smtp pop3 lockvar cref
+
+waitForChildren :: State -> IO ()
+waitForChildren S{childrenRef} = do
+  children <- readMVar childrenRef
+  mapM_ (getProcessStatus True False) children
 
 verbose :: Bool
 verbose = False
@@ -86,13 +94,14 @@ run_proc s (Until c p v0) = do
   else do
     debugmsg $ "Until false"
     run_proc s (Until c p (unsafeCoerce (Just v)))
-run_proc s (Spawn p) = do
+run_proc s@S{childrenRef} (Spawn p) = do
   debugmsg "Spawn"
-  _ <- forkProcess $ do
+  child <- forkProcess $ do
     pid <- getProcessID
     putStrLn $ "Spawned " ++ show pid
     _ <- run_proc s p
     return ()
+  modifyMVar_ childrenRef (\l -> return $ child:l)
   return $ unsafeCoerce ()
 
 run_proc S{tid} (Call MailFSMergedOp__GetTID) = do

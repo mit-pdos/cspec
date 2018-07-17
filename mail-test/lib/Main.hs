@@ -2,10 +2,7 @@
 module Main where
 
 -- Haskell libraries
-import Control.Concurrent
-import Control.Monad
 import System.Environment
-import System.Posix.Process
 
 -- Our library code
 import Interpreter
@@ -18,14 +15,10 @@ import MailFSMergedAPI
 import MailServer
 
 
-run_thread :: SMTPServer -> POP3Server -> Coq_maybe_proc (MailFSMergedOp__Coq_xOp a) -> IO ()
-run_thread _ _ NoProc = return ()
-run_thread smtp pop3 (Proc p) = do
-  pid <- getProcessID
-  putStrLn $ "Running " ++ (show pid)
-
-  s <- mkState smtp pop3
-  run_proc s p
+runThread :: State -> Coq_maybe_proc (MailFSMergedOp__Coq_xOp a) -> IO ()
+runThread _ NoProc = return ()
+runThread s (Proc p) = do
+  _ <- run_proc s p
   return ()
 
 main :: IO ()
@@ -37,11 +30,11 @@ mainArgs :: [String] -> IO ()
 mainArgs [nprocs, niter, nsmtpiter, npop3iter] = do
   smtp <- smtpListen 2525
   pop3 <- pop3Listen 2110
-  pids <- mapM
-    (\p -> forkProcess (run_thread smtp pop3 p))
+  s <- mkState smtp pop3
+  mapM_ (runThread s)
     (ms_bottom (read nprocs) (read niter) (read nsmtpiter) (read npop3iter))
-  putStrLn "Waiting for child processes.."
-  mapM_ (getProcessStatus True False) pids
+  putStrLn "Waiting for child processes..."
+  waitForChildren s
 
 mainArgs _ = do
   exec <- getProgName
