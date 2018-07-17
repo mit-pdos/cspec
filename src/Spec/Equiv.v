@@ -1740,21 +1740,11 @@ Proof.
 
       * auto.
 
-    + edestruct IHn.
-        intros. eapply trace_incl_rx_N_le; eauto; omega.
-        instantiate (1 := ctr); omega.
-        2: reflexivity.
-        2: {
-          match goal with
-          | [ |- exec _ _ ?ts _ _ ] => abstract_term ts
-          end.
-          eassumption.
-          eauto with exec_prefix.
-        }
-        intros.
-        eapply trace_incl_N_le; eauto; omega.
-
-      ExecPrefix tid0 tid'.
+    + ExecPrefix tid0 tid'.
+      rewrite thread_upd_abc_to_cab in * by auto.
+      eapply IHn with (n0:=ctr) (n':=ctr) (rx1:=rx1); intros; try omega; eauto.
+      eapply trace_incl_rx_N_le; eauto; omega.
+      eapply trace_incl_N_le; eauto; omega.
 Qed.
 
 Theorem trace_incl_rx_until :
