@@ -802,6 +802,25 @@ Definition trace_incl_rx {Op T} `(op_step : OpSemantics Op State) (p1 p2 : proc 
     (forall a, trace_incl op_step (rx1 a) (rx2 a)) ->
     trace_incl op_step (Bind p1 rx1) (Bind p2 rx2).
 
+Definition trace_incl_ts_N n `(op_step: OpSemantics Op State) (ts1 ts2 : threads_state Op) :=
+  forall tr s n',
+    n' <= n ->
+    (* TODO: specify the number of steps *)
+    exec_prefix op_step s ts1 tr (* n' *) ->
+    exec_prefix op_step s ts2 tr.
+
+Definition trace_incl_N n {Op T} `(op_step : OpSemantics Op State) (p1 p2 : proc Op T) :=
+  forall (ts: threads_state Op) tid,
+    trace_incl_ts_N n op_step
+      (ts [[ tid := Proc p1 ]])
+      (ts [[ tid := Proc p2 ]]).
+
+Definition trace_incl_rx_N n {Op T} `(op_step: OpSemantics Op State) (p1 p2: proc Op T) :=
+    forall TF (rx1 rx2 : _ -> proc _ TF) n0,
+    n0 <= n ->
+    (forall a, trace_incl_N (n0-1) op_step (rx1 a) (rx2 a)) ->
+    trace_incl_N n0 op_step (Bind p1 rx1) (Bind p2 rx2).
+
 Theorem trace_incl_trace_incl_s : forall T `(op_step : OpSemantics Op State) (p1 p2 : proc Op T),
   trace_incl op_step p1 p2 <->
   (forall s tid,
@@ -1309,6 +1328,16 @@ Proof.
   eapply H2 in H1; eauto.
   eapply H; eauto.
 Qed.
+
+Theorem trace_incl_rx_until_helper :
+  forall T Op (p1 p2 : option T -> proc Op T)
+         `(op_step : OpSemantics Op State)
+         (c : T -> bool) n v,
+    (forall v', trace_incl_rx_N (n-1) op_step (p1 v') (p2 v')) ->
+    trace_incl_rx_N n op_step (Until c p1 v) (Until c p2 v).
+Proof.
+  induction n; intros.
+Admitted.
 
 Theorem trace_incl_rx_until :
   forall T Op (p1 p2 : option T -> proc Op T)
