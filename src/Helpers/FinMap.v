@@ -91,7 +91,7 @@ Section Map.
       apply lower_mapping_thread_maximal with (n := thread_max x); auto.
     - destruct (lt_dec (thread_max x) a), v; subst;
         repeat match goal with
-               | |- context[if ?a == ?b then _ else _] => destruct (a == b)
+               | |- context[if equal_dec ?a ?b then _ else _] => destruct (a == b)
                end; subst; try omega; auto.
       destruct (lower_mapping_smaller x (thread_max x)); try omega.
       rewrite H; simpl; auto.
@@ -133,7 +133,7 @@ Section Map.
         end;
     simpl;
     repeat match goal with
-           | [ |- context[?a == ?a' ] ] =>
+           | [ |- context[equal_dec ?a ?a'] ] =>
              destruct (a == a')
            | _ => congruence
            end.
