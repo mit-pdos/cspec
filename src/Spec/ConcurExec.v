@@ -115,6 +115,38 @@ Section Proc.
   | ExecStop : forall (ts : threads_state Op) s,
     exec s ts TraceEmpty.
 
+  Inductive exec_till : nat -> State -> threads_state Op -> trace -> Prop :=
+
+  | ExecTillOne : forall T tid tid' (ts : threads_state Op) trace p s s' evs result spawned n,
+    ts tid = @Proc Op T p ->
+    ts tid' = NoProc ->
+    exec_tid tid s p s' result spawned evs ->
+    exec_till n s' (thread_upd (thread_upd ts tid' spawned) tid
+              match result with
+              | inl _ => NoProc
+              | inr p' => Proc p'
+              end) trace ->
+    exec_till (S n) s ts (prepend tid evs trace)
+
+  | ExecTillStop : forall (ts : threads_state Op) s,
+    exec_till 0 s ts TraceEmpty.
+
+  Theorem exec_to_counter : forall s ts tr,
+      exec s ts tr ->
+      exists n, exec_till n s ts tr.
+  Proof.
+    induction 1; propositional;
+      eauto using ExecTillOne, ExecTillStop.
+  Qed.
+
+  Theorem exec_till_to_exec : forall n s ts tr,
+      exec_till n s ts tr ->
+      exec s ts tr.
+  Proof.
+    induction 1; propositional;
+      eauto using ExecOne, ExecStop.
+  Qed.
+
   Theorem ExecPrefixOne
        : forall (T : Type)
            (tid : nat) (ts : threads_state Op) (tr : trace)
@@ -135,7 +167,6 @@ Section Proc.
     intros.
     eapply ExecOne; eauto.
   Qed.
-
 
   Inductive exec_any (tid : nat) (s : State) :
     forall T (p : proc Op T) (r : T) (s' : State), Prop :=

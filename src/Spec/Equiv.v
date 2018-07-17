@@ -600,6 +600,68 @@ Proof.
   reflexivity.
 Qed.
 
+(** exec_equiv with counter *)
+
+Definition exec_equiv_ts_N n Op (ts1 ts2: threads_state Op) :=
+  forall State op_step (s: State) tr,
+    exec_till op_step n s ts1 tr <->
+    exec_till op_step n s ts2 tr.
+
+Definition exec_equiv_N n Op T (p1 p2: proc Op T) :=
+  forall ts tid, exec_equiv_ts_N n (ts [[tid := Proc p1]]) (ts [[tid := Proc p2]]).
+
+Definition exec_equiv_rx_N n `(p1: proc Op T) (p2: proc _ T) :=
+  forall TR (rx: T -> proc _ TR),
+    exec_equiv_N n (Bind p1 rx) (Bind p2 rx).
+
+Theorem exec_equiv_N_bind_bind : forall `(p1 : proc Op T1) `(p2 : T1 -> proc Op T2) `(p3 : T2 -> proc Op T3) n,
+  exec_equiv_N n (Bind (Bind p1 p2) p3) (Bind p1 (fun v => Bind (p2 v) p3)).
+Proof.
+  split; intros.
+    - match goal with
+    | H : exec_till _ _ _ (thread_upd ?ts ?tid (Proc ?p)) _ |- _ =>
+      remember (thread_upd ts tid (Proc p));
+      generalize dependent ts;
+      generalize dependent p1;
+      induction H; intros; subst; eauto; NoProc_upd
+    end.
+
+    cmp_ts tid0 tid.
+    * repeat maybe_proc_inv.
+      exec_tid_inv.
+      exec_tid_inv.
+      (* ExecOne tid tid'.
+
+      destruct result; eauto. *)
+      admit.
+
+    * (* ExecOne tid0 tid'. *)
+      admit.
+
+    * constructor.
+
+  - match goal with
+    | H : exec_till _ _ _ (thread_upd ?ts ?tid (Proc ?p)) _ |- _ =>
+      remember (thread_upd ts tid (Proc p));
+      generalize dependent ts;
+      generalize dependent p1;
+      induction H; intros; subst; eauto; NoProc_upd
+    end.
+
+    cmp_ts tid0 tid.
+    * repeat maybe_proc_inv.
+      exec_tid_inv.
+
+      (* ExecOne tid tid'.
+
+      cbv beta iota.
+      destruct result0; eauto. *)
+      admit.
+
+    * (* ExecOne tid0 tid'. *)
+      admit.
+Admitted.
+
 (** A strong notion of equivalence for programs inside atomic sections.
     Basically the same as above, but defined as an underlying [atomic_exec]
     rather than [exec]. *)
@@ -805,8 +867,7 @@ Definition trace_incl_rx {Op T} `(op_step : OpSemantics Op State) (p1 p2 : proc 
 Definition trace_incl_ts_N n `(op_step: OpSemantics Op State) (ts1 ts2 : threads_state Op) :=
   forall tr s n',
     n' <= n ->
-    (* TODO: specify the number of steps *)
-    exec op_step s ts1 tr (* n' *) ->
+    exec_till op_step n' s ts1 tr ->
     exec op_step s ts2 tr.
 
 Definition trace_incl_N n {Op T} `(op_step : OpSemantics Op State) (p1 p2 : proc Op T) :=
@@ -821,6 +882,33 @@ Definition trace_incl_rx_N n {Op T} `(op_step: OpSemantics Op State) (p1 p2: pro
     (forall a, trace_incl_N (n0-1) op_step (rx1 a) (rx2 a)) ->
     trace_incl_N n0 op_step (Bind p1 rx1) (Bind p2 rx2).
 
+Theorem trace_incl_rx_all_n : forall `(op_step: OpSemantics Op State) T (p1 p2: proc Op T),
+    (forall n, trace_incl_rx_N n op_step p1 p2) ->
+    trace_incl_rx op_step p1 p2.
+Proof.
+  unfold trace_incl_rx, trace_incl, trace_incl_opt, trace_incl_ts, trace_incl_ts_s,
+  trace_incl_rx_N, trace_incl_N, trace_incl_ts_N.
+
+  intros.
+  apply exec_to_counter in H1; propositional.
+  eapply H in H1; eauto.
+  intros.
+  eapply H0.
+  eapply exec_till_to_exec; eauto.
+Qed.
+
+Theorem trace_incl_all_n : forall `(op_step: OpSemantics Op State) T (p1 p2: proc Op T),
+    (forall n, trace_incl_N n op_step p1 p2) ->
+    trace_incl op_step p1 p2.
+Proof.
+  unfold trace_incl_rx, trace_incl, trace_incl_opt, trace_incl_ts, trace_incl_ts_s,
+  trace_incl_rx_N, trace_incl_N, trace_incl_ts_N.
+
+  intros.
+  apply exec_to_counter in H0; propositional.
+  eauto.
+Qed.
+
 Theorem trace_incl_trace_incl_s : forall T `(op_step : OpSemantics Op State) (p1 p2 : proc Op T),
   trace_incl op_step p1 p2 <->
   (forall s tid,
@@ -829,7 +917,6 @@ Proof.
   unfold trace_incl, trace_incl_opt, trace_incl_s, trace_incl_ts.
   split; eauto.
 Qed.
-
 
 Instance trace_incl_opt_preorder :
   PreOrder (@trace_incl_opt Op State op_step).
@@ -858,13 +945,10 @@ Qed.
 Instance trace_incl_preorder :
   PreOrder (@trace_incl Op T State op_step).
 Proof.
-  split.
-  - unfold Reflexive; intros.
-    unfold trace_incl; intros.
-    reflexivity.
-  - unfold Transitive; intros.
-    unfold trace_incl; intros.
-    etransitivity; eauto.
+  unfold trace_incl.
+  constructor; hnf; intros.
+  - reflexivity.
+  - etransitivity; eauto.
 Qed.
 
 Instance exec_equiv_opt_to_trace_incl_opt :
@@ -893,7 +977,8 @@ Proof.
   intros.
   intros p1 p2 H21 p3 p4 H34 H; subst.
   unfold Basics.flip in *.
-  repeat (etransitivity; eauto).
+  etransitivity; eauto.
+  etransitivity; eauto.
 Qed.
 
 Instance trace_incl_proper_flip :
@@ -1329,6 +1414,60 @@ Proof.
   eapply H; eauto.
 Qed.
 
+Theorem trace_incl_N_ret_bind :
+  forall `(op_step : OpSemantics Op State) `(v : T) TF (rx1 rx2 : _ -> proc _ TF) n,
+    (forall a, trace_incl_N (n - 1) op_step (rx1 a) (rx2 a)) ->
+    trace_incl_N n op_step (Bind (Ret v) rx1) (Bind (Ret v) rx2).
+Proof.
+  repeat ( intro; intros ).
+  match goal with
+  | H : exec_till _ _ _ (thread_upd ?ts ?tid (Proc ?p)) _ |- _ =>
+    remember (thread_upd ts tid (Proc p));
+    generalize dependent ts;
+    induction H; intros; subst; eauto; NoProc_upd
+  end.
+
+  cmp_ts tid0 tid.
+  * repeat maybe_proc_inv.
+    repeat exec_tid_inv.
+    replace (S n - 1) with n in * by omega.
+    eapply H in H4; try omega.
+    ExecPrefix tid tid'.
+
+  * ExecPrefix tid0 tid'.
+    abstract_ts.
+    eapply IHexec_till; eauto with exec.
+    omega.
+    eauto with exec.
+Qed.
+
+Theorem trace_incl_N_le :
+  forall `(op_step : OpSemantics Op State) T (p1 p2 : proc _ T) n1 n2,
+    trace_incl_N n2 op_step p1 p2 ->
+    n1 <= n2 ->
+    trace_incl_N n1 op_step p1 p2.
+Proof.
+  repeat ( hnf; intros ).
+  eapply H in H2; try omega.
+  eauto.
+Qed.
+
+Theorem trace_incl_rx_N_le :
+  forall `(op_step : OpSemantics Op State) T (p1 p2 : proc _ T) n1 n2,
+    trace_incl_rx_N n2 op_step p1 p2 ->
+    n1 <= n2 ->
+    trace_incl_rx_N n1 op_step p1 p2.
+Proof.
+  repeat ( intro; intros ).
+  eapply H in H4.
+  eassumption.
+  3: reflexivity.
+  omega.
+  intros.
+  eapply trace_incl_N_le; eauto.
+  omega.
+Qed.
+
 Theorem trace_incl_rx_until_helper :
   forall T Op (p1 p2 : option T -> proc Op T)
          `(op_step : OpSemantics Op State)
@@ -1337,42 +1476,86 @@ Theorem trace_incl_rx_until_helper :
     trace_incl_rx_N n op_step (Until c p1 v) (Until c p2 v).
 Proof.
   induction n; intros.
-Admitted.
+
+  - intro; intros.
+    intro; intros.
+    intro; intros.
+    match goal with
+    | H : exec_till _ _ _ _ _ |- _ =>
+      invert H; eauto
+    end.
+    exfalso; omega.
+
+  - intro; intros.
+    intro; intros.
+    intro; intros.
+    match goal with
+    | H : exec_till _ _ _ _ _ |- _ =>
+      invert H; eauto; NoProc_upd
+    end.
+
+    cmp_ts tid0 tid.
+
+    + repeat maybe_proc_inv.
+      repeat exec_tid_inv.
+
+      unfold until1 in *.
+      lazymatch goal with
+      | H : exec_till _ _ _ _ _ |- _ =>
+        eapply exec_equiv_N_bind_bind in H
+      end.
+
+      replace (S n - 1) with (n) in * by omega.
+
+      match goal with
+      | H : exec_till _ _ _ _ _,
+        H' : forall _, trace_incl_rx_N _ _ _ _ |- _ =>
+        eapply H' in H; try omega
+      end.
+
+      ExecPrefix tid tid'.
+      unfold until1.
+      rewrite exec_equiv_bind_bind.
+      eassumption.
+      instantiate (1 := n1); omega.
+
+      simpl; intros.
+      destruct (Bool.bool_dec (c a)).
+      * eapply trace_incl_N_ret_bind; intros.
+        eapply trace_incl_N_le; eauto. omega.
+
+      * repeat ( intro; intros ).
+        eapply IHn.
+        intros. eapply trace_incl_rx_N_le; eauto; omega.
+        4: eassumption.
+        3: reflexivity.
+        omega.
+        intros; eapply trace_incl_N_le; eauto; omega.
+
+      * auto.
+
+    + ExecPrefix tid0 tid'.
+      rewrite thread_upd_abc_to_cab in * by auto.
+      eapply IHn with (n0:=n1) (n':=n1) (rx1:=rx1); intros; try omega; eauto.
+      eapply trace_incl_rx_N_le; eauto; omega.
+      eapply trace_incl_N_le; eauto; omega.
+Qed.
 
 Theorem trace_incl_rx_until :
   forall T Op (p1 p2 : option T -> proc Op T)
          `(op_step : OpSemantics Op State)
          (c : T -> bool) v,
-    (forall v', trace_incl_rx op_step (p1 v') (p2 v')) ->
-    trace_incl_rx op_step (Until c p1 v) (Until c p2 v).
+    (forall n v', trace_incl_rx_N n op_step (p1 v') (p2 v')) ->
+    forall n, trace_incl_rx_N n op_step (Until c p1 v) (Until c p2 v).
 Proof.
-  intros.
-  apply trace_incl_to_trace_incl_rx; intros.
-  repeat (hnf; intros).
-  match goal with
-  | H : exec _ _ (thread_upd ?ts ?tid (Proc ?p)) _ |- _ =>
-    remember (thread_upd ts tid (Proc p));
-      generalize dependent ts;
-      generalize dependent rx;
-      induction H; intros; subst; eauto; NoProc_upd
-  end.
-  cmp_ts tid0 tid.
-  - repeat maybe_proc_inv.
-    exec_tid_inv.
-    exec_tid_inv.
-    unfold until1 in H3.
-    rewrite exec_equiv_bind_bind in H3.
-    eapply H in H3.
-    ExecPrefix tid tid'.
-    unfold until1.
-    rewrite exec_equiv_bind_bind.
-    eauto.
-
-    intros.
-    destruct matches; simpl_match.
-    reflexivity.
-    (* TODO: can't use induction hypothesis, not general enough *)
-Admitted.
+  repeat ( intro; intros ).
+  eapply trace_incl_rx_until_helper in H3.
+  5: reflexivity.
+  eassumption.
+  intros. eapply H.
+  reflexivity.
+  intros; eapply trace_incl_N_le; eauto; omega.
+Qed.
 
 
 (** Correspondence between different layers *)
