@@ -13,26 +13,26 @@ Module AtomicDeliver' <:
     DeliverProtocol.
 
   Definition deliver_core (m : string) :=
-    ok <- Prim (DeliverOp.CreateWriteTmp m);
+    ok <- Call (DeliverOp.CreateWriteTmp m);
     match ok with
     | true =>
-      ok <- Prim (DeliverOp.LinkMail);
-      _ <- Prim (DeliverOp.UnlinkTmp);
+      ok <- Call (DeliverOp.LinkMail);
+      _ <- Call (DeliverOp.UnlinkTmp);
       Ret ok
     | false =>
-      _ <- Prim (DeliverOp.UnlinkTmp);
+      _ <- Call (DeliverOp.UnlinkTmp);
       Ret false
     end.
 
   Definition compile_op T (op : MailboxOp.Op T) : proc _ T :=
     match op with
     | MailboxOp.Deliver m => deliver_core m
-    | MailboxOp.List => Prim (DeliverOp.List)
-    | MailboxOp.Read fn => Prim (DeliverOp.Read fn)
-    | MailboxOp.Delete fn => Prim (DeliverOp.Delete fn)
-    | MailboxOp.Lock => Prim (DeliverOp.Lock)
-    | MailboxOp.Unlock => Prim (DeliverOp.Unlock)
-    | MailboxOp.Ext extop => Prim (DeliverOp.Ext extop)
+    | MailboxOp.List => Call (DeliverOp.List)
+    | MailboxOp.Read fn => Call (DeliverOp.Read fn)
+    | MailboxOp.Delete fn => Call (DeliverOp.Delete fn)
+    | MailboxOp.Lock => Call (DeliverOp.Lock)
+    | MailboxOp.Unlock => Call (DeliverOp.Unlock)
+    | MailboxOp.Ext extop => Call (DeliverOp.Ext extop)
     end.
 
   Theorem compile_op_no_atomics :
@@ -192,7 +192,7 @@ Module AtomicDeliver' <:
     match goal with
     | s : MailboxTmpAbsState.State |- _ =>
       destruct s
-    | H : exec_any _ _ _ (Prim _) _ _ |- _ =>
+    | H : exec_any _ _ _ (Call _) _ _ |- _ =>
       eapply exec_any_op in H; repeat deex
     end.
 

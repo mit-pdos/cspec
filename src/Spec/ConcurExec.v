@@ -47,7 +47,7 @@ Section Proc.
 
   | AtomicOp : forall T tid (v : T) s s' op evs,
     op_step op tid s v s' evs ->
-    atomic_exec (Prim op) tid s v s' evs
+    atomic_exec (Call op) tid s v s' evs
 
   | AtomicUntil : forall T (p : option T -> proc Op T) (c : T -> bool) v tid s r s' ev',
     atomic_exec (until1 c p v) tid s r s' ev' ->
@@ -66,7 +66,7 @@ Section Proc.
 
   | ExecTidOp : forall tid T (v : T) s s' op evs,
     op_step op tid s v s' evs ->
-    exec_tid tid s (Prim op)
+    exec_tid tid s (Call op)
                  s' (inl v)
                  NoProc evs
 
@@ -197,16 +197,16 @@ Section Proc.
   Qed.
 
   Lemma exec_any_op : forall `(op : Op T) tid r s s',
-    exec_any tid s (Prim op) r s' ->
+    exec_any tid s (Call op) r s' ->
       exists s0 evs,
         exec_others tid s s0 /\
         op_step op tid s0 r s' evs.
   Proof.
     intros.
-    remember (Prim op).
+    remember (Call op).
     induct H;
       repeat match goal with
-             | [ H: forall _, Prim _ = Prim _ -> _ |- _ ] =>
+             | [ H: forall _, Call _ = Call _ -> _ |- _ ] =>
                specialize (H _ eq_refl)
              end;
       propositional.

@@ -12,37 +12,37 @@ Module MailFSStringImpl' <:
     MailFSOp MailFSStringAbsAPI.
     
   Definition createwritetmp_core data :=
-    tid <- Prim (MailFSStringOp.GetTID);
-    r <- Prim (MailFSStringOp.CreateWriteTmp (encode_tid_fn tid 0) data);
+    tid <- Call (MailFSStringOp.GetTID);
+    r <- Call (MailFSStringOp.CreateWriteTmp (encode_tid_fn tid 0) data);
     Ret r.
 
   Definition linkmail_core mboxfn :=
-    tid <- Prim (MailFSStringOp.GetTID);
-    v <- Prim (MailFSStringOp.LinkMail (encode_tid_fn tid 0) (encode_tid_fn tid mboxfn));
+    tid <- Call (MailFSStringOp.GetTID);
+    v <- Call (MailFSStringOp.LinkMail (encode_tid_fn tid 0) (encode_tid_fn tid mboxfn));
     Ret v.
 
   Definition unlinktmp_core :=
-    tid <- Prim (MailFSStringOp.GetTID);
-    r <- Prim (MailFSStringOp.UnlinkTmp (encode_tid_fn tid 0));
+    tid <- Call (MailFSStringOp.GetTID);
+    r <- Call (MailFSStringOp.UnlinkTmp (encode_tid_fn tid 0));
     Ret r.
 
   Definition list_core :=
-    l <- Prim (MailFSStringOp.List);
+    l <- Call (MailFSStringOp.List);
     Ret (map decode_tid_fn l).
 
   Definition compile_op T (op : MailFSOp.Op T) : proc MailFSStringOp.Op T :=
     match op with
     | MailFSOp.LinkMail m => linkmail_core m
     | MailFSOp.List => list_core
-    | MailFSOp.Read fn => Prim (MailFSStringOp.Read (encode_tid_fn (fst fn) (snd fn)))
-    | MailFSOp.Delete fn => Prim (MailFSStringOp.Delete (encode_tid_fn (fst fn) (snd fn)))
+    | MailFSOp.Read fn => Call (MailFSStringOp.Read (encode_tid_fn (fst fn) (snd fn)))
+    | MailFSOp.Delete fn => Call (MailFSStringOp.Delete (encode_tid_fn (fst fn) (snd fn)))
     | MailFSOp.CreateWriteTmp data => createwritetmp_core data
     | MailFSOp.UnlinkTmp => unlinktmp_core
-    | MailFSOp.Ext extop => Prim (MailFSStringOp.Ext extop)
-    | MailFSOp.Lock => Prim (MailFSStringOp.Lock)
-    | MailFSOp.Unlock => Prim (MailFSStringOp.Unlock)
-    | MailFSOp.GetTID => Prim (MailFSStringOp.GetTID)
-    | MailFSOp.Random => Prim (MailFSStringOp.Random)
+    | MailFSOp.Ext extop => Call (MailFSStringOp.Ext extop)
+    | MailFSOp.Lock => Call (MailFSStringOp.Lock)
+    | MailFSOp.Unlock => Call (MailFSStringOp.Unlock)
+    | MailFSOp.GetTID => Call (MailFSStringOp.GetTID)
+    | MailFSOp.Random => Call (MailFSStringOp.Random)
     end.
 
   

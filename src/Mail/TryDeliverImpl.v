@@ -13,21 +13,21 @@ Module TryDeliverImpl' <:
     TryDeliverOp TryDeliverAPI.
 
   Definition linkmail_core :=
-    ts <- Prim MailFSOp.Random;
-    ok <- Prim (MailFSOp.LinkMail ts);
+    ts <- Call MailFSOp.Random;
+    ok <- Call (MailFSOp.LinkMail ts);
     Ret ok.
 
   Definition compile_op T (op : TryDeliverOp.Op T) : proc MailFSOp.Op T :=
     match op with
-    | TryDeliverOp.CreateWriteTmp data => Prim (MailFSOp.CreateWriteTmp data)
+    | TryDeliverOp.CreateWriteTmp data => Call (MailFSOp.CreateWriteTmp data)
     | TryDeliverOp.LinkMail => linkmail_core
-    | TryDeliverOp.UnlinkTmp => Prim (MailFSOp.UnlinkTmp)
-    | TryDeliverOp.List => Prim (MailFSOp.List)
-    | TryDeliverOp.Read fn => Prim (MailFSOp.Read fn)
-    | TryDeliverOp.Delete fn => Prim (MailFSOp.Delete fn)
-    | TryDeliverOp.Lock => Prim (MailFSOp.Lock)
-    | TryDeliverOp.Unlock => Prim (MailFSOp.Unlock)
-    | TryDeliverOp.Ext extop => Prim (MailFSOp.Ext extop)
+    | TryDeliverOp.UnlinkTmp => Call (MailFSOp.UnlinkTmp)
+    | TryDeliverOp.List => Call (MailFSOp.List)
+    | TryDeliverOp.Read fn => Call (MailFSOp.Read fn)
+    | TryDeliverOp.Delete fn => Call (MailFSOp.Delete fn)
+    | TryDeliverOp.Lock => Call (MailFSOp.Lock)
+    | TryDeliverOp.Unlock => Call (MailFSOp.Unlock)
+    | TryDeliverOp.Ext extop => Call (MailFSOp.Ext extop)
     end.
 
   Theorem compile_op_no_atomics :

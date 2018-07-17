@@ -120,7 +120,7 @@ Section Protocol.
   | FollowsProtocolProcOp :
     forall tid s T (op : Op T),
     op_allow op tid s ->
-    follows_protocol_proc tid s (Prim op)
+    follows_protocol_proc tid s (Call op)
   | FollowsProtocolProcBind :
     forall tid s T1 T2 (p1 : proc _ T1) (p2 : T1 -> proc _ T2),
     follows_protocol_proc tid s p1 ->

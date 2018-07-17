@@ -4,7 +4,7 @@ Section Proc.
   Variable Op : Type -> Type.
 
   Inductive proc : Type -> Type :=
-  | Prim : forall T (op : Op T), proc T
+  | Call : forall T (op : Op T), proc T
   | Ret : forall T (v : T), proc T
   | Bind : forall T (T1 : Type) (p1 : proc T1) (p2 : T1 -> proc T), proc T
   | Until : forall T (c : T -> bool) (p : option T -> proc T) (v : option T), proc T
@@ -17,7 +17,7 @@ Section Proc.
   | NoProc.
 End Proc.
 
-Arguments Prim {Op T}.
+Arguments Call {Op T}.
 Arguments Ret {Op T}.
 Arguments Bind {Op T T1}.
 Arguments Until {Op T}.

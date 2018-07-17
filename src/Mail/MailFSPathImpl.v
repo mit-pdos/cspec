@@ -13,17 +13,17 @@ Module MailFSPathImpl' <:
 
   Definition compile_op T (op : MailFSStringOp.Op T) : proc _ T :=
     match op with
-    | MailFSStringOp.LinkMail tmpfn mailfn => Prim (MailFSPathOp.Link (tmp_string, tmpfn) (mail_string, mailfn))
-    | MailFSStringOp.List => Prim (MailFSPathOp.List mail_string)
-    | MailFSStringOp.Read fn => Prim (MailFSPathOp.Read (mail_string, fn))
-    | MailFSStringOp.Delete fn => Prim (MailFSPathOp.Unlink (mail_string, fn))
-    | MailFSStringOp.CreateWriteTmp tmpfn data => Prim (MailFSPathOp.CreateWrite (tmp_string, tmpfn) data)
-    | MailFSStringOp.UnlinkTmp tmpfn => Prim (MailFSPathOp.Unlink (tmp_string, tmpfn))
-    | MailFSStringOp.Ext extop => Prim (MailFSPathOp.Ext extop)
-    | MailFSStringOp.Lock => Prim (MailFSPathOp.Lock)
-    | MailFSStringOp.Unlock => Prim (MailFSPathOp.Unlock)
-    | MailFSStringOp.GetTID => Prim (MailFSPathOp.GetTID)
-    | MailFSStringOp.Random => Prim (MailFSPathOp.Random)
+    | MailFSStringOp.LinkMail tmpfn mailfn => Call (MailFSPathOp.Link (tmp_string, tmpfn) (mail_string, mailfn))
+    | MailFSStringOp.List => Call (MailFSPathOp.List mail_string)
+    | MailFSStringOp.Read fn => Call (MailFSPathOp.Read (mail_string, fn))
+    | MailFSStringOp.Delete fn => Call (MailFSPathOp.Unlink (mail_string, fn))
+    | MailFSStringOp.CreateWriteTmp tmpfn data => Call (MailFSPathOp.CreateWrite (tmp_string, tmpfn) data)
+    | MailFSStringOp.UnlinkTmp tmpfn => Call (MailFSPathOp.Unlink (tmp_string, tmpfn))
+    | MailFSStringOp.Ext extop => Call (MailFSPathOp.Ext extop)
+    | MailFSStringOp.Lock => Call (MailFSPathOp.Lock)
+    | MailFSStringOp.Unlock => Call (MailFSPathOp.Unlock)
+    | MailFSStringOp.GetTID => Call (MailFSPathOp.GetTID)
+    | MailFSStringOp.Random => Call (MailFSPathOp.Random)
     end.
 
   Theorem compile_op_no_atomics :

@@ -24,7 +24,7 @@ Fixpoint namei_spec (startnode : Node) (pn : Pathname) : proc _ (option Node) :=
   | name :: pn' =>
     match startnode with
     | DirNode startdir =>
-      r <- Prim (LinkLookup startdir name);
+      r <- Call (LinkLookup startdir name);
       match r with
       | None => Ret None
       | Some n =>
@@ -53,21 +53,21 @@ Definition namei_cwd_file (cwd : nat) (pn : Pathname) : proc _ (option nat) :=
 
 Definition create (cwd : nat) (dir : Pathname) (name : string) :=
   dirnum <?- namei_cwd_dir cwd dir;
-  Prim (LinkAllocFile dirnum name).
+  Call (LinkAllocFile dirnum name).
 
 Definition mkdir (cwd : nat) (dir : Pathname) (name : string) :=
   dirnum <?- namei_cwd_dir cwd dir;
-  Prim (LinkAllocDir dirnum name).
+  Call (LinkAllocDir dirnum name).
 
 Definition unlink (cwd : nat) (dir : Pathname) (name : string) :=
   dirnum <?- namei_cwd_dir cwd dir;
-  n <?- Prim (LinkLookup dirnum name);
-  _ <- Prim (LinkDel dirnum name n);
+  n <?- Call (LinkLookup dirnum name);
+  _ <- Call (LinkDel dirnum name n);
   Ret (Some tt).
 
 Definition stat (cwd : nat) (dir : Pathname) (name : string) :=
   dirnum <?- namei_cwd_dir cwd dir;
-  n <?- Prim (LinkLookup dirnum name);
+  n <?- Call (LinkLookup dirnum name);
   match n with
   | FileNode _ => Ret (Some StatFile)
   | DirNode _ => Ret (Some StatDir)
@@ -75,25 +75,25 @@ Definition stat (cwd : nat) (dir : Pathname) (name : string) :=
 
 Definition readdir (cwd : nat) (pn : Pathname) :=
   dirnum <?- namei_cwd_dir cwd pn;
-  Prim (LinkList dirnum).
+  Call (LinkList dirnum).
 
 Definition rename (cwd : nat) (srcdir : Pathname) (srcname : string)
                               (dstdir : Pathname) (dstname : string) :=
   srcdirnum <?- namei_cwd_dir cwd srcdir;
   dstdirnum <?- namei_cwd_dir cwd dstdir;
-  srcnode <?- Prim (LinkLookup srcdirnum srcname);
-  dstnodeopt <- Prim (LinkLookup dstdirnum dstname);
+  srcnode <?- Call (LinkLookup srcdirnum srcname);
+  dstnodeopt <- Call (LinkLookup dstdirnum dstname);
   match srcnode with
   | FileNode _ =>
     match dstnodeopt with
     | None =>
-      _ <- Prim (LinkAdd dstdirnum dstname srcnode);
-      _ <- Prim (LinkDel srcdirnum srcname srcnode);
+      _ <- Call (LinkAdd dstdirnum dstname srcnode);
+      _ <- Call (LinkDel srcdirnum srcname srcnode);
       Ret (Some tt)
     | Some (FileNode dstfile) =>
-      _ <- Prim (LinkAdd dstdirnum dstname srcnode);
-      _ <- Prim (LinkDel dstdirnum dstname (FileNode dstfile));
-      _ <- Prim (LinkDel srcdirnum srcname srcnode);
+      _ <- Call (LinkAdd dstdirnum dstname srcnode);
+      _ <- Call (LinkDel dstdirnum dstname (FileNode dstfile));
+      _ <- Call (LinkDel srcdirnum srcname srcnode);
       Ret (Some tt)
     | _ =>
       Ret None
@@ -103,15 +103,15 @@ Definition rename (cwd : nat) (srcdir : Pathname) (srcname : string)
 
 Definition find_available_name (cwd : nat) (pn : Pathname) (pfx : string) :=
   dirnum <?- namei_cwd_dir cwd pn;
-  name <- Prim (LinkFindUnusedName dirnum pfx);
+  name <- Call (LinkFindUnusedName dirnum pfx);
   Ret (Some name).
 
 Definition read (cwd : nat) (pn : Pathname) :=
   f <?- namei_cwd_file cwd pn;
-  d <- Prim (FileRead f);
+  d <- Call (FileRead f);
   Ret (Some d).
 
 Definition write (cwd : nat) (pn : Pathname) (data : string) :=
   f <?- namei_cwd_file cwd pn;
-  _ <- Prim (FileWrite f data);
+  _ <- Call (FileWrite f data);
   Ret (Some tt).

@@ -16,8 +16,8 @@ Module MailProtoExperiment <: LayerImpl MailLinkAPI MailServerLinkAPI.
 *)
 
 Definition deliver (user : string) (m : message) : proc _ _ :=
-  cwd <- Prim LinkGetRoot;
-  tid <- Prim GetTID;
+  cwd <- Call LinkGetRoot;
+  tid <- Call GetTID;
   tmpname <?- find_available_name cwd [tmpdir] (tid_to_string tid);
   f <?- create cwd [tmpdir] tmpname;
   _ <?- write cwd ([tmpdir; tmpname]) m;
@@ -35,7 +35,7 @@ Fixpoint read_files (cwd : nat) (dir : Pathname) (files : list string) : proc _ 
   end.
 
 Definition read (user : string) : proc _ _ :=
-  cwd <- Prim LinkGetRoot;
+  cwd <- Call LinkGetRoot;
   filenames <?- readdir cwd ([maildir; user]);
   read_files cwd ([maildir; user]) filenames.
 
@@ -130,7 +130,7 @@ Ltac exec_propagate :=
   | s : RawLockAPI.State |- _ =>
     destruct s
 *)
-  | H : exec_any _ _ _ _ (Prim _) _ _ |- _ =>
+  | H : exec_any _ _ _ _ (Call _) _ _ |- _ =>
     eapply exec_any_op in H; repeat deex
   | H : exec_others _ _ _ ?s _,
     Hi : invariant ?s |- _ =>

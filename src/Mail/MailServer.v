@@ -49,58 +49,58 @@ Import MailServerComposedOp.
 
 
 Definition do_smtp_req : proc _ unit :=
-  conn <- Prim (Ext AcceptSMTP);
-  omsg <- Prim (Ext (SMTPGetMessage conn));
+  conn <- Call (Ext AcceptSMTP);
+  omsg <- Call (Ext (SMTPGetMessage conn));
   match omsg with
   | None => Ret tt
   | Some (user, msg) =>
-    eok <- Prim (CheckUser user);
+    eok <- Call (CheckUser user);
     match eok with
     | Missing =>
-      _ <- Prim (Ext (SMTPRespond conn false));
+      _ <- Call (Ext (SMTPRespond conn false));
       Ret tt
     | Present u =>
-      ok <- Prim (Deliver u msg);
-      _ <- Prim (Ext (SMTPRespond conn ok));
+      ok <- Call (Deliver u msg);
+      _ <- Call (Ext (SMTPRespond conn ok));
       Ret tt
     end
   end.
 
 Definition handle_pop3_one conn (u : validIndexT UserIdx.indexValid) (msgs : list ((nat*nat) * string)) :=
-  req <- Prim (Ext (POP3GetRequest conn));
+  req <- Call (Ext (POP3GetRequest conn));
   match req with
   | POP3Stat =>
-    _ <- Prim (Ext (POP3RespondStat conn (Datatypes.length msgs)
+    _ <- Call (Ext (POP3RespondStat conn (Datatypes.length msgs)
                   (fold_left plus (map string_length (map snd msgs)) 0)));
     Ret false
   | POP3List =>
-    _ <- Prim (Ext (POP3RespondList conn (map string_length (map snd msgs))));
+    _ <- Call (Ext (POP3RespondList conn (map string_length (map snd msgs))));
     Ret false
   | POP3Retr n =>
-    _ <- Prim (Ext (POP3RespondRetr conn (nth n (map snd msgs) tmp_string)));
+    _ <- Call (Ext (POP3RespondRetr conn (nth n (map snd msgs) tmp_string)));
     Ret false
   | POP3Delete n =>
-    _ <- Prim (Delete u (nth n (map fst msgs) (0, 0)));
-    _ <- Prim (Ext (POP3RespondDelete conn));
+    _ <- Call (Delete u (nth n (map fst msgs) (0, 0)));
+    _ <- Call (Ext (POP3RespondDelete conn));
     Ret false
   | POP3Closed =>
     Ret true
   end.
 
 Definition do_pop3_req : proc _ unit :=
-  conn <- Prim (Ext AcceptPOP3);
-  ouser <- Prim (Ext (POP3Authenticate conn));
+  conn <- Call (Ext AcceptPOP3);
+  ouser <- Call (Ext (POP3Authenticate conn));
   match ouser with
   | None => Ret tt
   | Some user =>
-    eok <- Prim (CheckUser user);
+    eok <- Call (CheckUser user);
     match eok with
     | Missing =>
-      _ <- Prim (Ext (POP3RespondAuth conn false));
+      _ <- Call (Ext (POP3RespondAuth conn false));
       Ret tt
     | Present u =>
-      _ <- Prim (Ext (POP3RespondAuth conn true));
-      msgs <- Prim (Pickup u);
+      _ <- Call (Ext (POP3RespondAuth conn true));
+      msgs <- Call (Pickup u);
       _ <- Until (fun done => done)
                  (fun _ => handle_pop3_one conn u msgs)
                  None;
@@ -137,32 +137,32 @@ Definition pop3_one (u : validIndexT UserIdx.indexValid) (msgs : list ((nat*nat)
         match l with
         | nil => Ret nil
         | msg :: l' =>
-          _ <- Prim (Delete u (fst msg));
+          _ <- Call (Delete u (fst msg));
           Ret l'
         end
       end)
     (Some msgs).
 
 Definition do_pop3 : proc _ unit :=
-  u <- Prim (Ext PickUser);
-  eok <- Prim (CheckUser u);
+  u <- Call (Ext PickUser);
+  eok <- Call (CheckUser u);
   match eok with
   | Missing =>
     Ret tt
   | Present u =>
-    msgs <- Prim (Pickup u);
+    msgs <- Call (Pickup u);
     _ <- pop3_one u msgs;
     Ret tt
   end.
 
 Definition do_smtp msg : proc _ unit :=
-  u <- Prim (Ext PickUser);
-  eok <- Prim (CheckUser u);
+  u <- Call (Ext PickUser);
+  eok <- Call (CheckUser u);
   match eok with
   | Missing =>
     Ret tt
   | Present u =>
-    ok <- Prim (Deliver u msg);
+    ok <- Call (Deliver u msg);
     Ret tt
   end.
 

@@ -1355,8 +1355,8 @@ Qed.
 Theorem trace_incl_op :
   forall `(p : T -> proc Op T') op `(op_step : OpSemantics Op State),
   trace_incl op_step
-    (Bind (Prim op) p)
-    (Bind (Atomic (Prim op)) p).
+    (Bind (Call op) p)
+    (Bind (Atomic (Call op)) p).
 Proof.
   intros.
   eapply trace_incl_proof_helper; intros.

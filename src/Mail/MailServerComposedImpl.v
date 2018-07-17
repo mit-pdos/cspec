@@ -15,11 +15,11 @@ Module MailServerComposedImpl' <:
 
   Definition compile_op T (op : MailServerComposedOp.Op T) : proc MailServerHOp.Op T :=
     match op with
-    | Deliver u m => Prim (Slice u (MailServerOp.Deliver m))
-    | Pickup u => Prim (Slice u (MailServerOp.Pickup))
-    | CheckUser u => Prim (CheckSlice u)
-    | Delete u id => Prim (Slice u (MailServerOp.Delete id))
-    | Ext extop => Prim (Slice nouser (MailServerOp.Ext extop))
+    | Deliver u m => Call (Slice u (MailServerOp.Deliver m))
+    | Pickup u => Call (Slice u (MailServerOp.Pickup))
+    | CheckUser u => Call (CheckSlice u)
+    | Delete u id => Call (Slice u (MailServerOp.Delete id))
+    | Ext extop => Call (Slice nouser (MailServerOp.Ext extop))
     end.
 
   Theorem compile_op_no_atomics :

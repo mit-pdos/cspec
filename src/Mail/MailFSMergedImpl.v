@@ -480,28 +480,28 @@ Module MailFSMergedOpImpl' <:
     | Slice (exist _ u _) op' =>
       match op' with
       | Link (srcdir, srcfn) (dstdir, dstfn) =>
-        Prim (MailFSMergedOp.Link (u, srcdir, srcfn) (u, dstdir, dstfn))
+        Call (MailFSMergedOp.Link (u, srcdir, srcfn) (u, dstdir, dstfn))
       | List dir =>
-        Prim (MailFSMergedOp.List (u, dir))
+        Call (MailFSMergedOp.List (u, dir))
       | Read (dir, fn) =>
-        Prim (MailFSMergedOp.Read (u, dir, fn))
+        Call (MailFSMergedOp.Read (u, dir, fn))
       | CreateWrite (dir, fn) data =>
-        Prim (MailFSMergedOp.CreateWrite (u, dir, fn) data)
+        Call (MailFSMergedOp.CreateWrite (u, dir, fn) data)
       | Unlink (dir, fn) =>
-        Prim (MailFSMergedOp.Unlink (u, dir, fn))
+        Call (MailFSMergedOp.Unlink (u, dir, fn))
       | Ext extop =>
-        Prim (MailFSMergedOp.Ext extop)
+        Call (MailFSMergedOp.Ext extop)
       | Lock =>
-        Prim (MailFSMergedOp.Lock u)
+        Call (MailFSMergedOp.Lock u)
       | Unlock =>
-        Prim (MailFSMergedOp.Unlock u)
+        Call (MailFSMergedOp.Unlock u)
       | GetTID =>
-        Prim (MailFSMergedOp.GetTID)
+        Call (MailFSMergedOp.GetTID)
       | Random =>
-        Prim (MailFSMergedOp.Random)
+        Call (MailFSMergedOp.Random)
       end
     | CheckSlice u =>
-      Prim (MailFSMergedOp.Exists u)
+      Call (MailFSMergedOp.Exists u)
     end.
 
   Ltac break_pairs :=

@@ -55,22 +55,22 @@ Module DeliverListTidImpl' <:
   Qed.
 
   Definition linkmail_core :=
-    files <- Prim DeliverListTidOp.ListTid;
+    files <- Call DeliverListTidOp.ListTid;
     let newname := nextfn files 0 in
-    ok <- Prim (DeliverListTidOp.LinkMail newname);
+    ok <- Call (DeliverListTidOp.LinkMail newname);
     Ret ok.
 
   Definition compile_op T (op : DeliverOp.Op T) : proc _ T :=
     match op with
-    | DeliverOp.CreateWriteTmp data => Prim (DeliverListTidOp.CreateWriteTmp data)
+    | DeliverOp.CreateWriteTmp data => Call (DeliverListTidOp.CreateWriteTmp data)
     | DeliverOp.LinkMail => linkmail_core
-    | DeliverOp.UnlinkTmp => Prim (DeliverListTidOp.UnlinkTmp)
-    | DeliverOp.List => Prim (DeliverListTidOp.List)
-    | DeliverOp.Read fn => Prim (DeliverListTidOp.Read fn)
-    | DeliverOp.Delete fn => Prim (DeliverListTidOp.Delete fn)
-    | DeliverOp.Lock => Prim (DeliverListTidOp.Lock)
-    | DeliverOp.Unlock => Prim (DeliverListTidOp.Unlock)
-    | DeliverOp.Ext extop => Prim (DeliverListTidOp.Ext extop)
+    | DeliverOp.UnlinkTmp => Call (DeliverListTidOp.UnlinkTmp)
+    | DeliverOp.List => Call (DeliverListTidOp.List)
+    | DeliverOp.Read fn => Call (DeliverListTidOp.Read fn)
+    | DeliverOp.Delete fn => Call (DeliverListTidOp.Delete fn)
+    | DeliverOp.Lock => Call (DeliverListTidOp.Lock)
+    | DeliverOp.Unlock => Call (DeliverListTidOp.Unlock)
+    | DeliverOp.Ext extop => Call (DeliverListTidOp.Ext extop)
     end.
 
   Theorem compile_op_no_atomics :

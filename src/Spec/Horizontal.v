@@ -209,7 +209,7 @@ Section HorizontalComposition.
 
   Fixpoint SliceProc (i : validIndexT) `(p : proc sliceOpT T) : proc horizOpT T :=
     match p with
-    | Prim op => Prim (Slice i op)
+    | Call op => Call (Slice i op)
     | Ret v => Ret v
     | Bind p1 p2 => Bind (SliceProc i p1) (fun r => SliceProc i (p2 r))
     | Until cond p init => Until cond (fun x => SliceProc i (p x)) init
@@ -860,7 +860,7 @@ Module LayerImplMoversProtocolHT
   Definition compile_op T (op : ho2.Op T) : proc ho1.Op T :=
     match op with
     | Slice i op => SliceProc i (a.compile_op op)
-    | CheckSlice i => Prim (CheckSlice i)
+    | CheckSlice i => Call (CheckSlice i)
     end.
 
   Theorem compile_op_no_atomics : forall T (op : ho2.Op T),
@@ -1040,7 +1040,7 @@ Module LayerImplMoversHT
   Definition compile_op T (op : ho2.Op T) : proc ho1.Op T :=
     match op with
     | Slice i op => SliceProc i (a.compile_op op)
-    | CheckSlice i => Prim (CheckSlice i)
+    | CheckSlice i => Call (CheckSlice i)
     end.
 
   Theorem compile_op_no_atomics : forall T (op : ho2.Op T),

@@ -18,7 +18,7 @@ Section ProcStructure.
 
   Inductive no_atomics : forall T (p : proc Op T), Prop :=
   | NoAtomicsOp : forall `(op : Op T),
-    no_atomics (Prim op)
+    no_atomics (Call op)
   | NoAtomicsRet : forall `(x : T),
     no_atomics (Ret x)
   | NoAtomicsBind : forall `(pa : proc Op T1) `(pb : T1 -> proc _ T2),
@@ -125,7 +125,7 @@ Section Compiler.
 
   Inductive compile_ok : forall T (p1 : proc opLoT T) (p2 : proc opMidT T), Prop :=
   | CompileOp : forall `(op : opMidT T),
-    compile_ok (compile_op op) (Prim op)
+    compile_ok (compile_op op) (Call op)
   | CompileRet : forall `(x : T),
     compile_ok (Ret x) (Ret x)
   | CompileBind : forall `(p1a : proc opLoT T1) (p2a : proc opMidT T1)
@@ -143,7 +143,7 @@ Section Compiler.
 
   Inductive atomic_compile_ok : forall T (p1 : proc opLoT T) (p2 : proc opMidT T), Prop :=
   | ACompileOp : forall `(op : opMidT T),
-    atomic_compile_ok (Atomic (compile_op op)) (Prim op)
+    atomic_compile_ok (Atomic (compile_op op)) (Call op)
   | ACompileRet : forall `(x : T),
     atomic_compile_ok (Ret x) (Ret x)
   | ACompileBind : forall `(p1a : proc opLoT T1) (p2a : proc opMidT T1)
@@ -166,7 +166,7 @@ Section Compiler.
   Fixpoint compile T (p : proc opMidT T) : proc opLoT T :=
     match p with
     | Ret t => Ret t
-    | Prim op => compile_op op
+    | Call op => compile_op op
     | Bind p1 p2 => Bind (compile p1) (fun r => compile (p2 r))
     | Atomic p => Atomic (compile p)
     | Until c p v => Until c (fun r => compile (p r)) v
