@@ -1,3 +1,4 @@
+{-# LANGUAGE NamedFieldPuns #-}
 module Interpreter where
 
 -- Haskell libraries
@@ -29,7 +30,10 @@ import MailServerAPI
 
 -- State for each process/thread
 data State =
-  S Integer SMTPServer POP3Server !(MVar Lock)
+  S { tid :: Integer
+    , smtpserver :: SMTPServer
+    , pop3server :: POP3Server
+    , lockvar :: !(MVar Lock) }
 
 mkState :: SMTPServer -> POP3Server -> IO State
 mkState smtp pop3 = do
@@ -62,7 +66,7 @@ filePath :: BS.ByteString -> BS.ByteString -> BS.ByteString -> FilePath
 filePath u dir fn = dirPath u dir ++ "/" ++ BSC8.unpack fn
 
 run_proc :: State -> Coq_proc (MailFSMergedOp__Coq_xOp a) GHC.Base.Any -> IO a
-run_proc s (Ret v) = do
+run_proc _ (Ret v) = do
   -- debugmsg $ "Ret"
   return $ unsafeCoerce v
 run_proc s (Bind p1 p2) = do
@@ -70,7 +74,7 @@ run_proc s (Bind p1 p2) = do
   v1 <- run_proc s p1
   v2 <- run_proc s (p2 $ unsafeCoerce v1)
   return v2
-run_proc s (Atomic _) = do
+run_proc _ (Atomic _) = do
   -- debugmsg $ "Atomic"
   error "Running atomic"
 run_proc s (Until c p v0) = do
@@ -91,7 +95,7 @@ run_proc s (Spawn p) = do
     return ()
   return $ unsafeCoerce ()
 
-run_proc (S tid _ _ _) (Call MailFSMergedOp__GetTID) = do
+run_proc S{tid} (Call MailFSMergedOp__GetTID) = do
   return $ unsafeCoerce tid
 
 run_proc _ (Call MailFSMergedOp__Random) = do
@@ -103,12 +107,12 @@ run_proc _ (Call (MailFSMergedOp__Ext (MailServerOp__PickUser))) = do
   u <- rdtsc
   return $ unsafeCoerce $ "u" ++ (show $ u `mod` 100)
 
-run_proc (S _ smtpserver _ _) (Call (MailFSMergedOp__Ext (MailServerOp__AcceptSMTP))) = do
+run_proc S{smtpserver} (Call (MailFSMergedOp__Ext (MailServerOp__AcceptSMTP))) = do
   debugmsg $ "AcceptSMTP"
   conn <- smtpAccept smtpserver
   return $ unsafeCoerce conn
 
-run_proc (S _ _ pop3server _) (Call (MailFSMergedOp__Ext (MailServerOp__AcceptPOP3))) = do
+run_proc S{pop3server} (Call (MailFSMergedOp__Ext (MailServerOp__AcceptPOP3))) = do
   debugmsg $ "AcceptPOP3"
   conn <- pop3Accept pop3server
   return $ unsafeCoerce conn
@@ -217,7 +221,7 @@ run_proc _ (Call (MailFSMergedOp__Read ((u, dir), fn))) = do
                  debugmsg "Unknown exception on read"
                  return $ unsafeCoerce Nothing)
 
-run_proc (S _ _ _ lockvar) (Call (MailFSMergedOp__Lock u)) = do
+run_proc S{lockvar} (Call (MailFSMergedOp__Lock u)) = do
   debugmsgs ["Lock ", u]
   mboxfd <- openFd (dirPath u "mail") ReadOnly Nothing defaultFileFlags
   lck <- lockFd mboxfd Exclusive Block
@@ -225,7 +229,7 @@ run_proc (S _ _ _ lockvar) (Call (MailFSMergedOp__Lock u)) = do
   putMVar lockvar lck
   return $ unsafeCoerce ()
 
-run_proc (S _ _ _ lockvar) (Call (MailFSMergedOp__Unlock u)) = do
+run_proc S{lockvar} (Call (MailFSMergedOp__Unlock u)) = do
   debugmsgs ["Unlock ", u]
   lck <- takeMVar lockvar
   unlock lck
