@@ -4,14 +4,12 @@ module Interpreter where
 import Control.Concurrent
 import Control.DeepSeq
 import Control.Exception
-import Data.Atomics
-import Data.IORef
-import Data.Maybe
+import qualified Data.ByteString as BS
+import qualified Data.ByteString.Char8 as BSC8
 import GHC.Base
 import System.Posix.Files
 import System.Posix.IO
 import System.Directory
-import System.Random
 import System.IO
 import System.IO.Error
 import System.CPUTime.Rdtsc
@@ -19,7 +17,6 @@ import System.Lock.FLock
 import System.Posix.Process
 
 -- Our own libraries
-import Support
 import SMTP
 import POP3
 
@@ -29,7 +26,6 @@ import qualified Horizontal
 import MailFSMergedAPI
 import MailServer
 import MailServerAPI
-import MailServerComposedAPI
 
 -- State for each process/thread
 data State =
@@ -44,22 +40,26 @@ mkState smtp pop3 = do
 verbose :: Bool
 verbose = False
 
-debugmsg :: String -> IO ()
+showBS :: Show a => a -> BS.ByteString
+showBS = BSC8.pack . show
+
+debugmsg :: BS.ByteString -> IO ()
 debugmsg s =
-  if verbose then do
+  when verbose $ do
     tid <- myThreadId
-    putStrLn $ "[" ++ (show tid) ++ "] " ++ s
-  else
-    return ()
+    BSC8.putStrLn $ BS.concat ["[", showBS tid, "] ", s]
 
-userPath :: String -> String
-userPath u = "/tmp/mailtest/" ++ u
+debugmsgs :: [BS.ByteString] -> IO ()
+debugmsgs = debugmsg . BS.concat
 
-dirPath :: String -> String -> String
-dirPath u dir = (userPath u) ++ "/" ++ dir
+userPath :: BS.ByteString -> String
+userPath u = "/tmp/mailtest/" ++ BSC8.unpack u
 
-filePath :: String -> String -> String -> String
-filePath u dir fn = (dirPath u dir) ++ "/" ++ fn
+dirPath :: BS.ByteString -> BS.ByteString -> String
+dirPath u dir = userPath u ++ "/" ++ BSC8.unpack dir
+
+filePath :: BS.ByteString -> BS.ByteString -> BS.ByteString -> FilePath
+filePath u dir fn = dirPath u dir ++ "/" ++ BSC8.unpack fn
 
 run_proc :: State -> Coq_proc (MailFSMergedOp__Coq_xOp a) GHC.Base.Any -> IO a
 run_proc s (Ret v) = do
@@ -87,7 +87,7 @@ run_proc s (Spawn p) = do
   _ <- forkProcess $ do
     pid <- getProcessID
     putStrLn $ "Spawned " ++ show pid
-    run_proc s p
+    _ <- run_proc s p
     return ()
   return $ unsafeCoerce ()
 
@@ -119,7 +119,7 @@ run_proc _ (Prim (MailFSMergedOp__Ext (MailServerOp__SMTPGetMessage conn))) = do
   return $ unsafeCoerce msg
 
 run_proc _ (Prim (MailFSMergedOp__Ext (MailServerOp__SMTPRespond conn ok))) = do
-  debugmsg $ "SMTPRespond" ++ " " ++ (show ok)
+  debugmsgs ["SMTPRespond", " ", showBS ok]
   smtpDone conn ok
   return $ unsafeCoerce ()
 
@@ -159,9 +159,9 @@ run_proc _ (Prim (MailFSMergedOp__Ext (MailServerOp__POP3RespondDelete conn))) =
   return $ unsafeCoerce ()
 
 run_proc _ (Prim (MailFSMergedOp__CreateWrite ((u, dir), fn) contents)) = do
-  debugmsg $ "CreateWrite " ++ u ++ "/" ++ dir ++ "/" ++ fn ++ ", " ++ (show contents)
+  debugmsgs ["CreateWrite ", u, "/", dir, "/", fn, ", ", showBS contents]
   catch (do
-           writeFile (filePath u dir fn) contents
+           BS.writeFile (filePath u dir fn) contents
            return $ unsafeCoerce True)
         (\e -> case e of
                _ | isFullError e -> do
@@ -172,7 +172,7 @@ run_proc _ (Prim (MailFSMergedOp__CreateWrite ((u, dir), fn) contents)) = do
                  return $ unsafeCoerce False)
 
 run_proc _ (Prim (MailFSMergedOp__Link ((srcu, srcdir), srcfn) ((dstu, dstdir), dstfn))) = do
-  debugmsg $ "Link " ++ srcu ++ "/" ++ srcdir ++ "/" ++ srcfn ++ " to " ++ dstu ++ "/" ++ dstdir ++ "/" ++ dstfn
+  debugmsgs ["Link ", srcu, "/", srcdir, "/", srcfn, " to ", dstu, "/", dstdir, "/", dstfn]
   catch (do
            createLink (filePath srcu srcdir srcfn) (filePath dstu dstdir dstfn)
            return $ unsafeCoerce True)
@@ -185,7 +185,7 @@ run_proc _ (Prim (MailFSMergedOp__Link ((srcu, srcdir), srcfn) ((dstu, dstdir), 
                  return $ unsafeCoerce False)
 
 run_proc _ (Prim (MailFSMergedOp__Unlink ((u, dir), fn))) = do
-  debugmsg $ "Unlink " ++ u ++ "/" ++ dir ++ "/" ++ (fn)
+  debugmsgs ["Unlink ", u, "/", dir, "/", fn]
   catch (removeLink (filePath u dir fn))
         (\e -> case e of
            _ | isDoesNotExistError e -> do
@@ -197,12 +197,12 @@ run_proc _ (Prim (MailFSMergedOp__Unlink ((u, dir), fn))) = do
   return $ unsafeCoerce ()
 
 run_proc _ (Prim (MailFSMergedOp__List (u, dir))) = do
-  debugmsg $ "List " ++ u ++ "/" ++ dir
+  debugmsgs ["List ", u, "/", dir]
   files <- listDirectory (dirPath u dir)
   return $ unsafeCoerce files
 
 run_proc _ (Prim (MailFSMergedOp__Read ((u, dir), fn))) = do
-  debugmsg $ "Read " ++ u ++ "/" ++ dir ++ "/" ++ fn
+  debugmsgs ["Read ", u, "/", dir, "/", fn]
   catch (do
            h <- openFile (filePath u dir fn) ReadMode
            contents <- hGetContents h
@@ -218,7 +218,7 @@ run_proc _ (Prim (MailFSMergedOp__Read ((u, dir), fn))) = do
                  return $ unsafeCoerce Nothing)
 
 run_proc (S _ _ _ lockvar) (Prim (MailFSMergedOp__Lock u)) = do
-  debugmsg $ "Lock " ++ u
+  debugmsgs ["Lock ", u]
   mboxfd <- openFd (dirPath u "mail") ReadOnly Nothing defaultFileFlags
   lck <- lockFd mboxfd Exclusive Block
   closeFd mboxfd
@@ -226,13 +226,13 @@ run_proc (S _ _ _ lockvar) (Prim (MailFSMergedOp__Lock u)) = do
   return $ unsafeCoerce ()
 
 run_proc (S _ _ _ lockvar) (Prim (MailFSMergedOp__Unlock u)) = do
-  debugmsg $ "Unlock " ++ u
+  debugmsgs ["Unlock ", u]
   lck <- takeMVar lockvar
   unlock lck
   return $ unsafeCoerce ()
 
 run_proc _ (Prim (MailFSMergedOp__Exists u)) = do
-  debugmsg $ "Exists " ++ u
+  debugmsgs ["Exists ", u]
   ok <- fileExist (userPath u)
   if ok then do
     return $ unsafeCoerce (Horizontal.Present u)

@@ -13,6 +13,10 @@ import_modules = {
         "MailServerAPI",
         "MailServer",
     ],
+    "import qualified Data.ByteString as BS":
+    [
+        "MailServerAPI",
+    ],
 }
 
 module_imports = {}

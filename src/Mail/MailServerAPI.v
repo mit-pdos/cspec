@@ -3,12 +3,14 @@ Require Import POCS.
 
 Parameter smtpconn : Type.
 Parameter pop3conn : Type.
-Parameter string : Type.
+Parameter abstract_string : Type.
+Definition string: Type := abstract_string.
 Parameter tmp_string : string.
 Parameter mail_string : string.
 Parameter bench_msg : string.
 Parameter tmp_mail_ne : tmp_string <> mail_string.
-Parameter string_length : string -> nat.
+Parameter abstract_string_length : string -> nat.
+Definition string_length s := abstract_string_length s.
 
 Instance string_Ordering : Ordering string.
 Admitted.

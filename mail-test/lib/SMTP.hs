@@ -45,7 +45,7 @@ smtpClose h = do
 process_to:: [String] -> String
 process_to rcpt =
   let u = splitOn ":" (rcpt !! 0)
-  in filter (not . flip elem "<>") (u !! 1)
+  in filter (not . (`elem` ['<', '>'])) (u !! 1)
     
 
 -- process_to :: [String] -> String

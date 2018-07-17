@@ -1,8 +1,23 @@
-module POP3 where
+module POP3
+  ( POP3Server(..)
+  , pop3Listen
+  , pop3Accept
+  , pop3ProcessAuth
+  , pop3Authenticate
+  , pop3RespondAuth
+  , pop3ProcessCommands
+  , pop3GetRequest
+  , pop3RespondStat
+  , pop3RespondList
+  , pop3RespondRetr
+  , pop3RespondDelete
+  ) where
 
 -- Haskell libraries
 
 import Control.Monad
+import qualified Data.ByteString as BS
+import qualified Data.ByteString.Char8 as BSC8
 import Data.Char
 import Network
 import System.IO
@@ -32,11 +47,17 @@ pop3Accept (POP3Server sock) = do
   pop3RespondOK conn
   return $ POP3Conn conn
 
-pop3Respond :: Handle -> Bool -> String -> IO ()
+hPutStrs :: Handle -> [BS.ByteString] -> IO ()
+hPutStrs h = BS.hPutStr h . BS.concat
+
+intToStr :: Integer -> BS.ByteString
+intToStr = BSC8.pack . show
+
+pop3Respond :: Handle -> Bool -> BS.ByteString -> IO ()
 pop3Respond h True text =
-  hPutStr h $ "+OK " ++ text ++ "\r\n"
+  hPutStrs h $ ["+OK ", text, "\r\n"]
 pop3Respond h False text =
-  hPutStr h $ "-ERR " ++ text ++ "\r\n"
+  hPutStrs h $ ["-ERR ", text, "\r\n"]
 
 pop3RespondOK :: Handle -> IO ()
 pop3RespondOK h =
@@ -122,21 +143,21 @@ pop3GetRequest (POP3Conn h) = do
 
 pop3RespondStat :: POP3Conn -> Integer -> Integer -> IO ()
 pop3RespondStat (POP3Conn h) count size = do
-  pop3Respond h True $ (show count) ++ " " ++ (show size)
+  pop3Respond h True $ BS.concat [intToStr count, " ", intToStr size]
 
 pop3RespondList :: POP3Conn -> [Integer] -> IO ()
 pop3RespondList (POP3Conn h) msglens = do
   pop3RespondOK h
   foldM (\idx msglen -> do
-    hPutStr h $ (show idx) ++ " " ++ (show msglen) ++ "\r\n"
+    BS.hPutStr h $ BS.concat [intToStr idx, " ", intToStr msglen, "\r\n"]
     return $ idx + 1) 1 msglens
-  hPutStr h ".\r\n"
+  BS.hPutStr h ".\r\n"
 
-pop3RespondRetr :: POP3Conn -> String -> IO ()
+pop3RespondRetr :: POP3Conn -> BS.ByteString -> IO ()
 pop3RespondRetr (POP3Conn h) body = do
   pop3RespondOK h
-  hPutStr h body
-  hPutStr h ".\r\n"
+  BS.hPutStr h body
+  BS.hPutStr h ".\r\n"
 
 pop3RespondDelete :: POP3Conn -> IO ()
 pop3RespondDelete (POP3Conn h) = do
