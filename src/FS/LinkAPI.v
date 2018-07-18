@@ -1,4 +1,4 @@
-Require Import POCS.
+Require Import CSPEC.
 Require Import String.
 Require Import Equalities.
 Require Import MSets.MSetWeakList.

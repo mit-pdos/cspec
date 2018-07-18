@@ -1,4 +1,4 @@
-Require Import POCS.
+Require Import CSPEC.
 Require Import FSAPI.
 Require Extraction.
 

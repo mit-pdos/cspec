@@ -1,4 +1,4 @@
-Require Import POCS.
+Require Import CSPEC.
 Require Import MailServerAPI.
 Require Import MailboxTmpAbsAPI.
 Require Import DeliverAPI.

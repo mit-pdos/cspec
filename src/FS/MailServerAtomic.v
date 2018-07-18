@@ -1,4 +1,4 @@
-Require Import POCS.
+Require Import CSPEC.
 Require Import FSModel.
 Require Import LinkAPI.
 Require Import FSAPI.
