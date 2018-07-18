@@ -392,11 +392,20 @@ Proof.
   propositional.
 Qed.
 
+Local Lemma exec_till_ts_eq : forall n Op State (op_step: OpSemantics Op State) s ts ts' tr,
+    exec_till op_step n s ts' tr ->
+    ts = ts' ->
+    exec_till op_step n s ts tr.
+Proof.
+  propositional.
+Qed.
+
 (* abstract the thread state in an exec goal (to deal with different update
 forms) *)
 Ltac abstract_ts :=
   match goal with
   | |- exec _ _ ?ts _ => eapply exec_ts_eq
+  | |- exec_till _ _ _ ?ts _ => eapply exec_till_ts_eq
   end.
 
 Local Lemma exec_tr_eq : forall Op State (op_step: OpSemantics Op State) s ts tr tr',

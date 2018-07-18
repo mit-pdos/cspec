@@ -573,6 +573,20 @@ Definition exec_equiv_rx_N n `(p1: proc Op T) (p2: proc _ T) :=
   forall TR (rx: T -> proc _ TR),
     exec_equiv_N n (Bind p1 rx) (Bind p2 rx).
 
+Hint Extern 1 (exec _ _ _ _ _) =>
+match goal with
+| |- exec_till _ _ _ ?ts _ => first [ is_evar ts; fail 1 | eapply ConcurExec.exec_ts_eq ]
+end : exec.
+
+(* basically the same as ExecPrefix, but applies [ExecTillOne] instead of
+[ExecPrefixOne] *)
+Ltac ExecOne tid_arg tid'_arg :=
+  eapply ExecTillOne with (tid:=tid_arg) (tid':=tid'_arg);
+  autorewrite with t;
+  (* need to exclude core for performance reasons *)
+  eauto 7 with nocore exec;
+  cbv beta iota.
+
 Theorem exec_equiv_N_bind_bind : forall `(p1 : proc Op T1) `(p2 : T1 -> proc Op T2) `(p3 : T2 -> proc Op T3) n,
   exec_equiv_N n (Bind (Bind p1 p2) p3) (Bind p1 (fun v => Bind (p2 v) p3)).
 Proof.
@@ -589,13 +603,14 @@ Proof.
     * repeat maybe_proc_inv.
       exec_tid_inv.
       exec_tid_inv.
-      (* ExecOne tid tid'.
+      ExecOne tid tid'.
 
-      destruct result; eauto. *)
-      admit.
+      destruct result; eauto.
 
-    * (* ExecOne tid0 tid'. *)
-      admit.
+    * ExecOne tid0 tid'.
+      abstract_ts.
+      apply IHexec_till; auto with exec.
+      auto with exec.
 
     * constructor.
 
@@ -611,15 +626,18 @@ Proof.
     * repeat maybe_proc_inv.
       exec_tid_inv.
 
-      (* ExecOne tid tid'.
+      ExecOne tid tid'.
 
       cbv beta iota.
-      destruct result0; eauto. *)
-      admit.
+      destruct result0; eauto.
 
-    * (* ExecOne tid0 tid'. *)
-      admit.
-Admitted.
+    * ExecOne tid0 tid'.
+      abstract_ts.
+      apply IHexec_till; auto with exec.
+      auto with exec.
+
+    * constructor.
+Qed.
 
 (** A strong notion of equivalence for programs inside atomic sections.
     Basically the same as above, but defined as an underlying [atomic_exec]
