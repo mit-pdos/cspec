@@ -918,38 +918,28 @@ Proof.
   split; eauto.
 Qed.
 
-Instance trace_incl_opt_preorder :
-  PreOrder (@trace_incl_opt Op State op_step).
-Proof.
-  split.
-  - unfold Reflexive; intros.
-    unfold trace_incl_opt; intros.
-    reflexivity.
-  - unfold Transitive; intros.
-    unfold trace_incl_opt; intros.
-    etransitivity; eauto.
-Qed.
+Ltac RelInstance_t :=
+  intros;
+  let refl := try solve [ hnf; intros; reflexivity ] in
+  let symm := try solve [ hnf; intros; try symmetry; eauto ] in
+  let trans := try solve [ hnf; intros; etransitivity; eauto ] in
+  match goal with
+  | |- PreOrder _ =>
+    constructor; hnf; intros; [ refl | trans ]
+  | |- Equivalence _ =>
+    constructor; hnf; intros; [ refl | symm | trans ]
+  end.
+
+Notation RelInstance := (ltac:(RelInstance_t)) (only parsing).
+
+Instance trace_incl_opt_preorder Op State (op_step: OpSemantics Op State) :
+  PreOrder (trace_incl_opt op_step) := RelInstance.
 
 Instance trace_incl_s_preorder :
-  PreOrder (@trace_incl_s State s tid Op op_step T).
-Proof.
-  split.
-  - unfold Reflexive; intros.
-    unfold trace_incl_s; intros.
-    reflexivity.
-  - unfold Transitive; intros.
-    unfold trace_incl_s; intros.
-    etransitivity; eauto.
-Qed.
+  PreOrder (@trace_incl_s State s tid Op op_step T) := RelInstance.
 
 Instance trace_incl_preorder :
-  PreOrder (@trace_incl Op T State op_step).
-Proof.
-  unfold trace_incl.
-  constructor; hnf; intros.
-  - reflexivity.
-  - etransitivity; eauto.
-Qed.
+  PreOrder (@trace_incl Op T State op_step) := RelInstance.
 
 Instance exec_equiv_opt_to_trace_incl_opt :
   subrelation (@exec_equiv_opt Op) (@trace_incl_opt Op State op_step).
@@ -1020,27 +1010,6 @@ Proof.
   eauto.
 Qed.
 
-Instance trace_incl_exec_equiv_proper :
-  Proper (exec_equiv ==> exec_equiv ==> iff)
-         (@trace_incl Op T State op_step).
-Proof.
-  intros p1 p1' ?.
-  intros p2 p2' ?.
-  split; intros.
-  - unfold trace_incl, trace_incl_opt,
-           trace_incl_ts, trace_incl_ts_s; intros.
-    apply H in H2.
-    apply H1 in H2.
-    apply H0 in H2.
-    eauto.
-  - unfold trace_incl, trace_incl_opt,
-           trace_incl_ts, trace_incl_ts_s; intros.
-    apply H in H2.
-    apply H1 in H2.
-    apply H0 in H2.
-    eauto.
-Qed.
-
 Instance trace_incl_s_exec_equiv_proper :
   Proper (exec_equiv ==> exec_equiv ==> iff)
          (@trace_incl_s State s tid Op op_step T).
@@ -1059,6 +1028,16 @@ Proof.
     apply H1 in H2.
     apply H0 in H2.
     eauto.
+Qed.
+
+Instance trace_incl_exec_equiv_proper :
+  Proper (exec_equiv ==> exec_equiv ==> iff)
+         (@trace_incl Op T State op_step).
+Proof.
+  unfold Proper, respectful, trace_incl, trace_incl_opt; intros.
+  split; intros.
+  rewrite <- H, <- H0; auto.
+  rewrite H, H0; auto.
 Qed.
 
 Instance Proc_trace_incl_proper :
