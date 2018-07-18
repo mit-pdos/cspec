@@ -61,6 +61,11 @@ Module MailFSMergedAPI <: Layer MailFSMergedOp MailFSMergedState.
   Import MailFSMergedOp.
   Import MailFSMergedState.
 
+  (* TCB: these are the atomic semantics of the low-level operation the mail
+  server is implemented on top of. There is no Coq implementation of these
+  operations; it is trusted that the Haskell implementation in
+  mail-test/lib/Interpreter.hs, when run on a file system, obeys these
+  semantics. *)
   Inductive xstep : forall T, Op T -> nat -> State -> T -> State -> list event -> Prop :=
   | StepCreateWriteOK : forall fs tid tmpfn data lock,
     xstep (CreateWrite tmpfn data) tid

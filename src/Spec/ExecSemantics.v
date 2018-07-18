@@ -5,6 +5,10 @@ Require Import Helpers.FinMap.
 Global Set Implicit Arguments.
 Global Generalizable All Variables.
 
+(* TCB: this file defines [exec], which specifies how operations interleave
+atomically. This is used both for modeling low-level execution and for
+specifying the behavior of a specification layer. *)
+
 Section Execution.
 
   Variable Op: Type -> Type.

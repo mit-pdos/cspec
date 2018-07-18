@@ -95,6 +95,9 @@ listMailDir u dir = do
 readMail :: BS.ByteString -> BS.ByteString -> BS.ByteString -> IO BS.ByteString
 readMail u dir fn = BS.readFile (filePath u dir fn)
 
+{- TCB: run_proc implements the low-level operations used by the mail server.
+ These implementations are trusted; specifically, they should be atomic with
+ respect to one another and have the semantics specified in MailFSMergedAPI.v. -}
 run_proc :: State -> Coq_proc (MailFSMergedOp__Coq_xOp a) GHC.Base.Any -> IO a
 run_proc _ (Ret v) = do
   -- debugmsg $ "Ret"

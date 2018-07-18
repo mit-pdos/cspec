@@ -75,6 +75,9 @@ End MailServerState.
 Module MailServerHState := HState MailServerState UserIdx.
 
 
+(* TCB: this is the top-level specification for the mail server. It specifies
+what each operation does, and the proof covers any sequence of these
+operations. *)
 Module MailServerAPI <: Layer MailServerOp MailServerState.
 
   Import MailServerOp.

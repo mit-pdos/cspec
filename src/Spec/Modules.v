@@ -23,6 +23,11 @@ Section TraceAbs.
   Variable lo_step : OpSemantics opLoT StateLo.
   Variable mid_step : OpSemantics opMidT StateMid.
 
+  (* TCB: this definition is the core of our specifications: we prove that all
+  behaviors of threads using low-level operations are also behaviors that could
+  be produced by the corresponding high-level code (our proofs will be for all
+  ts2, relating them to a compiled version using low-level operations that we
+  can actually execute) *)
   Definition traces_match_abs
                            (ts1 : threads_state opLoT)
                            (ts2 : threads_state opMidT) :=

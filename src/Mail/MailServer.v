@@ -47,6 +47,12 @@ Require Import MailServerComposedImpl.
 Import MailServerOp.
 Import MailServerComposedOp.
 
+(* TCB: these implementations are trusted as specifications for how the mail
+server should operate. The proof guarantees that each of these operations
+behaves (as far as external calls) as if the mail server operations had atomic
+semantics as given in MailServerAPI, for any number of threads running mail
+server code (that is, threads can call Pickup/Delete/Deliver in any way, not
+just with the code below). *)
 
 Definition do_smtp_req : proc _ unit :=
   conn <- Call (Ext AcceptSMTP);
