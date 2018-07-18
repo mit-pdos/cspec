@@ -367,12 +367,21 @@ Section Atomization.
     - eapply trace_incl_bind_a; eauto.
     - repeat rewrite exec_equiv_bind_bind.
       eauto.
-    - eapply trace_incl_rx_until.
-      intros; eapply trace_incl_to_trace_incl_rx; intros.
-      eapply H0; eauto.
+    - etransitivity.
+      eapply trace_incl_rx_to_trace_incl.
+      eapply trace_incl_rx_until.
+      intros. eapply trace_incl_to_trace_incl_rx; intros.
+      eapply H0; intros.
       reflexivity.
+      eapply trace_incl_bind_a; intros.
       eauto.
-    - eapply trace_incl_rx_spawn; eauto.
+    - etransitivity.
+      eapply trace_incl_rx_to_trace_incl.
+      eapply trace_incl_rx_spawn.
+      eapply trace_incl_to_trace_incl_rx; intros.
+      eapply IHatomize_ok; reflexivity.
+      eapply trace_incl_bind_a; intros.
+      eauto.
   Qed.
 
   Theorem atomize_ok_trace_incl :
