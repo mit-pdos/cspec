@@ -28,9 +28,9 @@ Section TraceAbs.
                            (ts2 : threads_state opMidT) :=
     forall (sl : StateLo) (sm : StateMid) tr1,
       initP sl ->
-      exec_prefix lo_step sl ts1 tr1 ->
+      exec lo_step sl ts1 tr1 ->
       absR sl sm ->
-      exec_prefix mid_step sm ts2 tr1.
+      exec mid_step sm ts2 tr1.
 
 End TraceAbs.
 
@@ -409,8 +409,7 @@ Module LayerImplMoversProtocol
     unfold traces_match_abs; intros; subst.
     clear H1.
     specialize (H sm).
-    destruct H2.
-    induction H1; eauto.
+    induction H2; eauto.
     cmp_ts tid tid'.
     pose proof (H tid _ p ltac:(eauto)) as Htid.
 
@@ -438,6 +437,13 @@ Module LayerImplMoversProtocol
       eapply follows_protocol_preserves_exec_tid'; eauto.
   Qed.
 
+  Lemma absR_reflexive : forall s, absR s s.
+  Proof.
+    reflexivity.
+  Qed.
+
+  Hint Resolve absR_reflexive.
+
   Theorem compile_traces_match :
     forall ts,
       no_atomics_ts ts ->
@@ -445,22 +451,14 @@ Module LayerImplMoversProtocol
   Proof.
     unfold traces_match_abs; intros.
     rewrite H2 in *; clear H2.
-    edestruct compile_traces_match_l1raw.
-      eapply compile_ts_follows_protocol.
-      eassumption.
-      eapply Compile.compile_ts_no_atomics.
+    assert (exec l1.step sm (Compile.compile_ts a.compile_op ts) tr1). {
+      eapply compile_traces_match_l1raw; eauto.
+      eapply compile_ts_follows_protocol; eauto.
+      eapply Compile.compile_ts_no_atomics; eauto.
       eapply a.compile_op_no_atomics.
-      eassumption.
-      eassumption.
-      eassumption.
-      reflexivity.
-    intuition idtac.
-    edestruct compile_traces_match_l1.
-      eassumption.
-      eassumption.
-      eauto.
-      reflexivity.
-    eexists; intuition eauto.
+    }
+
+    eapply compile_traces_match_l1; eauto.
   Qed.
 
 End LayerImplMoversProtocol.
@@ -563,9 +561,9 @@ Module Link
   Proof.
     unfold traces_match_abs; intros.
     inversion H2; clear H2; intuition idtac.
-    edestruct x.compile_traces_match; intuition eauto.
+    epose_proof x.compile_traces_match; intuition eauto.
       eapply y.compile_ts_no_atomics; eauto.
-    edestruct y.compile_traces_match; intuition eauto.
+    epose_proof y.compile_traces_match; intuition eauto.
   Qed.
 
 End Link.

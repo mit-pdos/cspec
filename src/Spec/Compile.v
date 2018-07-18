@@ -292,8 +292,7 @@ Section Compiler.
   Proof.
     unfold traces_match_ts; intros.
     generalize dependent ts2.
-    unfold exec_prefix in H0; repeat deex.
-    induction H; intros; eauto.
+    induction H0; intros; eauto.
 
     - eapply proc_match_pick with (tid := tid) in H3 as H'.
       intuition try congruence.

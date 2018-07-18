@@ -325,25 +325,24 @@ Section Movers.
     rewrite thread_upd_same_eq with (tid:=tid) by auto; auto.
   Qed.
 
-  Hint Resolve thread_upd_from_same : exec_prefix.
+  Hint Resolve thread_upd_from_same : exec.
 
   Lemma exec_left_mover : forall s ts tid `(rx : _ -> proc Op T) tr P,
     left_mover_pred P ->
     pred_stable op_step P ->
     enabled_in tid s ->
     P tid s ->
-    exec_prefix op_step s (ts [[ tid := Proc (x <- Call opMover; rx x) ]]) tr ->
+    exec op_step s (ts [[ tid := Proc (x <- Call opMover; rx x) ]]) tr ->
     exists s' r,
       op_step opMover tid s r s' nil /\
-      exec_prefix op_step s' (ts [[ tid := Proc (rx r) ]]) tr.
+      exec op_step s' (ts [[ tid := Proc (rx r) ]]) tr.
   Proof.
     intros.
 
     match goal with
-    | H : exec_prefix _ _ (thread_upd ?ts ?tid ?p) _ |- _ =>
+    | H : exec _ _ (thread_upd ?ts ?tid ?p) _ |- _ =>
       remember (thread_upd ts tid p);
       generalize dependent ts;
-      unfold exec_prefix in H; repeat deex;
       induction H; intros; subst; NoProc_upd
     end.
 
@@ -355,13 +354,13 @@ Section Movers.
         edestruct H5; clear H5; eauto.
         subst.
         descend; intuition eauto.
-        abstract_ts; eauto with exec_prefix.
+        abstract_ts; eauto with exec.
 
       + edestruct IHexec; intuition idtac.
           eapply enabled_stable_exec_tid; eauto.
           destruct H; eauto.
           eapply pred_stable_exec_tid; eauto.
-          eauto with exec_prefix.
+          eauto with exec.
         repeat deex.
 
         eapply exec_tid_left_mover in H2; eauto.
@@ -395,11 +394,10 @@ Section Movers.
     clear dependent tid'.
 
     match goal with
-    | H : exec_prefix _ _ (thread_upd ?ts ?tid ?pp) _ |- _ =>
+    | H : exec _ _ (thread_upd ?ts ?tid ?pp) _ |- _ =>
       remember (thread_upd ts tid pp);
       generalize dependent ts;
       generalize dependent s;
-      destruct H as [? H];
       induction H; simpl; intros; subst; eauto; NoProc_upd
     end.
 
@@ -630,7 +628,7 @@ Section YSA.
 
     cut (exists tr' v1 s1 evs1,
       atomic_exec op_step (l v) tid s' v1 s1 evs1 /\
-      exec_prefix op_step s1 (ts [[ tid := Proc (rx v1) ]]) tr' /\
+      exec op_step s1 (ts [[ tid := Proc (rx v1) ]]) tr' /\
       tr = (prepend tid evs1 tr')); intros.
     {
       repeat deex.

@@ -221,8 +221,7 @@ Section Compiler.
   Proof.
     unfold traces_match_ts; intros.
     generalize dependent ts2.
-    destruct H0.
-    induction H; eauto; intros.
+    induction H0; eauto; intros.
 
     eapply proc_match_pick with (tid := tid) in H3 as H2'.
     intuition idtac; try congruence.
