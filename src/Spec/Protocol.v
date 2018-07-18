@@ -236,7 +236,7 @@ Section Protocol.
       constructor; eauto.
       intros.
 
-      destruct (bool_dec (c r) true); eauto.
+      destruct (c r); eauto.
   Qed.
 
   Theorem follows_protocol_stable :

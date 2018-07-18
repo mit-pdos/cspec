@@ -3,8 +3,6 @@ Require Import Relation_Operators.
 Require Import Ordering.
 Require Import ProofIrrelevance.
 
-Require Import Arith.
-Require Import Bool.
 Require Import String.
 Require Import List.
 
@@ -32,8 +30,8 @@ Notation " x == y " := (equal_dec (x :>) (y :>)) (no associativity, at level 70)
     for [bool]s).
   *)
 
-Instance nat_equal_dec : EqualDec nat := eq_nat_dec.
-Instance bool_equal_dec : EqualDec bool := bool_dec.
+Instance nat_equal_dec : EqualDec nat := ltac:(hnf; decide equality).
+Instance bool_equal_dec : EqualDec bool := ltac:(hnf; decide equality).
 
 Instance string_equal_dec : EqualDec string := string_dec.
 Instance list_equal_dec A `{dec:EqualDec A} : EqualDec (list A) := list_eq_dec dec.

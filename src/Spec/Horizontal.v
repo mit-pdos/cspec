@@ -570,10 +570,10 @@ Section HorizontalCompositionMovers.
       inversion H0; clear H0; subst; repeat sigT_eq.
       edestruct IHatomic_exec.
       + unfold until1.
-        instantiate (1 := Bind (p0 v0) (fun x => if bool_dec (c0 x) true then Ret x else Until c0 (fun x0 => p0 x0) (Some x))).
+        instantiate (1 := Bind (p0 v0) (fun x => if (c0 x) then Ret x else Until c0 (fun x0 => p0 x0) (Some x))).
         simpl; f_equal.
         eapply functional_extensionality; intros.
-        destruct (bool_dec (c0 x) true); reflexivity.
+        destruct (c0 x); reflexivity.
       + intuition subst.
         eexists; split; eauto.
   Qed.

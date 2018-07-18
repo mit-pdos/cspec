@@ -5,11 +5,6 @@ Require Import Helpers.FinMap.
 Global Set Implicit Arguments.
 Global Generalizable All Variables.
 
-Definition bool_dec (x y:bool) : {x=y} + {x<>y}.
-Proof.
-  decide equality.
-Defined.
-
 Section Execution.
 
   Variable Op: Type -> Type.
@@ -21,8 +16,7 @@ Section Execution.
   Definition until1 T (c : T -> bool)
                       (p : option T -> proc Op T)
                       (v : option T) :=
-    (* TODO: don't use bool_dec, just do if (c x) ... *)
-    Bind (p v) (fun x => if bool_dec (c x) true then Ret x else Until c p (Some x)).
+    Bind (p v) (fun x => if c x then Ret x else Until c p (Some x)).
 
   Inductive atomic_exec : forall T, proc Op T -> nat -> State ->
                                     T -> State -> list event -> Prop :=

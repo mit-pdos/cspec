@@ -96,7 +96,7 @@ Section ProcStructure.
       destruct result; eauto.
     - inversion H; clear H; subst; repeat sigT_eq.
       constructor; eauto; intros.
-      destruct (bool_dec (c x) true); eauto.
+      destruct (c x); eauto.
   Qed.
 
 End ProcStructure.

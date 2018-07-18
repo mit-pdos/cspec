@@ -12,8 +12,7 @@ executable concur-test
                      , mtl
                      , bytestring
                      , atomic-primops
-  other-modules:       Bool
-                     , Interpreter
+  other-modules:       Interpreter
                      , Compile
                      , CompileLoop
                      , ConcurProc

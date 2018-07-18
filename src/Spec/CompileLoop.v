@@ -170,16 +170,12 @@ Section Compiler.
       intuition idtac; subst.
       + left.
         descend; intuition idtac.
-        rewrite H1.
-        destruct (bool_dec false true); try congruence.
-        eauto.
+        simpl_match; eauto.
       + right.
         descend; intuition idtac.
         eauto.
         eauto.
-        simpl.
-        rewrite H1.
-        destruct (bool_dec true true); try congruence.
+        simpl_match; eauto.
     - right.
       exec_tid_inv.
       descend; intuition idtac.
@@ -208,7 +204,7 @@ Section Compiler.
       eauto.
       simpl; eauto.
       constructor; eauto; intros.
-      destruct (bool_dec (c x) true); eauto.
+      destruct (c x); eauto.
     - right.
       exec_tid_inv.
       descend; intuition eauto.

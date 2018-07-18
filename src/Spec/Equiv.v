@@ -426,7 +426,6 @@ Proof.
   intros.
   rewrite exec_equiv_until.
   unfold until1.
-  destruct (bool_dec true true); try congruence.
   unfold exec_equiv_rx; intros.
   rewrite exec_equiv_bind_bind.
   eapply exec_equiv_bind_a; intros.
@@ -1317,7 +1316,7 @@ Proof.
       instantiate (1 := n1); omega.
 
       simpl; intros.
-      destruct (bool_dec (c a)).
+      destruct (c a).
       * eapply trace_incl_N_ret_bind; intros.
         eapply trace_incl_N_le; eauto. omega.
 
