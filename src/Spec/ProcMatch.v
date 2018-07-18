@@ -222,7 +222,10 @@ Proof.
 Qed.
 
 Theorem trace_incl_ts_general : forall Op State (op_step: OpSemantics Op State) (ts1 ts2: threads_state _),
-    (forall tid, trace_incl_opt op_step (ts1 tid) (ts2 tid)) ->
+    (forall tid ts,
+        trace_incl_ts op_step
+                      (ts [[ tid := ts1 tid ]])
+                      (ts [[ tid := ts2 tid ]])) ->
     thread_max ts1 = thread_max ts2 ->
     trace_incl_ts op_step ts1 ts2.
 Proof.

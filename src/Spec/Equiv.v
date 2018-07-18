@@ -814,14 +814,11 @@ Definition trace_incl_s `(s : State) tid `(op_step : OpSemantics Op State) `(p1 
       (ts [[ tid := Proc p1 ]])
       (ts [[ tid := Proc p2 ]]).
 
-Definition trace_incl_opt {Op} `(op_step : OpSemantics Op State) p1 p2 :=
+Definition trace_incl {Op T} `(op_step : OpSemantics Op State) (p1 p2 : proc Op T) :=
   forall (ts : threads_state Op) tid,
     trace_incl_ts op_step
-      (ts [[ tid := p1 ]])
-      (ts [[ tid := p2 ]]).
-
-Definition trace_incl {Op T} `(op_step : OpSemantics Op State) (p1 p2 : proc Op T) :=
-  trace_incl_opt op_step (Proc p1) (Proc p2).
+      (ts [[ tid := Proc p1 ]])
+      (ts [[ tid := Proc p2 ]]).
 
 (* natural definition of trace_incl_rx, defined in terms of all executions (that
 is, without requiring counters be identical) *)
@@ -855,7 +852,7 @@ Theorem trace_incl_rx'_all_n : forall `(op_step: OpSemantics Op State) T (p1 p2:
     (forall n, trace_incl_rx_N n op_step p1 p2) ->
     trace_incl_rx' op_step p1 p2.
 Proof.
-  unfold trace_incl_rx', trace_incl, trace_incl_opt, trace_incl_ts, trace_incl_ts_s,
+  unfold trace_incl_rx', trace_incl, trace_incl_ts, trace_incl_ts_s,
   trace_incl_rx_N, trace_incl_N, trace_incl_ts_N.
 
   intros.
@@ -886,7 +883,7 @@ Theorem trace_incl_all_n : forall `(op_step: OpSemantics Op State) T (p1 p2: pro
     (forall n, trace_incl_N n op_step p1 p2) ->
     trace_incl op_step p1 p2.
 Proof.
-  unfold trace_incl_rx, trace_incl, trace_incl_opt, trace_incl_ts, trace_incl_ts_s,
+  unfold trace_incl_rx, trace_incl, trace_incl_ts, trace_incl_ts_s,
   trace_incl_rx_N, trace_incl_N, trace_incl_ts_N.
 
   intros.
@@ -899,12 +896,9 @@ Theorem trace_incl_trace_incl_s : forall T `(op_step : OpSemantics Op State) (p1
   (forall s tid,
     trace_incl_s s tid op_step p1 p2).
 Proof.
-  unfold trace_incl, trace_incl_opt, trace_incl_s, trace_incl_ts.
+  unfold trace_incl, trace_incl_s, trace_incl_ts.
   split; eauto.
 Qed.
-
-Program Instance trace_incl_opt_preorder Op State (op_step: OpSemantics Op State) :
-  PreOrder (trace_incl_opt op_step).
 
 Program Instance trace_incl_s_preorder :
   PreOrder (@trace_incl_s State s tid Op op_step T).
@@ -912,20 +906,11 @@ Program Instance trace_incl_s_preorder :
 Program Instance trace_incl_preorder :
   PreOrder (@trace_incl Op T State op_step).
 
-Instance exec_equiv_opt_to_trace_incl_opt :
-  subrelation (@exec_equiv_opt Op) (@trace_incl_opt Op State op_step).
-Proof.
-  unfold subrelation; intros.
-  unfold trace_incl_opt, trace_incl_ts, trace_incl_ts_s; intros.
-  apply H in H0.
-  eauto.
-Qed.
-
 Instance exec_equiv_to_trace_incl :
   subrelation (@exec_equiv Op T) (@trace_incl Op T State op_step).
 Proof.
   unfold subrelation; intros.
-  unfold trace_incl, trace_incl_opt, trace_incl_ts, trace_incl_ts_s; intros.
+  unfold trace_incl, trace_incl_ts, trace_incl_ts_s; intros.
   apply H in H0.
   eauto.
 Qed.
@@ -1005,34 +990,10 @@ Instance trace_incl_exec_equiv_proper :
   Proper (exec_equiv ==> exec_equiv ==> iff)
          (@trace_incl Op T State op_step).
 Proof.
-  unfold Proper, respectful, trace_incl, trace_incl_opt; intros.
+  unfold Proper, respectful, trace_incl; intros.
   split; intros.
   rewrite <- H, <- H0; auto.
   rewrite H, H0; auto.
-Qed.
-
-Instance Proc_trace_incl_proper :
-  Proper (@trace_incl Op T State op_step ==>
-          @trace_incl_opt Op State op_step) (@Proc Op T).
-Proof.
-  intros.
-  unfold exec_equiv.
-  intros ts0 ts1 H; subst.
-  eauto.
-Qed.
-
-Instance thread_upd_trace_incl_proper :
-  Proper (eq ==> eq ==>
-          @trace_incl_opt Op State op_step ==>
-          trace_incl_ts op_step) (@thread_upd Op).
-Proof.
-  intros.
-  intros ts0 ts1 H; subst.
-  intros tid tid' H; subst.
-  intros p1 p2 H.
-
-  unfold trace_incl_opt in H.
-  eauto.
 Qed.
 
 Lemma trace_incl_ts_s_proof_helper :
@@ -1088,7 +1049,7 @@ Lemma trace_incl_proof_helper :
   trace_incl op_step
     p1 p2.
 Proof.
-  unfold trace_incl, trace_incl_opt, trace_incl_ts.
+  unfold trace_incl, trace_incl_ts.
   intros.
 
   eapply trace_incl_ts_s_proof_helper.
@@ -1162,8 +1123,7 @@ Theorem trace_incl_bind_a : forall `(p : proc Op T) `(p2 : T -> proc _ T') p2' `
   (forall x, trace_incl op_step (p2 x) (p2' x)) ->
   trace_incl op_step (Bind p p2) (Bind p p2').
 Proof.
-  unfold trace_incl, trace_incl_opt,
-         trace_incl_ts, trace_incl_ts_s.
+  unfold trace_incl, trace_incl_ts, trace_incl_ts_s.
   intros.
 
   match goal with
