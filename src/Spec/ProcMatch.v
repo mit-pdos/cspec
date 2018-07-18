@@ -1,9 +1,8 @@
 Require Import Spec.ConcurExec.
 Require Import Spec.Equiv.
+Require Import Spec.ConcurProc.
 Require Import ProofAutomation.
 Require Import Helpers.Instances.
-Require Import Helpers.FinMap.
-
 Require Import Omega.
 
 (** Helpers for connecting different [threads_state]s *)

@@ -25,3 +25,6 @@ Arguments Atomic {Op T}.
 
 Arguments Proc {Op T}.
 Arguments NoProc {Op}.
+
+Notation "x <- p1 ; p2" := (Bind p1 (fun x => p2))
+  (at level 60, right associativity).

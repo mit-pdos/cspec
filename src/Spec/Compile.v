@@ -1,7 +1,6 @@
-Require Import ConcurExec.
+Require Import Spec.ConcurExec.
 Require Import Equiv ProcMatch.
 Require Import ProofAutomation.
-Require Import Helpers.FinMap.
 Require Import FunctionalExtensionality.
 Require Import Omega.
 Require Import List.
@@ -97,7 +96,7 @@ Section ProcStructure.
       destruct result; eauto.
     - inversion H; clear H; subst; repeat sigT_eq.
       constructor; eauto; intros.
-      destruct (Bool.bool_dec (c x) true); eauto.
+      destruct (bool_dec (c x) true); eauto.
   Qed.
 
 End ProcStructure.
