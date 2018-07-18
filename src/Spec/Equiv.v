@@ -4,6 +4,7 @@ Require Import Morphisms.
 Require Import ProofAutomation.
 Require Import Helpers.ListStuff.
 Require Import Helpers.FinMap.
+Require Import Helpers.Instances.
 Require Import List.
 Require Import Omega.
 
@@ -31,61 +32,19 @@ Definition exec_equiv_rx `(p1 : proc Op T) (p2 : proc _ T) :=
   forall TR (rx : T -> proc _ TR),
     exec_equiv (Bind p1 rx) (Bind p2 rx).
 
-Instance exec_equiv_ts_equivalence :
+Local Obligation Tactic := try RelInstance_t.
+
+Program Instance exec_equiv_ts_equivalence :
   Equivalence (@exec_equiv_ts Op).
-Proof.
-  split.
-  - firstorder.
-  - unfold Symmetric, exec_equiv_ts; intros.
-    split; intros; apply H; eauto.
-  - unfold Transitive, exec_equiv_ts; intros.
-    split; intros.
-    + apply H0. apply H. eauto.
-    + apply H. apply H0. eauto.
-Qed.
 
-Instance exec_equiv_opt_equivalence :
+Program Instance exec_equiv_opt_equivalence :
   Equivalence (@exec_equiv_opt Op).
-Proof.
-  split.
-  - unfold exec_equiv_opt, Reflexive; intros.
-    reflexivity.
-  - unfold exec_equiv_opt, Symmetric; intros.
-    symmetry. eauto.
-  - intros t1 t2 t3.
-    unfold exec_equiv; split; intros.
-    + eapply H in H1; eauto.
-      eapply H0 in H1.
-      eauto.
-    + eapply H; eauto.
-      eapply H0; eauto.
-Qed.
 
-Instance exec_equiv_equivalence :
+Program Instance exec_equiv_equivalence :
   Equivalence (@exec_equiv Op T).
-Proof.
-  unfold exec_equiv.
-  split.
-  - intro t.
-    reflexivity.
-  - unfold Symmetric, exec_equiv_opt; intros.
-    symmetry. eauto.
-  - unfold Transitive; intros.
-    etransitivity; eauto.
-Qed.
 
-Instance exec_equiv_rx_equivalence :
+Program Instance exec_equiv_rx_equivalence :
   Equivalence (@exec_equiv_rx Op T).
-Proof.
-  unfold exec_equiv_rx.
-  split.
-  - intro t.
-    reflexivity.
-  - unfold Symmetric, exec_equiv_opt; intros.
-    symmetry. eauto.
-  - unfold Transitive; intros.
-    etransitivity; eauto.
-Qed.
 
 Instance thread_upd_exec_equiv_proper :
   Proper (eq ==> eq ==> exec_equiv_opt ==> exec_equiv_ts) (@thread_upd Op).
@@ -671,18 +630,8 @@ Definition atomic_equiv `(p1 : proc Op T) p2 :=
     atomic_exec op_step p1 tid s r s' evs <->
     atomic_exec op_step p2 tid s r s' evs.
 
-Instance atomic_equiv_equivalence :
+Program Instance atomic_equiv_equivalence :
   Equivalence (@atomic_equiv Op T).
-Proof.
-  split.
-  - firstorder.
-  - unfold Symmetric, atomic_equiv; intros.
-    split; intros; apply H; eauto.
-  - unfold Transitive, exec_equiv_ts; intros.
-    split; intros.
-    + apply H0. apply H. eauto.
-    + apply H. apply H0. eauto.
-Qed.
 
 Instance atomic_equiv_proper :
   Proper (atomic_equiv ==> atomic_equiv ==> iff) (@atomic_equiv Op T).
@@ -806,21 +755,18 @@ Definition trace_incl_ts {Op State} op_step (ts1 ts2 : threads_state Op) :=
   forall (s : State),
     trace_incl_ts_s op_step s s ts1 ts2.
 
-Instance trace_incl_ts_s_preorder :
+Program Instance trace_incl_ts_s_preorder :
   PreOrder (@trace_incl_ts_s Op State op_step s s).
-Proof.
-  constructor; repeat (hnf; intros).
-  - eauto.
-  - unfold trace_incl_ts_s in *; eauto 10.
+Next Obligation.
+  hnf; intros.
+  eauto.
+Qed.
+Next Obligation.
+  unfold trace_incl_ts_s in *; eauto 10.
 Qed.
 
-Instance trace_incl_ts_preorder :
+Program Instance trace_incl_ts_preorder :
   PreOrder (@trace_incl_ts Op State op_step).
-Proof.
-  constructor; hnf; intros.
-  - hnf; reflexivity.
-  - hnf; etransitivity; eauto.
-Qed.
 
 Instance exec_equiv_ts_to_trace_incl_ts :
   subrelation (@exec_equiv_ts Op) (@trace_incl_ts Op State op_step).
@@ -939,30 +885,14 @@ Proof.
   split; eauto.
 Qed.
 
-Ltac RelInstance_t :=
-  intros;
-  let refl := try solve [ hnf; intros; reflexivity ] in
-  let symm := try solve [ hnf; intros; try symmetry; eauto ] in
-  let trans := try solve [ hnf; intros; etransitivity; eauto ] in
-  match goal with
-  | |- Reflexive _ =>
-    hnf; intros; refl
-  | |- PreOrder _ =>
-    constructor; hnf; intros; [ refl | trans ]
-  | |- Equivalence _ =>
-    constructor; hnf; intros; [ refl | symm | trans ]
-  end.
+Program Instance trace_incl_opt_preorder Op State (op_step: OpSemantics Op State) :
+  PreOrder (trace_incl_opt op_step).
 
-Notation RelInstance := (ltac:(RelInstance_t)) (only parsing).
+Program Instance trace_incl_s_preorder :
+  PreOrder (@trace_incl_s State s tid Op op_step T).
 
-Instance trace_incl_opt_preorder Op State (op_step: OpSemantics Op State) :
-  PreOrder (trace_incl_opt op_step) := RelInstance.
-
-Instance trace_incl_s_preorder :
-  PreOrder (@trace_incl_s State s tid Op op_step T) := RelInstance.
-
-Instance trace_incl_preorder :
-  PreOrder (@trace_incl Op T State op_step) := RelInstance.
+Program Instance trace_incl_preorder :
+  PreOrder (@trace_incl Op T State op_step).
 
 Instance exec_equiv_opt_to_trace_incl_opt :
   subrelation (@exec_equiv_opt Op) (@trace_incl_opt Op State op_step).
@@ -1332,24 +1262,25 @@ Qed.
 Instance trace_incl_N_reflexive :
   Reflexive (@trace_incl_N n Op T State op_step) := RelInstance.
 
-Instance trace_incl_rx_preorder :
+Program Instance trace_incl_rx_preorder :
   PreOrder (@trace_incl_rx Op T State op_step).
-Proof.
-  unfold trace_incl_rx.
-  RelInstance_t.
-  - unfold trace_incl_rx_N; intros.
-    eapply trace_incl_N_bind_a.
-    eauto.
-  - repeat (hnf; intros).
-    eapply H in H4; try omega.
-    apply exec_to_counter in H4; propositional.
-    eapply H0 in H4; try omega.
-    eauto.
-    2: intros; reflexivity.
-    reflexivity. reflexivity.
-    reflexivity.
-    intros; eapply trace_incl_N_le; eauto.
-    omega.
+Next Obligation.
+  unfold trace_incl_rx, trace_incl_rx_N; intros.
+  eapply trace_incl_N_bind_a.
+  eauto.
+Qed.
+Next Obligation.
+  unfold trace_incl_rx in *.
+  repeat (hnf; intros).
+  eapply H in H4; try omega.
+  apply exec_to_counter in H4; propositional.
+  eapply H0 in H4; try omega.
+  eauto.
+  2: intros; reflexivity.
+  reflexivity. reflexivity.
+  reflexivity.
+  intros; eapply trace_incl_N_le; eauto.
+  omega.
 Qed.
 
 Instance Bind_trace_incl_proper_2 :
