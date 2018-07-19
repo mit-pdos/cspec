@@ -15,7 +15,6 @@ Require Export Helpers.Ordering.
 Require Export Helpers.StringUtils.
 
 Require Export Spec.ConcurExec.
-Require Export Spec.Equiv.
 Require Export Spec.Compile.
 Require Export Spec.Abstraction.
 Require Export Spec.Modules.

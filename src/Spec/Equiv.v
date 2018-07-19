@@ -68,26 +68,16 @@ Proof.
   eauto.
 Qed.
 
-Lemma thread_upd_aba : forall Op (ts: threads_state Op) tid1 tid2 p1 p2 p3,
-    tid1 <> tid2 ->
-    ts [[tid1 := p1]] [[tid2 := p2]] [[tid1 := p3]] =
-    ts [[tid1 := p3]] [[tid2 := p2]].
-Proof.
-  intros.
-  rewrite thread_upd_ne_comm by auto.
-  autorewrite with t; auto.
-Qed.
-
-Lemma thread_upd_aba' :
+Lemma thread_upd_aba :
   forall Op (ts: threads_state Op) tid1 tid2 p1 p2 p3,
     tid1 <> tid2 ->
     ts [[tid1 := p1]] [[tid2 := p2]] [[tid1 := p3]] =
     ts [[tid2 := p2]] [[tid1 := p3]].
 Proof.
   intros.
-  rewrite thread_upd_aba by congruence.
-  rewrite thread_upd_ne_comm by auto.
-  auto.
+  rewrite ?thread_upd_ne_comm with (tid:=tid2) (tid':=tid1) by auto.
+  f_equal.
+  autorewrite with t; auto.
 Qed.
 
 Lemma thread_spawn_none :
@@ -208,11 +198,28 @@ Ltac guess_ExecPrefix :=
     ExecPrefix tid tid'
   end.
 
+(* for performance reasons, we define this safely repeated version of exec_tid *)
+Local Notation exec_p p := (exec_tid _ _ _ p _ _ _ _) (only parsing).
+Ltac exec_tid_simpl :=
+  let execinv H := inversion H; clear H; subst in
+  repeat (match goal with
+          | [ H: exec_p (Ret _) |- _ ] => execinv H
+          | [ H: exec_p (Atomic _) |- _ ] => execinv H
+          | [ H: exec_p (Call _) |- _ ] => execinv H
+          | [ H: exec_p (Bind _ _) |- _ ] => execinv H
+          | [ H: exec_p (Until _ _ _) |- _ ] => execinv H
+          | [ H: exec_p (Spawn _) |- _ ] => execinv H
+          end || maybe_proc_inv);
+  autorewrite with t in *.
+
+(* former unoptimized implementation *)
+(* Ltac exec_tid_simpl := repeat (exec_tid_inv; is_one_goal). *)
+
 Ltac solve_ExecEquiv :=
   match goal with
   | [ H: context[thread_get (thread_upd _ ?tid _) ?tid'] |- _ ] =>
     cmp_ts tid' tid; repeat maybe_proc_inv;
-    repeat (exec_tid_inv; let n := numgoals in guard n = 1);
+    exec_tid_simpl;
     try (solve [ eauto ] ||
          solve [ guess_ExecPrefix ])
   end.
@@ -248,7 +255,7 @@ Qed.
 
 Hint Constructors exec_tid.
 
-Hint Rewrite thread_upd_aba' using congruence : t.
+Hint Rewrite thread_upd_aba using congruence : t.
 
 Theorem exec_equiv_bind_ret : forall `(p : proc Op T),
   exec_equiv (Bind p Ret) p.
@@ -273,18 +280,6 @@ Proof.
   rewrite <- exec_equiv_bind_ret with (p := x).
   rewrite <- exec_equiv_bind_ret with (p := y).
   eauto.
-Qed.
-
-Lemma thread_upd_other_and_spawn_eq :
-  forall Op (ts:threads_state Op)
-    tid T (p: proc _ T) tid' spawned tid'' T' (p': proc _ T'),
-    tid' <> tid'' ->
-    tid <> tid'' ->
-    ts tid'' = Proc p ->
-    ts [[tid := Proc p']] [[tid' := spawned]] tid'' = Proc p.
-Proof.
-  intros.
-  autorewrite with t; auto.
 Qed.
 
 Theorem exec_equiv_rx_proof_helper : forall `(p1 : proc Op T) p2,
@@ -317,23 +312,8 @@ Theorem exec_equiv_ret_bind : forall `(v : T) `(p : T -> proc Op T'),
   exec_equiv_rx (Bind (Ret v) p) (p v).
 Proof.
   intros.
-  eapply exec_equiv_rx_proof_helper; intros.
-  - repeat exec_tid_inv; simpl.
-    rewrite thread_upd_same_eq with (tid:=tid') in H2 by eauto.
-    eauto.
-  - rewrite <- app_nil_l with (l := evs).
-    rewrite prepend_app.
-    ExecPrefix tid tid'.
-    ExecPrefix tid tid'.
-Qed.
-
-Theorem exec_equiv_atomicret_bind : forall `(v : T) `(p : T -> proc Op T'),
-  exec_equiv_rx (Bind (Atomic (Ret v)) p) (p v).
-Proof.
-  intros.
-  eapply exec_equiv_rx_proof_helper; intros.
-  - repeat exec_tid_inv.
-    repeat atomic_exec_inv.
+  eapply exec_equiv_rx_proof_helper; intros; exec_tid_simpl.
+  - simpl.
     rewrite thread_upd_same_eq with (tid:=tid') in H2 by eauto.
     eauto.
   - rewrite <- app_nil_l with (l := evs).
@@ -346,14 +326,10 @@ Theorem exec_equiv_atomicret_ret : forall Op `(v : T),
   @exec_equiv_rx Op _ (Atomic (Ret v)) (Ret v).
 Proof.
   intros.
-  eapply exec_equiv_rx_proof_helper; intros.
-  - repeat exec_tid_inv.
-    repeat atomic_exec_inv.
-    rewrite thread_upd_same_eq with (tid:=tid') in H2 by eauto.
+  eapply exec_equiv_rx_proof_helper; intros; exec_tid_simpl.
+  - repeat atomic_exec_inv.
     ExecPrefix tid tid'.
-    rewrite thread_upd_same_eq with (tid:=tid') by eauto; eauto.
-  - repeat exec_tid_inv.
-    ExecPrefix tid tid'.
+  - ExecPrefix tid tid'.
 Qed.
 
 Theorem exec_equiv_bind_bind : forall `(p1 : proc Op T1) `(p2 : T1 -> proc Op T2) `(p3 : T2 -> proc Op T3),
@@ -366,14 +342,6 @@ Proof.
   - ExecEquiv' p1.
     ExecPrefix tid tid'.
     destruct result; eauto.
-Qed.
-
-Theorem exec_equiv_norx_bind_bind : forall `(p1 : proc Op T1) `(p2 : T1 -> proc Op T2) `(p3 : T2 -> proc Op T3),
-  exec_equiv (Bind (Bind p1 p2) p3) (Bind p1 (fun v => Bind (p2 v) p3)).
-Proof.
-  intros.
-  rewrite exec_equiv_bind_bind.
-  reflexivity.
 Qed.
 
 Theorem exec_equiv_bind_a : forall `(p : proc Op T) `(p1 : T -> proc _ T') p2,
@@ -392,26 +360,12 @@ Proof.
     eapply H; eauto.
 Qed.
 
-Theorem exec_equiv_bind_bind' : forall `(p1 : proc Op T1) `(p2 : T1 -> proc _ T2) `(p3 : T1 -> T2 -> proc _ T3),
-  exec_equiv_rx (Bind p1 (fun x => Bind (p2 x) (p3 x)))
-             (Bind (Bind p1 (fun x => Bind (p2 x) (fun y => Ret (x, y))))
-                   (fun p => p3 (fst p) (snd p))).
-Proof.
-  unfold exec_equiv_rx; intros.
-  repeat rewrite exec_equiv_bind_bind.
-  eapply exec_equiv_bind_a; intros.
-  repeat rewrite exec_equiv_bind_bind.
-  eapply exec_equiv_bind_a; intros.
-  rewrite exec_equiv_ret_bind; simpl.
-  reflexivity.
-Qed.
-
 Theorem exec_equiv_until : forall `(p : option T -> proc Op T) (c : T -> bool) v,
   exec_equiv_rx (Until c p v) (until1 c p v).
 Proof.
   intros.
   eapply exec_equiv_rx_proof_helper; intros.
-  - repeat exec_tid_inv.
+  - exec_tid_simpl.
     rewrite thread_upd_same_eq with (tid:=tid') in H2 by congruence.
     simpl; eauto.
   - rewrite <- app_nil_l with (l := evs).
@@ -420,17 +374,18 @@ Proof.
     ExecPrefix tid tid'.
 Qed.
 
-Theorem exec_equiv_until_once : forall Op `(p : proc Op T),
-  exec_equiv_rx (Until (fun _ => true) (fun _ => p) None) p.
+Theorem exec_equiv_congruence : forall Op T (p1 p2: proc Op T) T' (rx1 rx2: T -> proc Op T'),
+  exec_equiv_rx p1 p2 ->
+  (forall x, exec_equiv_rx (rx1 x) (rx2 x)) ->
+  exec_equiv_rx (Bind p1 rx1) (Bind p2 rx2).
 Proof.
   intros.
-  rewrite exec_equiv_until.
-  unfold until1.
   unfold exec_equiv_rx; intros.
-  rewrite exec_equiv_bind_bind.
+  repeat rewrite exec_equiv_bind_bind.
+  etransitivity.
+  eapply H.
   eapply exec_equiv_bind_a; intros.
-  rewrite exec_equiv_ret_bind.
-  reflexivity.
+  eapply H0.
 Qed.
 
 Instance Bind_exec_equiv_proper :
@@ -438,43 +393,14 @@ Instance Bind_exec_equiv_proper :
           pointwise_relation T exec_equiv_rx ==>
           @exec_equiv_rx Op TR) Bind.
 Proof.
-  unfold exec_equiv_rx; intros.
-  intros p1a p1b H1; intros.
-  intros p2a p2b H2; intros.
-  repeat rewrite exec_equiv_bind_bind.
-  etransitivity.
-  eapply H1.
-  eapply exec_equiv_bind_a; intros.
-  eapply H2.
-Qed.
-
-Theorem exec_equiv_ts_upd_same : forall `(ts : threads_state Op) p tid,
-  ts [[ tid ]] = p ->
-  exec_equiv_ts ts (ts [[ tid := p ]]).
-Proof.
-  intros.
-  autorewrite with t; reflexivity.
+  unfold Proper, respectful, pointwise_relation; intros.
+  apply exec_equiv_congruence; auto.
 Qed.
 
 Instance exec_proper_exec_equiv :
   Proper (eq ==> eq ==> exec_equiv_ts ==> eq ==> iff) (@exec Op State).
 Proof.
-  intros.
-  intros ? ? ?; subst.
-  intros ? ? ?; subst.
-  intros ? ? ?; subst.
-  intros ? ? ?; subst.
-  apply H.
-Qed.
-
-Theorem exec_equiv_rx_bind_ret : forall `(p : proc Op T),
-  exec_equiv_rx (Bind p Ret) p.
-Proof.
-  unfold exec_equiv_rx; intros.
-  rewrite exec_equiv_bind_bind.
-  eapply exec_equiv_bind_a; intros.
-  rewrite exec_equiv_ret_bind.
-  reflexivity.
+  unfold Proper, respectful; intros; subst; eauto.
 Qed.
 
 (** exec_equiv with counter *)
@@ -486,10 +412,6 @@ Definition exec_equiv_ts_N n Op (ts1 ts2: threads_state Op) :=
 
 Definition exec_equiv_N n Op T (p1 p2: proc Op T) :=
   forall ts tid, exec_equiv_ts_N n (ts [[tid := Proc p1]]) (ts [[tid := Proc p2]]).
-
-Definition exec_equiv_rx_N n `(p1: proc Op T) (p2: proc _ T) :=
-  forall TR (rx: T -> proc _ TR),
-    exec_equiv_N n (Bind p1 rx) (Bind p2 rx).
 
 Hint Extern 1 (exec _ _ _ _ _) =>
 match goal with
@@ -538,17 +460,7 @@ Program Instance atomic_equiv_equivalence :
 Instance atomic_equiv_proper :
   Proper (atomic_equiv ==> atomic_equiv ==> iff) (@atomic_equiv Op T).
 Proof.
-  intros.
-  intros ? ? ?.
-  intros ? ? ?.
-  split; intros.
-  - symmetry.
-    etransitivity; eauto.
-    symmetry.
-    etransitivity; eauto.
-  - etransitivity; eauto.
-    etransitivity; eauto.
-    symmetry; eauto.
+  typeclasses eauto.
 Qed.
 
 Theorem atomic_equiv_ret_bind : forall `(v : T) `(p : T -> proc Op T'),
@@ -587,32 +499,27 @@ Proof.
     eauto.
 Qed.
 
-Theorem atomic_equiv_bind_a : forall `(p : proc Op T) `(p1 : T -> proc _ T') p2,
-  (forall x, atomic_equiv (p1 x) (p2 x)) ->
-  atomic_equiv (Bind p p1) (Bind p p2).
+Theorem atomic_equiv_bind_congruence : forall Op T (p1 p2: proc Op T) T' (rx1 rx2: T -> proc Op T'),
+    atomic_equiv p1 p2 ->
+  (forall x, atomic_equiv (rx1 x) (rx2 x)) ->
+  atomic_equiv (Bind p1 rx1) (Bind p2 rx2).
 Proof.
-  unfold atomic_equiv; intros.
-  split; intros.
-  - invert H0.
-    econstructor; eauto.
-    eapply H; eauto.
-  - invert H0.
-    econstructor; eauto.
-    eapply H; eauto.
+  split; intros; atomic_exec_inv.
+  - apply H in H11.
+    apply H0 in H12.
+    eauto.
+  - apply H in H11.
+    apply H0 in H12.
+    eauto.
 Qed.
 
-Theorem atomic_equiv_bind_bind' : forall `(p1 : proc Op T1) `(p2 : T1 -> proc _ T2) `(p3 : T1 -> T2 -> proc _ T3),
-  atomic_equiv (Bind p1 (fun x => Bind (p2 x) (p3 x)))
-               (Bind (Bind p1 (fun x => Bind (p2 x) (fun y => Ret (x, y))))
-                     (fun p => p3 (fst p) (snd p))).
+Instance Bind_proper_atomic_equiv :
+  Proper (atomic_equiv ==>
+          pointwise_relation T atomic_equiv ==>
+          @atomic_equiv Op TR) Bind.
 Proof.
-  intros.
-  rewrite atomic_equiv_bind_bind.
-  eapply atomic_equiv_bind_a; intros.
-  rewrite atomic_equiv_bind_bind.
-  eapply atomic_equiv_bind_a; intros.
-  rewrite atomic_equiv_ret_bind; simpl.
-  reflexivity.
+  unfold Proper, respectful, pointwise_relation; intros.
+  apply atomic_equiv_bind_congruence; auto.
 Qed.
 
 Instance Atomic_proper_atomic_equiv :
@@ -626,23 +533,6 @@ Proof.
     ExecPrefix tid tid'.
   - apply H in H9.
     ExecPrefix tid tid'.
-Qed.
-
-Instance Bind_proper_atomic_equiv :
-  Proper (atomic_equiv ==>
-          pointwise_relation T atomic_equiv ==>
-          @atomic_equiv Op TR) Bind.
-Proof.
-  intros.
-  intros p1a p1b H1.
-  intros p2a p2b H2.
-  split; intros; atomic_exec_inv.
-  - apply H1 in H11.
-    apply H2 in H12.
-    eauto.
-  - apply H1 in H11.
-    apply H2 in H12.
-    eauto.
 Qed.
 
 
@@ -1153,7 +1043,7 @@ Proof.
   - ExecPrefix tid tid'.
   - rewrite thread_upd_same_eq with (tid:=tid') in * by auto.
     rewrite prepend_app.
-    rewrite exec_equiv_norx_bind_bind.
+    rewrite exec_equiv_bind_bind.
     eauto.
   - ExecPrefix tid tid'.
   - abstract_tr.
@@ -1335,22 +1225,6 @@ Proof.
       eapply IHn with (n0:=n1) (n':=n1) (rx1:=rx1); intros; try omega; eauto.
       eapply trace_incl_rx_N_le; eauto; omega.
       eapply trace_incl_N_le; eauto; omega.
-Qed.
-
-Theorem trace_incl_rx_until' :
-  forall T Op (p1 p2 : option T -> proc Op T)
-         `(op_step : OpSemantics Op State)
-         (c : T -> bool) v,
-    (forall n v', trace_incl_rx_N n op_step (p1 v') (p2 v')) ->
-    forall n, trace_incl_rx_N n op_step (Until c p1 v) (Until c p2 v).
-Proof.
-  repeat ( intro; intros ).
-  eapply trace_incl_rx_until_helper in H3.
-  5: reflexivity.
-  eassumption.
-  intros. eapply H.
-  reflexivity.
-  intros; eapply trace_incl_N_le; eauto; omega.
 Qed.
 
 Theorem trace_incl_rx_until :
