@@ -7,6 +7,7 @@ Parameter abstract_string : Type.
 Definition string: Type := abstract_string.
 Parameter tmp_string : string.
 Parameter mail_string : string.
+Parameter nouser_string : string.
 Parameter bench_msg : string.
 Parameter tmp_mail_ne : tmp_string <> mail_string.
 Parameter abstract_string_length : string -> nat.
@@ -22,6 +23,8 @@ Module UserIdx <: HIndex.
   Definition indexCmp := string_Ordering.
 End UserIdx.
 
+Axiom nouser_valid : UserIdx.indexValid nouser_string.
+Definition nouser := exist _ nouser_string nouser_valid.
 
 Module MailServerOp <: Ops.
 

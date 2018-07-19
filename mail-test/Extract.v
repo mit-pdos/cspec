@@ -16,6 +16,7 @@ Extract Inlined Constant abstract_string => "BS.ByteString".
 Extract Inlined Constant abstract_string_length => "(\s -> Prelude.fromIntegral (BS.length s))".
 Extract Inlined Constant tmp_string => """tmp""".
 Extract Inlined Constant mail_string => """mail""".
+Extract Inlined Constant nouser_string => """fake_user""".
 Extract Inlined Constant bench_msg => """Hello world.""".
 
 Cd "mail-test/extract/".

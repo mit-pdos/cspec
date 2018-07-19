@@ -2,9 +2,6 @@ Require Import CSPEC.
 Require Import MailServerAPI.
 Require Import MailServerComposedAPI.
 
-
-Axiom nouser : validIndexT UserIdx.indexValid.
-
 Module MailServerComposedImpl' <:
   LayerImplMoversT
     MailServerComposedState
@@ -54,8 +51,7 @@ Module MailServerComposedImpl' <:
     all: try rewrite hadd_hget_eq.
     all: eauto.
 
-    generalize nouser; intros.
-    destruct_validIndex.
+    destruct nouser.
     rewrite hadd_hget_eq.
     eauto.
   Qed.
