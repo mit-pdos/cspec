@@ -68,26 +68,16 @@ Proof.
   eauto.
 Qed.
 
-Lemma thread_upd_aba : forall Op (ts: threads_state Op) tid1 tid2 p1 p2 p3,
-    tid1 <> tid2 ->
-    ts [[tid1 := p1]] [[tid2 := p2]] [[tid1 := p3]] =
-    ts [[tid1 := p3]] [[tid2 := p2]].
-Proof.
-  intros.
-  rewrite thread_upd_ne_comm by auto.
-  autorewrite with t; auto.
-Qed.
-
-Lemma thread_upd_aba' :
+Lemma thread_upd_aba :
   forall Op (ts: threads_state Op) tid1 tid2 p1 p2 p3,
     tid1 <> tid2 ->
     ts [[tid1 := p1]] [[tid2 := p2]] [[tid1 := p3]] =
     ts [[tid2 := p2]] [[tid1 := p3]].
 Proof.
   intros.
-  rewrite thread_upd_aba by congruence.
-  rewrite thread_upd_ne_comm by auto.
-  auto.
+  rewrite ?thread_upd_ne_comm with (tid:=tid2) (tid':=tid1) by auto.
+  f_equal.
+  autorewrite with t; auto.
 Qed.
 
 Lemma thread_spawn_none :
@@ -248,7 +238,7 @@ Qed.
 
 Hint Constructors exec_tid.
 
-Hint Rewrite thread_upd_aba' using congruence : t.
+Hint Rewrite thread_upd_aba using congruence : t.
 
 Theorem exec_equiv_bind_ret : forall `(p : proc Op T),
   exec_equiv (Bind p Ret) p.
