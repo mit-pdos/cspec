@@ -35,3 +35,5 @@ Ltac induct H :=
   induction H; repeat sigT_eq; propositional.
 Ltac invert H :=
   inversion H; repeat sigT_eq; propositional; repeat sigT_eq.
+
+Ltac is_one_goal := let n := numgoals in guard n = 1.

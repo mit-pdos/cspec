@@ -198,11 +198,28 @@ Ltac guess_ExecPrefix :=
     ExecPrefix tid tid'
   end.
 
+(* for performance reasons, we define this safely repeated version of exec_tid *)
+Local Notation exec_p p := (exec_tid _ _ _ p _ _ _ _) (only parsing).
+Ltac exec_tid_simpl :=
+  let execinv H := inversion H; clear H; subst in
+  repeat (match goal with
+          | [ H: exec_p (Ret _) |- _ ] => execinv H
+          | [ H: exec_p (Atomic _) |- _ ] => execinv H
+          | [ H: exec_p (Call _) |- _ ] => execinv H
+          | [ H: exec_p (Bind _ _) |- _ ] => execinv H
+          | [ H: exec_p (Until _ _ _) |- _ ] => execinv H
+          | [ H: exec_p (Spawn _) |- _ ] => execinv H
+          end || maybe_proc_inv);
+  autorewrite with t in *.
+
+(* former unoptimized implementation *)
+(* Ltac exec_tid_simpl := repeat (exec_tid_inv; is_one_goal). *)
+
 Ltac solve_ExecEquiv :=
   match goal with
   | [ H: context[thread_get (thread_upd _ ?tid _) ?tid'] |- _ ] =>
     cmp_ts tid' tid; repeat maybe_proc_inv;
-    repeat (exec_tid_inv; let n := numgoals in guard n = 1);
+    exec_tid_simpl;
     try (solve [ eauto ] ||
          solve [ guess_ExecPrefix ])
   end.
@@ -295,8 +312,8 @@ Theorem exec_equiv_ret_bind : forall `(v : T) `(p : T -> proc Op T'),
   exec_equiv_rx (Bind (Ret v) p) (p v).
 Proof.
   intros.
-  eapply exec_equiv_rx_proof_helper; intros.
-  - repeat exec_tid_inv; simpl.
+  eapply exec_equiv_rx_proof_helper; intros; exec_tid_simpl.
+  - simpl.
     rewrite thread_upd_same_eq with (tid:=tid') in H2 by eauto.
     eauto.
   - rewrite <- app_nil_l with (l := evs).
@@ -309,14 +326,10 @@ Theorem exec_equiv_atomicret_ret : forall Op `(v : T),
   @exec_equiv_rx Op _ (Atomic (Ret v)) (Ret v).
 Proof.
   intros.
-  eapply exec_equiv_rx_proof_helper; intros.
-  - repeat exec_tid_inv.
-    repeat atomic_exec_inv.
-    rewrite thread_upd_same_eq with (tid:=tid') in H2 by eauto.
+  eapply exec_equiv_rx_proof_helper; intros; exec_tid_simpl.
+  - repeat atomic_exec_inv.
     ExecPrefix tid tid'.
-    rewrite thread_upd_same_eq with (tid:=tid') by eauto; eauto.
-  - repeat exec_tid_inv.
-    ExecPrefix tid tid'.
+  - ExecPrefix tid tid'.
 Qed.
 
 Theorem exec_equiv_bind_bind : forall `(p1 : proc Op T1) `(p2 : T1 -> proc Op T2) `(p3 : T2 -> proc Op T3),
@@ -374,7 +387,7 @@ Theorem exec_equiv_until : forall `(p : option T -> proc Op T) (c : T -> bool) v
 Proof.
   intros.
   eapply exec_equiv_rx_proof_helper; intros.
-  - repeat exec_tid_inv.
+  - exec_tid_simpl.
     rewrite thread_upd_same_eq with (tid:=tid') in H2 by congruence.
     simpl; eauto.
   - rewrite <- app_nil_l with (l := evs).
