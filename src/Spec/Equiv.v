@@ -499,32 +499,27 @@ Proof.
     eauto.
 Qed.
 
-Theorem atomic_equiv_bind_a : forall `(p : proc Op T) `(p1 : T -> proc _ T') p2,
-  (forall x, atomic_equiv (p1 x) (p2 x)) ->
-  atomic_equiv (Bind p p1) (Bind p p2).
+Theorem atomic_equiv_bind_congruence : forall Op T (p1 p2: proc Op T) T' (rx1 rx2: T -> proc Op T'),
+    atomic_equiv p1 p2 ->
+  (forall x, atomic_equiv (rx1 x) (rx2 x)) ->
+  atomic_equiv (Bind p1 rx1) (Bind p2 rx2).
 Proof.
-  unfold atomic_equiv; intros.
-  split; intros.
-  - invert H0.
-    econstructor; eauto.
-    eapply H; eauto.
-  - invert H0.
-    econstructor; eauto.
-    eapply H; eauto.
+  split; intros; atomic_exec_inv.
+  - apply H in H11.
+    apply H0 in H12.
+    eauto.
+  - apply H in H11.
+    apply H0 in H12.
+    eauto.
 Qed.
 
-Theorem atomic_equiv_bind_bind' : forall `(p1 : proc Op T1) `(p2 : T1 -> proc _ T2) `(p3 : T1 -> T2 -> proc _ T3),
-  atomic_equiv (Bind p1 (fun x => Bind (p2 x) (p3 x)))
-               (Bind (Bind p1 (fun x => Bind (p2 x) (fun y => Ret (x, y))))
-                     (fun p => p3 (fst p) (snd p))).
+Instance Bind_proper_atomic_equiv :
+  Proper (atomic_equiv ==>
+          pointwise_relation T atomic_equiv ==>
+          @atomic_equiv Op TR) Bind.
 Proof.
-  intros.
-  rewrite atomic_equiv_bind_bind.
-  eapply atomic_equiv_bind_a; intros.
-  rewrite atomic_equiv_bind_bind.
-  eapply atomic_equiv_bind_a; intros.
-  rewrite atomic_equiv_ret_bind; simpl.
-  reflexivity.
+  unfold Proper, respectful, pointwise_relation; intros.
+  apply atomic_equiv_bind_congruence; auto.
 Qed.
 
 Instance Atomic_proper_atomic_equiv :
@@ -538,23 +533,6 @@ Proof.
     ExecPrefix tid tid'.
   - apply H in H9.
     ExecPrefix tid tid'.
-Qed.
-
-Instance Bind_proper_atomic_equiv :
-  Proper (atomic_equiv ==>
-          pointwise_relation T atomic_equiv ==>
-          @atomic_equiv Op TR) Bind.
-Proof.
-  intros.
-  intros p1a p1b H1.
-  intros p2a p2b H2.
-  split; intros; atomic_exec_inv.
-  - apply H1 in H11.
-    apply H2 in H12.
-    eauto.
-  - apply H1 in H11.
-    apply H2 in H12.
-    eauto.
 Qed.
 
 
