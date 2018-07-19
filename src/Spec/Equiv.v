@@ -275,18 +275,6 @@ Proof.
   eauto.
 Qed.
 
-Lemma thread_upd_other_and_spawn_eq :
-  forall Op (ts:threads_state Op)
-    tid T (p: proc _ T) tid' spawned tid'' T' (p': proc _ T'),
-    tid' <> tid'' ->
-    tid <> tid'' ->
-    ts tid'' = Proc p ->
-    ts [[tid := Proc p']] [[tid' := spawned]] tid'' = Proc p.
-Proof.
-  intros.
-  autorewrite with t; auto.
-Qed.
-
 Theorem exec_equiv_rx_proof_helper : forall `(p1 : proc Op T) p2,
     (forall tid tid' `(s : State) s' op_step (ts: threads_state _) tr spawned evs `(rx : _ -> proc _ TR) result,
         exec_tid op_step tid s (Bind p1 rx) s' result spawned evs ->
@@ -319,21 +307,6 @@ Proof.
   intros.
   eapply exec_equiv_rx_proof_helper; intros.
   - repeat exec_tid_inv; simpl.
-    rewrite thread_upd_same_eq with (tid:=tid') in H2 by eauto.
-    eauto.
-  - rewrite <- app_nil_l with (l := evs).
-    rewrite prepend_app.
-    ExecPrefix tid tid'.
-    ExecPrefix tid tid'.
-Qed.
-
-Theorem exec_equiv_atomicret_bind : forall `(v : T) `(p : T -> proc Op T'),
-  exec_equiv_rx (Bind (Atomic (Ret v)) p) (p v).
-Proof.
-  intros.
-  eapply exec_equiv_rx_proof_helper; intros.
-  - repeat exec_tid_inv.
-    repeat atomic_exec_inv.
     rewrite thread_upd_same_eq with (tid:=tid') in H2 by eauto.
     eauto.
   - rewrite <- app_nil_l with (l := evs).
@@ -420,19 +393,6 @@ Proof.
     ExecPrefix tid tid'.
 Qed.
 
-Theorem exec_equiv_until_once : forall Op `(p : proc Op T),
-  exec_equiv_rx (Until (fun _ => true) (fun _ => p) None) p.
-Proof.
-  intros.
-  rewrite exec_equiv_until.
-  unfold until1.
-  unfold exec_equiv_rx; intros.
-  rewrite exec_equiv_bind_bind.
-  eapply exec_equiv_bind_a; intros.
-  rewrite exec_equiv_ret_bind.
-  reflexivity.
-Qed.
-
 Instance Bind_exec_equiv_proper :
   Proper (exec_equiv_rx ==>
           pointwise_relation T exec_equiv_rx ==>
@@ -467,16 +427,6 @@ Proof.
   apply H.
 Qed.
 
-Theorem exec_equiv_rx_bind_ret : forall `(p : proc Op T),
-  exec_equiv_rx (Bind p Ret) p.
-Proof.
-  unfold exec_equiv_rx; intros.
-  rewrite exec_equiv_bind_bind.
-  eapply exec_equiv_bind_a; intros.
-  rewrite exec_equiv_ret_bind.
-  reflexivity.
-Qed.
-
 (** exec_equiv with counter *)
 
 Definition exec_equiv_ts_N n Op (ts1 ts2: threads_state Op) :=
@@ -486,10 +436,6 @@ Definition exec_equiv_ts_N n Op (ts1 ts2: threads_state Op) :=
 
 Definition exec_equiv_N n Op T (p1 p2: proc Op T) :=
   forall ts tid, exec_equiv_ts_N n (ts [[tid := Proc p1]]) (ts [[tid := Proc p2]]).
-
-Definition exec_equiv_rx_N n `(p1: proc Op T) (p2: proc _ T) :=
-  forall TR (rx: T -> proc _ TR),
-    exec_equiv_N n (Bind p1 rx) (Bind p2 rx).
 
 Hint Extern 1 (exec _ _ _ _ _) =>
 match goal with
