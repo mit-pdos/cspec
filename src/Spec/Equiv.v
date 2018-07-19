@@ -344,14 +344,6 @@ Proof.
     destruct result; eauto.
 Qed.
 
-Theorem exec_equiv_norx_bind_bind : forall `(p1 : proc Op T1) `(p2 : T1 -> proc Op T2) `(p3 : T2 -> proc Op T3),
-  exec_equiv (Bind (Bind p1 p2) p3) (Bind p1 (fun v => Bind (p2 v) p3)).
-Proof.
-  intros.
-  rewrite exec_equiv_bind_bind.
-  reflexivity.
-Qed.
-
 Theorem exec_equiv_bind_a : forall `(p : proc Op T) `(p1 : T -> proc _ T') p2,
   (forall x, exec_equiv (p1 x) (p2 x)) ->
   exec_equiv (Bind p p1) (Bind p p2).
@@ -366,20 +358,6 @@ Proof.
     ExecPrefix tid tid'.
     destruct result0; eauto.
     eapply H; eauto.
-Qed.
-
-Theorem exec_equiv_bind_bind' : forall `(p1 : proc Op T1) `(p2 : T1 -> proc _ T2) `(p3 : T1 -> T2 -> proc _ T3),
-  exec_equiv_rx (Bind p1 (fun x => Bind (p2 x) (p3 x)))
-             (Bind (Bind p1 (fun x => Bind (p2 x) (fun y => Ret (x, y))))
-                   (fun p => p3 (fst p) (snd p))).
-Proof.
-  unfold exec_equiv_rx; intros.
-  repeat rewrite exec_equiv_bind_bind.
-  eapply exec_equiv_bind_a; intros.
-  repeat rewrite exec_equiv_bind_bind.
-  eapply exec_equiv_bind_a; intros.
-  rewrite exec_equiv_ret_bind; simpl.
-  reflexivity.
 Qed.
 
 Theorem exec_equiv_until : forall `(p : option T -> proc Op T) (c : T -> bool) v,
@@ -419,23 +397,10 @@ Proof.
   apply exec_equiv_congruence; auto.
 Qed.
 
-Theorem exec_equiv_ts_upd_same : forall `(ts : threads_state Op) p tid,
-  ts [[ tid ]] = p ->
-  exec_equiv_ts ts (ts [[ tid := p ]]).
-Proof.
-  intros.
-  autorewrite with t; reflexivity.
-Qed.
-
 Instance exec_proper_exec_equiv :
   Proper (eq ==> eq ==> exec_equiv_ts ==> eq ==> iff) (@exec Op State).
 Proof.
-  intros.
-  intros ? ? ?; subst.
-  intros ? ? ?; subst.
-  intros ? ? ?; subst.
-  intros ? ? ?; subst.
-  apply H.
+  unfold Proper, respectful; intros; subst; eauto.
 Qed.
 
 (** exec_equiv with counter *)
@@ -495,17 +460,7 @@ Program Instance atomic_equiv_equivalence :
 Instance atomic_equiv_proper :
   Proper (atomic_equiv ==> atomic_equiv ==> iff) (@atomic_equiv Op T).
 Proof.
-  intros.
-  intros ? ? ?.
-  intros ? ? ?.
-  split; intros.
-  - symmetry.
-    etransitivity; eauto.
-    symmetry.
-    etransitivity; eauto.
-  - etransitivity; eauto.
-    etransitivity; eauto.
-    symmetry; eauto.
+  typeclasses eauto.
 Qed.
 
 Theorem atomic_equiv_ret_bind : forall `(v : T) `(p : T -> proc Op T'),
@@ -1110,7 +1065,7 @@ Proof.
   - ExecPrefix tid tid'.
   - rewrite thread_upd_same_eq with (tid:=tid') in * by auto.
     rewrite prepend_app.
-    rewrite exec_equiv_norx_bind_bind.
+    rewrite exec_equiv_bind_bind.
     eauto.
   - ExecPrefix tid tid'.
   - abstract_tr.
@@ -1292,22 +1247,6 @@ Proof.
       eapply IHn with (n0:=n1) (n':=n1) (rx1:=rx1); intros; try omega; eauto.
       eapply trace_incl_rx_N_le; eauto; omega.
       eapply trace_incl_N_le; eauto; omega.
-Qed.
-
-Theorem trace_incl_rx_until' :
-  forall T Op (p1 p2 : option T -> proc Op T)
-         `(op_step : OpSemantics Op State)
-         (c : T -> bool) v,
-    (forall n v', trace_incl_rx_N n op_step (p1 v') (p2 v')) ->
-    forall n, trace_incl_rx_N n op_step (Until c p1 v) (Until c p2 v).
-Proof.
-  repeat ( intro; intros ).
-  eapply trace_incl_rx_until_helper in H3.
-  5: reflexivity.
-  eassumption.
-  intros. eapply H.
-  reflexivity.
-  intros; eapply trace_incl_N_le; eauto; omega.
 Qed.
 
 Theorem trace_incl_rx_until :
