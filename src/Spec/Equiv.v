@@ -396,19 +396,27 @@ Proof.
     ExecPrefix tid tid'.
 Qed.
 
+Theorem exec_equiv_congruence : forall Op T (p1 p2: proc Op T) T' (rx1 rx2: T -> proc Op T'),
+  exec_equiv_rx p1 p2 ->
+  (forall x, exec_equiv_rx (rx1 x) (rx2 x)) ->
+  exec_equiv_rx (Bind p1 rx1) (Bind p2 rx2).
+Proof.
+  intros.
+  unfold exec_equiv_rx; intros.
+  repeat rewrite exec_equiv_bind_bind.
+  etransitivity.
+  eapply H.
+  eapply exec_equiv_bind_a; intros.
+  eapply H0.
+Qed.
+
 Instance Bind_exec_equiv_proper :
   Proper (exec_equiv_rx ==>
           pointwise_relation T exec_equiv_rx ==>
           @exec_equiv_rx Op TR) Bind.
 Proof.
-  unfold exec_equiv_rx; intros.
-  intros p1a p1b H1; intros.
-  intros p2a p2b H2; intros.
-  repeat rewrite exec_equiv_bind_bind.
-  etransitivity.
-  eapply H1.
-  eapply exec_equiv_bind_a; intros.
-  eapply H2.
+  unfold Proper, respectful, pointwise_relation; intros.
+  apply exec_equiv_congruence; auto.
 Qed.
 
 Theorem exec_equiv_ts_upd_same : forall `(ts : threads_state Op) p tid,
