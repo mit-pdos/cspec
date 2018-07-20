@@ -316,3 +316,11 @@ Ltac abstract_tr :=
   match goal with
   | |- exec _ _ _ ?tr => eapply exec_tr_eq
   end.
+
+Ltac NoProc_upd :=
+  repeat lazymatch goal with
+         | [ H: thread_get (_ [[?tid := Proc _]]) ?tid' = NoProc |- _ ] =>
+           cmp_ts tid tid';
+           [ solve [ maybe_proc_inv ] | ]
+         | _ => idtac
+         end.

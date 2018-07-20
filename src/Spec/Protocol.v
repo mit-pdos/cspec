@@ -154,6 +154,8 @@ Section Protocol.
       restricted_step op' tid' s r s' evs ->
       op_allow op tid s'.
 
+  Hint Constructors exec_tid.
+
   Theorem follows_protocol_preserves_exec_tid' :
     forall tid `(p : proc _ T) s s' result spawned evs,
       follows_protocol_proc tid s p ->
