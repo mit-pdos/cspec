@@ -944,7 +944,7 @@ numbers of steps *)
     - ExecPrefix tid tid'.
     - abstract_tr.
       ExecPrefix tid tid'.
-      debug eauto.
+      eauto.
       rewrite thread_upd_same_eq with (tid:=tid') in * by auto;
         eauto with nocore exec.
   Qed.
