@@ -646,7 +646,7 @@ Section YSA.
         exec_any op_step tid s (Atomic p) r s' ->
           (P r) tid s' /\
           left_movers (P r) (l r)) ->
-      trace_incl_s s tid op_step
+      trace_incl_s op_step s tid
         (Bind (Bind (Atomic p) l) rx)
         (Bind (Atomic (Bind p l)) rx).
   Proof.

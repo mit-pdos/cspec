@@ -13,33 +13,37 @@ Import ListNotations.
 Global Set Implicit Arguments.
 Global Generalizable All Variables.
 
-(** A strong notion of execution equivalence, independent of semantics *)
+Section OpSemantics.
 
-Definition exec_equiv_ts {Op} (ts1 ts2 : threads_state Op) :=
-  forall State op_step (s : State) tr,
-    exec op_step s ts1 tr <->
-    exec op_step s ts2 tr.
+  Context {Op:Type -> Type}.
+  Context {State:Type}.
+  Variable op_step: OpSemantics Op State.
 
-(** A stronger notion of equivalence where number of steps taken must be
+  (** A strong notion of execution equivalence, independent of semantics *)
+
+  Definition exec_equiv_ts (ts1 ts2 : threads_state Op) :=
+    forall (s : State) tr,
+      exec op_step s ts1 tr <->
+      exec op_step s ts2 tr.
+
+  (** A stronger notion of equivalence where number of steps taken must be
     identical *)
 
-Definition exec_equiv_ts_N n Op (ts1 ts2: threads_state Op) :=
-  forall State op_step (s: State) tr,
-    exec_till op_step n s ts1 tr <->
-    exec_till op_step n s ts2 tr.
+  Definition exec_equiv_ts_N n (ts1 ts2: threads_state Op) :=
+    forall (s: State) tr,
+      exec_till op_step n s ts1 tr <->
+      exec_till op_step n s ts2 tr.
 
-(** A strong notion of equivalence for programs inside atomic sections.
+  (** A strong notion of equivalence for programs inside atomic sections.
     Basically the same as above, but defined as an underlying [atomic_exec]
     rather than [exec]. *)
 
-Definition atomic_equiv `(p1 : proc Op T) p2 :=
-  forall State op_step (s s' : State) r tid evs,
-    atomic_exec op_step p1 tid s r s' evs <->
-    atomic_exec op_step p2 tid s r s' evs.
+  Definition atomic_equiv `(p1 : proc Op T) p2 :=
+    forall (s s' : State) r tid evs,
+      atomic_exec op_step p1 tid s r s' evs <->
+      atomic_exec op_step p2 tid s r s' evs.
 
-Section OpSemantics.
-
-  Definition exec_equiv_opt `(p1 : maybe_proc Op) p2 :=
+  Definition exec_equiv_opt (p1 : maybe_proc Op) p2 :=
     forall (ts : threads_state _) tid,
       exec_equiv_ts (ts [[ tid := p1 ]]) (ts [[ tid := p2 ]]).
 
@@ -53,16 +57,16 @@ Section OpSemantics.
   Local Obligation Tactic := try RelInstance_t.
 
   Global Program Instance exec_equiv_ts_equivalence :
-    Equivalence (@exec_equiv_ts Op).
+    Equivalence exec_equiv_ts.
 
   Global Program Instance exec_equiv_opt_equivalence :
-    Equivalence (@exec_equiv_opt Op).
+    Equivalence exec_equiv_opt.
 
   Global Program Instance exec_equiv_equivalence :
-    Equivalence (@exec_equiv Op T).
+    Equivalence (@exec_equiv T).
 
   Global Program Instance exec_equiv_rx_equivalence :
-    Equivalence (@exec_equiv_rx Op T).
+    Equivalence (@exec_equiv_rx T).
 
   Global Instance thread_upd_exec_equiv_proper :
     Proper (eq ==> eq ==> exec_equiv_opt ==> exec_equiv_ts) (@thread_upd Op).
@@ -245,8 +249,8 @@ necessary some of the time, and generalizing can break existing proofs *)
 
   Hint Resolve thread_upd_abc_to_cab : exec.
 
-  Theorem exec_equiv_ret_None : forall Op `(v : T),
-      @exec_equiv_opt Op (Proc (Ret v)) NoProc.
+  Theorem exec_equiv_ret_None : forall `(v : T),
+      exec_equiv_opt (Proc (Ret v)) NoProc.
   Proof.
     split; intros.
     - ExecEquiv.
@@ -284,7 +288,7 @@ necessary some of the time, and generalizing can break existing proofs *)
   Qed.
 
   Global Instance exec_equiv_rx_to_exec_equiv :
-    subrelation (@exec_equiv_rx Op T) exec_equiv.
+    subrelation (@exec_equiv_rx T) exec_equiv.
   Proof.
     unfold subrelation, exec_equiv_rx; intros.
     rewrite <- exec_equiv_bind_ret with (p := x).
@@ -293,7 +297,7 @@ necessary some of the time, and generalizing can break existing proofs *)
   Qed.
 
   Theorem exec_equiv_rx_proof_helper : forall `(p1 : proc Op T) p2,
-      (forall tid tid' `(s : State) s' op_step (ts: threads_state _) tr spawned evs `(rx : _ -> proc _ TR) result,
+      (forall tid tid' `(s : State) s' (ts: threads_state _) tr spawned evs `(rx : _ -> proc _ TR) result,
           exec_tid op_step tid s (Bind p1 rx) s' result spawned evs ->
           ts tid' = NoProc ->
           tid <> tid' ->
@@ -302,7 +306,7 @@ necessary some of the time, and generalizing can break existing proofs *)
                                                            | inr p' => Proc p'
                                                            end]]) tr ->
           exec op_step s (ts [[tid := Proc (Bind p2 rx)]]) (prepend tid evs tr)) ->
-      (forall tid tid' `(s : State) s' op_step (ts: threads_state _) tr evs spawned `(rx : _ -> proc _ TR) result,
+      (forall tid tid' `(s : State) s' (ts: threads_state _) tr evs spawned `(rx : _ -> proc _ TR) result,
           exec_tid op_step tid s (Bind p2 rx) s' result spawned evs ->
           ts tid' = NoProc ->
           tid <> tid' ->
@@ -332,8 +336,8 @@ necessary some of the time, and generalizing can break existing proofs *)
       ExecPrefix tid tid'.
   Qed.
 
-  Theorem exec_equiv_atomicret_ret : forall Op `(v : T),
-      @exec_equiv_rx Op _ (Atomic (Ret v)) (Ret v).
+  Theorem exec_equiv_atomicret_ret : forall `(v : T),
+      exec_equiv_rx (Atomic (Ret v)) (Ret v).
   Proof.
     intros.
     eapply exec_equiv_rx_proof_helper; intros; exec_tid_simpl.
@@ -384,7 +388,7 @@ necessary some of the time, and generalizing can break existing proofs *)
       ExecPrefix tid tid'.
   Qed.
 
-  Theorem exec_equiv_congruence : forall Op T (p1 p2: proc Op T) T' (rx1 rx2: T -> proc Op T'),
+  Theorem exec_equiv_congruence : forall T (p1 p2: proc Op T) T' (rx1 rx2: T -> proc Op T'),
       exec_equiv_rx p1 p2 ->
       (forall x, exec_equiv_rx (rx1 x) (rx2 x)) ->
       exec_equiv_rx (Bind p1 rx1) (Bind p2 rx2).
@@ -401,21 +405,21 @@ necessary some of the time, and generalizing can break existing proofs *)
   Global Instance Bind_exec_equiv_proper :
     Proper (exec_equiv_rx ==>
                           pointwise_relation T exec_equiv_rx ==>
-                          @exec_equiv_rx Op TR) Bind.
+                          @exec_equiv_rx TR) Bind.
   Proof.
     unfold Proper, respectful, pointwise_relation; intros.
     apply exec_equiv_congruence; auto.
   Qed.
 
   Global Instance exec_proper_exec_equiv :
-    Proper (eq ==> eq ==> exec_equiv_ts ==> eq ==> iff) (@exec Op State).
+    Proper (eq ==> exec_equiv_ts ==> eq ==> iff) (@exec Op State op_step).
   Proof.
     unfold Proper, respectful; intros; subst; eauto.
   Qed.
 
   (** exec_equiv with counter *)
 
-  Definition exec_equiv_N n Op T (p1 p2: proc Op T) :=
+  Definition exec_equiv_N n T (p1 p2: proc Op T) :=
     forall ts tid, exec_equiv_ts_N n (ts [[tid := Proc p1]]) (ts [[tid := Proc p2]]).
 
   Hint Extern 1 (exec _ _ _ _ _) =>
@@ -452,10 +456,10 @@ necessary some of the time, and generalizing can break existing proofs *)
 
 
   Global Program Instance atomic_equiv_equivalence :
-    Equivalence (@atomic_equiv Op T).
+    Equivalence (@atomic_equiv T).
 
   Global Instance atomic_equiv_proper :
-    Proper (atomic_equiv ==> atomic_equiv ==> iff) (@atomic_equiv Op T).
+    Proper (atomic_equiv ==> atomic_equiv ==> iff) (@atomic_equiv T).
   Proof.
     typeclasses eauto.
   Qed.
@@ -496,7 +500,7 @@ necessary some of the time, and generalizing can break existing proofs *)
       eauto.
   Qed.
 
-  Theorem atomic_equiv_bind_congruence : forall Op T (p1 p2: proc Op T) T' (rx1 rx2: T -> proc Op T'),
+  Theorem atomic_equiv_bind_congruence : forall T (p1 p2: proc Op T) T' (rx1 rx2: T -> proc Op T'),
       atomic_equiv p1 p2 ->
       (forall x, atomic_equiv (rx1 x) (rx2 x)) ->
       atomic_equiv (Bind p1 rx1) (Bind p2 rx2).
@@ -513,14 +517,14 @@ necessary some of the time, and generalizing can break existing proofs *)
   Global Instance Bind_proper_atomic_equiv :
     Proper (atomic_equiv ==>
                          pointwise_relation T atomic_equiv ==>
-                         @atomic_equiv Op TR) Bind.
+                         @atomic_equiv TR) Bind.
   Proof.
     unfold Proper, respectful, pointwise_relation; intros.
     apply atomic_equiv_bind_congruence; auto.
   Qed.
 
   Global Instance Atomic_proper_atomic_equiv :
-    Proper (atomic_equiv ==> @exec_equiv_rx Op T) Atomic.
+    Proper (atomic_equiv ==> @exec_equiv_rx T) Atomic.
   Proof.
     intros.
     intros p1 p2 H.
@@ -535,17 +539,17 @@ necessary some of the time, and generalizing can break existing proofs *)
 
   (** Trace inclusion for an entire threads_state *)
 
-  Definition trace_incl_ts_s {Op State} op_step (s s' : State) (ts1 ts2 : threads_state Op) :=
+  Definition trace_incl_ts_s (s s' : State) (ts1 ts2 : threads_state Op) :=
     forall tr,
       exec op_step s ts1 tr ->
       exec op_step s' ts2 tr.
 
-  Definition trace_incl_ts {Op State} op_step (ts1 ts2 : threads_state Op) :=
+  Definition trace_incl_ts (ts1 ts2 : threads_state Op) :=
     forall (s : State),
-      trace_incl_ts_s op_step s s ts1 ts2.
+      trace_incl_ts_s s s ts1 ts2.
 
   Global Program Instance trace_incl_ts_s_preorder :
-    PreOrder (@trace_incl_ts_s Op State op_step s s).
+    PreOrder (@trace_incl_ts_s s s).
   Next Obligation.
     hnf; intros.
     eauto.
@@ -555,10 +559,10 @@ necessary some of the time, and generalizing can break existing proofs *)
   Qed.
 
   Global Program Instance trace_incl_ts_preorder :
-    PreOrder (@trace_incl_ts Op State op_step).
+    PreOrder trace_incl_ts.
 
   Global Instance exec_equiv_ts_to_trace_incl_ts :
-    subrelation (@exec_equiv_ts Op) (@trace_incl_ts Op State op_step).
+    subrelation exec_equiv_ts trace_incl_ts.
   Proof.
     unfold subrelation; intros.
     unfold trace_incl_ts, trace_incl_ts_s; intros.
@@ -566,10 +570,10 @@ necessary some of the time, and generalizing can break existing proofs *)
     eauto.
   Qed.
 
-  Theorem trace_incl_ts_s_trans : forall `(s0 : State) s1 s2 `(op_step : OpSemantics Op State) `(ts1 : threads_state Op) ts2 ts3,
-      trace_incl_ts_s op_step s0 s1 ts1 ts2 ->
-      trace_incl_ts_s op_step s1 s2 ts2 ts3 ->
-      trace_incl_ts_s op_step s0 s2 ts1 ts3.
+  Theorem trace_incl_ts_s_trans : forall `(s0 : State) s1 s2 `(ts1 : threads_state Op) ts2 ts3,
+      trace_incl_ts_s s0 s1 ts1 ts2 ->
+      trace_incl_ts_s s1 s2 ts2 ts3 ->
+      trace_incl_ts_s s0 s2 ts1 ts3.
   Proof.
     unfold trace_incl_ts_s; intros.
     apply H in H1.
@@ -579,49 +583,49 @@ necessary some of the time, and generalizing can break existing proofs *)
 
   (** Trace inclusion for a single thread *)
 
-  Definition trace_incl_s `(s : State) tid `(op_step : OpSemantics Op State) `(p1 : proc Op T) (p2 : proc _ T) :=
+  Definition trace_incl_s `(s : State) tid `(p1 : proc Op T) (p2 : proc _ T) :=
     forall ts,
-      trace_incl_ts_s op_step s s
+      trace_incl_ts_s s s
                       (ts [[ tid := Proc p1 ]])
                       (ts [[ tid := Proc p2 ]]).
 
-  Definition trace_incl {Op T} `(op_step : OpSemantics Op State) (p1 p2 : proc Op T) :=
+  Definition trace_incl {T} (p1 p2 : proc Op T) :=
     forall (ts : threads_state Op) tid,
-      trace_incl_ts op_step
-                    (ts [[ tid := Proc p1 ]])
-                    (ts [[ tid := Proc p2 ]]).
+      trace_incl_ts
+        (ts [[ tid := Proc p1 ]])
+        (ts [[ tid := Proc p2 ]]).
 
   (* natural definition of trace_incl_rx, defined in terms of all executions (that
 is, without requiring counters be identical) *)
-  Definition trace_incl_rx' {Op T} `(op_step : OpSemantics Op State) (p1 p2 : proc Op T) :=
+  Definition trace_incl_rx' {T} (p1 p2 : proc Op T) :=
     forall TF (rx1 rx2: _ -> proc _ TF),
-      (forall a, trace_incl op_step (rx1 a) (rx2 a)) ->
-      trace_incl op_step (Bind p1 rx1) (Bind p2 rx2).
+      (forall a, trace_incl (rx1 a) (rx2 a)) ->
+      trace_incl (Bind p1 rx1) (Bind p2 rx2).
 
-  Definition trace_incl_ts_N n `(op_step: OpSemantics Op State) (ts1 ts2 : threads_state Op) :=
+  Definition trace_incl_ts_N n (ts1 ts2 : threads_state Op) :=
     forall tr s n',
       n' <= n ->
       exec_till op_step n' s ts1 tr ->
       exec op_step s ts2 tr.
 
-  Definition trace_incl_N n {Op T} `(op_step : OpSemantics Op State) (p1 p2 : proc Op T) :=
+  Definition trace_incl_N n {T} (p1 p2 : proc Op T) :=
     forall (ts: threads_state Op) tid,
-      trace_incl_ts_N n op_step
+      trace_incl_ts_N n
                       (ts [[ tid := Proc p1 ]])
                       (ts [[ tid := Proc p2 ]]).
 
-  Definition trace_incl_rx_N n {Op T} `(op_step: OpSemantics Op State) (p1 p2: proc Op T) :=
+  Definition trace_incl_rx_N n {T} (p1 p2: proc Op T) :=
     forall TF (rx1 rx2 : _ -> proc _ TF) n0,
       n0 <= n ->
-      (forall a, trace_incl_N (n0-1) op_step (rx1 a) (rx2 a)) ->
-      trace_incl_N n0 op_step (Bind p1 rx1) (Bind p2 rx2).
+      (forall a, trace_incl_N (n0-1) (rx1 a) (rx2 a)) ->
+      trace_incl_N n0 (Bind p1 rx1) (Bind p2 rx2).
 
-  Definition trace_incl_rx {Op T} `(op_step: OpSemantics Op State) (p1 p2: proc Op T) :=
-    forall n, trace_incl_rx_N n op_step p1 p2.
+  Definition trace_incl_rx {T} (p1 p2: proc Op T) :=
+    forall n, trace_incl_rx_N n p1 p2.
 
-  Theorem trace_incl_rx'_all_n : forall `(op_step: OpSemantics Op State) T (p1 p2: proc Op T),
-      (forall n, trace_incl_rx_N n op_step p1 p2) ->
-      trace_incl_rx' op_step p1 p2.
+  Theorem trace_incl_rx'_all_n : forall T (p1 p2: proc Op T),
+      (forall n, trace_incl_rx_N n p1 p2) ->
+      trace_incl_rx' p1 p2.
   Proof.
     unfold trace_incl_rx', trace_incl, trace_incl_ts, trace_incl_ts_s,
     trace_incl_rx_N, trace_incl_N, trace_incl_ts_N.
@@ -634,25 +638,25 @@ is, without requiring counters be identical) *)
     eapply exec_till_to_exec; eauto.
   Qed.
 
-  Theorem trace_incl_rx_all_n : forall `(op_step: OpSemantics Op State) T (p1 p2: proc Op T),
-      (forall n, trace_incl_rx_N n op_step p1 p2) ->
-      trace_incl_rx op_step p1 p2.
+  Theorem trace_incl_rx_all_n : forall T (p1 p2: proc Op T),
+      (forall n, trace_incl_rx_N n p1 p2) ->
+      trace_incl_rx p1 p2.
   Proof.
     unfold trace_incl_rx; eauto.
   Qed.
 
   (* this is not true of trace_incl_rx' due to p1 and p2 possibly taking different
 numbers of steps *)
-  Theorem trace_incl_rx_to_N : forall `(op_step: OpSemantics Op State) T (p1 p2: proc Op T),
-      trace_incl_rx op_step p1 p2 ->
-      forall n, trace_incl_rx_N n op_step p1 p2.
+  Theorem trace_incl_rx_to_N : forall T (p1 p2: proc Op T),
+      trace_incl_rx p1 p2 ->
+      forall n, trace_incl_rx_N n p1 p2.
   Proof.
     unfold trace_incl_rx; eauto.
   Qed.
 
-  Theorem trace_incl_all_n : forall `(op_step: OpSemantics Op State) T (p1 p2: proc Op T),
-      (forall n, trace_incl_N n op_step p1 p2) ->
-      trace_incl op_step p1 p2.
+  Theorem trace_incl_all_n : forall T (p1 p2: proc Op T),
+      (forall n, trace_incl_N n p1 p2) ->
+      trace_incl p1 p2.
   Proof.
     unfold trace_incl_rx, trace_incl, trace_incl_ts, trace_incl_ts_s,
     trace_incl_rx_N, trace_incl_N, trace_incl_ts_N.
@@ -662,23 +666,23 @@ numbers of steps *)
     eauto.
   Qed.
 
-  Theorem trace_incl_trace_incl_s : forall T `(op_step : OpSemantics Op State) (p1 p2 : proc Op T),
-      trace_incl op_step p1 p2 <->
+  Theorem trace_incl_trace_incl_s : forall T (p1 p2 : proc Op T),
+      trace_incl p1 p2 <->
       (forall s tid,
-          trace_incl_s s tid op_step p1 p2).
+          trace_incl_s s tid p1 p2).
   Proof.
     unfold trace_incl, trace_incl_s, trace_incl_ts.
     split; eauto.
   Qed.
 
   Global Program Instance trace_incl_s_preorder :
-    PreOrder (@trace_incl_s State s tid Op op_step T).
+    PreOrder (@trace_incl_s s tid T).
 
   Global Program Instance trace_incl_preorder :
-    PreOrder (@trace_incl Op T State op_step).
+    PreOrder (@trace_incl T).
 
   Global Instance exec_equiv_to_trace_incl :
-    subrelation (@exec_equiv Op T) (@trace_incl Op T State op_step).
+    subrelation (@exec_equiv T) (@trace_incl T).
   Proof.
     unfold subrelation; intros.
     unfold trace_incl, trace_incl_ts, trace_incl_ts_s; intros.
@@ -687,9 +691,9 @@ numbers of steps *)
   Qed.
 
   Global Instance trace_incl_proper :
-    Proper (Basics.flip (@trace_incl Op T State op_step) ==>
-                        @trace_incl Op T State op_step ==>
-                        Basics.impl) (@trace_incl Op T State op_step).
+    Proper (Basics.flip (@trace_incl T) ==>
+                        @trace_incl T ==>
+                        Basics.impl) (@trace_incl T).
   Proof.
     intros.
     intros p1 p2 H21 p3 p4 H34 H; subst.
@@ -699,9 +703,9 @@ numbers of steps *)
   Qed.
 
   Global Instance trace_incl_proper_flip :
-    Proper (@trace_incl Op T State op_step ==>
-                        Basics.flip (@trace_incl Op T State op_step) ==>
-                        Basics.flip Basics.impl) (@trace_incl Op T State op_step).
+    Proper (@trace_incl T ==>
+                        Basics.flip (@trace_incl T) ==>
+                        Basics.flip Basics.impl) (@trace_incl T).
   Proof.
     intros.
     intros p1 p2 H21 p3 p4 H34 H; subst.
@@ -710,9 +714,9 @@ numbers of steps *)
   Qed.
 
   Global Instance trace_incl_s_proper :
-    Proper (Basics.flip (@trace_incl Op T State op_step) ==>
-                        @trace_incl Op T State op_step ==>
-                        Basics.impl) (@trace_incl_s State s tid Op op_step T).
+    Proper (Basics.flip (@trace_incl T) ==>
+                        @trace_incl T ==>
+                        Basics.impl) (@trace_incl_s s tid T).
   Proof.
     intros.
     intros p1 p2 H12 p3 p4 H34 H; subst.
@@ -724,9 +728,9 @@ numbers of steps *)
   Qed.
 
   Global Instance trace_incl_s_proper_flip :
-    Proper (@trace_incl Op T State op_step ==>
-                        Basics.flip (@trace_incl Op T State op_step) ==>
-                        Basics.flip Basics.impl) (@trace_incl_s State s tid Op op_step T).
+    Proper (@trace_incl T ==>
+                        Basics.flip (@trace_incl T) ==>
+                        Basics.flip Basics.impl) (@trace_incl_s s tid T).
   Proof.
     intros.
     intros p1 p2 H12 p3 p4 H34 H; subst.
@@ -739,7 +743,7 @@ numbers of steps *)
 
   Global Instance trace_incl_s_exec_equiv_proper :
     Proper (exec_equiv ==> exec_equiv ==> iff)
-           (@trace_incl_s State s tid Op op_step T).
+           (@trace_incl_s s tid T).
   Proof.
     intros.
     intros p1 p1' ?.
@@ -759,7 +763,7 @@ numbers of steps *)
 
   Global Instance trace_incl_exec_equiv_proper :
     Proper (exec_equiv ==> exec_equiv ==> iff)
-           (@trace_incl Op T State op_step).
+           (@trace_incl T).
   Proof.
     unfold Proper, respectful, trace_incl; intros.
     split; intros.
@@ -768,7 +772,7 @@ numbers of steps *)
   Qed.
 
   Lemma trace_incl_ts_s_proof_helper :
-    forall `(p1 : proc Op T) (p2 : proc _ T) ts tid `(op_step : OpSemantics Op State) s,
+    forall `(p1 : proc Op T) (p2 : proc _ T) ts tid s,
       (forall (ts: threads_state _) tid' s0 s' result tr spawned evs,
           exec_others op_step tid s s0 ->
           ts tid' = NoProc ->
@@ -779,7 +783,7 @@ numbers of steps *)
                                                            | inr p' => Proc p'
                                                            end]]) tr ->
           exec op_step s0 (ts [[tid := Proc p2]]) (prepend tid evs tr)) ->
-      trace_incl_ts_s op_step s s
+      trace_incl_ts_s s s
                       (ts [[ tid := Proc p1 ]])
                       (ts [[ tid := Proc p2 ]]).
   Proof.
@@ -796,7 +800,7 @@ numbers of steps *)
   Qed.
 
   Lemma trace_incl_proof_helper :
-    forall `(p1 : proc Op T) p2 `(op_step : OpSemantics Op State),
+    forall `(p1 : proc Op T) p2,
       (forall tid tid' (ts: threads_state _) s s' result tr spawned evs,
           exec_tid op_step tid s p1 s' result spawned evs ->
           ts tid' = NoProc ->
@@ -806,7 +810,7 @@ numbers of steps *)
                                                            | inr p' => Proc p'
                                                            end]]) tr ->
           exec op_step s (ts [[tid := Proc p2]]) (prepend tid evs tr)) ->
-      trace_incl op_step
+      trace_incl
                  p1 p2.
   Proof.
     unfold trace_incl, trace_incl_ts.
@@ -817,7 +821,7 @@ numbers of steps *)
   Qed.
 
   Lemma trace_incl_s_proof_helper :
-    forall `(p1 : proc Op T) p2 `(op_step : OpSemantics Op State) s tid,
+    forall `(p1 : proc Op T) p2 s tid,
       (forall (ts: threads_state _) tid' s0 s' result tr spawned evs,
           exec_others op_step tid s s0 ->
           ts tid' = NoProc ->
@@ -830,8 +834,7 @@ numbers of steps *)
           exists tr',
             exec op_step s0 (ts [[tid := Proc p2]]) tr' /\
             prepend tid evs tr = tr') ->
-      trace_incl_s s tid op_step
-                   p1 p2.
+      trace_incl_s s tid p1 p2.
   Proof.
     unfold trace_incl_s.
     intros.
@@ -843,8 +846,8 @@ numbers of steps *)
   Qed.
 
   Theorem trace_incl_op :
-    forall `(p : T -> proc Op T') op `(op_step : OpSemantics Op State),
-      trace_incl op_step
+    forall `(p : T -> proc Op T') op,
+      trace_incl
                  (Bind (Call op) p)
                  (Bind (Atomic (Call op)) p).
   Proof.
@@ -859,8 +862,8 @@ numbers of steps *)
     forall `(f : T1 -> T2)
       `(p : proc Op T1)
       `(rx : _ -> proc Op TF)
-      `(op_step : OpSemantics Op State),
-      trace_incl op_step
+     ,
+      trace_incl
                  (Bind (Bind (Atomic p) (fun r => Ret (f r))) rx)
                  (Bind (Atomic (Bind p (fun r => Ret (f r)))) rx).
   Proof.
@@ -879,9 +882,9 @@ numbers of steps *)
     assumption.
   Qed.
 
-  Theorem trace_incl_bind_a : forall `(p : proc Op T) `(p2 : T -> proc _ T') p2' `(op_step : OpSemantics Op State),
-      (forall x, trace_incl op_step (p2 x) (p2' x)) ->
-      trace_incl op_step (Bind p p2) (Bind p p2').
+  Theorem trace_incl_bind_a : forall `(p : proc Op T) `(p2 : T -> proc _ T') p2',
+      (forall x, trace_incl (p2 x) (p2' x)) ->
+      trace_incl (Bind p p2) (Bind p p2').
   Proof.
     unfold trace_incl, trace_incl_ts, trace_incl_ts_s.
     intros.
@@ -890,11 +893,11 @@ numbers of steps *)
     destruct result0; guess_ExecPrefix.
   Qed.
 
-  Theorem trace_incl_s_bind_a : forall `(p : proc Op T) `(p2 : T -> proc _ T') p2' `(op_step : OpSemantics Op State) s tid,
+  Theorem trace_incl_s_bind_a : forall `(p : proc Op T) `(p2 : T -> proc _ T') p2' s tid,
       (forall s' x,
           exec_any op_step tid s p x s' ->
-          trace_incl_s s' tid op_step (p2 x) (p2' x)) ->
-      trace_incl_s s tid op_step (Bind p p2) (Bind p p2').
+          trace_incl_s s' tid (p2 x) (p2' x)) ->
+      trace_incl_s s tid (Bind p p2) (Bind p p2').
   Proof.
     unfold trace_incl_s, trace_incl_ts_s.
     intros.
@@ -917,9 +920,9 @@ numbers of steps *)
       eauto with exec.
   Qed.
 
-  Theorem trace_incl_N_bind_a : forall `(p : proc Op T) `(p2 : T -> proc _ T') p2' `(op_step : OpSemantics Op State) n,
-      (forall x, trace_incl_N (n-1) op_step (p2 x) (p2' x)) ->
-      trace_incl_N n op_step (Bind p p2) (Bind p p2').
+  Theorem trace_incl_N_bind_a : forall `(p : proc Op T) `(p2 : T -> proc _ T') p2' n,
+      (forall x, trace_incl_N (n-1) (p2 x) (p2' x)) ->
+      trace_incl_N n (Bind p p2) (Bind p p2').
   Proof.
     unfold trace_incl_N, trace_incl_ts_N.
     intros.
@@ -944,10 +947,10 @@ numbers of steps *)
   Qed.
 
   Theorem trace_incl_N_le :
-    forall `(op_step : OpSemantics Op State) T (p1 p2 : proc _ T) n1 n2,
-      trace_incl_N n2 op_step p1 p2 ->
+    forall T (p1 p2 : proc _ T) n1 n2,
+      trace_incl_N n2 p1 p2 ->
       n1 <= n2 ->
-      trace_incl_N n1 op_step p1 p2.
+      trace_incl_N n1 p1 p2.
   Proof.
     repeat ( hnf; intros ).
     eapply H in H2; try omega.
@@ -955,17 +958,17 @@ numbers of steps *)
   Qed.
 
   Global Instance trace_incl_ts_N_reflexive :
-    Reflexive (@trace_incl_ts_N n Op State op_step) := RelInstance.
+    Reflexive (@trace_incl_ts_N n) := RelInstance.
   Proof.
     unfold trace_incl_ts_N; intros.
     eapply exec_till_to_exec; eauto.
   Qed.
 
   Global Instance trace_incl_N_reflexive :
-    Reflexive (@trace_incl_N n Op T State op_step) := RelInstance.
+    Reflexive (@trace_incl_N n T) := RelInstance.
 
   Global Program Instance trace_incl_rx_preorder :
-    PreOrder (@trace_incl_rx Op T State op_step).
+    PreOrder (@trace_incl_rx T).
   Next Obligation.
     unfold trace_incl_rx, trace_incl_rx_N; intros.
     eapply trace_incl_N_bind_a.
@@ -986,9 +989,8 @@ numbers of steps *)
   Qed.
 
   Global Instance Bind_trace_incl_proper_2 :
-    Proper (eq ==>
-               pointwise_relation T0 (@trace_incl Op T State op_step) ==>
-               @trace_incl Op T State op_step) Bind.
+    Proper (eq ==> pointwise_relation T0 (@trace_incl T) ==>
+               @trace_incl T) Bind.
   Proof.
     intros.
     intros p1a p1b H1; subst.
@@ -1001,8 +1003,8 @@ numbers of steps *)
     forall `(p1 : proc Op T)
       `(p2 : T -> proc Op T2)
       `(p3 : T2 -> proc Op T3)
-      `(op_step : OpSemantics Op State),
-      trace_incl op_step
+     ,
+      trace_incl
                  (Bind (Atomic (Bind p1 p2)) p3)
                  (Bind (Bind (Atomic p1) (fun r => Atomic (p2 r))) p3).
   Proof.
@@ -1021,8 +1023,8 @@ numbers of steps *)
   Lemma trace_incl_atomic :
     forall `(p1 : proc Op T)
       `(p2 : T -> proc Op T2)
-      `(op_step : OpSemantics Op State),
-      trace_incl op_step
+     ,
+      trace_incl
                  (Bind (Atomic p1) p2)
                  (Bind p1 p2).
   Proof.
@@ -1051,9 +1053,9 @@ numbers of steps *)
   Qed.
 
   Theorem trace_incl_rx_to_exec :
-    forall `(op_step: OpSemantics Op State) T (p1 p2: proc _ T)
+    forall T (p1 p2: proc _ T)
       (ts: threads_state _) s tid tr,
-      trace_incl_rx op_step p1 p2 ->
+      trace_incl_rx p1 p2 ->
       exec op_step s (ts [[tid := Proc p1]]) tr ->
       exec op_step s (ts [[tid := Proc p2]]) tr.
   Proof.
@@ -1066,11 +1068,9 @@ numbers of steps *)
   Qed.
 
   Theorem trace_incl_rx_spawn
-    : forall (Op : Type -> Type)
-        T (p1 p2 : proc Op T) (State : Type)
-        (op_step : OpSemantics Op State),
-      trace_incl_rx op_step p1 p2 ->
-      trace_incl_rx op_step (Spawn p1) (Spawn p2).
+    : forall T (p1 p2 : proc Op T),
+      trace_incl_rx p1 p2 ->
+      trace_incl_rx (Spawn p1) (Spawn p2).
   Proof.
     repeat (hnf; intros).
     match goal with
@@ -1095,10 +1095,10 @@ numbers of steps *)
   Qed.
 
   Theorem trace_incl_rx_to_trace_incl :
-    forall `(op_step : OpSemantics Op State) T (p1 p2 : proc Op T),
-      trace_incl_rx op_step p1 p2 ->
+    forall T (p1 p2 : proc Op T),
+      trace_incl_rx p1 p2 ->
       forall `(rx : _ -> proc _ TF),
-        trace_incl op_step (Bind p1 rx) (Bind p2 rx).
+        trace_incl (Bind p1 rx) (Bind p2 rx).
   Proof.
     repeat (hnf; intros).
     eapply exec_to_counter in H0; propositional.
@@ -1107,21 +1107,21 @@ numbers of steps *)
   Qed.
 
   Theorem trace_incl_to_trace_incl_rx :
-    forall `(op_step : OpSemantics Op State) T (p1 p2 : proc Op T),
+    forall T (p1 p2 : proc Op T),
       (forall `(rx : _ -> proc _ TF),
-          trace_incl op_step (Bind p1 rx) (Bind p2 rx)) ->
-      trace_incl_rx op_step p1 p2.
+          trace_incl (Bind p1 rx) (Bind p2 rx)) ->
+      trace_incl_rx p1 p2.
   Proof.
     repeat (hnf; intros).
-    assert (trace_incl_rx op_step p1 p1) by reflexivity.
+    assert (trace_incl_rx p1 p1) by reflexivity.
     eapply H4 in H3; [ | reflexivity | eassumption | omega ].
     eapply H; eauto.
   Qed.
 
   Theorem trace_incl_N_ret_bind :
-    forall `(op_step : OpSemantics Op State) `(v : T) TF (rx1 rx2 : _ -> proc _ TF) n,
-      (forall a, trace_incl_N (n - 1) op_step (rx1 a) (rx2 a)) ->
-      trace_incl_N n op_step (Bind (Ret v) rx1) (Bind (Ret v) rx2).
+    forall `(v : T) TF (rx1 rx2 : _ -> proc _ TF) n,
+      (forall a, trace_incl_N (n - 1) (rx1 a) (rx2 a)) ->
+      trace_incl_N n (Bind (Ret v) rx1) (Bind (Ret v) rx2).
   Proof.
     repeat (hnf; intros).
     ExecEquiv.
@@ -1136,10 +1136,10 @@ numbers of steps *)
   Qed.
 
   Theorem trace_incl_rx_N_le :
-    forall `(op_step : OpSemantics Op State) T (p1 p2 : proc _ T) n1 n2,
-      trace_incl_rx_N n2 op_step p1 p2 ->
+    forall T (p1 p2 : proc _ T) n1 n2,
+      trace_incl_rx_N n2 p1 p2 ->
       n1 <= n2 ->
-      trace_incl_rx_N n1 op_step p1 p2.
+      trace_incl_rx_N n1 p1 p2.
   Proof.
     repeat ( intro; intros ).
     eapply H in H4.
@@ -1152,11 +1152,10 @@ numbers of steps *)
   Qed.
 
   Theorem trace_incl_rx_until_helper :
-    forall T Op (p1 p2 : option T -> proc Op T)
-      `(op_step : OpSemantics Op State)
+    forall T (p1 p2 : option T -> proc Op T)
       (c : T -> bool) n v,
-      (forall v', trace_incl_rx_N (n-1) op_step (p1 v') (p2 v')) ->
-      trace_incl_rx_N n op_step (Until c p1 v) (Until c p2 v).
+      (forall v', trace_incl_rx_N (n-1) (p1 v') (p2 v')) ->
+      trace_incl_rx_N n (Until c p1 v) (Until c p2 v).
   Proof.
     induction n; intros.
 
@@ -1192,7 +1191,7 @@ numbers of steps *)
 
         match goal with
         | H : exec_till _ _ _ _ _,
-              H' : forall _, trace_incl_rx_N _ _ _ _ |- _ =>
+              H' : forall _, trace_incl_rx_N _ _ _ |- _ =>
           eapply H' in H; try omega
         end.
 
@@ -1225,11 +1224,10 @@ numbers of steps *)
   Qed.
 
   Theorem trace_incl_rx_until :
-    forall T Op (p1 p2 : option T -> proc Op T)
-      `(op_step : OpSemantics Op State)
+    forall T (p1 p2 : option T -> proc Op T)
       (c : T -> bool) v,
-      (forall v', trace_incl_rx op_step (p1 v') (p2 v')) ->
-      trace_incl_rx op_step (Until c p1 v) (Until c p2 v).
+      (forall v', trace_incl_rx (p1 v') (p2 v')) ->
+      trace_incl_rx (Until c p1 v) (Until c p2 v).
   Proof.
     repeat ( intro; intros ).
     eapply trace_incl_rx_until_helper in H3.
@@ -1240,30 +1238,30 @@ numbers of steps *)
     intros; eapply trace_incl_N_le; eauto; omega.
   Qed.
 
-  (** Correspondence between different layers *)
-
-  Definition traces_match_ts {opLoT opMidT State} lo_step hi_step
-             (ts1 : threads_state opLoT)
-             (ts2 : threads_state opMidT) :=
-    forall (s : State) tr1,
-      exec lo_step s ts1 tr1 ->
-      exec hi_step s ts2 tr1.
-
-  Global Instance traces_match_ts_proper :
-    Proper (@trace_incl_ts opLoT State lo_step ==>
-                           exec_equiv_ts ==>
-                           Basics.flip Basics.impl)
-           (@traces_match_ts opLoT opMidT State lo_step hi_step).
-  Proof.
-    intros.
-    intros ts1 ts1' H1.
-    intros ts2 ts2' H2.
-    unfold Basics.flip, Basics.impl.
-    unfold traces_match_ts; intros.
-    apply H1 in H0.
-    apply H in H0.
-    apply H2 in H0.
-    eauto.
-  Qed.
-
 End OpSemantics.
+
+(** Correspondence between different layers *)
+
+Definition traces_match_ts {opLoT opMidT State} lo_step hi_step
+           (ts1 : threads_state opLoT)
+           (ts2 : threads_state opMidT) :=
+  forall (s : State) tr1,
+    exec lo_step s ts1 tr1 ->
+    exec hi_step s ts2 tr1.
+
+Global Instance traces_match_ts_proper :
+  Proper (@trace_incl_ts opLoT State lo_step ==>
+                         @exec_equiv_ts opMidT State hi_step ==>
+                         Basics.flip Basics.impl)
+         (@traces_match_ts opLoT opMidT State lo_step hi_step).
+Proof.
+  intros.
+  intros ts1 ts1' H1.
+  intros ts2 ts2' H2.
+  unfold Basics.flip, Basics.impl.
+  unfold traces_match_ts; intros.
+  apply H1 in H0.
+  apply H in H0.
+  apply H2 in H0.
+  eauto.
+Qed.
