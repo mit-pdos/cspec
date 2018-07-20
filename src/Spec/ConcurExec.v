@@ -243,6 +243,9 @@ Qed.
 Hint Extern 1 (exec_tid _ _ _ _ _ _ _) => econstructor.
 Hint Extern 1 (atomic_exec _ _ _ _ _ _ _) => econstructor.
 
+Hint Resolve ExecOne.
+Hint Extern 1 (exec _ _ _ TraceEmpty) => simple apply ExecStop.
+
 Ltac maybe_proc_inv := match goal with
   | H : Proc _ = NoProc |- _ =>
     solve [ exfalso; inversion H ]
@@ -264,6 +267,24 @@ Ltac exec_tid_inv :=
     inversion H; clear H; subst; repeat maybe_proc_inv
   end;
   autorewrite with t in *.
+
+(* for performance reasons, we define this safely repeated version of
+  exec_tid_inv *)
+Local Notation exec_p p := (exec_tid _ _ _ p _ _ _ _) (only parsing).
+Ltac exec_tid_simpl :=
+  let execinv H := inversion H; clear H; subst in
+  repeat (match goal with
+          | [ H: exec_p (Ret _) |- _ ] => execinv H
+          | [ H: exec_p (Atomic _) |- _ ] => execinv H
+          | [ H: exec_p (Call _) |- _ ] => execinv H
+          | [ H: exec_p (Bind _ _) |- _ ] => execinv H
+          | [ H: exec_p (Until _ _ _) |- _ ] => execinv H
+          | [ H: exec_p (Spawn _) |- _ ] => execinv H
+          end || maybe_proc_inv);
+  autorewrite with t in *.
+
+(* former unoptimized implementation *)
+(* Ltac exec_tid_simpl := repeat (exec_tid_inv; is_one_goal). *)
 
 Ltac atomic_exec_inv :=
   match goal with
@@ -323,3 +344,121 @@ Ltac NoProc_upd :=
            cmp_ts tid tid';
            [ solve [ maybe_proc_inv ] | ]
          end.
+
+Ltac remove_redundant_upds :=
+  repeat match goal with
+         | [ Heq: thread_get ?ts ?tid = ?p,
+                  H: context[thread_upd ?ts ?tid ?p] |- _ ] =>
+           rewrite (thread_upd_same_eq _ _ Heq) in H
+         | [ Heq: thread_get ?ts ?tid = ?p
+             |- context[thread_upd ?ts ?tid ?p] ] =>
+           rewrite (thread_upd_same_eq _ _ Heq) in |- *
+         end.
+
+(* the ExecPrefix tactic solves exec goals by splitting them into one
+execution step and leaving the exec for [auto] *)
+
+(* copy some basic hints from core *)
+Hint Extern 2 (_ <> _) => simple apply not_eq_sym; trivial : exec.
+Hint Extern 2 (_ = _) => simple apply eq_sym : exec.
+Hint Resolve eq_refl : exec.
+
+Local Lemma thread_upd_aba :
+  forall Op (ts: threads_state Op) tid1 tid2 p1 p2 p3,
+    tid1 <> tid2 ->
+    ts [[tid1 := p1]] [[tid2 := p2]] [[tid1 := p3]] =
+    ts [[tid2 := p2]] [[tid1 := p3]].
+Proof.
+  intros.
+  rewrite ?thread_upd_ne_comm with (tid:=tid2) (tid':=tid1) by auto.
+  f_equal.
+  autorewrite with t; auto.
+Qed.
+
+Local Lemma thread_upd_abc_to_cab :
+  forall Op (ts: threads_state Op) tid1 tid2 tid3 p1 p2 p3,
+    tid1 <> tid2 ->
+    tid1 <> tid3 ->
+    ts [[tid1 := p1]] [[tid2 := p2]] [[tid3 := p3]] =
+    ts [[tid2 := p2]] [[tid3 := p3]] [[tid1 := p1]].
+Proof.
+  intros.
+  rewrite thread_upd_ne_comm with (tid := tid1) (tid' := tid2) by congruence.
+  rewrite thread_upd_ne_comm with (tid := tid1) (tid' := tid3) by congruence.
+  auto.
+Qed.
+
+Local Lemma thread_upd_other_eq : forall Op (ts:threads_state Op)
+                              tid T (p: proc _ T) tid' T' (p': proc _ T'),
+    tid' <> tid ->
+    ts tid' = Proc p ->
+    ts [[tid := Proc p']] tid' = Proc p.
+Proof.
+  intros.
+  autorewrite with t.
+  auto.
+Qed.
+
+Local Lemma thread_upd_spawn_delay :
+  forall Op (ts: threads_state Op) tid T (p: proc _ T) tid' spawned tid'' p',
+    tid'' <> tid ->
+    tid <> tid' ->
+    ts [[tid := Proc p]] [[tid' := spawned]] [[tid'' := p']] =
+    ts [[tid' := spawned]] [[tid'' := p']] [[tid := Proc p]].
+Proof.
+  intros.
+  apply thread_upd_abc_to_cab; auto.
+Qed.
+
+Local Lemma thread_spawn_none :
+  forall Op (ts: threads_state Op) T (p: proc Op T) tid tid' ,
+    tid <> tid' ->
+    ts tid' = NoProc ->
+    ts [[tid := Proc p]] [[tid' := NoProc]] =
+    ts [[tid := Proc p]].
+Proof.
+  intros.
+  rewrite thread_upd_same_eq; auto.
+  autorewrite with t; auto.
+Qed.
+
+Hint Resolve thread_upd_other_eq : exec.
+Hint Resolve thread_upd_spawn_delay : exec.
+Hint Resolve thread_upd_ne_comm : exec.
+Hint Resolve thread_upd_abc_to_cab : exec.
+Hint Constructors exec_tid atomic_exec : exec.
+
+Hint Extern 1 (exec _ _ _ _) =>
+match goal with
+| |- exec _ _ ?ts _ => first [ is_evar ts; fail 1 | eapply exec_ts_eq ]
+end : exec.
+
+Hint Rewrite thread_spawn_none using congruence : t.
+Hint Rewrite thread_upd_aba using congruence : t.
+
+Ltac ExecPrefix tid_arg tid'_arg :=
+  eapply ExecPrefixOne with (tid:=tid_arg) (tid':=tid'_arg);
+  autorewrite with t;
+  (* need to exclude core for performance reasons *)
+  eauto 7 with nocore exec;
+  remove_redundant_upds;
+  cbv beta iota.
+
+Module Examples.
+
+  Theorem ret_exec_example : forall Op State (op_step: OpSemantics Op State)
+                               (ts: threads_state Op) tid tid' T (v:T) s tr,
+    tid <> tid' ->
+    ts tid' = NoProc ->
+    ts tid = NoProc ->
+    exec op_step s ts tr ->
+    exec op_step s (ts [[tid := Proc (Ret v)]]) tr.
+  Proof.
+    intros.
+    abstract_tr.
+    ExecPrefix tid tid'.
+    eassumption.
+    reflexivity.
+  Qed.
+
+End Examples.

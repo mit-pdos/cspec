@@ -105,8 +105,6 @@ Section Execution.
 
 End Execution.
 
-Hint Constructors exec.
-
 Notation "ts [[ tid ]]" := (thread_get ts tid)
   (at level 12, left associativity).
 

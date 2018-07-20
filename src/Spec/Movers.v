@@ -76,27 +76,6 @@ Qed.
 Hint Resolve pred_stable_any.
 Hint Resolve pred_stable_exec_any_others.
 
-Hint Extern 2 (_ <> _) => simple apply not_eq_sym; trivial : exec.
-Hint Extern 2 (_ = _) => simple apply eq_sym : exec.
-Hint Resolve eq_refl : exec.
-Hint Resolve thread_upd_other_eq : exec.
-Hint Resolve thread_upd_spawn_delay : exec.
-Hint Resolve thread_upd_ne_comm : exec.
-
-Hint Extern 1 (exec _ _ _ _ _ _) =>
-match goal with
-| |- exec _ _ _ _ ?ts _ => first [ is_evar ts; fail 1 | eapply ConcurExec.exec_ts_eq ]
-end : exec.
-
-Ltac ExecPrefix tid_arg tid'_arg :=
-  eapply ExecPrefixOne with (tid:=tid_arg) (tid':=tid'_arg);
-  autorewrite with t;
-  (* need to exclude core for performance reasons *)
-  eauto 7 with nocore exec;
-  cbv beta iota.
-
-Hint Rewrite thread_upd_aba using congruence : t.
-
 Section Movers.
 
   Variable Op : Type -> Type.
@@ -389,7 +368,6 @@ Section Movers.
         descend; intuition eauto.
 
         ExecPrefix tid0 tid'.
-        rewrite thread_upd_abc_to_cab by congruence; eauto.
 
     - edestruct H1; repeat deex.
       edestruct H; clear H; eauto.
@@ -435,7 +413,7 @@ Section Movers.
       eauto.
       eauto.
       eauto.
-      rewrite thread_upd_abc_to_cab in * by congruence; eauto.
+      rewrite ConcurExec.thread_upd_abc_to_cab in * by congruence; eauto.
     + edestruct H; eauto; subst; simpl; eauto.
   Qed.
 

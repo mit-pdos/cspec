@@ -90,92 +90,6 @@ Section OpSemantics.
     eauto.
   Qed.
 
-  Lemma thread_upd_aba :
-    forall Op (ts: threads_state Op) tid1 tid2 p1 p2 p3,
-      tid1 <> tid2 ->
-      ts [[tid1 := p1]] [[tid2 := p2]] [[tid1 := p3]] =
-      ts [[tid2 := p2]] [[tid1 := p3]].
-  Proof.
-    intros.
-    rewrite ?thread_upd_ne_comm with (tid:=tid2) (tid':=tid1) by auto.
-    f_equal.
-    autorewrite with t; auto.
-  Qed.
-
-  Lemma thread_spawn_none :
-    forall Op (ts: threads_state Op) T (p: proc Op T) tid tid' ,
-      tid <> tid' ->
-      ts tid' = NoProc ->
-      ts [[tid := Proc p]] [[tid' := NoProc]] =
-      ts [[tid := Proc p]].
-  Proof.
-    intros.
-    rewrite thread_upd_same_eq; auto.
-    autorewrite with t; auto.
-  Qed.
-
-  Hint Rewrite thread_spawn_none using congruence : t.
-
-  Lemma thread_upd_abc_to_cab :
-    forall Op (ts: threads_state Op) tid1 tid2 tid3 p1 p2 p3,
-      tid1 <> tid2 ->
-      tid1 <> tid3 ->
-      ts [[tid1 := p1]] [[tid2 := p2]] [[tid3 := p3]] =
-      ts [[tid2 := p2]] [[tid3 := p3]] [[tid1 := p1]].
-  Proof.
-    intros.
-    rewrite thread_upd_ne_comm with (tid := tid1) (tid' := tid2) by congruence.
-    rewrite thread_upd_ne_comm with (tid := tid1) (tid' := tid3) by congruence.
-    auto.
-  Qed.
-
-  (* the ExecPrefix tactic solves exec goals by splitting them into one
-execution step and leaving the exec for [auto] *)
-
-  (* copy some basic hints from core *)
-  Hint Extern 2 (_ <> _) => simple apply not_eq_sym; trivial : exec.
-  Hint Extern 2 (_ = _) => simple apply eq_sym : exec.
-  Hint Resolve eq_refl : exec.
-
-  Lemma thread_upd_other_eq : forall Op (ts:threads_state Op)
-                                tid T (p: proc _ T) tid' T' (p': proc _ T'),
-      tid' <> tid ->
-      ts tid' = Proc p ->
-      ts [[tid := Proc p']] tid' = Proc p.
-  Proof.
-    intros.
-    autorewrite with t.
-    auto.
-  Qed.
-
-  Lemma thread_upd_spawn_delay :
-    forall Op (ts: threads_state Op) tid T (p: proc _ T) tid' spawned tid'' p',
-      tid'' <> tid ->
-      tid <> tid' ->
-      ts [[tid := Proc p]] [[tid' := spawned]] [[tid'' := p']] =
-      ts [[tid' := spawned]] [[tid'' := p']] [[tid := Proc p]].
-  Proof.
-    intros.
-    apply thread_upd_abc_to_cab; auto.
-  Qed.
-
-  Hint Resolve thread_upd_other_eq : exec.
-  Hint Resolve thread_upd_spawn_delay : exec.
-  Hint Resolve thread_upd_ne_comm : exec.
-  Hint Constructors exec_tid atomic_exec : exec.
-
-  Hint Extern 1 (exec _ _ _ _) =>
-  match goal with
-  | |- exec _ _ ?ts _ => first [ is_evar ts; fail 1 | eapply ConcurExec.exec_ts_eq ]
-  end : exec.
-
-  Ltac ExecPrefix tid_arg tid'_arg :=
-    eapply ExecPrefixOne with (tid:=tid_arg) (tid':=tid'_arg);
-    autorewrite with t;
-    (* need to exclude core for performance reasons *)
-    eauto 7 with nocore exec;
-    cbv beta iota.
-
   Ltac thread_upd_ind :=
     let ind H := induction H; intros; subst; eauto; NoProc_upd in
     match goal with
@@ -212,28 +126,12 @@ necessary some of the time, and generalizing can break existing proofs *)
       ExecPrefix tid tid'
     end.
 
-  (* for performance reasons, we define this safely repeated version of exec_tid *)
-  Local Notation exec_p p := (exec_tid _ _ _ p _ _ _ _) (only parsing).
-  Ltac exec_tid_simpl :=
-    let execinv H := inversion H; clear H; subst in
-    repeat (match goal with
-            | [ H: exec_p (Ret _) |- _ ] => execinv H
-            | [ H: exec_p (Atomic _) |- _ ] => execinv H
-            | [ H: exec_p (Call _) |- _ ] => execinv H
-            | [ H: exec_p (Bind _ _) |- _ ] => execinv H
-            | [ H: exec_p (Until _ _ _) |- _ ] => execinv H
-            | [ H: exec_p (Spawn _) |- _ ] => execinv H
-            end || maybe_proc_inv);
-    autorewrite with t in *.
-
-  (* former unoptimized implementation *)
-  (* Ltac exec_tid_simpl := repeat (exec_tid_inv; is_one_goal). *)
-
   Ltac solve_ExecEquiv :=
     match goal with
     | [ H: context[thread_get (thread_upd _ ?tid _) ?tid'] |- _ ] =>
       cmp_ts tid' tid; repeat maybe_proc_inv;
       exec_tid_simpl;
+      remove_redundant_upds;
       try (solve [ eauto ] ||
            solve [ guess_ExecPrefix ])
     end.
@@ -247,7 +145,7 @@ necessary some of the time, and generalizing can break existing proofs *)
     thread_upd_ind' p;
     [ solve_ExecEquiv | .. ].
 
-  Hint Resolve thread_upd_abc_to_cab : exec.
+  Local Notation exec_p p := (exec_tid _ _ _ p _ _ _ _) (only parsing).
 
   Theorem exec_equiv_ret_None : forall `(v : T),
       exec_equiv_opt (Proc (Ret v)) NoProc.
@@ -268,8 +166,6 @@ necessary some of the time, and generalizing can break existing proofs *)
   Qed.
 
   Hint Constructors exec_tid.
-
-  Hint Rewrite thread_upd_aba using congruence : t.
 
   Theorem exec_equiv_bind_ret : forall `(p : proc Op T),
       exec_equiv (Bind p Ret) p.
@@ -1017,6 +913,7 @@ numbers of steps *)
     rewrite ?prepend_app.
     ExecPrefix tid tid'.
     ExecPrefix tid tid'.
+    eauto.
     rewrite app_nil_r; auto.
   Qed.
 
@@ -1047,9 +944,9 @@ numbers of steps *)
     - ExecPrefix tid tid'.
     - abstract_tr.
       ExecPrefix tid tid'.
+      debug eauto.
       rewrite thread_upd_same_eq with (tid:=tid') in * by auto;
         eauto with nocore exec.
-      reflexivity.
   Qed.
 
   Theorem trace_incl_rx_to_exec :
@@ -1128,6 +1025,7 @@ numbers of steps *)
     + replace (S n - 1) with n in * by omega.
       eapply H in H4; try omega.
       ExecPrefix tid tid'.
+      eauto.
     + ExecPrefix tid0 tid'.
       abstract_ts.
       eapply IHexec_till; eauto with exec.
@@ -1217,7 +1115,7 @@ numbers of steps *)
         * auto.
 
       + ExecPrefix tid0 tid'.
-        rewrite thread_upd_abc_to_cab in * by auto.
+        rewrite ConcurExec.thread_upd_abc_to_cab in * by auto.
         eapply IHn with (n0:=n1) (n':=n1) (rx1:=rx1); intros; try omega; eauto.
         eapply trace_incl_rx_N_le; eauto; omega.
         eapply trace_incl_N_le; eauto; omega.
