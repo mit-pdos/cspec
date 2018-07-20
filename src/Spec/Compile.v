@@ -242,6 +242,8 @@ Section Compiler.
 
   Variable compile_is_correct : compile_correct.
 
+  Hint Constructors exec_tid.
+
   Lemma atomic_compile_ok_exec_tid : forall T (p1 : proc _ T) p2,
     atomic_compile_ok p1 p2 ->
     forall tid s s' result spawned evs,
@@ -302,7 +304,10 @@ Section Compiler.
       edestruct atomic_compile_ok_exec_tid; eauto.
       repeat deex.
       assert (ts2 tid' = NoProc) by eauto using proc_match_none.
-      ExecPrefix tid tid'.
+      eapply ExecPrefixOne with (tid:=tid) (tid':=tid');
+        autorewrite with t in *;
+        eauto 7 with nocore;
+        cbn beta iota.
       eapply IHexec.
       destruct matches; propositional;
         eauto using proc_match_del, proc_match_upd, proc_match_upd_opt.

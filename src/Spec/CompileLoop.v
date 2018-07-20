@@ -135,6 +135,7 @@ Section Compiler.
 
   Variable is_noop_or_success : noop_or_success.
 
+  Hint Constructors exec_tid.
 
   Lemma compile_ok_exec_tid : forall T (p1 : proc _ T) p2,
     compile_ok p1 p2 ->
@@ -169,19 +170,14 @@ Section Compiler.
       eapply is_noop_or_success in H6; eauto.
       intuition idtac; subst.
       + left.
-        descend; intuition idtac.
+        descend; intuition eauto.
         simpl_match; eauto.
       + right.
-        descend; intuition idtac.
-        eauto.
-        eauto.
+        descend; intuition eauto.
         simpl_match; eauto.
     - right.
       exec_tid_inv.
-      descend; intuition idtac.
-      eauto.
-      eauto.
-      simpl; eauto.
+      descend; intuition eauto.
     - left.
       repeat exec_tid_inv.
       eexists; intuition idtac.
@@ -189,20 +185,14 @@ Section Compiler.
       edestruct IHcompile_ok; eauto; intuition idtac.
       + repeat deex; subst.
         left.
-        eexists; intuition idtac.
-        eauto.
+        eexists; intuition eauto.
       + repeat deex; subst.
         right.
-        descend; intuition idtac.
-        eauto.
-        eauto.
-        destruct result0; destruct result'; subst; eauto;
-          try solve [ exfalso; eauto ].
+        descend; intuition eauto.
+        destruct matches; propositional; eauto.
     - right.
       exec_tid_inv.
-      descend; intuition idtac.
-      eauto.
-      simpl; eauto.
+      descend; intuition eauto.
       constructor; eauto; intros.
       destruct (c x); eauto.
     - right.
@@ -237,7 +227,9 @@ Section Compiler.
       + epose_proof IHexec.
         eapply proc_match_del; eauto.
         apply proc_match_upd_opt; eauto.
-        ExecPrefix tid tid'.
+        eapply ExecPrefixOne with (tid:=tid) (tid':=tid');
+          autorewrite with t in *;
+          eauto.
         destruct result'; propositional; eauto.
 
       + destruct result'; propositional.
@@ -248,13 +240,17 @@ Section Compiler.
           rewrite exec_equiv_ret_None in H8.
 
           abstract_tr.
-          ExecPrefix tid tid'.
+          eapply ExecPrefixOne with (tid:=tid) (tid':=tid');
+            autorewrite with t in *;
+            eauto.
           reflexivity.
 
         * epose_proof IHexec.
             eapply proc_match_upd; eauto.
             apply proc_match_upd_opt; eauto.
-          ExecPrefix tid tid'.
+          eapply ExecPrefixOne with (tid:=tid) (tid':=tid');
+            autorewrite with t in *;
+            eauto.
   Qed.
 
 End Compiler.
