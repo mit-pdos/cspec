@@ -2,7 +2,6 @@ Require Import ConcurExec.
 Require Import Relations.Relation_Operators.
 Require Import Morphisms.
 Require Import ProofAutomation.
-Require Import Helpers.ListStuff.
 Require Import Helpers.FinMap.
 Require Import Helpers.Instances.
 Require Import List.

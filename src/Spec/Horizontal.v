@@ -1,20 +1,20 @@
 Require Import ProofIrrelevance.
 Require Import FunctionalExtensionality.
+Require Import List.
+
 Require Import ProofAutomation.
+Require Import Ordering.
 Require Import Helpers.ListStuff.
 Require Import Helpers.Maps.
 Require Import Helpers.Instances.
-Require Import ConcurExec.
-Require Import Equiv.
-Require Import Omega.
-Require Import List.
-Require Import Modules.
-Require Import Ordering.
-Require Import Abstraction.
-Require Import Movers.
-Require Import Compile.
-Require Import CompileLoop.
-Require Import Protocol.
+Require Import Spec.ConcurExec.
+Require Import Spec.Equiv.
+Require Import Spec.Modules.
+Require Import Spec.Abstraction.
+Require Import Spec.Movers.
+Require Import Spec.Compile.
+Require Import Spec.CompileLoop.
+Require Import Spec.Protocol.
 
 Require Import Coq.Program.Equality.
 

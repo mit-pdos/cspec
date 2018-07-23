@@ -1,21 +1,5 @@
-Require Import ProofAutomation.
-Require Import Helpers.ListStuff.
+Require Import CSPEC.
 Require Import Helpers.Learn.
-Require Import Helpers.Instances.
-Require Import ConcurExec.
-Require Import Equiv.
-Require Import Omega.
-Require Import FunctionalExtensionality.
-Require Import Relations.Relation_Operators.
-Require Import RelationClasses.
-Require Import Morphisms.
-Require Import List.
-Require Import Compile.
-Require Import CompileLoop.
-Require Import Modules.
-Require Import Movers.
-Require Import Abstraction.
-Require Import Protocol.
 Require Import TSO.
 
 Import ListNotations.

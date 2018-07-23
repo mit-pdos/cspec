@@ -9,6 +9,7 @@
   *)
 
 Require Export Helpers.ProofAutomation.Abstract.
+Require Export Helpers.ProofAutomation.DependentEq.
 Require Export Helpers.ProofAutomation.ExistentialVariants.
 Require Export Helpers.ProofAutomation.Misc.
 Require Export Helpers.ProofAutomation.Propositional.
