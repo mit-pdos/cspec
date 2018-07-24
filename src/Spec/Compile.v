@@ -110,50 +110,50 @@ Hint Resolve no_atomics_exec_tid.
 
 Section Compiler.
 
-  Variable opLoT : Type -> Type.
-  Variable opMidT : Type -> Type.
+  Variable OpLo : Type -> Type.
+  Variable OpHi : Type -> Type.
 
-  Variable compile_op : forall T, opMidT T -> proc opLoT T.
+  Variable compile_op : forall T, OpHi T -> proc OpLo T.
 
   Variable compile_op_no_atomics :
-    forall `(op : opMidT T),
+    forall `(op : OpHi T),
       no_atomics (compile_op op).
 
-  Definition atomize T (op : opMidT T) : proc opLoT T :=
+  Definition atomize T (op : OpHi T) : proc OpLo T :=
     Atomic (compile_op op).
 
-  Inductive compile_ok : forall T (p1 : proc opLoT T) (p2 : proc opMidT T), Prop :=
-  | CompileOp : forall `(op : opMidT T),
+  Inductive compile_ok : forall T (p1 : proc OpLo T) (p2 : proc OpHi T), Prop :=
+  | CompileOp : forall `(op : OpHi T),
     compile_ok (compile_op op) (Call op)
   | CompileRet : forall `(x : T),
     compile_ok (Ret x) (Ret x)
-  | CompileBind : forall `(p1a : proc opLoT T1) (p2a : proc opMidT T1)
+  | CompileBind : forall `(p1a : proc OpLo T1) (p2a : proc OpHi T1)
                          `(p1b : T1 -> proc _ T2) (p2b : T1 -> proc _ T2),
     compile_ok p1a p2a ->
     (forall x, compile_ok (p1b x) (p2b x)) ->
     compile_ok (Bind p1a p1b) (Bind p2a p2b)
-  | CompileUntil : forall `(p1 : option T -> proc opLoT T) (p2 : option T -> proc opMidT T) (c : T -> bool) v,
+  | CompileUntil : forall `(p1 : option T -> proc OpLo T) (p2 : option T -> proc OpHi T) (c : T -> bool) v,
     (forall v', compile_ok (p1 v') (p2 v')) ->
     compile_ok (Until c p1 v) (Until c p2 v)
-  | CompileSpawn : forall T (p1: proc opLoT T) (p2: proc opMidT T),
+  | CompileSpawn : forall T (p1: proc OpLo T) (p2: proc OpHi T),
       compile_ok p1 p2 ->
       compile_ok (Spawn p1) (Spawn p2)
   .
 
-  Inductive atomic_compile_ok : forall T (p1 : proc opLoT T) (p2 : proc opMidT T), Prop :=
-  | ACompileOp : forall `(op : opMidT T),
+  Inductive atomic_compile_ok : forall T (p1 : proc OpLo T) (p2 : proc OpHi T), Prop :=
+  | ACompileOp : forall `(op : OpHi T),
     atomic_compile_ok (Atomic (compile_op op)) (Call op)
   | ACompileRet : forall `(x : T),
     atomic_compile_ok (Ret x) (Ret x)
-  | ACompileBind : forall `(p1a : proc opLoT T1) (p2a : proc opMidT T1)
+  | ACompileBind : forall `(p1a : proc OpLo T1) (p2a : proc OpHi T1)
                           `(p1b : T1 -> proc _ T2) (p2b : T1 -> proc _ T2),
     atomic_compile_ok p1a p2a ->
     (forall x, atomic_compile_ok (p1b x) (p2b x)) ->
     atomic_compile_ok (Bind p1a p1b) (Bind p2a p2b)
-  | ACompileUntil : forall `(p1 : option T -> proc opLoT T) (p2 : option T -> proc opMidT T) (c : T -> bool) v,
+  | ACompileUntil : forall `(p1 : option T -> proc OpLo T) (p2 : option T -> proc OpHi T) (c : T -> bool) v,
     (forall v', atomic_compile_ok (p1 v') (p2 v')) ->
     atomic_compile_ok (Until c p1 v) (Until c p2 v)
-  | ACompileSpawn : forall T (p1: proc opLoT T) (p2: proc opMidT T),
+  | ACompileSpawn : forall T (p1: proc OpLo T) (p2: proc OpHi T),
       atomic_compile_ok p1 p2 ->
       atomic_compile_ok (Spawn p1) (Spawn p2)
   .
@@ -162,7 +162,7 @@ Section Compiler.
   Hint Constructors atomic_compile_ok.
 
 
-  Fixpoint compile T (p : proc opMidT T) : proc opLoT T :=
+  Fixpoint compile T (p : proc OpHi T) : proc OpLo T :=
     match p with
     | Ret t => Ret t
     | Call op => compile_op op
@@ -232,11 +232,11 @@ Section Compiler.
   Qed.
 
   Variable State : Type.
-  Variable lo_step : OpSemantics opLoT State.
-  Variable hi_step : OpSemantics opMidT State.
+  Variable lo_step : OpSemantics OpLo State.
+  Variable hi_step : OpSemantics OpHi State.
 
   Definition compile_correct :=
-    forall T (op : opMidT T) tid s v s' evs,
+    forall T (op : OpHi T) tid s v s' evs,
       atomic_exec lo_step (compile_op op) tid s v s' evs ->
       hi_step op tid s v s' evs.
 
@@ -315,7 +315,7 @@ Section Compiler.
 
 End Compiler.
 
-Arguments atomize {opLoT opMidT} compile_op [T] op.
+Arguments atomize {OpLo OpHi} compile_op [T] op.
 
 
 Section Atomization.
@@ -324,34 +324,34 @@ Section Atomization.
      in the left-side proc have been replaced with atomic-bracketed
      versions in the right-side proc. *)
 
-  Variable opLoT : Type -> Type.
-  Variable opMidT : Type -> Type.
-  Variable compile_op : forall T, opMidT T -> proc opLoT T.
+  Variable OpLo : Type -> Type.
+  Variable OpHi : Type -> Type.
+  Variable compile_op : forall T, OpHi T -> proc OpLo T.
 
-  Inductive atomize_ok : forall T (p1 p2 : proc opLoT T), Prop :=
-  | AtomizeOp : forall `(op : opMidT T),
+  Inductive atomize_ok : forall T (p1 p2 : proc OpLo T), Prop :=
+  | AtomizeOp : forall `(op : OpHi T),
     atomize_ok (compile_op op) (atomize compile_op op)
   | AtomizeRet : forall `(x : T),
     atomize_ok (Ret x) (Ret x)
-  | AtomizeBind : forall T1 T2 (p1a p2a : proc opLoT T1)
-                               (p1b p2b : T1 -> proc opLoT T2),
+  | AtomizeBind : forall T1 T2 (p1a p2a : proc OpLo T1)
+                               (p1b p2b : T1 -> proc OpLo T2),
     atomize_ok p1a p2a ->
     (forall x, atomize_ok (p1b x) (p2b x)) ->
     atomize_ok (Bind p1a p1b) (Bind p2a p2b)
-  | AtomizeUntil : forall T (p1 p2 : option T -> proc opLoT T) (c : T -> bool) v,
+  | AtomizeUntil : forall T (p1 p2 : option T -> proc OpLo T) (c : T -> bool) v,
     (forall v', atomize_ok (p1 v') (p2 v')) ->
     atomize_ok (Until c p1 v) (Until c p2 v)
-  | AtomizeSpawn : forall T (p1 p2: proc opLoT T),
+  | AtomizeSpawn : forall T (p1 p2: proc OpLo T),
       atomize_ok p1 p2 ->
       atomize_ok (Spawn p1) (Spawn p2)
   .
 
 
   Variable State : Type.
-  Variable op_step : OpSemantics opLoT State.
+  Variable op_step : OpSemantics OpLo State.
 
   Definition atomize_correct :=
-    forall T (op : opMidT T)
+    forall T (op : OpHi T)
            T' (p1rest p2rest : _ -> proc _ T'),
            (forall x, trace_incl op_step (p1rest x) (p2rest x)) ->
            trace_incl op_step
@@ -413,13 +413,13 @@ Section Atomization.
 
 End Atomization.
 
-Arguments atomize_ok {opLoT opMidT} compile_op [T].
-Arguments atomize_correct {opLoT opMidT} compile_op [State] op_step.
+Arguments atomize_ok {OpLo OpHi} compile_op [T].
+Arguments atomize_correct {OpLo OpHi} compile_op [State] op_step.
 
 
 
 Theorem atomize_proc_match_helper :
-  forall T `(p1 : proc opLoT T) `(p2 : proc opMidT T)
+  forall T `(p1 : proc OpLo T) `(p2 : proc OpHi T)
          compile_op,
   compile_ok compile_op p1 p2 ->
     atomize_ok compile_op p1 (compile (atomize compile_op) p2) /\
@@ -437,8 +437,8 @@ Proof.
 Qed.
 
 Theorem atomize_proc_match :
-  forall `(ts1 : threads_state opLoT)
-         `(ts2 : threads_state opMidT)
+  forall `(ts1 : threads_state OpLo)
+         `(ts2 : threads_state OpHi)
          compile_op,
   proc_match (compile_ok compile_op) ts1 ts2 ->
   exists ts1',
@@ -461,9 +461,9 @@ Proof.
 Qed.
 
 Theorem compile_traces_match_ts :
-  forall `(ts1 : threads_state opLoT)
-         `(ts2 : threads_state opMidT)
-         `(lo_step : OpSemantics opLoT State) hi_step compile_op,
+  forall `(ts1 : threads_state OpLo)
+         `(ts2 : threads_state OpHi)
+         `(lo_step : OpSemantics OpLo State) hi_step compile_op,
   compile_correct compile_op lo_step hi_step ->
   atomize_correct compile_op lo_step ->
   proc_match (compile_ok compile_op) ts1 ts2 ->

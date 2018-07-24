@@ -1139,18 +1139,18 @@ End OpSemantics.
 
 (** Correspondence between different layers *)
 
-Definition traces_match_ts {opLoT opMidT State} lo_step hi_step
-           (ts1 : threads_state opLoT)
-           (ts2 : threads_state opMidT) :=
+Definition traces_match_ts {OpLo OpHi State} lo_step hi_step
+           (ts1 : threads_state OpLo)
+           (ts2 : threads_state OpHi) :=
   forall (s : State) tr1,
     exec lo_step s ts1 tr1 ->
     exec hi_step s ts2 tr1.
 
 Global Instance traces_match_ts_proper :
-  Proper (@trace_incl_ts opLoT State lo_step ==>
-                         @exec_equiv_ts opMidT State hi_step ==>
+  Proper (@trace_incl_ts OpLo State lo_step ==>
+                         @exec_equiv_ts OpHi State hi_step ==>
                          Basics.flip Basics.impl)
-         (@traces_match_ts opLoT opMidT State lo_step hi_step).
+         (@traces_match_ts OpLo OpHi State lo_step hi_step).
 Proof.
   intros.
   intros ts1 ts1' H1.

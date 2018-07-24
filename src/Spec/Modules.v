@@ -12,16 +12,16 @@ Require Import ProofAutomation.
 
 Section TraceAbs.
 
-  Variable opLoT : Type -> Type.
-  Variable opMidT : Type -> Type.
+  Variable OpLo : Type -> Type.
+  Variable OpHi : Type -> Type.
 
   Variable StateLo : Type.
-  Variable StateMid : Type.
-  Variable absR : StateLo -> StateMid -> Prop.
+  Variable StateHi : Type.
+  Variable absR : StateLo -> StateHi -> Prop.
   Variable initP : StateLo -> Prop.
 
-  Variable lo_step : OpSemantics opLoT StateLo.
-  Variable mid_step : OpSemantics opMidT StateMid.
+  Variable lo_step : OpSemantics OpLo StateLo.
+  Variable hi_step : OpSemantics OpHi StateHi.
 
   (* TCB: this definition is the core of our specifications: we prove that all
   behaviors of threads using low-level operations are also behaviors that could
@@ -29,13 +29,13 @@ Section TraceAbs.
   ts2, relating them to a compiled version using low-level operations that we
   can actually execute) *)
   Definition traces_match_abs
-                           (ts1 : threads_state opLoT)
-                           (ts2 : threads_state opMidT) :=
-    forall (sl : StateLo) (sm : StateMid) tr1,
+                           (ts1 : threads_state OpLo)
+                           (ts2 : threads_state OpHi) :=
+    forall (sl : StateLo) (sm : StateHi) tr1,
       initP sl ->
       exec lo_step sl ts1 tr1 ->
       absR sl sm ->
-      exec mid_step sm ts2 tr1.
+      exec hi_step sm ts2 tr1.
 
 End TraceAbs.
 

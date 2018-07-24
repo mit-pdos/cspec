@@ -14,12 +14,12 @@ Global Generalizable All Variables.
 
 Section Compiler.
 
-  Variable opLoT : Type -> Type.
-  Variable opMidT : Type -> Type.
+  Variable OpLo : Type -> Type.
+  Variable OpHi : Type -> Type.
 
-  Variable compile_op : forall T, opMidT T -> ((option T -> opLoT T) * (T -> bool) * option T).
+  Variable compile_op : forall T, OpHi T -> ((option T -> OpLo T) * (T -> bool) * option T).
 
-  Fixpoint compile T (p : proc opMidT T) : proc opLoT T :=
+  Fixpoint compile T (p : proc OpHi T) : proc OpLo T :=
     match p with
     | Ret t => Ret t
     | Call op =>
@@ -31,27 +31,27 @@ Section Compiler.
     | Spawn p => Spawn (compile p)
     end.
 
-  Inductive compile_ok : forall T (p1 : proc opLoT T) (p2 : proc opMidT T), Prop :=
-  | CompileOp : forall `(op : opMidT T) body cond iv v,
+  Inductive compile_ok : forall T (p1 : proc OpLo T) (p2 : proc OpHi T), Prop :=
+  | CompileOp : forall `(op : OpHi T) body cond iv v,
     compile_op op = (body, cond, iv) ->
     compile_ok (Until cond (fun x => Call (body x)) v) (Call op)
-  | CompileOp1 : forall `(op : opMidT T) body cond iv v,
+  | CompileOp1 : forall `(op : OpHi T) body cond iv v,
     compile_op op = (body, cond, iv) ->
     compile_ok (until1 cond (fun x => Call (body x)) v) (Call op)
   | CompileRet : forall `(x : T),
     compile_ok (Ret x) (Ret x)
-  | CompileExtraRet : forall `(x : T) `(p1 : T -> proc opLoT TF) p2,
+  | CompileExtraRet : forall `(x : T) `(p1 : T -> proc OpLo TF) p2,
     compile_ok (p1 x) (p2 x) ->
     compile_ok (Bind (Ret x) p1) (p2 x)
-  | CompileBind : forall `(p1a : proc opLoT T1) (p2a : proc opMidT T1)
+  | CompileBind : forall `(p1a : proc OpLo T1) (p2a : proc OpHi T1)
                          `(p1b : T1 -> proc _ T2) (p2b : T1 -> proc _ T2),
     compile_ok p1a p2a ->
     (forall x, compile_ok (p1b x) (p2b x)) ->
     compile_ok (Bind p1a p1b) (Bind p2a p2b)
-  | CompileUntil : forall `(p1 : option T -> proc opLoT T) (p2 : option T -> proc opMidT T) (c : T -> bool) v,
+  | CompileUntil : forall `(p1 : option T -> proc OpLo T) (p2 : option T -> proc OpHi T) (c : T -> bool) v,
     (forall v', compile_ok (p1 v') (p2 v')) ->
     compile_ok (Until c p1 v) (Until c p2 v)
-  | CompileSpawn : forall T (p1: proc opLoT T) (p2: proc opMidT T),
+  | CompileSpawn : forall T (p1: proc OpLo T) (p2: proc OpHi T),
       compile_ok p1 p2 ->
       compile_ok (Spawn p1) (Spawn p2)
   .
@@ -122,11 +122,11 @@ Section Compiler.
   Qed.
 
   Variable State : Type.
-  Variable lo_step : OpSemantics opLoT State.
-  Variable hi_step : OpSemantics opMidT State.
+  Variable lo_step : OpSemantics OpLo State.
+  Variable hi_step : OpSemantics OpHi State.
 
   Definition noop_or_success :=
-    forall T (opM : opMidT T) opL cond iv tid s r s',
+    forall T (opM : OpHi T) opL cond iv tid s r s',
       (opL, cond, iv) = compile_op opM ->
       forall v evs,
         lo_step (opL v) tid s r s' evs ->
@@ -255,4 +255,4 @@ Section Compiler.
 
 End Compiler.
 
-Arguments compile_ts {opLoT opMidT}.
+Arguments compile_ts {OpLo OpHi}.

@@ -15,18 +15,18 @@ Global Generalizable All Variables.
 
 Section StateAbstraction.
 
-  Variable opLoT : Type -> Type.
+  Variable OpLo : Type -> Type.
 
   Variable StateLo : Type.
   Variable StateHi : Type.
   Variable absR : StateLo -> StateHi -> Prop.
 
-  Variable lo_step : OpSemantics opLoT StateLo.
-  Variable hi_step : OpSemantics opLoT StateHi.
+  Variable lo_step : OpSemantics OpLo StateLo.
+  Variable hi_step : OpSemantics OpLo StateHi.
 
   Hint Constructors exec_tid.
 
-  Definition op_abs := forall T (op : opLoT T) s1 s1' s2 tid r evs,
+  Definition op_abs := forall T (op : OpLo T) s1 s1' s2 tid r evs,
     absR s1 s2 ->
     lo_step op tid s1 r s1' evs ->
       exists s2',
@@ -35,7 +35,7 @@ Section StateAbstraction.
 
   Variable op_abs_holds : op_abs.
 
-  Theorem atomic_exec_abs : forall `(p : proc opLoT T) s1 s1' s2 tid r evs,
+  Theorem atomic_exec_abs : forall `(p : proc OpLo T) s1 s1' s2 tid r evs,
     absR s1 s2 ->
     atomic_exec lo_step p tid s1 r s1' evs ->
       exists s2',
@@ -52,7 +52,7 @@ Section StateAbstraction.
     - edestruct IHatomic_exec; intuition eauto.
   Qed.
 
-  Theorem exec_tid_abs : forall `(p : proc opLoT T) s1 s1' s2 tid res spawned evs,
+  Theorem exec_tid_abs : forall `(p : proc OpLo T) s1 s1' s2 tid res spawned evs,
     absR s1 s2 ->
     exec_tid lo_step tid s1 p s1' res spawned evs ->
       exists s2',
@@ -68,7 +68,7 @@ Section StateAbstraction.
   Qed.
 
   Theorem trace_incl_abs :
-    forall s1 s2 (ts : threads_state opLoT) tr,
+    forall s1 s2 (ts : threads_state OpLo) tr,
       absR s1 s2 ->
       exec lo_step s1 ts tr ->
       exec hi_step s2 ts tr.

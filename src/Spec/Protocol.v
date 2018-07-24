@@ -298,10 +298,10 @@ Section Protocol.
       eapply exec_tid'_preserves_follows_protocol; eauto.
   Qed.
 
-  Variable opMidT : Type -> Type.
-  Variable compile_op : forall T, opMidT T -> proc Op T.
+  Variable OpHi : Type -> Type.
+  Variable compile_op : forall T, OpHi T -> proc Op T.
   Variable compile_op_follows_protocol :
-    forall tid s T (op : opMidT T), follows_protocol_proc tid s (compile_op op).
+    forall tid s T (op : OpHi T), follows_protocol_proc tid s (compile_op op).
 
   Theorem compile_ts_follows_protocol_proc :
     forall ts tid `(p : proc _ T) s,
