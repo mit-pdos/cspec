@@ -1,6 +1,6 @@
 Require Import Trace.
 Require Import ConcurProc.
-Require Import Helpers.FinMap.
+Require Import Spec.ThreadsState.
 
 Global Set Implicit Arguments.
 Global Generalizable All Variables.

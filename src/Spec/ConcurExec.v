@@ -1,7 +1,7 @@
 Require Export Trace.
 Require Export ConcurProc.
 Require Export ExecSemantics.
-Require Export Helpers.FinMap.
+Require Export Spec.ThreadsState.
 
 Require Import ProofAutomation.
 Require Import Helpers.ListStuff.

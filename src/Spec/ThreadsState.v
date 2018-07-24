@@ -8,7 +8,7 @@ Require Import ProofIrrelevance.
 Require Import ProofAutomation.
 Require Import Helpers.Instances.
 
-Require Import ConcurProc.
+Require Import Spec.ConcurProc.
 
 Set Implicit Arguments.
 

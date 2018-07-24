@@ -2,7 +2,7 @@ Require Import ConcurExec.
 Require Import Relations.Relation_Operators.
 Require Import Morphisms.
 Require Import ProofAutomation.
-Require Import Helpers.FinMap.
+Require Import Spec.ThreadsState.
 Require Import Helpers.Instances.
 Require Import List.
 Require Import Omega.
