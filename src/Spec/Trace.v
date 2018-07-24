@@ -1,44 +1,61 @@
-Require Import ProofAutomation.
+Require Import ProofAutomation.DependentEq.
+Require Import List.
 
-Require List.
-Import List.ListNotations.
-Open Scope list.
-
-Set Implicit Arguments.
+Definition TID := nat.
 
 Inductive event :=
-| Event : forall T (v : T), event.
+| Event : forall T (v:T), event.
+Arguments Event {T} v.
 
-Inductive trace :=
-| TraceEvent : forall (tid : nat) (ev : event), trace -> trace
-| TraceEmpty : trace.
+Definition trace := list (TID * event).
 
+Definition thread_tr tid (evs: list event) : trace := map (pair tid) evs.
 
-Fixpoint prepend tid (evs : list event) (tr : trace) : trace :=
-  match evs with
-  | nil => tr
-  | e :: evs' =>
-    TraceEvent tid e (prepend tid evs' tr)
-  end.
+Theorem thread_tr_app : forall tid evs1 evs2,
+    thread_tr tid evs1 ++ thread_tr tid evs2 =
+    thread_tr tid (evs1 ++ evs2).
+Proof.
+  unfold thread_tr; simpl; intros.
+  rewrite map_app; auto.
+Qed.
+
+Theorem thread_tr_eq : forall tid evs1 evs2,
+    thread_tr tid evs1 = thread_tr tid evs2 ->
+    evs1 = evs2.
+Proof.
+  induct evs1.
+  - destruct evs2; simpl in *; congruence.
+  - destruct evs2; simpl in *; try congruence.
+    invert H; eauto.
+    f_equal; auto.
+Qed.
+
+(* TODO: these are only for backwards compatibility, from when [trace] was an
+inductive definition. *)
+Definition TraceEmpty : trace := nil.
+
+Definition prepend tid (evs: list event) (tr: trace) : trace :=
+  thread_tr tid evs ++ tr.
 
 Theorem prepend_empty_eq : forall tid evs evs',
     prepend tid evs TraceEmpty = prepend tid evs' TraceEmpty ->
     evs = evs'.
 Proof.
-  intros.
-  generalize dependent evs'.
-  induct evs.
-  - destruct evs'; simpl in *; congruence.
-  - destruct evs'; simpl in *; try congruence.
-    invert H.
-    f_equal; eauto.
+  unfold prepend; simpl; intros.
+  rewrite !app_nil_r in H.
+  apply thread_tr_eq in H; auto.
 Qed.
 
-Lemma prepend_app : forall `(evs1 : list event) evs2 tr tid,
+Theorem prepend_app : forall (evs1 : list event) evs2 tr tid,
     prepend tid (evs1 ++ evs2) tr = prepend tid evs1 (prepend tid evs2 tr).
 Proof.
-  induction evs1; simpl; intros; eauto.
-  rewrite IHevs1; eauto.
+  unfold prepend; simpl; intros.
+  rewrite <- thread_tr_app.
+  rewrite app_assoc; auto.
 Qed.
 
-Arguments Event {T}.
+Theorem prepend_nil : forall tid tr,
+    prepend tid nil tr = tr.
+Proof.
+  reflexivity.
+Qed.

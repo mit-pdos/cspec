@@ -415,6 +415,7 @@ Section Movers.
       eauto.
       rewrite ConcurExec.thread_upd_abc_to_cab in * by congruence; eauto.
     + edestruct H; eauto; subst; simpl; eauto.
+      rewrite prepend_nil; eauto.
   Qed.
 
   Theorem trace_incl_atomize_op_left_mover :
