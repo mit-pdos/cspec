@@ -103,7 +103,8 @@ Section OpSemantics.
     end.
 
   (* same as thread_upd_ind, but also generalize the program - this seems
-necessary some of the time, and generalizing can break existing proofs *)
+   * necessary some of the time, and generalizing can break existing proofs
+   *)
   Ltac thread_upd_ind' p :=
     let ind H := induction H; intros; subst; eauto; NoProc_upd in
     match goal with
@@ -283,6 +284,28 @@ necessary some of the time, and generalizing can break existing proofs *)
       ExecPrefix tid tid'.
   Qed.
 
+  Theorem exec_equiv_spawn : forall `(p1 : proc Op T) p2,
+      exec_equiv p1 p2 ->
+      exec_equiv_rx (Spawn p1) (Spawn p2).
+  Proof.
+    intros.
+    eapply exec_equiv_rx_proof_helper; intros.
+    - exec_tid_simpl.
+      ExecPrefix tid tid'.
+      rewrite thread_upd_ne_comm in * by auto.
+      match goal with
+      | H : exec_equiv _ _ |- _ =>
+        apply H; eauto
+      end.
+    - exec_tid_simpl.
+      ExecPrefix tid tid'.
+      rewrite thread_upd_ne_comm in * by auto.
+      match goal with
+      | H : exec_equiv _ _ |- _ =>
+        apply H; eauto
+      end.
+  Qed.
+
   Theorem exec_equiv_congruence : forall T (p1 p2: proc Op T) T' (rx1 rx2: T -> proc Op T'),
       exec_equiv_rx p1 p2 ->
       (forall x, exec_equiv_rx (rx1 x) (rx2 x)) ->
@@ -304,6 +327,13 @@ necessary some of the time, and generalizing can break existing proofs *)
   Proof.
     unfold Proper, respectful, pointwise_relation; intros.
     apply exec_equiv_congruence; auto.
+  Qed.
+
+  Global Instance Spawn_exec_equiv_proper :
+    Proper (@exec_equiv T ==> exec_equiv_rx) Spawn.
+  Proof.
+    unfold Proper, respectful, pointwise_relation; intros.
+    apply exec_equiv_spawn; auto.
   Qed.
 
   Global Instance exec_proper_exec_equiv :
@@ -1133,6 +1163,37 @@ numbers of steps *)
     intros. eapply H.
     reflexivity.
     intros; eapply trace_incl_N_le; eauto; omega.
+  Qed.
+
+
+  (** Reuse the complicated proof about [Until]. *)
+
+  Theorem exec_equiv_until_body : forall `(p1 : option T -> proc Op T) p2 c v,
+      (forall a, exec_equiv_rx (p1 a) (p2 a)) ->
+      exec_equiv_rx (Until c p1 v) (Until c p2 v).
+  Proof.
+    split; intros.
+    - eapply exec_to_counter in H0; deex.
+      eapply trace_incl_rx_until; try eassumption; try reflexivity.
+      intros; eapply trace_incl_to_trace_incl_rx.
+      intros; eapply exec_equiv_to_trace_incl.
+      eapply H.
+    - eapply exec_to_counter in H0; deex.
+      eapply trace_incl_rx_until; try eassumption; try reflexivity.
+      intros; eapply trace_incl_to_trace_incl_rx.
+      intros; eapply exec_equiv_to_trace_incl.
+      symmetry.
+      eapply H.
+  Qed.
+
+  Global Instance Until_exec_equiv_proper :
+    Proper (eq ==>
+               pointwise_relation _ exec_equiv_rx ==>
+               eq ==>
+               @exec_equiv_rx T) Until.
+  Proof.
+    unfold Proper, respectful, pointwise_relation; intros; subst.
+    apply exec_equiv_until_body; eauto.
   Qed.
 
 End OpSemantics.

@@ -19,17 +19,10 @@ Section Compiler.
 
   Variable compile_op : forall T, OpHi T -> ((option T -> OpLo T) * (T -> bool) * option T).
 
-  Fixpoint compile T (p : proc OpHi T) : proc OpLo T :=
-    match p with
-    | Ret t => Ret t
-    | Call op =>
+  Definition compile :=
+    Compile.compile (fun T op =>
       let '(body, cond, iv) := compile_op op in
-      Until cond (fun x => Call (body x)) iv
-    | Bind p1 p2 => Bind (compile p1) (fun r => compile (p2 r))
-    | Atomic p => Atomic (compile p)
-    | Until c p v => Until c (fun r => compile (p r)) v
-    | Spawn p => Spawn (compile p)
-    end.
+      Until cond (fun x => Call (body x)) iv).
 
   Inductive compile_ok : forall T (p1 : proc OpLo T) (p2 : proc OpHi T), Prop :=
   | CompileOp : forall `(op : OpHi T) body cond iv v,
@@ -78,14 +71,10 @@ Section Compiler.
       no_atomics p ->
       no_atomics (compile p).
   Proof.
-    induction p; simpl; intros; eauto.
-    - destruct (compile_op op) as [x iv] eqn:He1.
-      destruct x as [body cond] eqn:He2.
-      eauto.
-    - invert H0; eauto.
-    - invert H0; eauto.
-    - invert H.
-    - invert H; eauto.
+    intros.
+    eapply Compile.compile_no_atomics; eauto.
+    intros.
+    destruct (compile_op op); destruct p0; eauto.
   Qed.
 
   Definition compile_ts ts :=

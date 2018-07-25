@@ -88,4 +88,35 @@ Proof.
   rewrite IHl; auto.
 Qed.
 
- 
+Lemma list_upd_app : forall `(l1 : list T) l2 i v,
+  length l1 <= i ->
+  list_upd (l1 ++ l2) i v = l1 ++ list_upd l2 (i - length l1) v.
+Proof.
+  induction l1; simpl; intros.
+  - replace (i - 0) with i by omega; auto.
+  - destruct i; try omega.
+    f_equal.
+    simpl.
+    eapply IHl1; omega.
+Qed.
+
+Theorem nth_error_list_upd_eq :
+  forall `(l : list A) n v,
+    n < length l ->
+    nth_error (list_upd l n v) n = Some v.
+Proof.
+  induction l; simpl; intros; try omega.
+  destruct n; simpl; eauto.
+  eapply IHl; omega.
+Qed.
+
+Theorem nth_error_list_upd_ne :
+  forall `(l : list A) n n' v,
+    n <> n' ->
+    nth_error (list_upd l n v) n' = nth_error l n'.
+Proof.
+  induction l; simpl; intros; eauto.
+  destruct n; simpl; eauto.
+  - destruct n'; eauto; omega.
+  - destruct n'; eauto.
+Qed.

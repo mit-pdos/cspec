@@ -7,6 +7,8 @@ Require Import FunctionalExtensionality.
 Require Import ProofIrrelevance.
 Require Import ProofAutomation.
 Require Import Helpers.Instances.
+Require Import List.
+Require Import ListStuff.
 
 Require Import Spec.ConcurProc.
 
@@ -354,8 +356,6 @@ Section Map.
     induction n; simpl; eauto.
   Qed.
 
-  (* TODO: prove this, just for fun (note that it is unused; conversion back
-    to lists is only for extraction purposes) *)
   Lemma from_list__to_list : forall l n,
       n <= length l ->
       _to_list (thread_from_list l) n = List.firstn n (List.map (fun '(existT _ _ p) => Proc p) l).
@@ -366,7 +366,33 @@ Section Map.
     rewrite ?firstn_map.
     clear IHn.
     fold (lt n (length l)) in H.
-  Admitted.
+    assert (length (firstn n l) = n) by ( apply firstn_length_le; omega ).
+    replace (firstn (S n) l) with (firstn n l ++ (firstn 1 (skipn n l))).
+    2: {
+      replace (S n) with (length (firstn n l) + 1) by omega.
+      replace l with (firstn n l ++ skipn n l) at 4 by apply firstn_skipn.
+      rewrite firstn_app_2.
+      reflexivity.
+    }
+
+    assert (skipn n l <> nil).
+    {
+      erewrite <- firstn_skipn with (l := l) in H.
+      rewrite app_length in H.
+      rewrite H0 in H.
+      destruct (skipn n l); simpl in *; try congruence.
+      omega.
+    }
+
+    rewrite map_app.
+    f_equal.
+    rewrite <- firstn_skipn with (l := l) (n := n) at 1.
+    rewrite nth_error_app2 by omega.
+    replace (n - length (firstn n l)) with 0 by omega.
+
+    destruct (skipn n l); try congruence; simpl.
+    reflexivity.
+  Qed.
 
   Theorem thread_from_list_to_list : forall l,
       0 < length l ->
@@ -465,6 +491,70 @@ Section Map_map.
 
 End Map_map.
 
+
+Theorem thread_map_eq :
+  forall Op1 Op2
+         (f g : forall T, proc Op1 T -> proc Op2 T)
+         ts,
+    (forall T p, f T p = g T p) ->
+    thread_map f ts = thread_map g ts.
+Proof.
+  intros.
+  replace g with f; auto.
+  apply functional_extensionality_dep; intros.
+  apply functional_extensionality; eauto.
+Qed.
+
+Theorem thread_map_thread_map :
+  forall Op1 Op2 Op3
+         (f : forall T, proc Op1 T -> proc Op2 T)
+         (g : forall T, proc Op2 T -> proc Op3 T)
+         ts,
+    thread_map g (thread_map f ts) = thread_map (fun T t => g T (f T t)) ts.
+Proof.
+  intros.
+  apply thread_ext_eq; intros; cbn.
+  destruct matches.
+Qed.
+
+Theorem map_nth_error_none :
+  forall A B (f : A -> B) n l,
+    nth_error l n = None -> nth_error (map f l) n = None.
+Proof.
+  intros.
+  apply nth_error_None in H.
+  apply nth_error_None.
+  rewrite map_length; auto.
+Qed.
+
+Theorem thread_map_thread_from_list :
+  forall Op1 Op2
+         (f : forall T, proc Op1 T -> proc Op2 T)
+         tl,
+    thread_map f (thread_from_list tl) =
+    thread_from_list (map (fun '(existT _ T p) => existT _ T (f T p)) tl).
+Proof.
+  intros.
+  apply thread_ext_eq; intros; cbn.
+  destruct_with_eqn (nth_error tl tid).
+  - erewrite map_nth_error by eauto.
+    destruct matches.
+  - erewrite map_nth_error_none; eauto.
+Qed.
+
+Theorem thread_upd_thread_from_list :
+  forall Op tl tid T (p : proc Op T),
+    tid < length tl ->
+    thread_upd (thread_from_list tl) tid (Proc p) =
+    thread_from_list (list_upd tl tid (existT _ T p)).
+Proof.
+  intros.
+  apply thread_ext_eq; intros; simpl.
+  destruct (tid == tid0); propositional.
+  - rewrite nth_error_list_upd_eq; eauto.
+  - rewrite nth_error_list_upd_ne; eauto.
+Qed.
+
 Global Opaque
        thread_get
        thread_upd
@@ -482,3 +572,4 @@ Hint Rewrite thread_upd_thread_upd_eq : t.
 Hint Rewrite thread_upd_same_eq using solve [ auto ] : t.
 Hint Rewrite map_thread_get_none using solve [ auto ] : t.
 Hint Rewrite empty_thread_max : t.
+Hint Rewrite thread_map_thread_map : t.

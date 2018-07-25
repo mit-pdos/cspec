@@ -207,15 +207,8 @@ Section HorizontalComposition.
         FMap.MapsTo i s (HSMap S) /\
         initP s.
 
-  Fixpoint SliceProc (i : validIndexT) `(p : proc sliceOpT T) : proc horizOpT T :=
-    match p with
-    | Call op => Call (Slice i op)
-    | Ret v => Ret v
-    | Bind p1 p2 => Bind (SliceProc i p1) (fun r => SliceProc i (p2 r))
-    | Until cond p init => Until cond (fun x => SliceProc i (p x)) init
-    | Atomic p => Atomic (SliceProc i p)
-    | Spawn p => Spawn (SliceProc i p)
-    end.
+  Definition SliceProc (i : validIndexT) `(p : proc sliceOpT T) : proc horizOpT T :=
+    Compile.compile (fun T (op : sliceOpT T) => Call (Slice i op)) p.
 
   Theorem SliceProc_eq : forall i T (p p': proc _ T),
       SliceProc i p = SliceProc i p' ->

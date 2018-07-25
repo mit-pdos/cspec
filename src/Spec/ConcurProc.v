@@ -22,6 +22,7 @@ Arguments Ret {Op T}.
 Arguments Bind {Op T T1}.
 Arguments Until {Op T}.
 Arguments Atomic {Op T}.
+Arguments Spawn {Op T}.
 
 Arguments Proc {Op T}.
 Arguments NoProc {Op}.

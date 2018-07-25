@@ -108,6 +108,42 @@ Hint Resolve no_atomics_thread_upd_Proc.
 Hint Resolve no_atomics_exec_tid.
 
 
+Section Compilation.
+
+  Variable OpLo : Type -> Type.
+  Variable OpHi : Type -> Type.
+
+  Variable compile_op : forall T, OpHi T -> proc OpLo T.
+
+  Fixpoint compile T (p : proc OpHi T) : proc OpLo T :=
+    match p with
+    | Ret t => Ret t
+    | Call op => compile_op op
+    | Bind p1 p2 => Bind (compile p1) (fun r => compile (p2 r))
+    | Atomic p => Atomic (compile p)
+    | Until c p v => Until c (fun r => compile (p r)) v
+    | Spawn p => Spawn (compile p)
+    end.
+
+  Theorem compile_no_atomics :
+    forall `(p : proc _ T),
+      (forall `(op : OpHi T'), no_atomics (compile_op op)) ->
+      no_atomics p ->
+      no_atomics (compile p).
+  Proof.
+    (* TODO: this eauto takes forever to fail *)
+    induct p; simpl; eauto.
+    - invert H1; eauto.
+    - invert H1; eauto.
+    - invert H0.
+    - invert H0; eauto.
+  Qed.
+
+End Compilation.
+
+Hint Resolve compile_no_atomics.
+
+
 Section Compiler.
 
   Variable OpLo : Type -> Type.
@@ -162,21 +198,10 @@ Section Compiler.
   Hint Constructors atomic_compile_ok.
 
 
-  Fixpoint compile T (p : proc OpHi T) : proc OpLo T :=
-    match p with
-    | Ret t => Ret t
-    | Call op => compile_op op
-    | Bind p1 p2 => Bind (compile p1) (fun r => compile (p2 r))
-    | Atomic p => Atomic (compile p)
-    | Until c p v => Until c (fun r => compile (p r)) v
-    | Spawn p => Spawn (compile p)
-    end.
-
-
   Theorem compile_ok_compile :
     forall `(p : proc _ T),
       no_atomics p ->
-      compile_ok (compile p) p.
+      compile_ok (compile compile_op p) p.
   Proof.
     induct p; simpl; eauto.
     - invert H0; eauto.
@@ -184,24 +209,9 @@ Section Compiler.
     - invert H.
     - invert H; eauto.
   Qed.
-
-  Theorem compile_no_atomics :
-    forall `(p : proc _ T),
-      no_atomics p ->
-      no_atomics (compile p).
-  Proof.
-    (* TODO: this eauto takes forever to fail *)
-    induct p; simpl; eauto.
-    - invert H0; eauto.
-    - invert H0; eauto.
-    - invert H.
-    - invert H; eauto.
-  Qed.
-
-  Hint Resolve compile_no_atomics.
 
   Definition compile_ts ts :=
-    thread_map compile ts.
+    thread_map (compile compile_op) ts.
 
   Hint Resolve compile_ok_compile.
 

@@ -120,7 +120,7 @@ Definition smtp_server_thread : proc _ unit :=
 Definition pop3_server_thread : proc _ unit :=
   Until (fun _ => false) (fun _ => do_pop3_req) None.
 
-Fixpoint SpawnN (n:nat) Op T (p:proc Op T) : proc Op unit :=
+Fixpoint SpawnN {Op T} (n:nat) (p:proc Op T) : proc Op unit :=
   match n with
   | 0 => Ret tt
   | S n' => Bind (Spawn p) (fun _ => SpawnN n' p)
