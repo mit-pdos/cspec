@@ -102,14 +102,14 @@ Section HorizontalComposition.
     eapply FMap.mapsto_add in m; eauto.
   Qed.
 
-  Theorem hget_hadd_eq_general : forall i s s',
+  Local Theorem hget_hadd_eq_general : forall i s s',
       hget (hadd i s s') i = s.
   Proof.
     destruct i; intros.
     apply hget_hadd_eq.
   Qed.
 
-  Theorem hget_hadd_ne : forall S s i i' H0 H1,
+  Local Theorem hget_hadd_ne : forall S s i i' H0 H1,
     i <> i' ->
     hget (hadd (exist _ i H0) s S) (exist _ i' H1) = hget S (exist _ i' H1).
   Proof.
@@ -121,7 +121,7 @@ Section HorizontalComposition.
     eapply FMap.mapsto_unique; eauto.
   Qed.
 
-  Theorem hget_hadd_ne_general : forall i i' s S,
+  Local Theorem hget_hadd_ne_general : forall i i' s S,
       i <> i' ->
       hget (hadd i s S) i' = hget S i'.
   Proof.
@@ -151,7 +151,7 @@ Section HorizontalComposition.
     apply proof_irrelevance.
   Qed.
 
-  Theorem hadd_hadd_eq : forall S s s' i H0 H1,
+  Local Theorem hadd_hadd_eq : forall S s s' i H0 H1,
     hadd (exist _ i H0) s (hadd (exist _ i H1) s' S) = hadd (exist _ i H0) s S.
   Proof.
     destruct S; simpl; intros.
@@ -165,7 +165,7 @@ Section HorizontalComposition.
     apply proof_irrelevance.
   Qed.
 
-  Theorem hadd_hadd_ne : forall S s s' i i' H0 H1,
+  Local Theorem hadd_hadd_ne : forall S s s' i i' H0 H1,
     i <> i' ->
     hadd (exist _ i H0) s (hadd (exist _ i' H1) s' S) =
     hadd (exist _ i' H1) s' (hadd (exist _ i H0) s S).
@@ -236,17 +236,6 @@ Section HorizontalComposition.
     - dependent destruction p'; simpl in *; try congruence.
       invert H.
       erewrite IHp; eauto.
-  Qed.
-
-  Theorem SliceProc_spawn : forall i (p1: proc _ unit) T' (p2: proc _ T'),
-      Spawn (SliceProc i p2) = SliceProc i p1 ->
-      p1 = Spawn p2.
-  Proof.
-    intros.
-    dependent destruction p1; simpl in *; intros; try congruence.
-    invert H.
-    eapply SliceProc_eq in H2.
-    f_equal; auto.
   Qed.
 
 End HorizontalComposition.
@@ -388,7 +377,7 @@ Section HorizontalCompositionMovers.
   Opaque hget.
   Opaque hadd.
 
-  Theorem horiz_right_mover_ok :
+  Local Theorem horiz_right_mover_ok :
     forall `(op : sliceOpT T),
       right_mover sliceStep op ->
       forall i,
@@ -450,7 +439,7 @@ Section HorizontalCompositionMovers.
       rewrite hget_hadd_ne; eauto.
   Qed.
 
-  Theorem horiz_left_mover_ok :
+  Local Theorem horiz_left_mover_ok :
     forall `(op : sliceOpT T),
       left_mover sliceStep op ->
       forall i,
@@ -488,7 +477,7 @@ Section HorizontalCompositionMovers.
       }
   Qed.
 
-  Theorem horiz_left_mover_pred_ok :
+  Local Theorem horiz_left_mover_pred_ok :
     forall `(op : sliceOpT T) P,
       left_mover_pred sliceStep op P ->
       forall i,
@@ -571,7 +560,7 @@ Section HorizontalCompositionMovers.
         eexists; split; eauto.
   Qed.
 
-  Lemma hadd_hget_eq' : forall (i: validIndexT indexValid) (s: horizState _ _ sliceState),
+  Local Lemma hadd_hget_eq' : forall (i: validIndexT indexValid) (s: horizState _ _ sliceState),
       s = hadd i (hget s i) s.
   Proof.
     intros.
@@ -581,7 +570,7 @@ Section HorizontalCompositionMovers.
 
   Hint Resolve hadd_hget_eq'.
 
-  Lemma exec_tid_slice :
+  Local Lemma exec_tid_slice :
     forall S1 S2 tid `(p : proc _ T) r spawned evs,
       exec_tid (horizStep indexT indexValid sliceStep) tid S1 p S2 r spawned evs ->
       forall `(p' : proc _ T) i,
@@ -634,7 +623,7 @@ Section HorizontalCompositionMovers.
       descend; intuition eauto.
   Qed.
 
-  Lemma exec_any_slice :
+  Local Lemma exec_any_slice :
     forall S1 S2 tid `(p : proc _ T) r,
       exec_any (horizStep indexT indexValid sliceStep) tid S1 p r S2 ->
       forall `(p' : proc _ T) i,
@@ -665,7 +654,7 @@ Section HorizontalCompositionMovers.
       eapply IHexec_any.
   Qed.
 
-  Lemma exec_others_slice :
+  Local Lemma exec_others_slice :
     forall S1 S2 tid,
       exec_others (horizStep indexT indexValid sliceStep) tid S1 S2 ->
       forall i,
@@ -690,7 +679,7 @@ Section HorizontalCompositionMovers.
   Hint Resolve exec_any_slice.
   Hint Resolve exec_others_slice.
 
-  Lemma horiz_left_movers :
+  Local Lemma horiz_left_movers :
     forall `(p : proc _ T) P,
       left_movers sliceStep P p ->
       forall i,
@@ -714,7 +703,7 @@ Section HorizontalCompositionMovers.
   Qed.
 
 
-  Theorem horiz_ysa_movers :
+  Local Theorem horiz_ysa_movers :
     forall `(p : proc _ T),
       ysa_movers sliceStep p ->
       forall i,
