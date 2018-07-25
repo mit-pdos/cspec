@@ -462,36 +462,33 @@ Section OpSemantics.
       ExecPrefix tid tid'.
   Qed.
 
-
   (** Trace inclusion for an entire threads_state *)
 
-  Definition trace_incl_ts_s (s s' : State) (ts1 ts2 : threads_state Op) :=
+  Definition trace_incl_ts_s s (ts1 ts2 : threads_state Op) :=
     forall tr,
       exec op_step s ts1 tr ->
-      exec op_step s' ts2 tr.
+      exec op_step s ts2 tr.
 
   Definition trace_incl_ts (ts1 ts2 : threads_state Op) :=
-    forall (s : State),
-      trace_incl_ts_s s s ts1 ts2.
+    forall tr (s : State),
+      exec op_step s ts1 tr ->
+      exec op_step s ts2 tr.
 
-  Global Program Instance trace_incl_ts_s_preorder :
-    PreOrder (@trace_incl_ts_s s s).
+  Global Program Instance trace_incl_ts_preorder :
+    PreOrder trace_incl_ts.
   Next Obligation.
     hnf; intros.
     eauto.
   Qed.
   Next Obligation.
-    unfold trace_incl_ts_s in *; eauto 10.
+    unfold trace_incl_ts in *; eauto.
   Qed.
-
-  Global Program Instance trace_incl_ts_preorder :
-    PreOrder trace_incl_ts.
 
   Global Instance exec_equiv_ts_to_trace_incl_ts :
     subrelation exec_equiv_ts trace_incl_ts.
   Proof.
     unfold subrelation; intros.
-    unfold trace_incl_ts, trace_incl_ts_s; intros.
+    unfold trace_incl_ts; intros.
     apply H in H0.
     eauto.
   Qed.
@@ -500,7 +497,7 @@ Section OpSemantics.
 
   Definition trace_incl_s `(s : State) tid `(p1 : proc Op T) (p2 : proc _ T) :=
     forall ts,
-      trace_incl_ts_s s s
+      trace_incl_ts_s s
                       (ts [[ tid := Proc p1 ]])
                       (ts [[ tid := Proc p2 ]]).
 
@@ -593,12 +590,18 @@ numbers of steps *)
       (forall s tid,
           trace_incl_s s tid p1 p2).
   Proof.
-    unfold trace_incl, trace_incl_s, trace_incl_ts.
+    unfold trace_incl, trace_incl_s, trace_incl_ts, trace_incl_ts_s.
     split; eauto.
   Qed.
 
   Global Program Instance trace_incl_s_preorder :
     PreOrder (@trace_incl_s s tid T).
+  Next Obligation.
+    repeat (hnf; intros); eauto.
+  Qed.
+  Next Obligation.
+    unfold trace_incl_s, trace_incl_ts_s in *; eauto.
+  Qed.
 
   Global Program Instance trace_incl_preorder :
     PreOrder (@trace_incl T).
@@ -705,7 +708,7 @@ numbers of steps *)
                                                            | inr p' => Proc p'
                                                            end]]) tr ->
           exec op_step s0 (ts [[tid := Proc p2]]) (prepend tid evs tr)) ->
-      trace_incl_ts_s s s
+      trace_incl_ts_s s
                       (ts [[ tid := Proc p1 ]])
                       (ts [[ tid := Proc p2 ]]).
   Proof.
@@ -732,14 +735,12 @@ numbers of steps *)
                                                            | inr p' => Proc p'
                                                            end]]) tr ->
           exec op_step s (ts [[tid := Proc p2]]) (prepend tid evs tr)) ->
-      trace_incl
-                 p1 p2.
+      trace_incl p1 p2.
   Proof.
     unfold trace_incl, trace_incl_ts.
     intros.
 
-    eapply trace_incl_ts_s_proof_helper.
-    eauto.
+    eapply trace_incl_ts_s_proof_helper; eauto.
   Qed.
 
   Lemma trace_incl_s_proof_helper :
