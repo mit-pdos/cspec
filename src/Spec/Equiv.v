@@ -20,7 +20,7 @@ Section OpSemantics.
 
   (** A strong notion of execution equivalence, independent of semantics *)
 
-  Definition exec_equiv_ts (ts1 ts2 : threads_state Op) :=
+  Local Definition exec_equiv_ts (ts1 ts2 : threads_state Op) :=
     forall (s : State) tr,
       exec op_step s ts1 tr <->
       exec op_step s ts2 tr.
@@ -28,7 +28,7 @@ Section OpSemantics.
   (** A stronger notion of equivalence where number of steps taken must be
     identical *)
 
-  Definition exec_equiv_ts_N n (ts1 ts2: threads_state Op) :=
+  Local Definition exec_equiv_ts_N n (ts1 ts2: threads_state Op) :=
     forall (s: State) tr,
       exec_till op_step n s ts1 tr <->
       exec_till op_step n s ts2 tr.
@@ -37,19 +37,19 @@ Section OpSemantics.
     Basically the same as above, but defined as an underlying [atomic_exec]
     rather than [exec]. *)
 
-  Definition atomic_equiv `(p1 : proc Op T) p2 :=
+  Local Definition atomic_equiv `(p1 : proc Op T) p2 :=
     forall (s s' : State) r tid evs,
       atomic_exec op_step p1 tid s r s' evs <->
       atomic_exec op_step p2 tid s r s' evs.
 
-  Definition exec_equiv_opt (p1 : maybe_proc Op) p2 :=
+  Local Definition exec_equiv_opt (p1 : maybe_proc Op) p2 :=
     forall (ts : threads_state _) tid,
       exec_equiv_ts (ts [[ tid := p1 ]]) (ts [[ tid := p2 ]]).
 
-  Definition exec_equiv `(p1 : proc Op T) (p2 : proc _ T) :=
+  Local Definition exec_equiv `(p1 : proc Op T) (p2 : proc _ T) :=
     exec_equiv_opt (Proc p1) (Proc p2).
 
-  Definition exec_equiv_rx `(p1 : proc Op T) (p2 : proc _ T) :=
+  Local Definition exec_equiv_rx `(p1 : proc Op T) (p2 : proc _ T) :=
     forall TR (rx : T -> proc _ TR),
       exec_equiv (Bind p1 rx) (Bind p2 rx).
 
@@ -192,7 +192,7 @@ Section OpSemantics.
     eauto.
   Qed.
 
-  Theorem exec_equiv_rx_proof_helper : forall `(p1 : proc Op T) p2,
+  Local Theorem exec_equiv_rx_proof_helper : forall `(p1 : proc Op T) p2,
       (forall tid tid' `(s : State) s' (ts: threads_state _) tr spawned evs `(rx : _ -> proc _ TR) result,
           exec_tid op_step tid s (Bind p1 rx) s' result spawned evs ->
           ts tid' = NoProc ->
@@ -254,7 +254,7 @@ Section OpSemantics.
       destruct result; eauto.
   Qed.
 
-  Theorem exec_equiv_bind_a : forall `(p : proc Op T) `(p1 : T -> proc _ T') p2,
+  Local Theorem exec_equiv_bind_a : forall `(p : proc Op T) `(p1 : T -> proc _ T') p2,
       (forall x, exec_equiv (p1 x) (p2 x)) ->
       exec_equiv (Bind p p1) (Bind p p2).
   Proof.
@@ -270,7 +270,8 @@ Section OpSemantics.
       eapply H; eauto.
   Qed.
 
-  Theorem exec_equiv_until : forall `(p : option T -> proc Op T) (c : T -> bool) v,
+  (* unused *)
+  Local Theorem exec_equiv_until : forall `(p : option T -> proc Op T) (c : T -> bool) v,
       exec_equiv_rx (Until c p v) (until1 c p v).
   Proof.
     intros.
@@ -306,7 +307,7 @@ Section OpSemantics.
       end.
   Qed.
 
-  Theorem exec_equiv_congruence : forall T (p1 p2: proc Op T) T' (rx1 rx2: T -> proc Op T'),
+  Local Theorem exec_equiv_congruence : forall T (p1 p2: proc Op T) T' (rx1 rx2: T -> proc Op T'),
       exec_equiv_rx p1 p2 ->
       (forall x, exec_equiv_rx (rx1 x) (rx2 x)) ->
       exec_equiv_rx (Bind p1 rx1) (Bind p2 rx2).
@@ -344,7 +345,7 @@ Section OpSemantics.
 
   (** exec_equiv with counter *)
 
-  Definition exec_equiv_N n T (p1 p2: proc Op T) :=
+  Local Definition exec_equiv_N n T (p1 p2: proc Op T) :=
     forall ts tid, exec_equiv_ts_N n (ts [[tid := Proc p1]]) (ts [[tid := Proc p2]]).
 
   Hint Extern 1 (exec _ _ _ _ _) =>
@@ -363,7 +364,7 @@ Section OpSemantics.
 
   Hint Constructors exec_till.
 
-  Theorem exec_equiv_N_bind_bind : forall `(p1 : proc Op T1) `(p2 : T1 -> proc Op T2) `(p3 : T2 -> proc Op T3) n,
+  Local Theorem exec_equiv_N_bind_bind : forall `(p1 : proc Op T1) `(p2 : T1 -> proc Op T2) `(p3 : T2 -> proc Op T3) n,
       exec_equiv_N n (Bind (Bind p1 p2) p3) (Bind p1 (fun v => Bind (p2 v) p3)).
   Proof.
     split; intros.
@@ -399,7 +400,8 @@ Section OpSemantics.
       eauto.
   Qed.
 
-  Theorem atomic_equiv_bind_ret : forall `(p : proc Op T),
+  (* unused *)
+  Local Theorem atomic_equiv_bind_ret : forall `(p : proc Op T),
       atomic_equiv (Bind p Ret) p.
   Proof.
     split; intros.
@@ -495,17 +497,6 @@ Section OpSemantics.
     eauto.
   Qed.
 
-  Theorem trace_incl_ts_s_trans : forall `(s0 : State) s1 s2 `(ts1 : threads_state Op) ts2 ts3,
-      trace_incl_ts_s s0 s1 ts1 ts2 ->
-      trace_incl_ts_s s1 s2 ts2 ts3 ->
-      trace_incl_ts_s s0 s2 ts1 ts3.
-  Proof.
-    unfold trace_incl_ts_s; intros.
-    apply H in H1.
-    apply H0 in H1.
-    intuition eauto.
-  Qed.
-
   (** Trace inclusion for a single thread *)
 
   Definition trace_incl_s `(s : State) tid `(p1 : proc Op T) (p2 : proc _ T) :=
@@ -519,13 +510,6 @@ Section OpSemantics.
       trace_incl_ts
         (ts [[ tid := Proc p1 ]])
         (ts [[ tid := Proc p2 ]]).
-
-  (* natural definition of trace_incl_rx, defined in terms of all executions (that
-is, without requiring counters be identical) *)
-  Definition trace_incl_rx' {T} (p1 p2 : proc Op T) :=
-    forall TF (rx1 rx2: _ -> proc _ TF),
-      (forall a, trace_incl (rx1 a) (rx2 a)) ->
-      trace_incl (Bind p1 rx1) (Bind p2 rx2).
 
   Definition trace_incl_ts_N n (ts1 ts2 : threads_state Op) :=
     forall tr s n',
@@ -548,7 +532,18 @@ is, without requiring counters be identical) *)
   Definition trace_incl_rx {T} (p1 p2: proc Op T) :=
     forall n, trace_incl_rx_N n p1 p2.
 
-  Theorem trace_incl_rx'_all_n : forall T (p1 p2: proc Op T),
+  (* several remarks about an alternate trace_incl_rx definition, which turns
+  out to be unneeded *)
+  (* natural definition of trace_incl_rx, defined in terms of all executions (that
+is, without requiring counters be identical) *)
+  Local Definition trace_incl_rx' {T} (p1 p2 : proc Op T) :=
+    forall TF (rx1 rx2: _ -> proc _ TF),
+      (forall a, trace_incl (rx1 a) (rx2 a)) ->
+      trace_incl (Bind p1 rx1) (Bind p2 rx2).
+
+
+  (* unused, just a remark *)
+  Local Theorem trace_incl_rx'_all_n : forall T (p1 p2: proc Op T),
       (forall n, trace_incl_rx_N n p1 p2) ->
       trace_incl_rx' p1 p2.
   Proof.
@@ -563,23 +558,26 @@ is, without requiring counters be identical) *)
     eapply exec_till_to_exec; eauto.
   Qed.
 
-  Theorem trace_incl_rx_all_n : forall T (p1 p2: proc Op T),
+  (* unused, just a remark *)
+  Local Theorem trace_incl_rx_all_n : forall T (p1 p2: proc Op T),
       (forall n, trace_incl_rx_N n p1 p2) ->
       trace_incl_rx p1 p2.
   Proof.
     unfold trace_incl_rx; eauto.
   Qed.
 
+  (* unused, just a remark *)
   (* this is not true of trace_incl_rx' due to p1 and p2 possibly taking different
 numbers of steps *)
-  Theorem trace_incl_rx_to_N : forall T (p1 p2: proc Op T),
+  Local Theorem trace_incl_rx_to_N : forall T (p1 p2: proc Op T),
       trace_incl_rx p1 p2 ->
       forall n, trace_incl_rx_N n p1 p2.
   Proof.
     unfold trace_incl_rx; eauto.
   Qed.
 
-  Theorem trace_incl_all_n : forall T (p1 p2: proc Op T),
+  (* unused, just a remark *)
+  Local Theorem trace_incl_all_n : forall T (p1 p2: proc Op T),
       (forall n, trace_incl_N n p1 p2) ->
       trace_incl p1 p2.
   Proof.
@@ -783,30 +781,6 @@ numbers of steps *)
     ExecPrefix tid tid'.
   Qed.
 
-  Theorem trace_incl_atomize_ret_l :
-    forall `(f : T1 -> T2)
-      `(p : proc Op T1)
-      `(rx : _ -> proc Op TF)
-     ,
-      trace_incl
-                 (Bind (Bind (Atomic p) (fun r => Ret (f r))) rx)
-                 (Bind (Atomic (Bind p (fun r => Ret (f r)))) rx).
-  Proof.
-    intros.
-    eapply trace_incl_proof_helper; intros.
-    repeat exec_tid_inv.
-
-    eapply trace_incl_ts_s_proof_helper in H2.
-    abstract_tr.
-    ExecPrefix tid tid'.
-    rewrite app_nil_r; auto.
-
-    intros.
-    repeat exec_tid_inv.
-    rewrite thread_upd_same_eq with (tid:=tid'0) in H6 by congruence.
-    assumption.
-  Qed.
-
   Theorem trace_incl_bind_a : forall `(p : proc Op T) `(p2 : T -> proc _ T') p2',
       (forall x, trace_incl (p2 x) (p2' x)) ->
       trace_incl (Bind p p2) (Bind p p2').
@@ -871,7 +845,7 @@ numbers of steps *)
       auto with exec.
   Qed.
 
-  Theorem trace_incl_N_le :
+  Local Theorem trace_incl_N_le :
     forall T (p1 p2 : proc _ T) n1 n2,
       trace_incl_N n2 p1 p2 ->
       n1 <= n2 ->
@@ -922,60 +896,6 @@ numbers of steps *)
     intros p2a p2b H2.
     eapply trace_incl_bind_a; intros.
     eapply H2.
-  Qed.
-
-  Lemma trace_incl_atomic_bind :
-    forall `(p1 : proc Op T)
-      `(p2 : T -> proc Op T2)
-      `(p3 : T2 -> proc Op T3)
-     ,
-      trace_incl
-                 (Bind (Atomic (Bind p1 p2)) p3)
-                 (Bind (Bind (Atomic p1) (fun r => Atomic (p2 r))) p3).
-  Proof.
-    intros.
-    eapply trace_incl_proof_helper; intros.
-    repeat exec_tid_inv.
-    atomic_exec_inv.
-
-    replace (ev1 ++ ev2) with (ev1 ++ ev2 ++ []).
-    rewrite ?prepend_app.
-    ExecPrefix tid tid'.
-    ExecPrefix tid tid'.
-    eauto.
-    rewrite app_nil_r; auto.
-  Qed.
-
-  Lemma trace_incl_atomic :
-    forall `(p1 : proc Op T)
-      `(p2 : T -> proc Op T2)
-     ,
-      trace_incl
-                 (Bind (Atomic p1) p2)
-                 (Bind p1 p2).
-  Proof.
-    intros.
-    eapply trace_incl_proof_helper; intros.
-    repeat exec_tid_inv.
-
-    generalize dependent p2.
-    generalize dependent tr.
-
-    match goal with
-    | H : atomic_exec _ _ _ _ _ _ _ |- _ =>
-      induction H; intros; subst
-    end.
-    - ExecPrefix tid tid'.
-    - rewrite thread_upd_same_eq with (tid:=tid') in * by auto.
-      rewrite prepend_app.
-      rewrite exec_equiv_bind_bind.
-      eauto.
-    - ExecPrefix tid tid'.
-    - abstract_tr.
-      ExecPrefix tid tid'.
-      eauto.
-      rewrite thread_upd_same_eq with (tid:=tid') in * by auto;
-        eauto with nocore exec.
   Qed.
 
   Theorem trace_incl_rx_to_exec :
@@ -1044,7 +964,7 @@ numbers of steps *)
     eapply H; eauto.
   Qed.
 
-  Theorem trace_incl_N_ret_bind :
+  Local Theorem trace_incl_N_ret_bind :
     forall `(v : T) TF (rx1 rx2 : _ -> proc _ TF) n,
       (forall a, trace_incl_N (n - 1) (rx1 a) (rx2 a)) ->
       trace_incl_N n (Bind (Ret v) rx1) (Bind (Ret v) rx2).
@@ -1062,7 +982,7 @@ numbers of steps *)
       auto with exec.
   Qed.
 
-  Theorem trace_incl_rx_N_le :
+  Local Theorem trace_incl_rx_N_le :
     forall T (p1 p2 : proc _ T) n1 n2,
       trace_incl_rx_N n2 p1 p2 ->
       n1 <= n2 ->
@@ -1078,7 +998,7 @@ numbers of steps *)
     omega.
   Qed.
 
-  Theorem trace_incl_rx_until_helper :
+  Local Theorem trace_incl_rx_until_helper :
     forall T (p1 p2 : option T -> proc Op T)
       (c : T -> bool) n v,
       (forall v', trace_incl_rx_N (n-1) (p1 v') (p2 v')) ->
