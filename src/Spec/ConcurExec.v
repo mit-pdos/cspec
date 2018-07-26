@@ -462,3 +462,10 @@ Module Examples.
   Qed.
 
 End Examples.
+
+(* TODO: stuck this here for lack of a better place to put it *)
+Fixpoint SpawnN {Op T} (n:nat) (p:proc Op T) : proc Op unit :=
+  match n with
+  | 0 => Ret tt
+  | S n' => Bind (Spawn p) (fun _ => SpawnN n' p)
+  end.
