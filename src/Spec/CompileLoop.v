@@ -1,5 +1,5 @@
 Require Import ConcurExec.
-Require Import Spec.BasicEquiv.
+Require Import Spec.Equiv.Execution.
 Require Import Spec.Equiv.
 Require Import ProcMatch.
 Require Import Equiv ProcMatch.

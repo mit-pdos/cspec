@@ -1,5 +1,5 @@
 Require Import CSPEC.
-Require Import Spec.BasicEquiv.
+Require Import Spec.Equiv.Execution.
 Require Import Morphisms.
 Require Import FunctionalExtensionality.
 
