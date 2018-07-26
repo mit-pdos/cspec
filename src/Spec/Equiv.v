@@ -20,7 +20,7 @@ Section OpSemantics.
 
   (** A strong notion of execution equivalence, independent of semantics *)
 
-  Local Definition exec_equiv_ts (ts1 ts2 : threads_state Op) :=
+  Definition exec_equiv_ts (ts1 ts2 : threads_state Op) :=
     forall (s : State) tr,
       exec op_step s ts1 tr <->
       exec op_step s ts2 tr.
@@ -46,10 +46,10 @@ Section OpSemantics.
     forall (ts : threads_state _) tid,
       exec_equiv_ts (ts [[ tid := p1 ]]) (ts [[ tid := p2 ]]).
 
-  Local Definition exec_equiv `(p1 : proc Op T) (p2 : proc _ T) :=
+  Definition exec_equiv `(p1 : proc Op T) (p2 : proc _ T) :=
     exec_equiv_opt (Proc p1) (Proc p2).
 
-  Local Definition exec_equiv_rx `(p1 : proc Op T) (p2 : proc _ T) :=
+  Definition exec_equiv_rx `(p1 : proc Op T) (p2 : proc _ T) :=
     forall TR (rx : T -> proc _ TR),
       exec_equiv (Bind p1 rx) (Bind p2 rx).
 
@@ -254,7 +254,7 @@ Section OpSemantics.
       destruct result; eauto.
   Qed.
 
-  Local Theorem exec_equiv_bind_a : forall `(p : proc Op T) `(p1 : T -> proc _ T') p2,
+  Theorem exec_equiv_bind_a : forall `(p : proc Op T) `(p1 : T -> proc _ T') p2,
       (forall x, exec_equiv (p1 x) (p2 x)) ->
       exec_equiv (Bind p p1) (Bind p p2).
   Proof.
@@ -270,8 +270,7 @@ Section OpSemantics.
       eapply H; eauto.
   Qed.
 
-  (* unused *)
-  Local Theorem exec_equiv_until : forall `(p : option T -> proc Op T) (c : T -> bool) v,
+  Theorem exec_equiv_until : forall `(p : option T -> proc Op T) (c : T -> bool) v,
       exec_equiv_rx (Until c p v) (until1 c p v).
   Proof.
     intros.

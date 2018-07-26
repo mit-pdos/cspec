@@ -22,3 +22,5 @@ Require Export Spec.Movers.
 Require Export Spec.Protocol.
 Require Export Spec.CompileLoop.
 Require Export Spec.Horizontal.
+Require Export Spec.Equiv.
+Require Export Spec.CodeOpt.
