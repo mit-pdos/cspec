@@ -18,12 +18,17 @@ Section OpSemantics.
   Context {State:Type}.
   Variable op_step: OpSemantics Op State.
 
+  Local Obligation Tactic := try RelInstance_t.
+
   (** A strong notion of execution equivalence, independent of semantics *)
 
   Definition exec_equiv_ts (ts1 ts2 : threads_state Op) :=
     forall (s : State) tr,
       exec op_step s ts1 tr <->
       exec op_step s ts2 tr.
+
+  Global Program Instance exec_equiv_ts_equivalence :
+    Equivalence exec_equiv_ts.
 
   (** A stronger notion of equivalence where number of steps taken must be
     identical *)
@@ -33,6 +38,9 @@ Section OpSemantics.
       exec_till op_step n s ts1 tr <->
       exec_till op_step n s ts2 tr.
 
+  Local Definition exec_equiv_N n T (p1 p2: proc Op T) :=
+    forall ts tid, exec_equiv_ts_N n (ts [[tid := Proc p1]]) (ts [[tid := Proc p2]]).
+
   (** A strong notion of equivalence for programs inside atomic sections.
     Basically the same as above, but defined as an underlying [atomic_exec]
     rather than [exec]. *)
@@ -41,6 +49,15 @@ Section OpSemantics.
     forall (s s' : State) r tid evs,
       atomic_exec op_step p1 tid s r s' evs <->
       atomic_exec op_step p2 tid s r s' evs.
+
+  Global Program Instance atomic_equiv_equivalence :
+    Equivalence (@atomic_equiv T).
+
+  Global Instance atomic_equiv_proper :
+    Proper (atomic_equiv ==> atomic_equiv ==> iff) (@atomic_equiv T).
+  Proof.
+    typeclasses eauto.
+  Qed.
 
   Local Definition exec_equiv_opt (p1 : maybe_proc Op) p2 :=
     forall (ts : threads_state _) tid,
@@ -52,11 +69,6 @@ Section OpSemantics.
   Definition exec_equiv_rx `(p1 : proc Op T) (p2 : proc _ T) :=
     forall TR (rx : T -> proc _ TR),
       exec_equiv (Bind p1 rx) (Bind p2 rx).
-
-  Local Obligation Tactic := try RelInstance_t.
-
-  Global Program Instance exec_equiv_ts_equivalence :
-    Equivalence exec_equiv_ts.
 
   Global Program Instance exec_equiv_opt_equivalence :
     Equivalence exec_equiv_opt.
@@ -88,6 +100,146 @@ Section OpSemantics.
     intros ts0 ts1 H; subst.
     eauto.
   Qed.
+
+  (** Trace inclusion for an entire threads_state *)
+
+  Definition trace_incl_ts_s s (ts1 ts2 : threads_state Op) :=
+    forall tr,
+      exec op_step s ts1 tr ->
+      exec op_step s ts2 tr.
+
+  Definition trace_incl_ts (ts1 ts2 : threads_state Op) :=
+    forall tr (s : State),
+      exec op_step s ts1 tr ->
+      exec op_step s ts2 tr.
+
+  Global Program Instance trace_incl_ts_preorder :
+    PreOrder trace_incl_ts.
+  Next Obligation.
+    hnf; intros.
+    eauto.
+  Qed.
+  Next Obligation.
+    unfold trace_incl_ts in *; eauto.
+  Qed.
+
+  Global Instance exec_equiv_ts_to_trace_incl_ts :
+    subrelation exec_equiv_ts trace_incl_ts.
+  Proof.
+    unfold subrelation; intros.
+    unfold trace_incl_ts; intros.
+    apply H in H0.
+    eauto.
+  Qed.
+
+  (** Trace inclusion for a single thread *)
+
+  Definition trace_incl_s `(s : State) tid `(p1 : proc Op T) (p2 : proc _ T) :=
+    forall ts,
+      trace_incl_ts_s s
+                      (ts [[ tid := Proc p1 ]])
+                      (ts [[ tid := Proc p2 ]]).
+
+  Definition trace_incl {T} (p1 p2 : proc Op T) :=
+    forall (ts : threads_state Op) tid,
+      trace_incl_ts
+        (ts [[ tid := Proc p1 ]])
+        (ts [[ tid := Proc p2 ]]).
+
+  Definition trace_incl_ts_N n (ts1 ts2 : threads_state Op) :=
+    forall tr s n',
+      n' <= n ->
+      exec_till op_step n' s ts1 tr ->
+      exec op_step s ts2 tr.
+
+  Definition trace_incl_N n {T} (p1 p2 : proc Op T) :=
+    forall (ts: threads_state Op) tid,
+      trace_incl_ts_N n
+                      (ts [[ tid := Proc p1 ]])
+                      (ts [[ tid := Proc p2 ]]).
+
+  Definition trace_incl_rx_N n {T} (p1 p2: proc Op T) :=
+    forall TF (rx1 rx2 : _ -> proc _ TF) n0,
+      n0 <= n ->
+      (forall a, trace_incl_N (n0-1) (rx1 a) (rx2 a)) ->
+      trace_incl_N n0 (Bind p1 rx1) (Bind p2 rx2).
+
+  Definition trace_incl_rx {T} (p1 p2: proc Op T) :=
+    forall n, trace_incl_rx_N n p1 p2.
+
+  (* several remarks about an alternate trace_incl_rx definition, which turns
+  out to be unneeded *)
+  (* natural definition of trace_incl_rx, defined in terms of all executions (that
+is, without requiring counters be identical) *)
+  Local Definition trace_incl_rx' {T} (p1 p2 : proc Op T) :=
+    forall TF (rx1 rx2: _ -> proc _ TF),
+      (forall a, trace_incl (rx1 a) (rx2 a)) ->
+      trace_incl (Bind p1 rx1) (Bind p2 rx2).
+
+
+  (* unused, just a remark *)
+  Local Theorem trace_incl_rx'_all_n : forall T (p1 p2: proc Op T),
+      (forall n, trace_incl_rx_N n p1 p2) ->
+      trace_incl_rx' p1 p2.
+  Proof.
+    unfold trace_incl_rx', trace_incl, trace_incl_ts, trace_incl_ts_s,
+    trace_incl_rx_N, trace_incl_N, trace_incl_ts_N.
+
+    intros.
+    apply exec_to_counter in H1; propositional.
+    eapply H in H1; eauto.
+    intros.
+    eapply H0.
+    eapply exec_till_to_exec; eauto.
+  Qed.
+
+  (* unused, just a remark *)
+  Local Theorem trace_incl_rx_all_n : forall T (p1 p2: proc Op T),
+      (forall n, trace_incl_rx_N n p1 p2) ->
+      trace_incl_rx p1 p2.
+  Proof.
+    unfold trace_incl_rx; eauto.
+  Qed.
+
+  (* unused, just a remark *)
+  (* this is not true of trace_incl_rx' due to p1 and p2 possibly taking different
+numbers of steps *)
+  Local Theorem trace_incl_rx_to_N : forall T (p1 p2: proc Op T),
+      trace_incl_rx p1 p2 ->
+      forall n, trace_incl_rx_N n p1 p2.
+  Proof.
+    unfold trace_incl_rx; eauto.
+  Qed.
+
+  (* unused, just a remark *)
+  Local Theorem trace_incl_all_n : forall T (p1 p2: proc Op T),
+      (forall n, trace_incl_N n p1 p2) ->
+      trace_incl p1 p2.
+  Proof.
+    unfold trace_incl_rx, trace_incl, trace_incl_ts, trace_incl_ts_s,
+    trace_incl_rx_N, trace_incl_N, trace_incl_ts_N.
+
+    intros.
+    apply exec_to_counter in H0; propositional.
+    eauto.
+  Qed.
+
+  Hint Constructors exec_tid.
+  Hint Constructors exec_till.
+
+  Hint Extern 1 (exec _ _ _ _ _) =>
+  match goal with
+  | |- exec_till _ _ _ ?ts _ => first [ is_evar ts; fail 1 | eapply ConcurExec.exec_ts_eq ]
+  end : exec.
+
+  (* basically the same as ExecPrefix, but applies [ExecTillOne] instead of
+[ExecPrefixOne] *)
+  Ltac ExecOne tid_arg tid'_arg :=
+    eapply ExecTillOne with (tid:=tid_arg) (tid':=tid'_arg);
+    autorewrite with t;
+    (* need to exclude core for performance reasons *)
+    eauto 7 with nocore exec;
+    cbv beta iota.
 
   Ltac thread_upd_ind :=
     let ind H := induction H; intros; subst; eauto; NoProc_upd in
@@ -164,8 +316,6 @@ Section OpSemantics.
       autorewrite with t; eauto.
       rewrite mapping_finite; eauto.
   Qed.
-
-  Hint Constructors exec_tid.
 
   Theorem exec_equiv_bind_ret : forall `(p : proc Op T),
       exec_equiv (Bind p Ret) p.
@@ -342,27 +492,6 @@ Section OpSemantics.
     unfold Proper, respectful; intros; subst; eauto.
   Qed.
 
-  (** exec_equiv with counter *)
-
-  Local Definition exec_equiv_N n T (p1 p2: proc Op T) :=
-    forall ts tid, exec_equiv_ts_N n (ts [[tid := Proc p1]]) (ts [[tid := Proc p2]]).
-
-  Hint Extern 1 (exec _ _ _ _ _) =>
-  match goal with
-  | |- exec_till _ _ _ ?ts _ => first [ is_evar ts; fail 1 | eapply ConcurExec.exec_ts_eq ]
-  end : exec.
-
-  (* basically the same as ExecPrefix, but applies [ExecTillOne] instead of
-[ExecPrefixOne] *)
-  Ltac ExecOne tid_arg tid'_arg :=
-    eapply ExecTillOne with (tid:=tid_arg) (tid':=tid'_arg);
-    autorewrite with t;
-    (* need to exclude core for performance reasons *)
-    eauto 7 with nocore exec;
-    cbv beta iota.
-
-  Hint Constructors exec_till.
-
   Local Theorem exec_equiv_N_bind_bind : forall `(p1 : proc Op T1) `(p2 : T1 -> proc Op T2) `(p3 : T2 -> proc Op T3) n,
       exec_equiv_N n (Bind (Bind p1 p2) p3) (Bind p1 (fun v => Bind (p2 v) p3)).
   Proof.
@@ -377,16 +506,6 @@ Section OpSemantics.
         destruct result0; eauto.
       + ExecOne tid0 tid'.
         abstract_ts; typeclasses eauto 7 with exec.
-  Qed.
-
-
-  Global Program Instance atomic_equiv_equivalence :
-    Equivalence (@atomic_equiv T).
-
-  Global Instance atomic_equiv_proper :
-    Proper (atomic_equiv ==> atomic_equiv ==> iff) (@atomic_equiv T).
-  Proof.
-    typeclasses eauto.
   Qed.
 
   Theorem atomic_equiv_ret_bind : forall `(v : T) `(p : T -> proc Op T'),
@@ -460,129 +579,6 @@ Section OpSemantics.
       ExecPrefix tid tid'.
     - apply H in H9.
       ExecPrefix tid tid'.
-  Qed.
-
-  (** Trace inclusion for an entire threads_state *)
-
-  Definition trace_incl_ts_s s (ts1 ts2 : threads_state Op) :=
-    forall tr,
-      exec op_step s ts1 tr ->
-      exec op_step s ts2 tr.
-
-  Definition trace_incl_ts (ts1 ts2 : threads_state Op) :=
-    forall tr (s : State),
-      exec op_step s ts1 tr ->
-      exec op_step s ts2 tr.
-
-  Global Program Instance trace_incl_ts_preorder :
-    PreOrder trace_incl_ts.
-  Next Obligation.
-    hnf; intros.
-    eauto.
-  Qed.
-  Next Obligation.
-    unfold trace_incl_ts in *; eauto.
-  Qed.
-
-  Global Instance exec_equiv_ts_to_trace_incl_ts :
-    subrelation exec_equiv_ts trace_incl_ts.
-  Proof.
-    unfold subrelation; intros.
-    unfold trace_incl_ts; intros.
-    apply H in H0.
-    eauto.
-  Qed.
-
-  (** Trace inclusion for a single thread *)
-
-  Definition trace_incl_s `(s : State) tid `(p1 : proc Op T) (p2 : proc _ T) :=
-    forall ts,
-      trace_incl_ts_s s
-                      (ts [[ tid := Proc p1 ]])
-                      (ts [[ tid := Proc p2 ]]).
-
-  Definition trace_incl {T} (p1 p2 : proc Op T) :=
-    forall (ts : threads_state Op) tid,
-      trace_incl_ts
-        (ts [[ tid := Proc p1 ]])
-        (ts [[ tid := Proc p2 ]]).
-
-  Definition trace_incl_ts_N n (ts1 ts2 : threads_state Op) :=
-    forall tr s n',
-      n' <= n ->
-      exec_till op_step n' s ts1 tr ->
-      exec op_step s ts2 tr.
-
-  Definition trace_incl_N n {T} (p1 p2 : proc Op T) :=
-    forall (ts: threads_state Op) tid,
-      trace_incl_ts_N n
-                      (ts [[ tid := Proc p1 ]])
-                      (ts [[ tid := Proc p2 ]]).
-
-  Definition trace_incl_rx_N n {T} (p1 p2: proc Op T) :=
-    forall TF (rx1 rx2 : _ -> proc _ TF) n0,
-      n0 <= n ->
-      (forall a, trace_incl_N (n0-1) (rx1 a) (rx2 a)) ->
-      trace_incl_N n0 (Bind p1 rx1) (Bind p2 rx2).
-
-  Definition trace_incl_rx {T} (p1 p2: proc Op T) :=
-    forall n, trace_incl_rx_N n p1 p2.
-
-  (* several remarks about an alternate trace_incl_rx definition, which turns
-  out to be unneeded *)
-  (* natural definition of trace_incl_rx, defined in terms of all executions (that
-is, without requiring counters be identical) *)
-  Local Definition trace_incl_rx' {T} (p1 p2 : proc Op T) :=
-    forall TF (rx1 rx2: _ -> proc _ TF),
-      (forall a, trace_incl (rx1 a) (rx2 a)) ->
-      trace_incl (Bind p1 rx1) (Bind p2 rx2).
-
-
-  (* unused, just a remark *)
-  Local Theorem trace_incl_rx'_all_n : forall T (p1 p2: proc Op T),
-      (forall n, trace_incl_rx_N n p1 p2) ->
-      trace_incl_rx' p1 p2.
-  Proof.
-    unfold trace_incl_rx', trace_incl, trace_incl_ts, trace_incl_ts_s,
-    trace_incl_rx_N, trace_incl_N, trace_incl_ts_N.
-
-    intros.
-    apply exec_to_counter in H1; propositional.
-    eapply H in H1; eauto.
-    intros.
-    eapply H0.
-    eapply exec_till_to_exec; eauto.
-  Qed.
-
-  (* unused, just a remark *)
-  Local Theorem trace_incl_rx_all_n : forall T (p1 p2: proc Op T),
-      (forall n, trace_incl_rx_N n p1 p2) ->
-      trace_incl_rx p1 p2.
-  Proof.
-    unfold trace_incl_rx; eauto.
-  Qed.
-
-  (* unused, just a remark *)
-  (* this is not true of trace_incl_rx' due to p1 and p2 possibly taking different
-numbers of steps *)
-  Local Theorem trace_incl_rx_to_N : forall T (p1 p2: proc Op T),
-      trace_incl_rx p1 p2 ->
-      forall n, trace_incl_rx_N n p1 p2.
-  Proof.
-    unfold trace_incl_rx; eauto.
-  Qed.
-
-  (* unused, just a remark *)
-  Local Theorem trace_incl_all_n : forall T (p1 p2: proc Op T),
-      (forall n, trace_incl_N n p1 p2) ->
-      trace_incl p1 p2.
-  Proof.
-    unfold trace_incl_rx, trace_incl, trace_incl_ts, trace_incl_ts_s,
-    trace_incl_rx_N, trace_incl_N, trace_incl_ts_N.
-
-    intros.
-    apply exec_to_counter in H0; propositional.
-    eauto.
   Qed.
 
   Theorem trace_incl_trace_incl_s : forall T (p1 p2 : proc Op T),
@@ -1084,7 +1080,6 @@ numbers of steps *)
     reflexivity.
     intros; eapply trace_incl_N_le; eauto; omega.
   Qed.
-
 
   (** Reuse the complicated proof about [Until]. *)
 
