@@ -835,32 +835,6 @@ numbers of steps *)
       eauto with exec.
   Qed.
 
-  Local Theorem trace_incl_N_bind_a : forall `(p : proc Op T) `(p2 : T -> proc _ T') p2' n,
-      (forall x, trace_incl_N (n-1) (p2 x) (p2' x)) ->
-      trace_incl_N n (Bind p p2) (Bind p p2').
-  Proof.
-    unfold trace_incl_N, trace_incl_ts_N.
-    intros.
-
-    ExecEquiv' p.
-    - destruct result0.
-      + epose_proof H.
-        2: eassumption.
-        omega.
-
-        ExecPrefix tid tid'.
-      + epose_proof IHexec_till.
-        2: eauto.
-        omega.
-
-        ExecPrefix tid tid'.
-    - ExecPrefix tid0 tid'.
-      abstract_ts.
-      eapply IHexec_till; eauto with exec.
-      omega.
-      auto with exec.
-  Qed.
-
   Local Theorem trace_incl_N_le :
     forall T (p1 p2 : proc _ T) n1 n2,
       trace_incl_N n2 p1 p2 ->
@@ -870,6 +844,43 @@ numbers of steps *)
     repeat ( hnf; intros ).
     eapply H in H2; try omega.
     eauto.
+  Qed.
+
+  Hint Extern 4 (_ <= _) => omega.
+
+  Local Theorem trace_incl_N_bind_a : forall `(p : proc Op T) `(p2 : T -> proc _ T') p2' n,
+      (forall x, trace_incl_N (n-1) (p2 x) (p2' x)) ->
+      trace_incl_N n (Bind p p2) (Bind p p2').
+  Proof.
+    unfold trace_incl_N, trace_incl_ts_N.
+    intros.
+    ExecEquiv' p.
+    - destruct result0.
+      + ExecPrefix tid tid'.
+        eapply H with (n':=n0); eauto.
+      + ExecPrefix tid tid'.
+        eapply IHexec_till; eauto.
+    - ExecPrefix tid0 tid'.
+      abstract_ts.
+      eapply IHexec_till; eauto with exec.
+      auto with exec.
+  Qed.
+
+  (* NOTE: this is a specialization of trace_incl_N_bind_a, but it's all that's
+  needed for the trace_incl Until proof so I've left a standalone proof *)
+  Local Theorem trace_incl_N_ret_bind :
+    forall `(v : T) TF (rx1 rx2 : _ -> proc _ TF) n,
+      (forall a, trace_incl_N (n - 1) (rx1 a) (rx2 a)) ->
+      trace_incl_N n (Bind (Ret v) rx1) (Bind (Ret v) rx2).
+  Proof.
+    repeat (hnf; intros).
+    ExecEquiv.
+    + ExecPrefix tid tid'.
+      eapply H in H4; eauto.
+    + ExecPrefix tid0 tid'.
+      abstract_ts.
+      eapply IHexec_till; eauto with exec.
+      auto with exec.
   Qed.
 
   Global Instance trace_incl_ts_N_reflexive :
@@ -890,7 +901,9 @@ numbers of steps *)
     eauto.
   Qed.
   Next Obligation.
+    (* TODO: simplify this *)
     unfold trace_incl_rx in *.
+    intros.
     repeat (hnf; intros).
     eapply H in H4; try omega.
     apply exec_to_counter in H4; propositional.
@@ -996,24 +1009,6 @@ numbers of steps *)
     eapply trace_incl_bind_a; eauto.
   Qed.
 
-  Local Theorem trace_incl_N_ret_bind :
-    forall `(v : T) TF (rx1 rx2 : _ -> proc _ TF) n,
-      (forall a, trace_incl_N (n - 1) (rx1 a) (rx2 a)) ->
-      trace_incl_N n (Bind (Ret v) rx1) (Bind (Ret v) rx2).
-  Proof.
-    repeat (hnf; intros).
-    ExecEquiv.
-    + replace (S n - 1) with n in * by omega.
-      eapply H in H4; try omega.
-      ExecPrefix tid tid'.
-      eauto.
-    + ExecPrefix tid0 tid'.
-      abstract_ts.
-      eapply IHexec_till; eauto with exec.
-      omega.
-      auto with exec.
-  Qed.
-
   Local Theorem trace_incl_rx_N_le :
     forall T (p1 p2 : proc _ T) n1 n2,
       trace_incl_rx_N n2 p1 p2 ->
@@ -1027,7 +1022,6 @@ numbers of steps *)
     omega.
     intros.
     eapply trace_incl_N_le; eauto.
-    omega.
   Qed.
 
   Theorem trace_incl_upto_0 : forall T (p1 p2: proc Op T),
@@ -1054,7 +1048,6 @@ numbers of steps *)
       intros.
       eapply IHn; intros.
       eapply trace_incl_rx_N_le; eauto.
-      omega.
       clear IHn.
       replace (S n - 1) with n in * by omega.
 
@@ -1089,8 +1082,8 @@ numbers of steps *)
 
         simpl; intros.
         destruct (c a).
-        * eapply trace_incl_N_ret_bind; intros.
-          eapply trace_incl_N_le; eauto. omega.
+        * eapply trace_incl_N_ret_bind; eauto; intros.
+          eapply trace_incl_N_le; eauto; omega.
 
         * repeat ( intro; intros ).
           eapply IHn'.
