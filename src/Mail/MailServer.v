@@ -373,41 +373,69 @@ Proof.
   destruct x; eauto.
 Qed.
 
+(* Optimize stuff. *)
+Ltac reflexivity_maybe_fun :=
+  reflexivity ||
+  ( instantiate (1 := fun _ => _); reflexivity ).
+
+Ltac step :=
+  match goal with
+  | _ => progress simpl; idtac "simpl"
+  (* Fixpoints where [simpl] is not sufficient. *)
+  | |- context[SpawnN] => rewrite compile_SpawnN; idtac "compile SpawnN"
+  | |- context[MailboxImpl.AtomicReader'.read_list] => rewrite compile_read_list1; idtac "compile read_list"
+  | |- context[read_list_compiled] => rewrite compile_read_list2; idtac "compile read_list_compiled"
+  | |- context[read_list_compiled] => unfold read_list_compiled; idtac "unfold read_list_compiled"
+  (* SliceProc is a wrapper around compilation; unfold it. *)
+  | |- context[SliceProc] => unfold SliceProc; idtac "unfold SliceProc"
+  (* Bubble up common program structures. *)
+  | |- exec_equiv _ _ _ => eapply exec_equiv_rx_to_exec_equiv; idtac "exec_equiv_rx"
+  | |- exec_equiv_rx _ _ (Bind _ _) => eapply Bind_exec_equiv_proper; idtac "Bind"
+  | |- exec_equiv_rx _ _ (SpawnN _ _) => eapply SpawnN_exec_equiv_proper; [ reflexivity | ]; idtac "SpawnN"
+  | |- exec_equiv_rx _ _ (Until _ _ _) => rewrite exec_equiv_until_once; idtac "Until once"
+  | |- exec_equiv_rx _ _ (Until _ _ _) => eapply Until_exec_equiv_proper; [ reflexivity_maybe_fun | | reflexivity ]; idtac "Until"
+  (* No more simplifications for [Call] and [Ret]. *)
+  | |- exec_equiv_rx _ _ (Call _) => reflexivity; idtac "Call"
+  | |- exec_equiv_rx _ _ (Ret _) => reflexivity; idtac "Ret"
+  (* Create variables for continuation arguments, if necessary. *)
+  | |- pointwise_relation _ _ _ _ => eapply pointwise_unused; idtac "Unused arg"
+  | |- pointwise_relation _ _ _ _ => eapply pointwise_used; intros; idtac "Used arg"
+  (* Create a [match ..] for things that depend on an argument. *)
+  | |- exec_equiv_rx _ (_ ?arg) ?rhs =>
+    match rhs with
+    | context[match ?arg with _ => _ end] =>
+      idtac "Match on" arg;
+      (
+        instantiate (1 := fun z => match z with | None => _ | Some a => _ a end) ||
+        instantiate (1 := fun z => match z with | (a, b) => _ a b end) ||
+        instantiate (1 := fun z => match z with | exist _ a _ => _ a end) ||
+        instantiate (1 := fun z => match z with | Missing => _ | Present a => _ a end) ||
+        instantiate (1 := fun z => match z with | true => _ | false => _ end) ||
+        instantiate (1 := fun z => match z with
+          | MailServerAPI.MailServerOp.POP3Stat => _
+          | MailServerAPI.MailServerOp.POP3List => _
+          | MailServerAPI.MailServerOp.POP3Retr n => _ n
+          | MailServerAPI.MailServerOp.POP3Delete n => _ n
+          | MailServerAPI.MailServerOp.POP3Closed => _
+          end) ||
+        instantiate (1 := if arg then _ else _) ||
+        ( idtac "Could not match on" arg; fail 1 )
+      );
+      idtac "Succeeded in building match on" arg;
+      destruct arg
+    | _ =>
+      instantiate (1 := fun _ => _);
+      idtac "Passing through argument" arg
+    end
+  end.
+
 Definition ms_bottom_server_opt' a b :
     {ts : threads_state _ | exec_equiv_ts MailFSMergedAPI.step ts
                             (c0.compile_ts (mail_server a b))}.
 
   eexists.
 
-  unfold c0.compile_ts.
-  unfold c10.compile_ts.
-  unfold c9.compile_ts.
-  unfold c8.compile_ts.
-  unfold c7.compile_ts.
-  unfold c6.compile_ts.
-  unfold c5'.compile_ts.
-  unfold c4'.compile_ts.
-  unfold c3.compile_ts.
-  unfold c2.compile_ts.
-  unfold c1.compile_ts.
-
-  unfold MailServerComposedImpl.MailServerComposedImpl.compile_ts.
-  unfold MailServerLockAbsImpl.MailServerLockAbsImplH.compile_ts.
-  unfold MailboxImpl.AtomicReaderH.compile_ts.
-  unfold MailboxTmpAbsImpl.MailboxTmpAbsImplH.compile_ts.
-  unfold DeliverImpl.AtomicDeliverH.compile_ts.
-  unfold LinkRetryImpl.LinkRetryImplH.compile_ts.
-  unfold TryDeliverImpl.TryDeliverImplH.compile_ts.
-  unfold MailFSStringAbsImpl.MailFSStringAbsImplH.compile_ts.
-  unfold MailFSStringImpl.MailFSStringImplH.compile_ts.
-  unfold MailFSPathAbsImpl.MailFSPathAbsImplH.compile_ts.
-  unfold MailFSPathImpl.MailFSPathImplH.compile_ts.
-  unfold MailFSMergedImpl.MailFSMergedImpl.compile_ts.
-  unfold MailFSMergedImpl.MailFSMergedOpImpl.compile_ts.
-  unfold MailFSMergedImpl.MailFSMergedAbsImpl.compile_ts.
-
-  unfold compile_ts.
-  unfold Compile.compile_ts.
+  repeat eapply exec_equiv_ts_thread_map_thread_map.
   unfold compile.
 
   autorewrite with t.
@@ -425,61 +453,6 @@ Definition ms_bottom_server_opt' a b :
     split; [ reflexivity | ].
     split; [ reflexivity | ].
 
-    (* Optimize stuff. *)
-    Ltac reflexivity_maybe_fun :=
-      reflexivity ||
-      ( instantiate (1 := fun _ => _); reflexivity ).
-
-    Ltac step :=
-      match goal with
-      | _ => progress simpl; idtac "simpl"
-      (* Fixpoints where [simpl] is not sufficient. *)
-      | |- context[SpawnN] => rewrite compile_SpawnN; idtac "compile SpawnN"
-      | |- context[MailboxImpl.AtomicReader'.read_list] => rewrite compile_read_list1; idtac "compile read_list"
-      | |- context[read_list_compiled] => rewrite compile_read_list2; idtac "compile read_list_compiled"
-      | |- context[read_list_compiled] => unfold read_list_compiled; idtac "unfold read_list_compiled"
-      (* SliceProc is a wrapper around compilation; unfold it. *)
-      | |- context[SliceProc] => unfold SliceProc; idtac "unfold SliceProc"
-      (* Bubble up common program structures. *)
-      | |- exec_equiv _ _ _ => eapply exec_equiv_rx_to_exec_equiv; idtac "exec_equiv_rx"
-      | |- exec_equiv_rx _ _ (Bind _ _) => eapply Bind_exec_equiv_proper; idtac "Bind"
-      | |- exec_equiv_rx _ _ (SpawnN _ _) => eapply SpawnN_exec_equiv_proper; [ reflexivity | ]; idtac "SpawnN"
-      | |- exec_equiv_rx _ _ (Until _ _ _) => rewrite exec_equiv_until_once; idtac "Until once"
-      | |- exec_equiv_rx _ _ (Until _ _ _) => eapply Until_exec_equiv_proper; [ reflexivity_maybe_fun | | reflexivity ]; idtac "Until"
-      (* No more simplifications for [Call] and [Ret]. *)
-      | |- exec_equiv_rx _ _ (Call _) => reflexivity; idtac "Call"
-      | |- exec_equiv_rx _ _ (Ret _) => reflexivity; idtac "Ret"
-      (* Create variables for continuation arguments, if necessary. *)
-      | |- pointwise_relation _ _ _ _ => eapply pointwise_unused; idtac "Unused arg"
-      | |- pointwise_relation _ _ _ _ => eapply pointwise_used; intros; idtac "Used arg"
-      (* Create a [match ..] for things that depend on an argument. *)
-      | |- exec_equiv_rx _ (_ ?arg) ?rhs =>
-        match rhs with
-        | context[match ?arg with _ => _ end] =>
-          idtac "Match on" arg;
-          (
-            instantiate (1 := fun z => match z with | None => _ | Some a => _ a end) ||
-            instantiate (1 := fun z => match z with | (a, b) => _ a b end) ||
-            instantiate (1 := fun z => match z with | exist _ a _ => _ a end) ||
-            instantiate (1 := fun z => match z with | Missing => _ | Present a => _ a end) ||
-            instantiate (1 := fun z => match z with | true => _ | false => _ end) ||
-            instantiate (1 := fun z => match z with
-              | MailServerAPI.MailServerOp.POP3Stat => _
-              | MailServerAPI.MailServerOp.POP3List => _
-              | MailServerAPI.MailServerOp.POP3Retr n => _ n
-              | MailServerAPI.MailServerOp.POP3Delete n => _ n
-              | MailServerAPI.MailServerOp.POP3Closed => _
-              end) ||
-            ( idtac "Could not match on" arg; fail 1 )
-          );
-          idtac "Succeeded in building match on" arg;
-          destruct arg
-        | _ =>
-          instantiate (1 := fun _ => _);
-          idtac "Passing through argument" arg
-        end
-      end.
-
     repeat step.
     reflexivity.
   }
@@ -491,3 +464,41 @@ Definition ms_bottom_server_opt nsmtp npop3 :=
   Eval cbn in (proj1_sig (ms_bottom_server_opt' nsmtp npop3)).
 
 Print ms_bottom_server_opt.
+
+
+Definition ms_bottom_opt' a b c d :
+    {ts : threads_state _ | exec_equiv_ts MailFSMergedAPI.step ts
+                            (c0.compile_ts (mail_perf a b c d))}.
+
+  eexists.
+
+  repeat eapply exec_equiv_ts_thread_map_thread_map.
+  unfold compile.
+
+  unfold mail_perf.
+  unfold threads_from_proc.
+  rewrite thread_map_thread_from_list.
+  cbn [map].
+
+  eapply exec_equiv_ts_thread_from_list.
+
+  eapply Forall2_cons.
+  {
+    do 3 eexists.
+    split; [ reflexivity | ].
+    split; [ reflexivity | ].
+
+    repeat step.
+    reflexivity.
+
+    (* Something isn't quite right.. *)
+    all: admit.
+  }
+
+  eapply Forall2_nil.
+Admitted.
+
+Definition ms_bottom_opt a b c d :=
+  Eval cbn in (proj1_sig (ms_bottom_opt' a b c d)).
+
+Print ms_bottom_opt.

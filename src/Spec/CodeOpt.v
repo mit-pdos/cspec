@@ -91,3 +91,20 @@ Proof.
   rewrite exec_equiv_ret_bind.
   reflexivity.
 Qed.
+
+Theorem exec_equiv_ts_thread_map_thread_map :
+  forall Op1 Op2 Op3 State (step : OpSemantics Op3 State)
+         (f : forall T, proc Op1 T -> proc Op2 T)
+         (g : forall T, proc Op2 T -> proc Op3 T)
+         lhs rhs,
+    exec_equiv_ts step lhs
+      (thread_map (fun T t => g T (f T t)) rhs) ->
+    exec_equiv_ts step lhs
+      (thread_map g
+        (thread_map f
+          rhs)).
+Proof.
+  intros.
+  autorewrite with t.
+  eauto.
+Qed.
