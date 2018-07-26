@@ -11,8 +11,6 @@ Require Import Morphisms.
 Require Import List.
 Require Import Omega.
 
-Import ListNotations.
-
 Global Set Implicit Arguments.
 Global Generalizable All Variables.
 
@@ -198,106 +196,55 @@ numbers of steps *)
     split; eauto.
   Qed.
 
+  Ltac forward_chaining :=
+    repeat (hnf; intros);
+    repeat match goal with
+           | [ H: _ |- _ ] => apply H
+           end.
+
+  Local Obligation Tactic := try solve [ forward_chaining ].
+
   Global Program Instance trace_incl_s_preorder :
     PreOrder (@trace_incl_s s tid T).
-  Next Obligation.
-    repeat (hnf; intros); eauto.
-  Qed.
-  Next Obligation.
-    unfold trace_incl_s, trace_incl_ts_s in *; eauto.
-  Qed.
 
   Global Program Instance trace_incl_preorder :
     PreOrder (@trace_incl T).
 
-  Global Instance exec_equiv_to_trace_incl :
+  Global Program Instance exec_equiv_to_trace_incl :
     subrelation (exec_equiv op_step (T:=T)) (@trace_incl T).
-  Proof.
-    unfold subrelation; intros.
-    unfold trace_incl, trace_incl_ts, trace_incl_ts_s; intros.
-    apply H in H0.
-    eauto.
-  Qed.
 
-  Global Instance trace_incl_proper :
+  Global Program Instance trace_incl_proper :
     Proper (Basics.flip (@trace_incl T) ==>
                         @trace_incl T ==>
                         Basics.impl) (@trace_incl T).
-  Proof.
-    intros.
-    intros p1 p2 H21 p3 p4 H34 H; subst.
-    unfold Basics.flip in *.
-    etransitivity; eauto.
-    etransitivity; eauto.
-  Qed.
 
-  Global Instance trace_incl_proper_flip :
+  Global Program Instance trace_incl_proper_flip :
     Proper (@trace_incl T ==>
                         Basics.flip (@trace_incl T) ==>
                         Basics.flip Basics.impl) (@trace_incl T).
-  Proof.
-    intros.
-    intros p1 p2 H21 p3 p4 H34 H; subst.
-    unfold Basics.flip in *.
-    repeat (etransitivity; eauto).
-  Qed.
 
-  Global Instance trace_incl_s_proper :
+  Global Program Instance trace_incl_s_proper :
     Proper (Basics.flip (@trace_incl T) ==>
                         @trace_incl T ==>
                         Basics.impl) (@trace_incl_s s tid T).
-  Proof.
-    intros.
-    intros p1 p2 H12 p3 p4 H34 H; subst.
-    unfold trace_incl_s, trace_incl_ts_s; intros.
-    apply H12 in H0.
-    apply H in H0.
-    apply H34 in H0.
-    eauto.
-  Qed.
 
-  Global Instance trace_incl_s_proper_flip :
+  Global Program Instance trace_incl_s_proper_flip :
     Proper (@trace_incl T ==>
                         Basics.flip (@trace_incl T) ==>
                         Basics.flip Basics.impl) (@trace_incl_s s tid T).
-  Proof.
-    intros.
-    intros p1 p2 H12 p3 p4 H34 H; subst.
-    unfold trace_incl_s, trace_incl_ts_s; intros.
-    apply H12 in H0.
-    apply H in H0.
-    apply H34 in H0.
-    eauto.
-  Qed.
 
-  Global Instance trace_incl_s_exec_equiv_proper :
+  Global Program Instance trace_incl_s_exec_equiv_proper :
     Proper (exec_equiv op_step ==> exec_equiv op_step ==> iff)
            (@trace_incl_s s tid T).
-  Proof.
-    intros.
-    intros p1 p1' ?.
-    intros p2 p2' ?.
-    split; intros.
-    - unfold trace_incl_s, trace_incl_ts_s; intros.
-      apply H in H2.
-      apply H1 in H2.
-      apply H0 in H2.
-      eauto.
-    - unfold trace_incl_s, trace_incl_ts_s; intros.
-      apply H in H2.
-      apply H1 in H2.
-      apply H0 in H2.
-      eauto.
+  Next Obligation.
+    split; forward_chaining.
   Qed.
 
-  Global Instance trace_incl_exec_equiv_proper :
+  Global Program Instance trace_incl_exec_equiv_proper :
     Proper (exec_equiv op_step ==> exec_equiv op_step ==> iff)
            (@trace_incl T).
-  Proof.
-    unfold Proper, respectful, trace_incl; intros.
-    split; intros.
-    rewrite <- H, <- H0; auto.
-    rewrite H, H0; auto.
+  Next Obligation.
+    split; forward_chaining.
   Qed.
 
   Local Lemma trace_incl_ts_s_proof_helper :
@@ -481,27 +428,25 @@ numbers of steps *)
   Global Instance trace_incl_N_reflexive :
     Reflexive (@trace_incl_N n T) := RelInstance.
 
-  Global Program Instance trace_incl_rx_preorder :
-    PreOrder (@trace_incl_rx T).
-  Next Obligation.
-    unfold trace_incl_rx, trace_incl_rx_N; intros.
-    eapply trace_incl_N_bind_a.
-    eauto.
-  Qed.
-  Next Obligation.
-    (* TODO: simplify this *)
-    unfold trace_incl_rx in *.
-    intros.
-    repeat (hnf; intros).
-    eapply H in H4; try omega.
-    apply exec_to_counter in H4; propositional.
-    eapply H0 in H4; try omega.
-    eauto.
-    2: intros; reflexivity.
-    reflexivity. reflexivity.
-    reflexivity.
-    intros; eapply trace_incl_N_le; eauto.
-    omega.
+  Global Instance trace_incl_rx_preorder :
+    PreOrder (@trace_incl_rx T) := RelInstance.
+  Proof.
+    - (* TODO: simplify this *)
+      unfold trace_incl_rx in *.
+      intros.
+      repeat (hnf; intros).
+      eapply H in H4; try omega.
+      apply exec_to_counter in H4; propositional.
+      eapply H0 in H4; try omega.
+      eauto.
+      2: intros; reflexivity.
+      reflexivity. reflexivity.
+      reflexivity.
+      intros; eapply trace_incl_N_le; eauto.
+      omega.
+    - unfold trace_incl_rx, trace_incl_rx_N; intros.
+      eapply trace_incl_N_bind_a.
+      eauto.
   Qed.
 
   Global Instance Bind_trace_incl_proper_2 :
@@ -769,13 +714,8 @@ Global Instance traces_match_ts_proper :
                          Basics.flip Basics.impl)
          (@traces_match_ts OpLo OpHi State lo_step hi_step).
 Proof.
-  intros.
-  intros ts1 ts1' H1.
-  intros ts2 ts2' H2.
-  unfold Basics.flip, Basics.impl.
-  unfold traces_match_ts; intros.
-  apply H1 in H0.
-  apply H in H0.
-  apply H2 in H0.
-  eauto.
+  repeat (hnf; intros).
+  repeat match goal with
+         | [ H: _ |- _ ] => apply H
+         end.
 Qed.
