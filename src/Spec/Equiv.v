@@ -551,7 +551,7 @@ numbers of steps *)
       eauto.
   Qed.
 
-  Theorem atomic_equiv_bind_bind : forall `(p1 : proc Op T1) `(p2 : T1 -> proc Op T2) `(p3 : T2 -> proc Op T3),
+  Local Theorem atomic_equiv_bind_bind : forall `(p1 : proc Op T1) `(p2 : T1 -> proc Op T2) `(p3 : T2 -> proc Op T3),
       atomic_equiv (Bind (Bind p1 p2) p3) (Bind p1 (fun v => Bind (p2 v) p3)).
   Proof.
     split; intros.
@@ -565,7 +565,7 @@ numbers of steps *)
       eauto.
   Qed.
 
-  Theorem atomic_equiv_bind_congruence : forall T (p1 p2: proc Op T) T' (rx1 rx2: T -> proc Op T'),
+  Local Theorem atomic_equiv_bind_congruence : forall T (p1 p2: proc Op T) T' (rx1 rx2: T -> proc Op T'),
       atomic_equiv p1 p2 ->
       (forall x, atomic_equiv (rx1 x) (rx2 x)) ->
       atomic_equiv (Bind p1 rx1) (Bind p2 rx2).
@@ -712,7 +712,7 @@ numbers of steps *)
     rewrite H, H0; auto.
   Qed.
 
-  Lemma trace_incl_ts_s_proof_helper :
+  Local Lemma trace_incl_ts_s_proof_helper :
     forall `(p1 : proc Op T) (p2 : proc _ T) ts tid s,
       (forall (ts: threads_state _) tid' s0 s' result tr spawned evs,
           exec_others op_step tid s s0 ->
@@ -835,7 +835,7 @@ numbers of steps *)
       eauto with exec.
   Qed.
 
-  Theorem trace_incl_N_bind_a : forall `(p : proc Op T) `(p2 : T -> proc _ T') p2' n,
+  Local Theorem trace_incl_N_bind_a : forall `(p : proc Op T) `(p2 : T -> proc _ T') p2' n,
       (forall x, trace_incl_N (n-1) (p2 x) (p2' x)) ->
       trace_incl_N n (Bind p p2) (Bind p p2').
   Proof.
@@ -914,7 +914,7 @@ numbers of steps *)
     eapply H2.
   Qed.
 
-  Theorem trace_incl_rx_to_exec :
+  Local Theorem trace_incl_rx_to_exec :
     forall T (p1 p2: proc _ T)
       (ts: threads_state _) s tid tr,
       trace_incl_rx p1 p2 ->
