@@ -1030,6 +1030,17 @@ numbers of steps *)
     omega.
   Qed.
 
+  Theorem trace_incl_upto_0 : forall T (p1 p2: proc Op T),
+      trace_incl_rx_N 0 p1 p2.
+  Proof.
+    repeat (hnf; intros).
+    replace n' with 0 in * by omega.
+    match goal with
+    | [ H: exec_till _ _ _ _ _ |- _ ] =>
+      invert H; eauto
+    end.
+  Qed.
+
   Local Theorem trace_incl_rx_until_helper :
     forall T (p1 p2 : option T -> proc Op T)
       (c : T -> bool) n v,
@@ -1038,21 +1049,19 @@ numbers of steps *)
   Proof.
     induction n; intros.
 
-    - intro; intros.
-      intro; intros.
-      intro; intros.
-      match goal with
-      | H : exec_till _ _ _ _ _ |- _ =>
-        invert H; eauto
-      end.
-      exfalso; omega.
+    - apply trace_incl_upto_0.
+    - assert (forall v, trace_incl_rx_N n (Until c p1 v) (Until c p2 v)) as IHn'.
+      intros.
+      eapply IHn; intros.
+      eapply trace_incl_rx_N_le; eauto.
+      omega.
+      clear IHn.
+      replace (S n - 1) with n in * by omega.
 
-    - intro; intros.
-      intro; intros.
-      intro; intros.
+      repeat (hnf; intros).
       match goal with
       | H : exec_till _ _ _ _ _ |- _ =>
-        invert H; eauto; NoProc_upd
+        invert H; clear H; eauto; NoProc_upd
       end.
 
       cmp_ts tid0 tid.
@@ -1065,8 +1074,6 @@ numbers of steps *)
         | H : exec_till _ _ _ _ _ |- _ =>
           eapply exec_equiv_N_bind_bind in H
         end.
-
-        replace (S n - 1) with (n) in * by omega.
 
         match goal with
         | H : exec_till _ _ _ _ _,
@@ -1086,19 +1093,17 @@ numbers of steps *)
           eapply trace_incl_N_le; eauto. omega.
 
         * repeat ( intro; intros ).
-          eapply IHn.
-          intros. eapply trace_incl_rx_N_le; eauto; omega.
-          4: eassumption.
-          3: reflexivity.
-          omega.
+          eapply IHn'.
+          instantiate (1 := n'); omega.
           intros; eapply trace_incl_N_le; eauto; omega.
+          eauto.
+          eauto.
 
         * auto.
 
       + ExecPrefix tid0 tid'.
         rewrite ConcurExec.thread_upd_abc_to_cab in * by auto.
-        eapply IHn with (n0:=n1) (n':=n1) (rx1:=rx1); intros; try omega; eauto.
-        eapply trace_incl_rx_N_le; eauto; omega.
+        eapply IHn' with (n0:=n1) (n':=n1) (rx1:=rx1); intros; try omega; eauto.
         eapply trace_incl_N_le; eauto; omega.
   Qed.
 
