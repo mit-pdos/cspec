@@ -433,6 +433,16 @@ match goal with
 | |- exec _ _ ?ts _ => first [ is_evar ts; fail 1 | eapply exec_ts_eq ]
 end : exec.
 
+(* basically the same as ExecPrefix, but applies [ExecTillOne] instead of
+[ExecPrefixOne] *)
+Ltac ExecOne tid_arg tid'_arg :=
+  eapply ExecTillOne with (tid:=tid_arg) (tid':=tid'_arg);
+  autorewrite with t;
+  (* need to exclude core for performance reasons *)
+  eauto 7 with nocore exec;
+  remove_redundant_upds;
+  cbv beta iota.
+
 Hint Rewrite thread_spawn_none using congruence : t.
 Hint Rewrite thread_upd_aba using congruence : t.
 

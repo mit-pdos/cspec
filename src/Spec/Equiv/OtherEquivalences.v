@@ -1,10 +1,13 @@
 Require Import Spec.ConcurExec.
 Require Import Spec.ThreadsState.
 Require Import Spec.Equiv.Execution.
+
+Require Import ProofAutomation.
+Require Import Spec.Equiv.Automation.
+Require Import Helpers.Instances.
+
 Require Import Relations.Relation_Operators.
 Require Import Morphisms.
-Require Import ProofAutomation.
-Require Import Helpers.Instances.
 Require Import List.
 Require Import Omega.
 
@@ -31,24 +34,6 @@ Section OpSemantics.
 
   Definition exec_equiv_N n T (p1 p2: proc Op T) :=
     forall ts tid, exec_equiv_ts_N n (ts [[tid := Proc p1]]) (ts [[tid := Proc p2]]).
-
-  (** A strong notion of equivalence for programs inside atomic sections.
-    Basically the same as above, but defined as an underlying [atomic_exec]
-    rather than [exec]. *)
-
-  Local Definition atomic_equiv `(p1 : proc Op T) p2 :=
-    forall (s s' : State) r tid evs,
-      atomic_exec op_step p1 tid s r s' evs <->
-      atomic_exec op_step p2 tid s r s' evs.
-
-  Global Program Instance atomic_equiv_equivalence :
-    Equivalence (@atomic_equiv T).
-
-  Global Instance atomic_equiv_proper :
-    Proper (atomic_equiv ==> atomic_equiv ==> iff) (@atomic_equiv T).
-  Proof.
-    typeclasses eauto.
-  Qed.
 
   (** Trace inclusion for an entire threads_state *)
 
@@ -188,163 +173,20 @@ numbers of steps *)
   Hint Constructors exec_tid.
   Hint Constructors exec_till.
 
-  Hint Extern 1 (exec _ _ _ _ _) =>
-  match goal with
-  | |- exec_till _ _ _ ?ts _ => first [ is_evar ts; fail 1 | eapply ConcurExec.exec_ts_eq ]
-  end : exec.
-
-  (* basically the same as ExecPrefix, but applies [ExecTillOne] instead of
-[ExecPrefixOne] *)
-  Ltac ExecOne tid_arg tid'_arg :=
-    eapply ExecTillOne with (tid:=tid_arg) (tid':=tid'_arg);
-    autorewrite with t;
-    (* need to exclude core for performance reasons *)
-    eauto 7 with nocore exec;
-    cbv beta iota.
-
-  Ltac thread_upd_ind :=
-    let ind H := induction H; intros; subst; eauto; NoProc_upd in
-    match goal with
-    | H : exec _ _ (thread_upd ?ts ?tid (Proc ?p)) _ |- _ =>
-      remember (thread_upd ts tid (Proc p));
-      generalize dependent ts;
-      ind H
-    | H : exec_till _ _ _ (thread_upd ?ts ?tid (Proc ?p)) _ |- _ =>
-      remember (thread_upd ts tid (Proc p));
-      generalize dependent ts;
-      ind H
-    end.
-
-  (* same as thread_upd_ind, but also generalize the program - this seems
-   * necessary some of the time, and generalizing can break existing proofs
-   *)
-  Ltac thread_upd_ind' p :=
-    let ind H := induction H; intros; subst; eauto; NoProc_upd in
-    match goal with
-    | H : exec _ _ (thread_upd ?ts ?tid (Proc ?pp)) _ |- _ =>
-      remember (thread_upd ts tid (Proc pp));
-      generalize dependent ts;
-      generalize dependent p;
-      ind H
-    | H : exec_till _ _ _ (thread_upd ?ts ?tid (Proc ?pp)) _ |- _ =>
-      remember (thread_upd ts tid (Proc pp));
-      generalize dependent ts;
-      generalize dependent p;
-      ind H
-    end.
-
-  Ltac guess_ExecPrefix :=
-    match goal with
-    | [ H: thread_get _ ?tid' = NoProc |- context[prepend ?tid _ _] ] =>
-      ExecPrefix tid tid'
-    end.
-
-  Ltac solve_ExecEquiv :=
-    match goal with
-    | [ H: context[thread_get (thread_upd _ ?tid _) ?tid'] |- _ ] =>
-      cmp_ts tid' tid; repeat maybe_proc_inv;
-      exec_tid_simpl;
-      remove_redundant_upds;
-      try (solve [ eauto ] ||
-           solve [ guess_ExecPrefix ])
-    end.
-
-  Ltac ExecEquiv :=
-    thread_upd_ind;
-    [ solve_ExecEquiv | .. ].
-
-  (* alternative that uses thread_upd_ind' *)
-  Ltac ExecEquiv' p :=
-    thread_upd_ind' p;
-    [ solve_ExecEquiv | .. ].
-
   Local Theorem exec_equiv_N_bind_bind : forall `(p1 : proc Op T1) `(p2 : T1 -> proc Op T2) `(p3 : T2 -> proc Op T3) n,
       exec_equiv_N n (Bind (Bind p1 p2) p3) (Bind p1 (fun v => Bind (p2 v) p3)).
   Proof.
     split; intros.
-    - ExecEquiv' p1.
+    - ExecEquiv p1.
       + ExecOne tid tid'.
         destruct result; eauto.
       + ExecOne tid0 tid'.
         abstract_ts; typeclasses eauto 7 with exec.
-    - ExecEquiv' p1.
+    - ExecEquiv p1.
       + ExecOne tid tid'.
         destruct result0; eauto.
       + ExecOne tid0 tid'.
         abstract_ts; typeclasses eauto 7 with exec.
-  Qed.
-
-  Theorem atomic_equiv_ret_bind : forall `(v : T) `(p : T -> proc Op T'),
-      atomic_equiv (Bind (Ret v) p) (p v).
-  Proof.
-    split; intros.
-    - atomic_exec_inv.
-      invert H9.
-    - rewrite <- app_nil_l.
-      eauto.
-  Qed.
-
-  (* unused *)
-  Local Theorem atomic_equiv_bind_ret : forall `(p : proc Op T),
-      atomic_equiv (Bind p Ret) p.
-  Proof.
-    split; intros.
-    - atomic_exec_inv.
-      invert H10.
-      rewrite app_nil_r.
-      eauto.
-    - rewrite <- app_nil_r.
-      eauto.
-  Qed.
-
-  Local Theorem atomic_equiv_bind_bind : forall `(p1 : proc Op T1) `(p2 : T1 -> proc Op T2) `(p3 : T2 -> proc Op T3),
-      atomic_equiv (Bind (Bind p1 p2) p3) (Bind p1 (fun v => Bind (p2 v) p3)).
-  Proof.
-    split; intros.
-    - atomic_exec_inv.
-      invert H9.
-      rewrite <- app_assoc.
-      eauto.
-    - atomic_exec_inv.
-      invert H10.
-      rewrite app_assoc.
-      eauto.
-  Qed.
-
-  Local Theorem atomic_equiv_bind_congruence : forall T (p1 p2: proc Op T) T' (rx1 rx2: T -> proc Op T'),
-      atomic_equiv p1 p2 ->
-      (forall x, atomic_equiv (rx1 x) (rx2 x)) ->
-      atomic_equiv (Bind p1 rx1) (Bind p2 rx2).
-  Proof.
-    split; intros; atomic_exec_inv.
-    - apply H in H11.
-      apply H0 in H12.
-      eauto.
-    - apply H in H11.
-      apply H0 in H12.
-      eauto.
-  Qed.
-
-  Global Instance Bind_proper_atomic_equiv :
-    Proper (atomic_equiv ==>
-                         pointwise_relation T atomic_equiv ==>
-                         @atomic_equiv TR) Bind.
-  Proof.
-    unfold Proper, respectful, pointwise_relation; intros.
-    apply atomic_equiv_bind_congruence; auto.
-  Qed.
-
-  Global Instance Atomic_proper_atomic_equiv :
-    Proper (atomic_equiv ==> exec_equiv_rx op_step (T:=T)) Atomic.
-  Proof.
-    intros.
-    intros p1 p2 H.
-    eapply exec_equiv_rx_proof_helper; intros;
-      repeat exec_tid_inv.
-    - apply H in H9.
-      ExecPrefix tid tid'.
-    - apply H in H9.
-      ExecPrefix tid tid'.
   Qed.
 
   Theorem trace_incl_trace_incl_s : forall T (p1 p2 : proc Op T),
@@ -476,7 +318,7 @@ numbers of steps *)
   Proof.
     unfold trace_incl_ts_s.
     intros.
-    ExecEquiv.
+    ExecEquiv tt.
     ExecPrefix tid0 tid'.
     abstract_ts.
     eapply IHexec; intros; eauto with exec.
@@ -550,7 +392,7 @@ numbers of steps *)
     unfold trace_incl, trace_incl_ts, trace_incl_ts_s.
     intros.
 
-    ExecEquiv' p.
+    ExecEquiv p.
     destruct result0; guess_ExecPrefix.
   Qed.
 
@@ -563,7 +405,7 @@ numbers of steps *)
     unfold trace_incl_s, trace_incl_ts_s.
     intros.
 
-    thread_upd_ind' p.
+    thread_upd_ind p.
 
     cmp_ts tid0 tid.
     + repeat maybe_proc_inv.
@@ -600,7 +442,7 @@ numbers of steps *)
   Proof.
     unfold trace_incl_N, trace_incl_ts_N.
     intros.
-    ExecEquiv' p.
+    ExecEquiv p.
     - destruct result0.
       + ExecPrefix tid tid'.
         eapply H with (n':=n0); eauto.
@@ -620,7 +462,7 @@ numbers of steps *)
       trace_incl_N n (Bind (Ret v) rx1) (Bind (Ret v) rx2).
   Proof.
     repeat (hnf; intros).
-    ExecEquiv.
+    ExecEquiv tt.
     + ExecPrefix tid tid'.
       eapply H in H4; eauto.
     + ExecPrefix tid0 tid'.
