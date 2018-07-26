@@ -164,18 +164,30 @@ Section OpSemantics.
       (forall a, trace_incl_N (n0-1) (rx1 a) (rx2 a)) ->
       trace_incl_N n0 (Bind p1 rx1) (Bind p2 rx2).
 
-  Definition trace_incl_rx {T} (p1 p2: proc Op T) :=
+  Local Definition trace_incl_rx_N' n {T} (p1 p2: proc Op T) :=
+    forall TF (rx1 rx2 : _ -> proc _ TF),
+      (forall a, trace_incl_N (n-1) (rx1 a) (rx2 a)) ->
+      trace_incl_N n (Bind p1 rx1) (Bind p2 rx2).
+
+  Local Theorem trace_incl_rx_N_to_N' : forall n T (p1 p2: proc Op T),
+      trace_incl_rx_N n p1 p2 -> trace_incl_rx_N' n p1 p2.
+  Proof.
+    unfold trace_incl_rx_N, trace_incl_rx_N', trace_incl_N, trace_incl_ts_N.
+    intros.
+    eapply H; intros; eauto.
+    eapply H0; [ | eassumption ].
+    omega.
+  Qed.
+
+  Local Definition trace_incl_rx {T} (p1 p2: proc Op T) :=
     forall n, trace_incl_rx_N n p1 p2.
 
-  (* several remarks about an alternate trace_incl_rx definition, which turns
-  out to be unneeded *)
-  (* natural definition of trace_incl_rx, defined in terms of all executions (that
-is, without requiring counters be identical) *)
-  Local Definition trace_incl_rx' {T} (p1 p2 : proc Op T) :=
+  (* natural definition of trace_incl_rx, defined in terms of all executions
+     (that is, without requiring counters be identical) *)
+  Definition trace_incl_rx' {T} (p1 p2 : proc Op T) :=
     forall TF (rx1 rx2: _ -> proc _ TF),
       (forall a, trace_incl (rx1 a) (rx2 a)) ->
       trace_incl (Bind p1 rx1) (Bind p2 rx2).
-
 
   (* unused, just a remark *)
   Local Theorem trace_incl_rx'_all_n : forall T (p1 p2: proc Op T),
@@ -316,6 +328,14 @@ numbers of steps *)
       autorewrite with t; eauto.
       rewrite mapping_finite; eauto.
   Qed.
+
+  (* TODO: define trace_incl between two n's for all ts and continuations, prove
+     this for as many things as possible.
+
+   Then prove generic theorems that prove the others are special cases. *)
+
+  (* trace_incl_rx' is the right definition; steps should not be used unless
+     needed, really only hold for monad associativity *)
 
   Theorem exec_equiv_bind_ret : forall `(p : proc Op T),
       exec_equiv (Bind p Ret) p.
@@ -909,7 +929,7 @@ numbers of steps *)
     reflexivity.
   Qed.
 
-  Theorem trace_incl_rx_spawn
+  Local Theorem trace_incl_rx_spawn
     : forall T (p1 p2 : proc Op T),
       trace_incl_rx p1 p2 ->
       trace_incl_rx (Spawn p1) (Spawn p2).
@@ -958,6 +978,22 @@ numbers of steps *)
     assert (trace_incl_rx p1 p1) by reflexivity.
     eapply H4 in H3; [ | reflexivity | eassumption | omega ].
     eapply H; eauto.
+  Qed.
+
+  Theorem trace_incl_rx'_spawn
+    : forall T (p1 p2 : proc Op T),
+      trace_incl_rx' p1 p2 ->
+      trace_incl_rx' (Spawn p1) (Spawn p2).
+  Proof.
+    intros.
+    unfold trace_incl_rx'; intros.
+    etransitivity.
+    eapply trace_incl_rx_to_trace_incl.
+    eapply trace_incl_rx_spawn.
+    eapply trace_incl_to_trace_incl_rx; intros.
+    eapply H.
+    reflexivity.
+    eapply trace_incl_bind_a; eauto.
   Qed.
 
   Local Theorem trace_incl_N_ret_bind :
@@ -1066,7 +1102,7 @@ numbers of steps *)
         eapply trace_incl_N_le; eauto; omega.
   Qed.
 
-  Theorem trace_incl_rx_until :
+  Local Theorem trace_incl_rx_until :
     forall T (p1 p2 : option T -> proc Op T)
       (c : T -> bool) v,
       (forall v', trace_incl_rx (p1 v') (p2 v')) ->
@@ -1079,6 +1115,24 @@ numbers of steps *)
     intros. eapply H.
     reflexivity.
     intros; eapply trace_incl_N_le; eauto; omega.
+  Qed.
+
+  Theorem trace_incl_rx'_until :
+    forall T (p1 p2 : option T -> proc Op T)
+      (c : T -> bool) v,
+      (forall v', trace_incl_rx' (p1 v') (p2 v')) ->
+      trace_incl_rx' (Until c p1 v) (Until c p2 v).
+  Proof.
+    intros.
+    unfold trace_incl_rx'; intros.
+    etransitivity.
+    eapply trace_incl_rx_to_trace_incl.
+    eapply trace_incl_rx_until; intros.
+    eapply trace_incl_to_trace_incl_rx; intros.
+    eapply H.
+    reflexivity.
+    eapply trace_incl_bind_a; intros.
+    eauto.
   Qed.
 
   (** Reuse the complicated proof about [Until]. *)
