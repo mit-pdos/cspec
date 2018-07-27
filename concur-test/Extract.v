@@ -5,7 +5,7 @@ Require Import ExtrHaskellNatInteger.
 
 Extraction Language Haskell.
 
-Require Import Spec.CounterExample.
+Require Import Examples.LockedCounter.
 
 Separate Extraction compiled_threads.
 

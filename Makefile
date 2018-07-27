@@ -5,6 +5,7 @@ CODE += $(wildcard src/Spec/*.v)
 CODE += $(wildcard src/Spec/*/*.v)
 CODE += $(wildcard src/*.v)
 CODE += $(wildcard src/Mail/*.v)
+CODE += $(wildcard src/Examples/*.v)
 
 COQRFLAGS := -R build POCS
 
@@ -43,7 +44,7 @@ docs: coq
 	coqtop $(COQRFLAGS) -batch -noglob -load-vernac-source $<
 	./scripts/add-preprocess.sh $@/*.hs
 
-concur-test/extract: build/Spec/CounterExample.vo
+concur-test/extract: build/Examples/LockedCounter.vo
 mail-test/extract: build/Mail/MailServer.vo
 
 bin/%: %/extract %/lib/*.hs
