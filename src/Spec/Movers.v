@@ -1,5 +1,6 @@
 Require Import ConcurExec.
-Require Import Equiv.
+Require Import Spec.Equiv.Execution.
+Require Import Spec.Equiv.
 Require Import ProofAutomation.
 Require Import FunctionalExtensionality.
 Require Import Omega.

@@ -1,4 +1,5 @@
 Require Import CSPEC.
+Require Import Spec.Equiv.Execution.
 Require Import Morphisms.
 Require Import FunctionalExtensionality.
 
@@ -121,12 +122,6 @@ Definition smtp_server_thread : proc _ unit :=
 
 Definition pop3_server_thread : proc _ unit :=
   Until (fun _ => false) (fun _ => do_pop3_req) None.
-
-Fixpoint SpawnN {Op T} (n:nat) (p:proc Op T) : proc Op unit :=
-  match n with
-  | 0 => Ret tt
-  | S n' => Bind (Spawn p) (fun _ => SpawnN n' p)
-  end.
 
 Definition threads_from_proc Op T (p: proc Op T) : threads_state Op :=
   thread_from_list (existT _ T p :: nil).
@@ -316,18 +311,6 @@ Print Assumptions c0.compile_traces_match.
 (**
  * Generating optimized code.
  *)
-
-Global Instance SpawnN_exec_equiv_proper :
-  forall Op State T op_step,
-    Proper (eq ==> (@exec_equiv Op State op_step T) ==> exec_equiv_rx op_step) SpawnN.
-Proof.
-  unfold Proper, respectful; intros; subst.
-  induction y; simpl.
-  - reflexivity.
-  - rewrite H0.
-    setoid_rewrite IHy.
-    reflexivity.
-Qed.
 
 Theorem compile_SpawnN :
   forall Op1 Op2 (compile_op : forall T, Op1 T -> proc Op2 T) n `(p : proc _ T),

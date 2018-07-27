@@ -6,6 +6,7 @@
 
 Require Import Spec.ConcurProc.
 Require Import Spec.ExecSemantics.
+Require Import Spec.Equiv.Execution.
 Require Import Spec.Equiv.
 Require Import Spec.ThreadsState.
 Require Import Helpers.ProofAutomation.
