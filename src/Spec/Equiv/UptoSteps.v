@@ -192,28 +192,21 @@ numbers of steps *)
     eapply exec_till_to_exec; eauto.
   Qed.
 
+  Hint Resolve trace_incl_N_le.
+
   Global Instance trace_incl_N_reflexive :
     Reflexive (@trace_incl_N n T) := RelInstance.
 
   Global Instance trace_incl_rx_preorder :
     PreOrder (@trace_incl_rx T) := RelInstance.
   Proof.
-    - (* TODO: simplify this *)
-      unfold trace_incl_rx in *.
-      intros.
-      repeat (hnf; intros).
-      eapply H in H4; try omega.
+    - repeat (hnf; intros).
+      eapply H in H4; intros; try apply le_n; eauto.
       apply exec_to_counter in H4; propositional.
-      eapply H0 in H4; try omega.
-      eauto.
-      2: intros; reflexivity.
-      reflexivity. reflexivity.
+      eapply H0 in H4; try apply le_n; eauto.
       reflexivity.
-      intros; eapply trace_incl_N_le; eauto.
-      omega.
-    - unfold trace_incl_rx, trace_incl_rx_N; intros.
-      eapply trace_incl_N_bind_a.
-      eauto.
+    - repeat (hnf; intros).
+      eapply trace_incl_N_bind_a; typeclasses eauto with core.
   Qed.
 
   Local Theorem trace_incl_rx_to_exec :
@@ -374,22 +367,15 @@ numbers of steps *)
 
         simpl; intros.
         destruct (c a).
-        * eapply trace_incl_N_ret_bind; eauto; intros.
-          eapply trace_incl_N_le; eauto; omega.
+        * eapply trace_incl_N_ret_bind; eauto.
 
         * repeat ( intro; intros ).
-          eapply IHn'.
-          instantiate (1 := n'); omega.
-          intros; eapply trace_incl_N_le; eauto; omega.
-          eauto.
-          eauto.
-
+          eapply IHn' with (n0:=n'); eauto.
         * auto.
 
       + ExecPrefix tid0 tid'.
         rewrite ConcurExec.thread_upd_abc_to_cab in * by auto.
         eapply IHn' with (n0:=n1) (n':=n1) (rx1:=rx1); intros; try omega; eauto.
-        eapply trace_incl_N_le; eauto; omega.
   Qed.
 
   Local Theorem trace_incl_rx_until :
@@ -399,12 +385,8 @@ numbers of steps *)
       trace_incl_rx (Until c p1 v) (Until c p2 v).
   Proof.
     repeat ( intro; intros ).
-    eapply trace_incl_rx_until_helper in H3.
-    5: reflexivity.
-    eassumption.
-    intros. eapply H.
-    reflexivity.
-    intros; eapply trace_incl_N_le; eauto; omega.
+    eapply trace_incl_rx_until_helper in H3; eauto.
+    intros; eapply H.
   Qed.
 
   Theorem trace_incl_rx'_until :
