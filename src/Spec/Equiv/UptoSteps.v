@@ -7,7 +7,7 @@
 Require Import Spec.ConcurExec.
 Require Import Spec.ThreadsState.
 Require Import Spec.Equiv.Execution.
-Require Import Spec.Equiv.OtherEquivalences.
+Require Import Spec.Equiv.TraceIncl.
 
 Require Import ProofAutomation.
 Require Import Helpers.Instances.
