@@ -7,8 +7,7 @@ Import ListNotations.
 Global Set Implicit Arguments.
 Global Generalizable All Variables.
 
-
-(** Opcodes and states *)
+(** LAYER: TASAPI *)
 
 Module TASOp <: Ops.
 
@@ -23,32 +22,6 @@ Module TASOp <: Ops.
 
 End TASOp.
 
-
-Module LockOp <: Ops.
-
-  Inductive xOp : Type -> Type :=
-  | Acquire : xOp bool
-  | Release : xOp unit
-  | Read : xOp nat
-  | Write : nat -> xOp unit
-  | Flush : xOp unit.
-
-  Definition Op := xOp.
-
-End LockOp.
-
-
-Module CounterOp <: Ops.
-
-  Inductive xOp : Type -> Type :=
-  | Inc : xOp nat
-  | Dec : xOp nat.
-
-  Definition Op := xOp.
-
-End CounterOp.
-
-
 Module TASState <: State.
 
   Record s := mkTASState {
@@ -61,31 +34,6 @@ Module TASState <: State.
     TASLock s = false.
 
 End TASState.
-
-
-Module LockState <: State.
-
-  Record s := mkState {
-                  Value : memT nat;
-                  Lock : option nat;
-                }.
-
-  Definition State := s.
-  Definition initP s :=
-    Lock s = None.
-
-End LockState.
-
-
-Module CounterState <: State.
-
-  Definition State := nat.
-  Definition initP (s : State) := True.
-
-End CounterState.
-
-
-(** Layer definitions *)
 
 Definition bg_step `(step: OpSemantics Op State) (bg: State -> State -> Prop) : OpSemantics Op State :=
   fun _ op tid s r s' evs =>
@@ -126,6 +74,8 @@ Module TASAPI <: Layer TASOp TASState.
 
 End TASAPI.
 
+(** LAYER: TASDelayNondetAPI *)
+
 Module TASDelayNondetAPI <: Layer TASOp TASState.
 
   Import TASOp.
@@ -149,6 +99,8 @@ Module TASDelayNondetAPI <: Layer TASOp TASState.
   Definition step := xstep.
 
 End TASDelayNondetAPI.
+
+(** IMPL: TASDelayNondetAPI -> TASAPI *)
 
 Module AbsNondet' <:
   LayerImplAbsT TASOp
@@ -211,6 +163,34 @@ Module AbsNondet :=
                TASState TASDelayNondetAPI
                AbsNondet'.
 
+(** LAYER: TASLockAPI *)
+
+Module LockOp <: Ops.
+
+  Inductive xOp : Type -> Type :=
+  | Acquire : xOp bool
+  | Release : xOp unit
+  | Read : xOp nat
+  | Write : nat -> xOp unit
+  | Flush : xOp unit.
+
+  Definition Op := xOp.
+
+End LockOp.
+
+Module LockState <: State.
+
+  Record s := mkState {
+                  Value : memT nat;
+                  Lock : option nat;
+                }.
+
+  Definition State := s.
+  Definition initP s :=
+    Lock s = None.
+
+End LockState.
+
 Module TASLockAPI <: Layer TASOp LockState.
 
   Import TASOp.
@@ -237,6 +217,60 @@ Module TASLockAPI <: Layer TASOp LockState.
 
 End TASLockAPI.
 
+(** IMPL: TASLockAPI -> TASDelayNondetAPI
+
+Adding ghost state to the test-and-set bit. *)
+
+Module AbsLock' <:
+  LayerImplAbsT TASOp
+                TASState TASDelayNondetAPI
+                LockState TASLockAPI.
+
+  Import TASState.
+  Import LockState.
+
+  Definition absR (s1 : TASState.State) (s2 : LockState.State) :=
+    TASValue s1 = Value s2 /\
+    ((TASLock s1 = false /\ Lock s2 = None) \/
+     (exists tid, TASLock s1 = true /\ Lock s2 = Some tid)).
+
+  Hint Constructors TASLockAPI.xstep.
+
+  Theorem absR_ok :
+    op_abs absR TASDelayNondetAPI.step TASLockAPI.step.
+  Proof.
+    unfold op_abs; intros.
+    destruct s1; destruct s2; unfold absR in *.
+    unfold TASLockAPI.step.
+    ( intuition idtac ); simpl in *; subst; repeat deex.
+    - inversion H0; clear H0; subst; repeat sigT_eq; simpl in *.
+      all: eexists; (intuition idtac); [ | | eauto ].
+      all: simpl; eauto.
+    - inversion H0; clear H0; subst; repeat sigT_eq; simpl in *.
+      all: eexists; (intuition idtac); [ | | eauto ].
+      all: simpl; eauto.
+  Qed.
+
+  Theorem absInitP :
+    forall s1 s2,
+      TASState.initP s1 ->
+      absR s1 s2 ->
+      LockState.initP s2.
+  Proof.
+    unfold absR, TASState.initP, LockState.initP.
+    intuition eauto.
+    deex; congruence.
+  Qed.
+
+End AbsLock'.
+
+Module AbsLock :=
+  LayerImplAbs TASOp
+               TASState TASDelayNondetAPI
+               LockState TASLockAPI
+               AbsLock'.
+
+(** LAYER: RawLockAPI *)
 
 Module RawLockAPI <: Layer LockOp LockState.
 
@@ -261,7 +295,6 @@ Module RawLockAPI <: Layer LockOp LockState.
   Definition step := xstep.
 
 End RawLockAPI.
-
 
 Module LockProtocol <: Protocol LockOp LockState.
 
@@ -294,6 +327,17 @@ Module LockAPI <: Layer LockOp LockState.
 
 End LockAPI.
 
+(** LAYER: LockedCounterAPI *)
+
+Module CounterOp <: Ops.
+
+  Inductive xOp : Type -> Type :=
+  | Inc : xOp nat
+  | Dec : xOp nat.
+
+  Definition Op := xOp.
+
+End CounterOp.
 
 
 Module LockedCounterAPI <: Layer CounterOp LockState.
@@ -318,23 +362,6 @@ Module LockedCounterAPI <: Layer CounterOp LockState.
   Definition step := xstep.
 
 End LockedCounterAPI.
-
-
-Module CounterAPI <: Layer CounterOp CounterState.
-
-  Import CounterOp.
-  Import CounterState.
-
-  Inductive xstep : forall T, Op T -> nat -> State -> T -> State -> list event -> Prop :=
-  | StepInc : forall tid v,
-      xstep Inc tid v v (v + 1) nil
-  | StepDec : forall tid v,
-      xstep Dec tid v v (v - 1) nil.
-
-  Definition step := xstep.
-
-End CounterAPI.
-
 
 (** Using locks to get atomicity. *)
 
@@ -599,6 +626,30 @@ Module LockingCounter' <:
 
 End LockingCounter'.
 
+(** LAYER: CounterAPI *)
+
+Module CounterState <: State.
+
+  Definition State := nat.
+  Definition initP (s : State) := True.
+
+End CounterState.
+
+Module CounterAPI <: Layer CounterOp CounterState.
+
+  Import CounterOp.
+  Import CounterState.
+
+  Inductive xstep : forall T, Op T -> nat -> State -> T -> State -> list event -> Prop :=
+  | StepInc : forall tid v,
+      xstep Inc tid v v (v + 1) nil
+  | StepDec : forall tid v,
+      xstep Dec tid v v (v - 1) nil.
+
+  Definition step := xstep.
+
+End CounterAPI.
+
 
 (** Abstracting away the lock details. *)
 
@@ -701,57 +752,6 @@ Module AbsCounter :=
                CounterState CounterAPI
                AbsCounter'.
 
-
-(** Adding ghost state to the test-and-set bit. *)
-
-Module AbsLock' <:
-  LayerImplAbsT TASOp
-                TASState TASDelayNondetAPI
-                LockState TASLockAPI.
-
-  Import TASState.
-  Import LockState.
-
-  Definition absR (s1 : TASState.State) (s2 : LockState.State) :=
-    TASValue s1 = Value s2 /\
-    ((TASLock s1 = false /\ Lock s2 = None) \/
-     (exists tid, TASLock s1 = true /\ Lock s2 = Some tid)).
-
-  Hint Constructors TASLockAPI.xstep.
-
-  Theorem absR_ok :
-    op_abs absR TASDelayNondetAPI.step TASLockAPI.step.
-  Proof.
-    unfold op_abs; intros.
-    destruct s1; destruct s2; unfold absR in *.
-    unfold TASLockAPI.step.
-    ( intuition idtac ); simpl in *; subst; repeat deex.
-    - inversion H0; clear H0; subst; repeat sigT_eq; simpl in *.
-      all: eexists; (intuition idtac); [ | | eauto ].
-      all: simpl; eauto.
-    - inversion H0; clear H0; subst; repeat sigT_eq; simpl in *.
-      all: eexists; (intuition idtac); [ | | eauto ].
-      all: simpl; eauto.
-  Qed.
-
-  Theorem absInitP :
-    forall s1 s2,
-      TASState.initP s1 ->
-      absR s1 s2 ->
-      LockState.initP s2.
-  Proof.
-    unfold absR, TASState.initP, LockState.initP.
-    intuition eauto.
-    deex; congruence.
-  Qed.
-
-End AbsLock'.
-
-Module AbsLock :=
-  LayerImplAbs TASOp
-               TASState TASDelayNondetAPI
-               LockState TASLockAPI
-               AbsLock'.
 
 
 (** Implement [Acquire] on top of test-and-set *)
