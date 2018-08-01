@@ -9,7 +9,7 @@ import GHC.Prim
 
 -- Extracted code
 import ConcurProc
-import CounterExample
+import LockedCounter
 
 data State =
   S !(MVar ()) !(IORef Integer)
