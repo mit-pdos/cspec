@@ -1,4 +1,5 @@
 {-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE PackageImports #-}
 module Interpreter where
 
 -- Haskell libraries
@@ -7,14 +8,17 @@ import Control.Exception
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Char8 as BSC8
 import GHC.Base
-import System.Posix.Files
-import System.Posix.IO
-import System.Directory
+import System.Posix.ByteString.FilePath (RawFilePath)
+import System.Posix.Files.ByteString (createLink, removeLink, fileExist)
+import "unix" System.Posix.IO.ByteString (openFd, closeFd,
+                                          defaultFileFlags, OpenMode(..))
+import "unix-bytestring" System.Posix.IO.ByteString (fdRead, fdWrite)
+import System.Posix.Directory.ByteString (openDirStream, readDirStream, closeDirStream)
 import System.IO.Error
 import System.CPUTime.Rdtsc
 import System.Lock.FLock
 import System.Posix.Process (forkProcess, getProcessID, getProcessStatus, ProcessStatus(..))
-import System.Posix.Types (ProcessID)
+import System.Posix.Types (ProcessID, Fd)
 
 -- Our own libraries
 import SMTP
@@ -73,27 +77,61 @@ debugmsg s =
 debugmsgs :: [BS.ByteString] -> IO ()
 debugmsgs = debugmsg . BS.concat
 
-userPath :: BS.ByteString -> String
-userPath u = "/tmp/mailtest/" ++ BSC8.unpack u
+userPath :: BS.ByteString -> BS.ByteString
+userPath u = BS.concat ["/tmp/mailtest/", u]
 
-dirPath :: BS.ByteString -> BS.ByteString -> String
-dirPath u dir = userPath u ++ "/" ++ BSC8.unpack dir
+dirPath :: BS.ByteString -> BS.ByteString -> RawFilePath
+dirPath u dir = BS.concat [userPath u, "/", dir]
 
-filePath :: BS.ByteString -> BS.ByteString -> BS.ByteString -> FilePath
-filePath u dir fn = dirPath u dir ++ "/" ++ BSC8.unpack fn
+filePath :: BS.ByteString -> BS.ByteString -> BS.ByteString -> RawFilePath
+filePath u dir fn = BS.concat [dirPath u dir, "/", fn]
 
 pickUser :: IO BS.ByteString
 pickUser = do
   u <- rdtsc
   return $ BS.concat ["u", BSC8.pack $ show (u `mod` 100)]
 
+listDirectory :: RawFilePath -> IO [RawFilePath]
+listDirectory p = bracket open close repeatRead
+  where open = openDirStream p
+        close = closeDirStream
+        repeatRead stream = do
+          d <- readDirStream stream
+          if BS.null d
+            then return []
+            else (d:) <$> repeatRead stream
+
 listMailDir :: BS.ByteString -> BS.ByteString -> IO [BS.ByteString]
-listMailDir u dir = do
-  files <- listDirectory (dirPath u dir)
-  return $ map BSC8.pack files
+listMailDir u dir = listDirectory (dirPath u dir)
+
+withFd :: RawFilePath -> OpenMode -> (Fd -> IO a) -> IO a
+withFd p m act = do
+  fd <- openFd p m Nothing defaultFileFlags
+  r <- act fd
+  closeFd fd
+  return r
+
+readFileBytes :: RawFilePath -> IO BS.ByteString
+readFileBytes p = withFd p ReadOnly $
+  \fd -> let bytes = 4096
+             go = do
+              s <- fdRead fd bytes
+              if BS.length s < fromIntegral bytes
+                then BS.append s <$> go
+                else return s in
+          go
+
+writeFileBytes :: RawFilePath -> BS.ByteString -> IO ()
+writeFileBytes p contents = withFd p WriteOnly $
+  \fd -> let go s = do
+              bytes <- fromIntegral <$> fdWrite fd s
+              if bytes < BS.length s
+                then go (BS.drop bytes s)
+                else return () in
+          go contents
 
 readMail :: BS.ByteString -> BS.ByteString -> BS.ByteString -> IO BS.ByteString
-readMail u dir fn = BS.readFile (filePath u dir fn)
+readMail u dir fn = readFileBytes (filePath u dir fn)
 
 {- TCB: run_proc implements the low-level operations used by the mail server.
  These implementations are trusted; specifically, they should be atomic with
@@ -199,7 +237,7 @@ run_proc _ (Call (MailFSMergedOp__Ext (MailServerOp__POP3RespondDelete conn))) =
 run_proc _ (Call (MailFSMergedOp__CreateWrite ((u, dir), fn) contents)) = {-# SCC "CreateWrite" #-} do
   debugmsgs ["CreateWrite ", u, "/", dir, "/", fn, ", ", showBS contents]
   catch (do
-           BS.writeFile (filePath u dir fn) contents
+           writeFileBytes (filePath u dir fn) contents
            return $ unsafeCoerce True)
         (\e -> case e of
                _ | isFullError e -> do
@@ -254,9 +292,7 @@ run_proc _ (Call (MailFSMergedOp__Read ((u, dir), fn))) = {-# SCC "Read" #-} do
 
 run_proc S{lockvar} (Call (MailFSMergedOp__Lock u)) = do
   debugmsgs ["Lock ", u]
-  mboxfd <- openFd (dirPath u "mail") ReadOnly Nothing defaultFileFlags
-  lck <- lockFd mboxfd Exclusive Block
-  closeFd mboxfd
+  lck <- withFd (dirPath u "mail") ReadOnly (\fd -> lockFd fd Exclusive Block)
   putMVar lockvar lck
   return $ unsafeCoerce ()
 
