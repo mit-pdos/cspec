@@ -5,7 +5,7 @@ import Control.Concurrent
 import Data.Atomics
 import Data.IORef
 import Data.Maybe
-import GHC.Prim
+import GHC.Base
 
 -- Extracted code
 import ConcurProc
@@ -31,7 +31,7 @@ debugmsg s =
   else
     return ()
 
-run_proc :: State -> Coq_proc (TASOp__Coq_xOp a) GHC.Prim.Any -> IO a
+run_proc :: State -> Coq_proc (TASOp__Coq_xOp a) GHC.Base.Any -> IO a
 run_proc s (Ret v) = do
   -- debugmsg $ "Ret"
   return $ unsafeCoerce v
