@@ -394,6 +394,7 @@ Ltac step :=
         instantiate (1 := fun z => match z with | exist _ a _ => _ a end) ||
         instantiate (1 := fun z => match z with | Missing => _ | Present a => _ a end) ||
         instantiate (1 := fun z => match z with | true => _ | false => _ end) ||
+        instantiate (1 := fun z => match z with | nil => _ | hd :: tl => _ hd tl end) ||
         instantiate (1 := fun z => match z with
           | MailServerAPI.MailServerOp.POP3Stat => _
           | MailServerAPI.MailServerOp.POP3List => _
@@ -444,7 +445,7 @@ Definition ms_bottom_server_opt' a b :
 Defined.
 
 Definition ms_bottom_server_opt nsmtp npop3 :=
-  Eval cbn in (proj1_sig (ms_bottom_server_opt' nsmtp npop3)).
+  Eval cbn in (thread_to_list (proj1_sig (ms_bottom_server_opt' nsmtp npop3))).
 
 Print ms_bottom_server_opt.
 
@@ -473,15 +474,13 @@ Definition ms_bottom_opt' a b c d :
 
     repeat step.
     reflexivity.
-
-    (* Something isn't quite right.. *)
-    all: admit.
+    reflexivity.
   }
 
   eapply Forall2_nil.
-Admitted.
+Defined.
 
 Definition ms_bottom_opt a b c d :=
-  Eval cbn in (proj1_sig (ms_bottom_opt' a b c d)).
+  Eval cbn in (thread_to_list (proj1_sig (ms_bottom_opt' a b c d))).
 
 Print ms_bottom_opt.

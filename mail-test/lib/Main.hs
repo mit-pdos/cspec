@@ -32,7 +32,8 @@ mainArgs [nprocs, niter, nsmtpiter, npop3iter] = do
   pop3 <- pop3Listen 2110
   s <- mkState smtp pop3
   mapM_ (runThread s)
-    (ms_bottom (read nprocs) (read niter) (read nsmtpiter) (read npop3iter))
+    -- (ms_bottom (read nprocs) (read niter) (read nsmtpiter) (read npop3iter))
+    (ms_bottom_opt (read nprocs) (read niter) (read nsmtpiter) (read npop3iter))
   putStrLn "Waiting for child processes..."
   waitForChildren s
 

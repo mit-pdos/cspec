@@ -20,5 +20,5 @@ Extract Inlined Constant nouser_string => """fake_user""".
 Extract Inlined Constant bench_msg => """Hello world.""".
 
 Cd "mail-test/extract/".
-Separate Extraction ms_bottom ms_bottom_server.
+Separate Extraction ms_bottom ms_bottom_opt ms_bottom_server ms_bottom_server_opt.
 Cd "../../".
