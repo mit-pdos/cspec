@@ -322,37 +322,61 @@ Proof.
   apply functional_extensionality; eauto.
 Qed.
 
-Definition read_list_compiled {Op} (compile_op : forall T, MailboxOp.Op T -> proc Op T) :=
-  fix read_list_compiled' (l : list (nat*nat)) (r : list ((nat*nat) * string)) {struct l} :=
-    match l with
-    | nil =>
-      Compile.compile compile_op ( _ <- Call MailboxOp.Unlock; Ret r )
-    | fn :: l' =>
-      m <- Compile.compile compile_op ( Call (MailboxOp.Read fn) );
-      match m with
-      | None => read_list_compiled' l' r
-      | Some s => read_list_compiled' l' (r ++ ((fn, s) :: nil))
-      end
-    end.
+Section ReadListCompiled.
 
-Theorem compile_read_list1 :
+  Variable Op : Type -> Type.
+  Variable Pnil : list ((nat*nat) * string) -> proc Op (list (nat * nat * string)).
+  Variable Pcons : nat*nat -> proc Op (option string).
+
+  Fixpoint read_list_compiled (l : list (nat*nat)) (r : list ((nat*nat) * string)) {struct l} :=
+      match l with
+      | nil =>
+        Pnil r
+      | fn :: l' =>
+        m <- Pcons fn;
+        match m with
+        | None => read_list_compiled l' r
+        | Some s => read_list_compiled l' (r ++ ((fn, s) :: nil))
+        end
+      end.
+
+End ReadListCompiled.
+
+Theorem read_list_compiled_start :
   forall l r,
     AtomicReader'.read_list l r =
-    read_list_compiled (fun T op => Call op) l r.
+    read_list_compiled
+      (fun r => _ <- Call MailboxOp.Unlock; Ret r)
+      (fun fn => Call (MailboxOp.Read fn))
+      l r.
 Proof.
   induction l; simpl; eauto; intros.
 Qed.
 
-Theorem compile_read_list2 :
+Theorem compile_read_list_compiled :
   forall Op1 Op2
-         (compile_op1 : forall T, MailboxOp.Op T -> proc Op1 T)
-         (compile_op2 : forall T, Op1 T -> proc Op2 T) l r,
-    Compile.compile compile_op2 (read_list_compiled compile_op1 l r) =
-    read_list_compiled (fun T op => Compile.compile compile_op2 (compile_op1 _ op)) l r.
+         (compile_op : forall T, Op1 T -> proc Op2 T) p1 p2 l r,
+    Compile.compile compile_op (read_list_compiled p1 p2 l r) =
+    read_list_compiled
+      (fun r => Compile.compile compile_op (p1 r))
+      (fun fn => Compile.compile compile_op (p2 fn))
+      l r.
 Proof.
   induction l; simpl; eauto; intros.
   f_equal.
   apply functional_extensionality; intros.
+  destruct x; eauto.
+Qed.
+
+Theorem read_list_compiled_proper :
+  forall Op State p1 p1' p2 p2' l r (op_step : OpSemantics Op State),
+    (forall r, exec_equiv_rx op_step (p1' r) (p1 r)) ->
+    (forall fn, exec_equiv_rx op_step (p2' fn) (p2 fn)) ->
+    exec_equiv_rx op_step (read_list_compiled p1' p2' l r) (read_list_compiled p1 p2 l r).
+Proof.
+  induction l; simpl; eauto; intros.
+  rewrite H0.
+  eapply exec_equiv_rx_bind_a; intros.
   destruct x; eauto.
 Qed.
 
@@ -366,9 +390,8 @@ Ltac step :=
   | _ => progress simpl; idtac "simpl"
   (* Fixpoints where [simpl] is not sufficient. *)
   | |- context[SpawnN] => rewrite compile_SpawnN; idtac "compile SpawnN"
-  | |- context[MailboxImpl.AtomicReader'.read_list] => rewrite compile_read_list1; idtac "compile read_list"
-  | |- context[read_list_compiled] => rewrite compile_read_list2; idtac "compile read_list_compiled"
-  | |- context[read_list_compiled] => unfold read_list_compiled; idtac "unfold read_list_compiled"
+  | |- context[MailboxImpl.AtomicReader'.read_list] => rewrite read_list_compiled_start; idtac "read_list_compiled_start"
+  | |- context[read_list_compiled] => rewrite compile_read_list_compiled; idtac "compile_read_list_compiled"
   (* SliceProc is a wrapper around compilation; unfold it. *)
   | |- context[SliceProc] => unfold SliceProc; idtac "unfold SliceProc"
   (* Bubble up common program structures. *)
@@ -377,6 +400,7 @@ Ltac step :=
   | |- exec_equiv_rx _ _ (SpawnN _ _) => eapply SpawnN_exec_equiv_proper; [ reflexivity | ]; idtac "SpawnN"
   | |- exec_equiv_rx _ _ (Until _ _ _) => rewrite exec_equiv_until_once; idtac "Until once"
   | |- exec_equiv_rx _ _ (Until _ _ _) => eapply Until_exec_equiv_proper; [ reflexivity_maybe_fun | | reflexivity ]; idtac "Until"
+  | |- exec_equiv_rx _ _ (read_list_compiled _ _ _ _) => eapply read_list_compiled_proper; intros; idtac "read_list_compiled"
   (* No more simplifications for [Call] and [Ret]. *)
   | |- exec_equiv_rx _ _ (Call _) => reflexivity; idtac "Call"
   | |- exec_equiv_rx _ _ (Ret _) => reflexivity; idtac "Ret"
@@ -438,7 +462,6 @@ Definition ms_bottom_server_opt' a b :
     split; [ reflexivity | ].
 
     repeat step.
-    reflexivity.
   }
 
   eapply Forall2_nil.
@@ -473,8 +496,6 @@ Definition ms_bottom_opt' a b c d :
     split; [ reflexivity | ].
 
     repeat step.
-    reflexivity.
-    reflexivity.
   }
 
   eapply Forall2_nil.
