@@ -298,9 +298,8 @@ Module c0 :=
     MailServerComposedOp MailServerComposedState MailServerComposedAPI
     c10 MailServerComposedImpl.
 
-Definition ms_bottom nsmtp npop3 nsmtpiter npop3iter :=
-  (* TODO: these aren't actually the arguments mail_perf takes *)
-  thread_to_list (c0.compile_ts (mail_perf nsmtp npop3 nsmtpiter npop3iter)).
+Definition ms_bottom nprocs niter nsmtpiter npop3iter :=
+  thread_to_list (c0.compile_ts (mail_perf nprocs niter nsmtpiter npop3iter)).
 
 Definition ms_bottom_server nsmtp npop3 :=
   thread_to_list (c0.compile_ts (mail_server nsmtp npop3)).
