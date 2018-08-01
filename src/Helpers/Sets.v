@@ -218,3 +218,4 @@ Module FSet.
 End FSet.
 
 Arguments FSet.t A {Acmp}.
+Arguments FSet.empty {A Acmp}.
