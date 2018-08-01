@@ -18,7 +18,7 @@ import System.IO.Error
 import System.CPUTime.Rdtsc
 import System.Lock.FLock
 import System.Posix.Process (forkProcess, getProcessID, getProcessStatus, ProcessStatus(..))
-import System.Posix.Types (ProcessID, Fd)
+import System.Posix.Types (ProcessID, Fd, FileMode)
 
 -- Our own libraries
 import SMTP
@@ -99,30 +99,32 @@ listDirectory p = bracket open close repeatRead
           d <- readDirStream stream
           if BS.null d
             then return []
+            else if d == "." then repeatRead stream
+            else if d == ".." then repeatRead stream
             else (d:) <$> repeatRead stream
 
 listMailDir :: BS.ByteString -> BS.ByteString -> IO [BS.ByteString]
 listMailDir u dir = listDirectory (dirPath u dir)
 
-withFd :: RawFilePath -> OpenMode -> (Fd -> IO a) -> IO a
-withFd p m act = do
-  fd <- openFd p m Nothing defaultFileFlags
+withFd :: RawFilePath -> OpenMode -> Maybe FileMode -> (Fd -> IO a) -> IO a
+withFd p m fm act = do
+  fd <- openFd p m fm defaultFileFlags
   r <- act fd
   closeFd fd
   return r
 
 readFileBytes :: RawFilePath -> IO BS.ByteString
-readFileBytes p = withFd p ReadOnly $
+readFileBytes p = withFd p ReadOnly Nothing $
   \fd -> let bytes = 4096
              go = do
               s <- fdRead fd bytes
-              if BS.length s < fromIntegral bytes
+              if BS.length s == fromIntegral bytes
                 then BS.append s <$> go
                 else return s in
           go
 
 writeFileBytes :: RawFilePath -> BS.ByteString -> IO ()
-writeFileBytes p contents = withFd p WriteOnly $
+writeFileBytes p contents = withFd p WriteOnly (Just 0o666) $
   \fd -> let go s = do
               bytes <- fromIntegral <$> fdWrite fd s
               if bytes < BS.length s
@@ -292,7 +294,7 @@ run_proc _ (Call (MailFSMergedOp__Read ((u, dir), fn))) = {-# SCC "Read" #-} do
 
 run_proc S{lockvar} (Call (MailFSMergedOp__Lock u)) = do
   debugmsgs ["Lock ", u]
-  lck <- withFd (dirPath u "mail") ReadOnly (\fd -> lockFd fd Exclusive Block)
+  lck <- withFd (dirPath u "mail") ReadOnly Nothing (\fd -> lockFd fd Exclusive Block)
   putMVar lockvar lck
   return $ unsafeCoerce ()
 
