@@ -102,7 +102,7 @@ run_proc :: State -> Coq_proc (MailFSMergedOp__Coq_xOp a) GHC.Base.Any -> IO a
 run_proc _ (Ret v) = do
   -- debugmsg $ "Ret"
   return $ unsafeCoerce v
-run_proc s (Bind p1 p2) = do
+run_proc s (Bind p1 p2) = {-# SCC "Bind" #-} do
   -- debugmsg $ "Bind"
   v1 <- run_proc s p1
   v2 <- run_proc s (p2 $ unsafeCoerce v1)
@@ -196,7 +196,7 @@ run_proc _ (Call (MailFSMergedOp__Ext (MailServerOp__POP3RespondDelete conn))) =
   pop3RespondDelete conn
   return $ unsafeCoerce ()
 
-run_proc _ (Call (MailFSMergedOp__CreateWrite ((u, dir), fn) contents)) = do
+run_proc _ (Call (MailFSMergedOp__CreateWrite ((u, dir), fn) contents)) = {-# SCC "CreateWrite" #-} do
   debugmsgs ["CreateWrite ", u, "/", dir, "/", fn, ", ", showBS contents]
   catch (do
            BS.writeFile (filePath u dir fn) contents
@@ -209,7 +209,7 @@ run_proc _ (Call (MailFSMergedOp__CreateWrite ((u, dir), fn) contents)) = do
                  debugmsg "Unknown exception on createwrite"
                  return $ unsafeCoerce False)
 
-run_proc _ (Call (MailFSMergedOp__Link ((srcu, srcdir), srcfn) ((dstu, dstdir), dstfn))) = do
+run_proc _ (Call (MailFSMergedOp__Link ((srcu, srcdir), srcfn) ((dstu, dstdir), dstfn))) = {-# SCC "Link" #-} do
   debugmsgs ["Link ", srcu, "/", srcdir, "/", srcfn, " to ", dstu, "/", dstdir, "/", dstfn]
   catch (do
            createLink (filePath srcu srcdir srcfn) (filePath dstu dstdir dstfn)
@@ -222,7 +222,7 @@ run_proc _ (Call (MailFSMergedOp__Link ((srcu, srcdir), srcfn) ((dstu, dstdir), 
                  debugmsg "createLink unknown error"
                  return $ unsafeCoerce False)
 
-run_proc _ (Call (MailFSMergedOp__Unlink ((u, dir), fn))) = do
+run_proc _ (Call (MailFSMergedOp__Unlink ((u, dir), fn))) = {-# SCC "Unlink" #-} do
   debugmsgs ["Unlink ", u, "/", dir, "/", fn]
   catch (removeLink (filePath u dir fn))
         (\e -> case e of
@@ -234,12 +234,12 @@ run_proc _ (Call (MailFSMergedOp__Unlink ((u, dir), fn))) = do
              return ())
   return $ unsafeCoerce ()
 
-run_proc _ (Call (MailFSMergedOp__List (u, dir))) = do
+run_proc _ (Call (MailFSMergedOp__List (u, dir))) = {-# SCC "List" #-} do
   debugmsgs ["List ", u, "/", dir]
   files <- listMailDir u dir
   return $ unsafeCoerce files
 
-run_proc _ (Call (MailFSMergedOp__Read ((u, dir), fn))) = do
+run_proc _ (Call (MailFSMergedOp__Read ((u, dir), fn))) = {-# SCC "Read" #-} do
   debugmsgs ["Read ", u, "/", dir, "/", fn]
   catch (do
            contents <- readMail u dir fn
@@ -266,7 +266,7 @@ run_proc S{lockvar} (Call (MailFSMergedOp__Unlock u)) = do
   unlock lck
   return $ unsafeCoerce ()
 
-run_proc _ (Call (MailFSMergedOp__Exists u)) = do
+run_proc _ (Call (MailFSMergedOp__Exists u)) = {-# SCC "Exists" #-} do
   debugmsgs ["Exists ", u]
   ok <- fileExist (userPath u)
   if ok then do
