@@ -395,6 +395,9 @@ Ltac step :=
   | |- context[SliceProc] => unfold SliceProc; idtac "unfold SliceProc"
   (* Bubble up common program structures. *)
   | |- exec_equiv _ _ _ => eapply exec_equiv_rx_to_exec_equiv; idtac "exec_equiv_rx"
+  | |- exec_equiv_rx _ _ (Bind (Bind _ _) _) => rewrite exec_equiv_rx_bind_bind; idtac "Bind Bind"
+  | |- exec_equiv_rx _ _ (Bind (Ret _) _) => rewrite exec_equiv_ret_bind; idtac "Bind Ret"
+  | |- exec_equiv_rx _ _ (Bind (Until _ _ _) _) => rewrite exec_equiv_until_once; idtac "Until once in Bind"
   | |- exec_equiv_rx _ _ (Bind _ _) => eapply Bind_exec_equiv_proper; idtac "Bind"
   | |- exec_equiv_rx _ _ (SpawnN _ _) => eapply SpawnN_exec_equiv_proper; [ reflexivity | ]; idtac "SpawnN"
   | |- exec_equiv_rx _ _ (Until _ _ _) => rewrite exec_equiv_until_once; idtac "Until once"
