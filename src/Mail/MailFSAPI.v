@@ -9,15 +9,15 @@ Module MailFSOp <: Ops.
 
   Inductive xOp : Type -> Type :=
   | CreateWriteTmp : forall (data : string), xOp bool
-  | LinkMail : forall (mboxfn : nat), xOp bool
+  | LinkMail : forall (mboxfn : string), xOp bool
   | UnlinkTmp : xOp unit
 
   | GetTID : xOp nat
   | Random : xOp nat
 
-  | List : xOp (list (nat * nat))
-  | Read : forall (fn : nat * nat), xOp (option string)
-  | Delete : forall (fn : nat * nat), xOp unit
+  | List : xOp (list (string * string))
+  | Read : forall (fn : string * string), xOp (option string)
+  | Delete : forall (fn : string * string), xOp unit
   | Lock : xOp unit
   | Unlock : xOp unit
 
@@ -40,7 +40,7 @@ Module MailFSAPI <: Layer MailFSOp MailboxTmpAbsState.
     xstep (CreateWriteTmp data) tid
       (mk_state tmp mbox lock)
       true
-      (mk_state (FMap.add (tid, 0) data tmp) mbox lock)
+      (mk_state (FMap.add (tid, empty_string) data tmp) mbox lock)
       nil
   | StepCreateWriteTmpErr1 : forall tmp mbox tid data lock,
     xstep (CreateWriteTmp data) tid

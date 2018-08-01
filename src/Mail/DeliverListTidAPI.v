@@ -9,13 +9,13 @@ Module DeliverListTidOp <: Ops.
   
   Inductive xOp : Type -> Type :=
   | CreateWriteTmp : forall (data : string), xOp bool
-  | LinkMail : forall (mboxfn : nat), xOp bool
+  | LinkMail : forall (mboxfn : string), xOp bool
   | UnlinkTmp : xOp unit
 
-  | List : xOp (list (nat * nat))
-  | ListTid : xOp (list nat)
-  | Read : forall (fn : nat * nat), xOp (option string)
-  | Delete : forall (fn : nat * nat), xOp unit
+  | List : xOp (list (string * string))
+  | ListTid : xOp (list string)
+  | Read : forall (fn : string * string), xOp (option string)
+  | Delete : forall (fn : string * string), xOp unit
   | Lock : xOp unit
   | Unlock : xOp unit
 
@@ -38,7 +38,7 @@ Module DeliverListTidAPI <: Layer DeliverListTidOp MailboxTmpAbsState.
     xstep (CreateWriteTmp data) tid
       (mk_state tmp mbox lock)
       true
-      (mk_state (FMap.add (tid, 0) data tmp) mbox lock)
+      (mk_state (FMap.add (nat_to_string tid, empty_string) data tmp) mbox lock)
       nil
   | StepCreateWriteTmpErr1 : forall tmp mbox tid data lock,
     xstep (CreateWriteTmp data) tid
@@ -50,21 +50,21 @@ Module DeliverListTidAPI <: Layer DeliverListTidOp MailboxTmpAbsState.
     xstep (CreateWriteTmp data) tid
       (mk_state tmp mbox lock)
       false
-      (mk_state (FMap.add (tid, 0) data' tmp) mbox lock)
+      (mk_state (FMap.add (nat_to_string tid, empty_string) data' tmp) mbox lock)
       nil
   | StepUnlinkTmp : forall tmp mbox tid lock,
     xstep (UnlinkTmp) tid
       (mk_state tmp mbox lock)
       tt
-      (mk_state (FMap.remove (tid, 0) tmp) mbox lock)
+      (mk_state (FMap.remove (nat_to_string tid, empty_string) tmp) mbox lock)
       nil
   | StepLinkMailOK : forall tmp mbox tid mailfn data lock,
-    FMap.MapsTo (tid, 0) data tmp ->
-    ~ FMap.In (tid, mailfn) mbox ->
+    FMap.MapsTo (nat_to_string tid, empty_string) data tmp ->
+    ~ FMap.In (nat_to_string tid, mailfn) mbox ->
     xstep (LinkMail mailfn) tid
       (mk_state tmp mbox lock)
       true
-      (mk_state tmp (FMap.add (tid, mailfn) data mbox) lock)
+      (mk_state tmp (FMap.add (nat_to_string tid, mailfn) data mbox) lock)
       nil
   | StepLinkMailErr : forall tmp mbox tid mailfn lock,
     xstep (LinkMail mailfn) tid
@@ -81,7 +81,7 @@ Module DeliverListTidAPI <: Layer DeliverListTidOp MailboxTmpAbsState.
       (mk_state tmp mbox lock)
       nil
   | StepListTid : forall tmp mbox tid r lock,
-    (forall fn, FMap.In (tid, fn) mbox -> In fn r) ->
+    (forall fn, FMap.In (nat_to_string tid, fn) mbox -> In fn r) ->
     xstep ListTid tid
       (mk_state tmp mbox lock)
       r
@@ -147,7 +147,7 @@ Module DeliverListTidProtocol <: Protocol DeliverListTidOp MailboxTmpAbsState.
   | AllowCreateWriteTmp : forall tid s data,
     xstep_allow (CreateWriteTmp data) tid s
   | AllowLinkMail : forall tid tmp mbox mailfn lock,
-    ~ FMap.In (tid, mailfn) mbox ->
+    ~ FMap.In (nat_to_string tid, mailfn) mbox ->
     xstep_allow (LinkMail mailfn) tid (mk_state tmp mbox lock)
   | AllowUnlinkTmp : forall tid s,
     xstep_allow (UnlinkTmp) tid s

@@ -8,9 +8,9 @@ Module MailboxOp <: Ops.
 
   Inductive xOp : Type -> Type :=
   | Deliver : forall (m : string), xOp bool
-  | List : xOp (list (nat*nat))
-  | Read : forall (fn : nat*nat), xOp (option string)
-  | Delete : forall (fn : nat*nat), xOp unit
+  | List : xOp (list (string*string))
+  | Read : forall (fn : string*string), xOp (option string)
+  | Delete : forall (fn : string*string), xOp unit
   | Lock : xOp unit
   | Unlock : xOp unit
   | Ext : forall `(op : extopT T), xOp T

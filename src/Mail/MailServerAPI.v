@@ -8,6 +8,7 @@ Definition string: Type := abstract_string.
 Parameter tmp_string : string.
 Parameter mail_string : string.
 Parameter nouser_string : string.
+Parameter empty_string : string.
 Parameter bench_msg : string.
 Parameter tmp_mail_ne : tmp_string <> mail_string.
 Parameter abstract_string_length : string -> nat.
@@ -15,6 +16,25 @@ Definition string_length s := abstract_string_length s.
 
 Instance string_Ordering : Ordering string.
 Admitted.
+
+Parameter nat_to_string : nat -> string.
+Axiom nat_to_string_eq : forall a b,
+  nat_to_string a = nat_to_string b -> a = b.
+
+Theorem nat_to_string_ne : forall a b,
+  a <> b -> nat_to_string a <> nat_to_string b.
+Proof.
+  intros. contradict H. apply nat_to_string_eq; eauto.
+Qed.
+
+Theorem pair_ne : forall A B (a1 a2 : A) (b1 b2 : B),
+  a1 <> a2 \/ b1 <> b2 -> (a1, b1) <> (a2, b2).
+Proof.
+  intros. destruct H; congruence.
+Qed.
+
+Hint Resolve nat_to_string_ne.
+Hint Resolve pair_ne.
 
 
 Module UserIdx <: HIndex.
@@ -56,8 +76,8 @@ Module MailServerOp <: Ops.
 
   Inductive xOp : Type -> Type :=
   | Deliver : forall (m : string), xOp bool
-  | Pickup : xOp (list ((nat*nat) * string))
-  | Delete : forall (id : nat*nat), xOp unit
+  | Pickup : xOp (list ((string*string) * string))
+  | Delete : forall (id : string*string), xOp unit
   | Ext : forall `(op : extopT T), xOp T
   .
 
@@ -69,7 +89,7 @@ Module MailServerHOp := HOps MailServerOp UserIdx.
 
 Module MailServerState <: State.
 
-  Definition dir_contents := FMap.t (nat*nat) string.
+  Definition dir_contents := FMap.t (string*string) string.
 
   Definition State := dir_contents.
   Definition initP (s : State) := True.

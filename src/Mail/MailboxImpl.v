@@ -12,7 +12,7 @@ Module AtomicReader' <:
     MailServerOp MailServerLockAbsAPI
     MailboxProtocol.
 
-  Fixpoint read_list (l : list (nat*nat)) (r : list ((nat*nat) * string)) :=
+  Fixpoint read_list (l : list (string*string)) (r : list ((string*string) * string)) :=
     match l with
     | nil =>
       _ <- Call MailboxOp.Unlock;
@@ -184,7 +184,7 @@ Module AtomicReader' <:
         Forall (fun fn => FMap.In fn (MailServerLockAbsState.maildir s)) r).
 
     {
-      generalize (@nil ((nat*nat) * string)).
+      generalize (@nil ((string*string) * string)).
       induction r; simpl; eauto; intros.
 
       {
@@ -421,7 +421,7 @@ Module AtomicReader' <:
 
     clear.
     generalize dependent mbox0.
-    generalize (@nil ((nat*nat) * string)).
+    generalize (@nil ((string*string) * string)).
     induction r; simpl; intros.
 
     - constructor; intros.

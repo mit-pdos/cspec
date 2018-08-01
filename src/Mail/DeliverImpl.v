@@ -85,13 +85,13 @@ Module AtomicDeliver' <:
     unfold right_mover; intros.
     repeat step_inv; eauto 10.
     - eexists; split; eauto 10.
-      rewrite FMap.add_add_ne by congruence.
+      rewrite FMap.add_add_ne by eauto.
       eauto 10.
     - eexists; split; eauto 10.
-      rewrite FMap.add_add_ne by congruence.
+      rewrite FMap.add_add_ne by eauto.
       eauto 10.
     - eexists.
-      rewrite FMap.add_add_ne by congruence.
+      rewrite FMap.add_add_ne by eauto.
       split.
       2: eauto.
       eauto.
@@ -99,21 +99,21 @@ Module AtomicDeliver' <:
       2: eauto 10.
       eauto.
     - eexists.
-      rewrite FMap.add_add_ne by congruence.
+      rewrite FMap.add_add_ne by eauto.
       split; ( constructor; [ eauto | ] ).
       eapply DeliverAPI.StepCreateWriteTmpErr2.
       eapply DeliverAPI.StepCreateWriteTmpErr2.
     - eexists; split; eauto 10.
-      rewrite <- FMap.add_remove_ne by congruence.
+      rewrite <- FMap.add_remove_ne by eauto.
       eauto 10.
     - eexists; split; eauto 10.
-      rewrite <- FMap.add_remove_ne by congruence.
+      rewrite <- FMap.add_remove_ne by eauto.
       eauto 10.
     - eexists; split; eauto.
-      econstructor; eauto.
+      econstructor; eauto 6.
       econstructor; eauto.
       eapply FMap.mapsto_add_ne; eauto.
-    - eapply FMap.mapsto_add_ne in H13; try congruence.
+    - eapply FMap.mapsto_add_ne in H13; eauto.
       eexists; split.
       eauto 8.
       eauto.
@@ -140,19 +140,19 @@ Module AtomicDeliver' <:
     split; eauto.
     intros; repeat step_inv; eauto; repeat deex.
     + eexists; split; eauto.
-      rewrite <- FMap.add_remove_ne by congruence.
+      rewrite <- FMap.add_remove_ne by eauto.
       eauto 10.
     + eexists; split; eauto.
-      rewrite <- FMap.add_remove_ne by congruence.
+      rewrite <- FMap.add_remove_ne by eauto.
       eauto 10.
     + eexists; split; eauto.
       rewrite FMap.remove_remove.
       eauto.
     + eexists; split; eauto.
-      econstructor; eauto.
+      econstructor; eauto 6.
       econstructor; eauto.
       eapply FMap.mapsto_remove_ne; eauto.
-    + eexists; split; eauto.
+    + eexists; split; eauto 8.
     + eexists; split; eauto.
     + eexists; split; eauto.
     + eexists; split; eauto.
@@ -242,7 +242,7 @@ Module AtomicDeliver' <:
       DeliverProtocol.step_allow op tid s'.
   Proof.
     intros.
-    destruct op; destruct op'; repeat step_inv; subst; eauto.
+    destruct op; destruct op'; repeat step_inv; subst; eauto 8.
   Qed.
 
   Theorem raw_step_ok :
