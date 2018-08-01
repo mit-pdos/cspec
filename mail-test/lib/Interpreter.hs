@@ -99,19 +99,16 @@ listDirectory p = bracket open close repeatRead
           d <- readDirStream stream
           if BS.null d
             then return []
-            else if d == "." then repeatRead stream
-            else if d == ".." then repeatRead stream
+            else if d == "." || d == ".." then repeatRead stream
             else (d:) <$> repeatRead stream
 
 listMailDir :: BS.ByteString -> BS.ByteString -> IO [BS.ByteString]
 listMailDir u dir = listDirectory (dirPath u dir)
 
 withFd :: RawFilePath -> OpenMode -> Maybe FileMode -> (Fd -> IO a) -> IO a
-withFd p m fm act = do
-  fd <- openFd p m fm defaultFileFlags
-  r <- act fd
-  closeFd fd
-  return r
+withFd p m fm = bracket open close
+  where open = openFd p m fm defaultFileFlags
+        close = closeFd
 
 readFileBytes :: RawFilePath -> IO BS.ByteString
 readFileBytes p = withFd p ReadOnly Nothing $
