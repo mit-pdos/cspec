@@ -9,10 +9,6 @@ Parameter decode_tid_fn : string -> (string * string).
 Axiom encode_decode_tid_fn : forall tid fn,
   decode_tid_fn (encode_tid_fn tid fn) = (tid, fn).
 
-Parameter nat_to_string : nat -> string.
-Axiom nat_to_string_unique : forall a b,
-  a <> b -> nat_to_string a <> nat_to_string b.
-
 Theorem encode_tid_eq : forall t1 t2 n1 n2,
   encode_tid_fn t1 n1 = encode_tid_fn t2 n2 ->
   (t1, n1) = (t2, n2).
@@ -63,7 +59,7 @@ Module MailFSStringAbsAPI <: Layer MailFSOp MailFSStringAbsState.
     xstep (CreateWriteTmp data) tid
       (mk_state tmp mbox lock)
       true
-      (mk_state (FMap.add (encode_tid_fn (nat_to_string tid) empty_string) data tmp) mbox lock)
+      (mk_state (FMap.add (encode_tid_fn (nat_to_string tid) (nat_to_string 0)) data tmp) mbox lock)
       nil
   | StepCreateWriteTmpErr1 : forall tmp mbox tid data lock,
     xstep (CreateWriteTmp data) tid
@@ -75,21 +71,21 @@ Module MailFSStringAbsAPI <: Layer MailFSOp MailFSStringAbsState.
     xstep (CreateWriteTmp data) tid
       (mk_state tmp mbox lock)
       false
-      (mk_state (FMap.add (encode_tid_fn (nat_to_string tid) empty_string) data' tmp) mbox lock)
+      (mk_state (FMap.add (encode_tid_fn (nat_to_string tid) (nat_to_string 0)) data' tmp) mbox lock)
       nil
   | StepUnlinkTmp : forall tmp mbox tid lock,
     xstep (UnlinkTmp) tid
       (mk_state tmp mbox lock)
       tt
-      (mk_state (FMap.remove (encode_tid_fn (nat_to_string tid) empty_string) tmp) mbox lock)
+      (mk_state (FMap.remove (encode_tid_fn (nat_to_string tid) (nat_to_string 0)) tmp) mbox lock)
       nil
   | StepLinkMailOK : forall tmp mbox tid mailfn data lock,
     FMap.MapsTo (encode_tid_fn (nat_to_string tid) empty_string) data tmp ->
     ~ FMap.In (encode_tid_fn (nat_to_string tid) mailfn) mbox ->
-    xstep (LinkMail mailfn) tid
+    xstep (LinkMail (nat_to_string mailfn)) tid
       (mk_state tmp mbox lock)
       true
-      (mk_state tmp (FMap.add (encode_tid_fn (nat_to_string tid) mailfn) data mbox) lock)
+      (mk_state tmp (FMap.add (encode_tid_fn (nat_to_string tid) (nat_to_string mailfn)) data mbox) lock)
       nil
   | StepLinkMail : forall tmp mbox tid mailfn lock,
     xstep (LinkMail mailfn) tid

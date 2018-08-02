@@ -8,7 +8,6 @@ Definition string: Type := abstract_string.
 Parameter tmp_string : string.
 Parameter mail_string : string.
 Parameter nouser_string : string.
-Parameter empty_string : string.
 Parameter bench_msg : string.
 Parameter tmp_mail_ne : tmp_string <> mail_string.
 Parameter abstract_string_length : string -> nat.
@@ -18,8 +17,21 @@ Instance string_Ordering : Ordering string.
 Admitted.
 
 Parameter nat_to_string : nat -> string.
-Axiom nat_to_string_eq : forall a b,
+Parameter string_to_nat : string -> nat.
+Axiom nat_to_string_to_nat : forall a,
+  string_to_nat (nat_to_string a) = a.
+
+Definition natpair_to_stringpair '(a, b) := (nat_to_string a, nat_to_string b).
+
+Theorem nat_to_string_eq : forall a b,
   nat_to_string a = nat_to_string b -> a = b.
+Proof.
+  intros.
+  rewrite <- nat_to_string_to_nat.
+  rewrite <- H.
+  rewrite nat_to_string_to_nat.
+  reflexivity.
+Qed.
 
 Theorem nat_to_string_ne : forall a b,
   a <> b -> nat_to_string a <> nat_to_string b.
@@ -89,7 +101,7 @@ Module MailServerHOp := HOps MailServerOp UserIdx.
 
 Module MailServerState <: State.
 
-  Definition dir_contents := FMap.t (string*string) string.
+  Definition dir_contents := FMap.t (nat*nat) string.
 
   Definition State := dir_contents.
   Definition initP (s : State) := True.
@@ -124,11 +136,11 @@ Module MailServerAPI <: Layer MailServerOp MailServerState.
     FMap.is_permutation_kv r mbox ->
     xstep Pickup tid
       mbox
-      r
+      (map (fun '(fn, msg) => (natpair_to_stringpair fn, msg)) r)
       mbox
       nil
   | StepDelete : forall mbox tid id,
-    xstep (Delete id) tid
+    xstep (Delete (natpair_to_stringpair id)) tid
       mbox
       tt
       (FMap.remove id mbox)

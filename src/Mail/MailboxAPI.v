@@ -45,27 +45,27 @@ Module MailboxAPI <: Layer MailboxOp MailServerLockAbsState.
     FMap.is_permutation_key r mbox ->
     xstep List tid
       (mk_state mbox lock)
-      r
+      (map natpair_to_stringpair r)
       (mk_state mbox lock)
       nil
 
   | StepReadOK : forall fn mbox tid m lock,
     FMap.MapsTo fn m mbox ->
-    xstep (Read fn) tid
+    xstep (Read (natpair_to_stringpair fn)) tid
       (mk_state mbox lock)
       (Some m)
       (mk_state mbox lock)
       nil
   | StepReadNone : forall fn mbox tid lock,
     ~ FMap.In fn mbox ->
-    xstep (Read fn) tid
+    xstep (Read (natpair_to_stringpair fn)) tid
       (mk_state mbox lock)
       None
       (mk_state mbox lock)
       nil
 
   | StepDelete : forall fn mbox tid lock,
-    xstep (Delete fn) tid
+    xstep (Delete (natpair_to_stringpair fn)) tid
       (mk_state mbox lock)
       tt
       (mk_state (FMap.remove fn mbox) lock)

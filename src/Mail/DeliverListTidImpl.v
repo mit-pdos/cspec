@@ -26,9 +26,10 @@ Module DeliverListTidImpl' <:
     end.
 
   Lemma nextfn_ok' : forall (tid : nat) `(s : FMap.t _ V) r1 r0 n,
-    ( forall fn, FMap.In (tid, fn) s -> In fn (r0 ++ r1) ) ->
-    ( forall fn, In fn r0 -> n > fn ) ->
-    ~ FMap.In (tid, nextfn r1 n) s.
+    ( forall fn, FMap.In (nat_to_string tid, nat_to_string fn) s ->
+                 In fn (map string_to_nat (r0 ++ r1)) ) ->
+    ( forall fn, In fn (map string_to_nat r0) -> n > fn ) ->
+    ~ FMap.In (nat_to_string tid, nat_to_string (nextfn (map string_to_nat r1) n)) s.
   Proof.
     induction r1; simpl; intros.
     - intro.
@@ -37,16 +38,17 @@ Module DeliverListTidImpl' <:
       omega.
     - eapply IHr1 with (r0 := r0 ++ (a :: nil)); clear IHr1; intros.
       + rewrite <- app_assoc; simpl. eauto.
-      + eapply in_app_or in H1; intuition eauto.
+      + rewrite map_app in H1.
+        eapply in_app_or in H1; intuition eauto.
         * specialize (H0 _ H2).
-          destruct (le_dec n a); simpl; omega.
+          destruct (le_dec n (string_to_nat a)); simpl; omega.
         * inversion H2; subst. 2: inversion H1.
-          destruct (le_dec n fn); simpl; omega.
+          destruct (le_dec n (string_to_nat a)); simpl; omega.
   Qed.
 
   Lemma nextfn_ok : forall (tid : nat) `(s : FMap.t _ V) r n,
-    ( forall fn, FMap.In (tid, fn) s -> In fn r ) ->
-    ~ FMap.In (tid, nextfn r n) s.
+    ( forall fn, FMap.In (nat_to_string tid, nat_to_string fn) s -> In fn (map string_to_nat r) ) ->
+    ~ FMap.In (nat_to_string tid, nat_to_string (nextfn (map string_to_nat r) n)) s.
   Proof.
     intros.
     eapply nextfn_ok' with (r0 := nil); simpl; intros.
@@ -56,8 +58,8 @@ Module DeliverListTidImpl' <:
 
   Definition linkmail_core :=
     files <- Call DeliverListTidOp.ListTid;
-    let newname := nextfn files 0 in
-    ok <- Call (DeliverListTidOp.LinkMail newname);
+    let newname := nextfn (map string_to_nat files) 0 in
+    ok <- Call (DeliverListTidOp.LinkMail (nat_to_string newname));
     Ret ok.
 
   Definition compile_op T (op : DeliverOp.Op T) : proc _ T :=
@@ -114,7 +116,6 @@ Module DeliverListTidImpl' <:
       econstructor; intros; eauto.
       eapply H4.
       eapply FMap.in_add_ne; eauto.
-      congruence.
     + eexists; split.
       econstructor; eauto.
       econstructor; intros; eauto.
@@ -162,6 +163,11 @@ Module DeliverListTidImpl' <:
 
       econstructor.
       eapply nextfn_ok; eauto.
+
+      intros.
+      specialize (H3 _ H0).
+      rewrite <- nat_to_string_to_nat with (a := fn).
+      eapply in_map; eauto.
     }
 
     constructor; intros.
@@ -191,7 +197,6 @@ Module DeliverListTidImpl' <:
     - constructor.
       contradict H3.
       eapply FMap.in_add_ne; eauto.
-      congruence.
     - constructor.
       contradict H3.
       eapply FMap.in_remove; eauto.

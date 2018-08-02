@@ -38,7 +38,7 @@ Module DeliverListTidAPI <: Layer DeliverListTidOp MailboxTmpAbsState.
     xstep (CreateWriteTmp data) tid
       (mk_state tmp mbox lock)
       true
-      (mk_state (FMap.add (nat_to_string tid, empty_string) data tmp) mbox lock)
+      (mk_state (FMap.add (nat_to_string tid, nat_to_string 0) data tmp) mbox lock)
       nil
   | StepCreateWriteTmpErr1 : forall tmp mbox tid data lock,
     xstep (CreateWriteTmp data) tid
@@ -50,16 +50,16 @@ Module DeliverListTidAPI <: Layer DeliverListTidOp MailboxTmpAbsState.
     xstep (CreateWriteTmp data) tid
       (mk_state tmp mbox lock)
       false
-      (mk_state (FMap.add (nat_to_string tid, empty_string) data' tmp) mbox lock)
+      (mk_state (FMap.add (nat_to_string tid, nat_to_string 0) data' tmp) mbox lock)
       nil
   | StepUnlinkTmp : forall tmp mbox tid lock,
     xstep (UnlinkTmp) tid
       (mk_state tmp mbox lock)
       tt
-      (mk_state (FMap.remove (nat_to_string tid, empty_string) tmp) mbox lock)
+      (mk_state (FMap.remove (nat_to_string tid, nat_to_string 0) tmp) mbox lock)
       nil
   | StepLinkMailOK : forall tmp mbox tid mailfn data lock,
-    FMap.MapsTo (nat_to_string tid, empty_string) data tmp ->
+    FMap.MapsTo (nat_to_string tid, nat_to_string 0) data tmp ->
     ~ FMap.In (nat_to_string tid, mailfn) mbox ->
     xstep (LinkMail mailfn) tid
       (mk_state tmp mbox lock)
@@ -81,7 +81,7 @@ Module DeliverListTidAPI <: Layer DeliverListTidOp MailboxTmpAbsState.
       (mk_state tmp mbox lock)
       nil
   | StepListTid : forall tmp mbox tid r lock,
-    (forall fn, FMap.In (nat_to_string tid, fn) mbox -> In fn r) ->
+    (forall fn, FMap.In (nat_to_string tid, nat_to_string fn) mbox -> In (nat_to_string fn) r) ->
     xstep ListTid tid
       (mk_state tmp mbox lock)
       r

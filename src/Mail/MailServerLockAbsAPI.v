@@ -20,7 +20,7 @@ Module MailServerLockAbsAPI <: Layer MailServerOp MailServerLockAbsState.
 
   Import MailServerOp.
   Import MailServerLockAbsState.
-  
+
   Inductive xstep : forall T, Op T -> nat -> State -> T -> State -> list event -> Prop :=
   | StepDeliverOK : forall m mbox fn tid lock,
     ~ FMap.In fn mbox ->
@@ -39,11 +39,11 @@ Module MailServerLockAbsAPI <: Layer MailServerOp MailServerLockAbsState.
     FMap.is_permutation_kv r mbox ->
     xstep Pickup tid
       (mk_state mbox lock)
-      r
+      (map (fun '(fn, msg) => (natpair_to_stringpair fn, msg)) r)
       (mk_state mbox lock)
       nil
   | StepDelete : forall mbox tid id lock,
-    xstep (Delete id) tid
+    xstep (Delete (natpair_to_stringpair id)) tid
       (mk_state mbox lock)
       tt
       (mk_state (FMap.remove id mbox) lock)

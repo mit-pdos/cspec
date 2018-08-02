@@ -36,7 +36,7 @@ Module DeliverAPI <: Layer DeliverOp MailboxTmpAbsState.
     xstep (CreateWriteTmp data) tid
       (mk_state tmp mbox lock)
       true
-      (mk_state (FMap.add (nat_to_string tid, empty_string) data tmp) mbox lock)
+      (mk_state (FMap.add (nat_to_string tid, nat_to_string 0) data tmp) mbox lock)
       nil
 
   | StepCreateWriteTmpErr1 : forall tmp mbox tid data lock,
@@ -49,17 +49,17 @@ Module DeliverAPI <: Layer DeliverOp MailboxTmpAbsState.
     xstep (CreateWriteTmp data) tid
       (mk_state tmp mbox lock)
       false
-      (mk_state (FMap.add (nat_to_string tid, empty_string) data' tmp) mbox lock)
+      (mk_state (FMap.add (nat_to_string tid, nat_to_string 0) data' tmp) mbox lock)
       nil
 
   | StepUnlinkTmp : forall tmp mbox tid lock,
     xstep (UnlinkTmp) tid
       (mk_state tmp mbox lock)
       tt
-      (mk_state (FMap.remove (nat_to_string tid, empty_string) tmp) mbox lock)
+      (mk_state (FMap.remove (nat_to_string tid, nat_to_string 0) tmp) mbox lock)
       nil
   | StepLinkMailOK : forall tmp mbox tid mailfn data lock,
-    FMap.MapsTo (nat_to_string tid, empty_string) data tmp ->
+    FMap.MapsTo (nat_to_string tid, nat_to_string 0) data tmp ->
     ~ FMap.In (nat_to_string tid, mailfn) mbox ->
     xstep (LinkMail) tid
       (mk_state tmp mbox lock)
@@ -140,7 +140,7 @@ Module DeliverProtocol <: Protocol DeliverOp MailboxTmpAbsState.
   | AllowCreateWriteTmp : forall tid tmp mbox data lock,
     xstep_allow (CreateWriteTmp data) tid (mk_state tmp mbox lock)
   | AllowLinkMail : forall tid tmp mbox lock,
-    FMap.In (nat_to_string tid, empty_string) tmp ->
+    FMap.In (nat_to_string tid, nat_to_string 0) tmp ->
     xstep_allow (LinkMail) tid (mk_state tmp mbox lock)
   | AllowUnlinkTmp : forall tid s,
     xstep_allow (UnlinkTmp) tid s

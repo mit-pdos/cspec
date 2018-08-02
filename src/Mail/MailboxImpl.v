@@ -94,7 +94,7 @@ Module AtomicReader' <:
   Lemma read_left_mover : forall fn,
     left_mover_pred
       MailboxRestrictedAPI.step
-      (MailboxOp.Read fn)
+      (MailboxOp.Read (natpair_to_stringpair fn))
       (fun tid s => FMap.In fn (MailServerLockAbsState.maildir s)).
   Proof.
     split.
