@@ -3,7 +3,7 @@ Require Import MailServerAPI.
 Require Import MailServerLockAbsAPI.
 
 Module MailServerLockAbsImpl' <:
-  LayerImplAbsT MailServerOp
+  HLayerImplAbsT MailServerOp
     MailServerLockAbsState MailServerLockAbsAPI
     MailServerState MailServerAPI.
 
@@ -23,19 +23,15 @@ Module MailServerLockAbsImpl' <:
     all: eauto.
   Qed.
 
-  Theorem absInitP :
-    forall s1 s2,
-      MailServerLockAbsState.initP s1 ->
-      absR s1 s2 ->
-      MailServerAPI.MailServerState.initP s2.
-  Proof.
-    eauto.
-  Qed.
+  Definition initP_map (s1: MailServerLockAbsState.State) : {s2:MailServerState.State | initP s1 -> absR s1 s2 /\ MailServerState.initP s2}.
+    exists (maildir s1).
+    unfold initP, absR, MailServerState.initP; eauto.
+  Defined.
 
 End MailServerLockAbsImpl'.
 
 Module MailServerLockAbsImpl :=
-  LayerImplAbs MailServerOp
+  HLayerImplAbs MailServerOp
     MailServerLockAbsState MailServerLockAbsAPI
     MailServerState MailServerAPI
     MailServerLockAbsImpl'.

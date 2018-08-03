@@ -758,6 +758,17 @@ Module FMap.
       intuition simp.
     Qed.
 
+    Theorem mapsto_empty_def : forall m,
+        m = empty <-> (forall x v, ~MapsTo x v m).
+    Proof.
+      split; propositional.
+      - apply empty_mapsto.
+      - apply mapsto_extensionality; intros.
+        split; intros.
+        exfalso; eapply H; eauto.
+        exfalso; eapply empty_mapsto; eauto.
+    Qed.
+
     Fixpoint _filter (P: A -> bool) (l: list (A*V)) : list (A*V) :=
       match l with
       | [] => []

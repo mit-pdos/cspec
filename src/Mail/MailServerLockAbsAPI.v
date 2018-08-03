@@ -11,7 +11,7 @@ Module MailServerLockAbsState <: State.
   }.
 
   Definition State := state_rec.
-  Definition initP (s : State) := True.
+  Definition initP (s : State) := locked s = None.
 
 End MailServerLockAbsState.
 Module MailServerLockAbsHState := HState MailServerLockAbsState UserIdx.

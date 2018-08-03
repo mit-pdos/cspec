@@ -7,7 +7,7 @@ Require Import MailboxTmpAbsAPI.
 
 
 Module MailFSStringAbsImpl' <:
-  LayerImplAbsT MailFSOp
+  HLayerImplAbsT MailFSOp
     MailFSStringAbsState MailFSStringAbsAPI
     MailboxTmpAbsState MailFSAPI.
 
@@ -21,6 +21,15 @@ Module MailFSStringAbsImpl' <:
     MailFSStringAbsState.locked s1 = MailboxTmpAbsState.locked s2.
 
   Hint Extern 1 (MailFSAPI.step _ _ _ _ _ _) => econstructor.
+
+  Lemma dirR_empty : dirR FMap.empty FMap.empty.
+  Proof.
+    unfold dirR; intros.
+    symmetry.
+    apply FMap.mapsto_empty_def; intros.
+    unfold not; intros.
+    apply FMap.map_keys_mapsto' in H; propositional.
+  Qed.
 
   Lemma dirR_mapsto :
     forall d1 d2 tid fn data,
@@ -131,19 +140,19 @@ Module MailFSStringAbsImpl' <:
       solve [ eexists; split; [ split | econstructor ]; simpl; intuition eauto ].
   Qed.
 
-  Theorem absInitP :
-    forall s1 s2,
-      MailFSStringAbsState.initP s1 ->
-      absR s1 s2 ->
-      MailboxTmpAbsState.initP s2.
+  Definition initP_map (s1: MailFSStringAbsState.State) :
+    {s2:MailboxTmpAbsState.State |
+     MailFSStringAbsState.initP s1 -> absR s1 s2 /\ MailboxTmpAbsState.initP s2}.
   Proof.
-    eauto.
+    unfold MailFSStringAbsState.initP, MailboxTmpAbsState.initP, absR.
+    destruct s1; simpl.
+    exists_econstructor; (intuition eauto); propositional.
   Qed.
 
 End MailFSStringAbsImpl'.
 
 Module MailFSStringAbsImpl :=
-  LayerImplAbs MailFSOp
+  HLayerImplAbs MailFSOp
     MailFSStringAbsState MailFSStringAbsAPI
     MailboxTmpAbsState MailFSAPI
     MailFSStringAbsImpl'.

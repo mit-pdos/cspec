@@ -7,6 +7,7 @@ Require Import Protocol.
 Require Import CompileLoop.
 Require Import ProofAutomation.
 
+Require Import Helpers.Instances.
 
 (** Combining trace matching with state abstraction. *)
 
@@ -19,6 +20,7 @@ Section TraceAbs.
   Variable StateHi : Type.
   Variable absR : StateLo -> StateHi -> Prop.
   Variable initP : StateLo -> Prop.
+  Variable initHi : StateHi -> Prop.
 
   Variable lo_step : OpSemantics OpLo StateLo.
   Variable hi_step : OpSemantics OpHi StateHi.
@@ -31,11 +33,12 @@ Section TraceAbs.
   Definition traces_match_abs
                            (ts1 : threads_state OpLo)
                            (ts2 : threads_state OpHi) :=
-    forall (sl : StateLo) (sm : StateHi) tr1,
+    forall (sl : StateLo) tr1,
       initP sl ->
       exec lo_step sl ts1 tr1 ->
-      absR sl sm ->
-      exec hi_step sm ts2 tr1.
+      exists sm, absR sl sm /\
+            initHi sm /\
+            exec hi_step sm ts2 tr1.
 
 End TraceAbs.
 
@@ -80,14 +83,14 @@ Module Type LayerImpl
       no_atomics_ts ts ->
       no_atomics_ts (compile_ts ts).
   Axiom absInitP :
-    forall s1 s2,
+    forall s1,
       s1.initP s1 ->
-      absR s1 s2 ->
+      exists s2, absR s1 s2 /\
       s2.initP s2.
   Axiom compile_traces_match :
     forall ts,
       no_atomics_ts ts ->
-      traces_match_abs absR s1.initP l1.step l2.step (compile_ts ts) ts.
+      traces_match_abs absR s1.initP s2.initP l1.step l2.step (compile_ts ts) ts.
 
   Hint Resolve absInitP.
 
@@ -102,10 +105,8 @@ Module Type LayerImplAbsT
   Axiom absR : s1.State -> s2.State -> Prop.
   Axiom absR_ok : op_abs absR l1.step l2.step.
   Axiom absInitP :
-    forall s1 s2,
-      s1.initP s1 ->
-      absR s1 s2 ->
-      s2.initP s2.
+    forall s1, s1.initP s1 ->
+          exists s2, absR s1 s2 /\ s2.initP s2.
 
 End LayerImplAbsT.
 
@@ -134,10 +135,10 @@ Module LayerImplAbs
   Theorem compile_traces_match :
     forall ts,
       no_atomics_ts ts ->
-      traces_match_abs absR s1.initP l1.step l2.step (compile_ts ts) ts.
+      traces_match_abs absR s1.initP s2.initP l1.step l2.step (compile_ts ts) ts.
   Proof.
     unfold compile_ts, traces_match_abs; intros.
-    eapply trace_incl_abs; eauto.
+    eapply absInitP in H0; propositional; eauto using trace_incl_abs.
   Qed.
 
 End LayerImplAbs.
@@ -161,6 +162,13 @@ Module Type LayerImplMoversT
 
 End LayerImplMoversT.
 
+Local Ltac init_abs :=
+  match goal with
+  | [ |- exists s2, _ _ s2 /\ _ /\ _ ] =>
+    eexists; split; [ reflexivity | split; [ now auto |  ] ]
+  | |- exists s2, _ _ s2 /\ _ =>
+    eexists; split; [ reflexivity | ]
+  end.
 
 Module LayerImplMovers
   (s : State)
@@ -171,12 +179,13 @@ Module LayerImplMovers
   Definition absR (s1 : s.State) (s2 : s.State) := s1 = s2.
 
   Theorem absInitP :
-    forall s1 s2,
+    forall s1,
       s.initP s1 ->
-      absR s1 s2 ->
+      exists s2, absR s1 s2 /\
       s.initP s2.
   Proof.
-    congruence.
+    intros.
+    init_abs; auto.
   Qed.
 
 
@@ -225,10 +234,10 @@ Module LayerImplMovers
   Theorem compile_traces_match :
     forall ts2,
       no_atomics_ts ts2 ->
-      traces_match_abs absR s.initP l1.step l2.step (compile_ts ts2) ts2.
+      traces_match_abs absR s.initP s.initP l1.step l2.step (compile_ts ts2) ts2.
   Proof.
     unfold traces_match_abs; intros.
-    rewrite H2 in *; clear H2.
+    init_abs.
     eapply all_traces_match; eauto.
     eapply Compile.compile_ts_ok; eauto.
   Qed.
@@ -273,12 +282,12 @@ Module LayerImplMoversProtocol
   Definition absR (s1 : s.State) (s2 : s.State) := s1 = s2.
 
   Theorem absInitP :
-    forall s1 s2,
+    forall s1,
       s.initP s1 ->
-      absR s1 s2 ->
+      exists s2, absR s1 s2 /\
       s.initP s2.
   Proof.
-    congruence.
+    unfold absR; eauto.
   Qed.
 
 
@@ -327,10 +336,10 @@ Module LayerImplMoversProtocol
   Theorem compile_traces_match_l1 :
     forall ts2,
       no_atomics_ts ts2 ->
-      traces_match_abs absR s.initP l1.step l2.step (compile_ts ts2) ts2.
+      traces_match_abs absR s.initP s.initP l1.step l2.step (compile_ts ts2) ts2.
   Proof.
     unfold traces_match_abs; intros.
-    rewrite H2 in *; clear H2.
+    init_abs.
     eapply all_traces_match; eauto.
     eapply Compile.compile_ts_ok; eauto.
   Qed.
@@ -408,12 +417,13 @@ Module LayerImplMoversProtocol
     forall ts,
       follows_protocol ts ->
       no_atomics_ts ts ->
-      traces_match_abs absR s.initP l1raw.step l1.step ts ts.
+      traces_match_abs absR s.initP s.initP l1raw.step l1.step ts ts.
   Proof.
     unfold compile_ts, follows_protocol, absR.
     unfold traces_match_abs; intros; subst.
+    init_abs.
     clear H1.
-    specialize (H sm).
+    specialize (H sl).
     induction H2; eauto.
     cmp_ts tid tid'.
     pose proof (H tid _ p ltac:(eauto)) as Htid.
@@ -442,28 +452,21 @@ Module LayerImplMoversProtocol
       eapply follows_protocol_preserves_exec_tid'; eauto.
   Qed.
 
-  Lemma absR_reflexive : forall s, absR s s.
-  Proof.
-    reflexivity.
-  Qed.
+  Hint Resolve (_:Reflexive absR).
+  Local Hint Resolve (_:Transitive absR).
 
-  Hint Resolve absR_reflexive.
+  Local Hint Resolve compile_ts_no_atomics.
+  Local Hint Resolve compile_ts_follows_protocol.
+  Local Hint Resolve a.compile_op_no_atomics.
 
   Theorem compile_traces_match :
     forall ts,
       no_atomics_ts ts ->
-      traces_match_abs absR s.initP l1raw.step l2.step (compile_ts ts) ts.
+      traces_match_abs absR s.initP s.initP l1raw.step l2.step (compile_ts ts) ts.
   Proof.
     unfold traces_match_abs; intros.
-    rewrite H2 in *; clear H2.
-    assert (exec l1.step sm (Compile.compile_ts a.compile_op ts) tr1). {
-      eapply compile_traces_match_l1raw; eauto.
-      eapply compile_ts_follows_protocol; eauto.
-      eapply Compile.compile_ts_no_atomics; eauto.
-      eapply a.compile_op_no_atomics.
-    }
-
-    eapply compile_traces_match_l1; eauto.
+    eapply compile_traces_match_l1raw in H1; propositional; eauto.
+    eapply compile_traces_match_l1 in H3; propositional; eauto.
   Qed.
 
 End LayerImplMoversProtocol.
@@ -501,20 +504,21 @@ Module LayerImplLoop
   Qed.
 
   Theorem absInitP :
-    forall s1 s2,
+    forall s1,
       s.initP s1 ->
-      absR s1 s2 ->
+      exists s2, absR s1 s2 /\
       s.initP s2.
   Proof.
-    congruence.
+    unfold absR; eauto.
   Qed.
 
   Theorem compile_traces_match :
     forall ts,
       no_atomics_ts ts ->
-      traces_match_abs absR s.initP l1.step l2.step (compile_ts ts) ts.
+      traces_match_abs absR s.initP s.initP l1.step l2.step (compile_ts ts) ts.
   Proof.
     unfold traces_match_abs, absR; intros; subst.
+    init_abs.
     eapply CompileLoop.compile_traces_match_ts; eauto.
     eapply a.noop_or_success.
     eapply CompileLoop.compile_ts_ok; eauto.
@@ -550,25 +554,36 @@ Module Link
   Qed.
 
   Theorem absInitP :
-    forall s1 s2,
+    forall s1,
       sA.initP s1 ->
-      absR s1 s2 ->
-      sC.initP s2.
+      exists s2, absR s1 s2 /\ sC.initP s2.
   Proof.
-    unfold absR; intros; deex.
+    unfold absR; intros.
+    eapply x.absInitP in H; propositional.
+    eapply y.absInitP in H0; propositional.
     eauto.
   Qed.
+
+  Hint Resolve x.compile_ts_no_atomics y.compile_ts_no_atomics.
+
+  Lemma absR_transitive : forall s1 s2 s3,
+      x.absR s1 s2 ->
+      y.absR s2 s3 ->
+      absR s1 s3.
+  Proof.
+    unfold absR; eauto.
+  Qed.
+
+  Hint Resolve absR_transitive.
 
   Theorem compile_traces_match :
     forall ts,
       no_atomics_ts ts ->
-      traces_match_abs absR sA.initP a.step c.step (compile_ts ts) ts.
+      traces_match_abs absR sA.initP sC.initP a.step c.step (compile_ts ts) ts.
   Proof.
     unfold traces_match_abs; intros.
-    inversion H2; clear H2; intuition idtac.
-    epose_proof x.compile_traces_match; intuition eauto.
-      eapply y.compile_ts_no_atomics; eauto.
-    epose_proof y.compile_traces_match; intuition eauto.
+    eapply x.compile_traces_match in H1; propositional; eauto.
+    eapply y.compile_traces_match in H3; propositional; eauto.
   Qed.
 
 End Link.

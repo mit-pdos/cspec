@@ -12,7 +12,8 @@ Module MailFSPathAbsState <: State.
   }.
 
   Definition State := state_rec.
-  Definition initP (s : State) := True.
+  Definition initP (s : State) := locked s = false /\
+                              fs s = FMap.empty.
 
 End MailFSPathAbsState.
 Module MailFSPathAbsHState := HState MailFSPathAbsState UserIdx.

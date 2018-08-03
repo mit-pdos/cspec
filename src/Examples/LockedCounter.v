@@ -31,7 +31,8 @@ Module TASState <: State.
 
   Definition State := s.
   Definition initP s :=
-    TASLock s = false.
+    TASLock s = false /\
+    TASValue s = {| MemValue := 0; SBuf := fun _ => [] |}.
 
 End TASState.
 
@@ -147,12 +148,15 @@ Module AbsNondet' <:
   Qed.
 
   Theorem absInitP :
-    forall s1 s2,
+    forall s1,
       TASState.initP s1 ->
-      absR s1 s2 ->
-      TASState.initP s2.
+      exists s2, absR s1 s2 /\
+            TASState.initP s2.
   Proof.
-    unfold initP, absR, tas_bg; (intuition idtac); congruence.
+    unfold initP, absR, tas_bg; intros.
+    destruct s1; simpl in *; propositional.
+    exists_econstructor; intuition eauto.
+    reflexivity.
   Qed.
 
 End AbsNondet'.
@@ -187,7 +191,8 @@ Module LockState <: State.
 
   Definition State := s.
   Definition initP s :=
-    Lock s = None.
+    Lock s = None /\
+    Value s = {| MemValue := 0; SBuf := fun _ => [] |}.
 
 End LockState.
 
@@ -252,14 +257,13 @@ Module AbsLock' <:
   Qed.
 
   Theorem absInitP :
-    forall s1 s2,
+    forall s1,
       TASState.initP s1 ->
-      absR s1 s2 ->
+      exists s2, absR s1 s2 /\
       LockState.initP s2.
   Proof.
-    unfold absR, TASState.initP, LockState.initP.
-    intuition eauto.
-    deex; congruence.
+    unfold absR, TASState.initP, LockState.initP; intros.
+    exists_econstructor; intuition eauto.
   Qed.
 
 End AbsLock'.
@@ -631,7 +635,7 @@ End LockingCounter'.
 Module CounterState <: State.
 
   Definition State := nat.
-  Definition initP (s : State) := True.
+  Definition initP (s : State) := s = 0.
 
 End CounterState.
 
@@ -736,12 +740,15 @@ Module AbsCounter' <:
   Qed.
 
   Theorem absInitP :
-    forall s1 s2,
+    forall s1,
       LockState.initP s1 ->
-      absR s1 s2 ->
+      exists s2, absR s1 s2 /\
       CounterState.initP s2.
   Proof.
-    firstorder.
+    unfold absR, LockState.initP, CounterState.initP; intros.
+    destruct s1; simpl in *; propositional.
+    exists 0; intuition eauto.
+    unfold empty_sb; simpl; auto.
   Qed.
 
 End AbsCounter'.

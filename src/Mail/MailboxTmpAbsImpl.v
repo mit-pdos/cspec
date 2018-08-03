@@ -6,7 +6,7 @@ Require Import MailServerLockAbsAPI.
 
 
 Module MailboxTmpAbs' <:
-  LayerImplAbsT MailboxOp
+  HLayerImplAbsT MailboxOp
     MailboxTmpAbsState MailboxTmpAbsAPI
     MailServerLockAbsState MailboxAPI.
 
@@ -39,19 +39,18 @@ Module MailboxTmpAbs' <:
 
   Hint Resolve absR_ok.
 
-  Theorem absInitP :
-    forall s1 s2,
-      MailboxTmpAbsState.initP s1 ->
-      absR s1 s2 ->
-      MailServerLockAbsState.initP s2.
-  Proof.
-    eauto.
-  Qed.
+  Definition initP_map (s1: MailboxTmpAbsState.State) :
+    {s2:MailServerLockAbsState.State |
+     initP s1 -> absR s1 s2 /\
+                MailServerLockAbsState.initP s2}.
+    unfold initP, absR, MailServerLockAbsState.initP.
+    exists_econstructor; intuition eauto.
+  Defined.
 
 End MailboxTmpAbs'.
 
 Module MailboxTmpAbsImpl :=
-  LayerImplAbs MailboxOp
+  HLayerImplAbs MailboxOp
    MailboxTmpAbsState MailboxTmpAbsAPI
    MailServerLockAbsState MailboxAPI
    MailboxTmpAbs'.
