@@ -1,6 +1,7 @@
 Require Import List.
 Require Import Ordering.
 Require Import ProofIrrelevance.
+Require Import Helpers.ProofAutomation.Abstract.
 
 Set Implicit Arguments.
 
@@ -45,6 +46,14 @@ Proof.
 Qed.
 
 Hint Constructors sorted.
+
+Lemma map_respects_funext : forall A B (f1 f2: A -> B),
+    (forall x, f1 x = f2 x) ->
+    forall l, map f1 l = map f2 l.
+Proof.
+  induction l; simpl; intros; auto.
+  f_equal; eauto.
+Qed.
 
 Import List.ListNotations.
 Open Scope list.
@@ -1468,5 +1477,76 @@ Module FMap.
     Qed.
 
   End MapKeys.
+
+  Section MapValues.
+    Variable A:Type.
+    Variables V1 V2:Type.
+    Context {Acmp: Ordering A}.
+
+    Variable f : V1 -> V2.
+
+    Definition map_values (m: t A V1) : t A V2.
+      refine {| elements := List.map (fun '(k, v) => (k, f v)) m.(elements) |}.
+      rewrite map_map; simpl.
+      rewrite map_respects_funext with (f2 := @fst A V1).
+      apply elem_sorted.
+      destruct x; auto.
+    Defined.
+
+    Theorem map_values_keys : forall m,
+        keys (map_values m) = keys m.
+    Proof.
+      unfold keys; simpl; intros.
+      rewrite map_map.
+      apply map_respects_funext.
+      destruct x; auto.
+    Qed.
+
+    Theorem map_values_in : forall m a,
+        In a m <-> In a (map_values m).
+    Proof.
+      unfold In; intros.
+      rewrite map_values_keys; reflexivity.
+    Qed.
+
+    Theorem map_values_MapsTo : forall m a v,
+        MapsTo a v m -> MapsTo a (f v) (map_values m).
+    Proof.
+      unfold MapsTo; simpl; intros.
+      abstract_term (a, f v).
+      eapply List.in_map in H; eassumption.
+      auto.
+    Qed.
+
+    Theorem map_values_MapsTo_general : forall m a v2,
+        MapsTo a v2 (map_values m) ->
+        exists v1, f v1 = v2 /\
+              MapsTo a v1 m.
+    Proof.
+      unfold MapsTo; simpl; intros.
+      destruct m; simpl in *.
+      subst keys0.
+      induction elements0; simpl in *.
+      - destruct H.
+      - destruct a0; simpl in *.
+        inversion_clear elem_sorted0.
+        intuition eauto.
+        + inversion H2; subst; clear H2.
+          eexists; eauto.
+        + destruct H3; intuition eauto.
+    Qed.
+
+    Theorem map_values_MapsTo' : forall m a v,
+        forall (Hinjective: forall x1 x2, f x1 = f x2 -> x1 = x2),
+          MapsTo a (f v) (map_values m) ->
+          MapsTo a v m.
+    Proof.
+      intros.
+      apply map_values_MapsTo_general in H.
+      destruct H; intuition idtac.
+      apply Hinjective in H0; subst; auto.
+    Qed.
+
+  End MapValues.
 
 End FMap.
