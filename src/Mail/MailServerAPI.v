@@ -16,6 +16,10 @@ Definition string_length s := abstract_string_length s.
 Instance string_Ordering : Ordering string.
 Admitted.
 
+Parameter readdir_handle : Type.
+Instance readdir_handle_Ordering : Ordering readdir_handle.
+Admitted.
+
 
 Module UserIdx <: HIndex.
   Definition indexT := string.

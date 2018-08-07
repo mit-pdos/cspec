@@ -3,11 +3,6 @@ Require Import MailServerAPI.
 Require Import MailFSPathAPI.
 
 
-Parameter readdir_handle : Type.
-Instance readdir_handle_Ordering : Ordering readdir_handle.
-Admitted.
-
-
 Module MailFSMergedOp <: Ops.
 
   Definition extopT := MailServerAPI.MailServerOp.extopT.
@@ -285,6 +280,37 @@ Module MailFSMergedAbsAPI <: Layer MailFSPathHOp MailFSMergedState.
       (mk_state fs lock dirs)
       r
       (mk_state fs lock dirs)
+      nil
+
+  | StepDirOpen : forall fs lock dirs tid r dirname u P,
+    ~ FMap.In r dirs ->
+    xstep (Slice (exist _ u P) (DirOpen dirname)) tid
+      (mk_state fs lock dirs)
+      r
+      (mk_state fs lock (FMap.add r ((u, dirname), FSet.empty) dirs))
+      nil
+  | StepDirNext : forall fs lock dirs dirname dirnames tid h name u P,
+    FMap.MapsTo h (dirname, dirnames) dirs ->
+    FMap.In (dirname, name) fs ->
+    ~ FMap.In name dirnames ->
+    xstep (Slice (exist _ u P) (DirNext h)) tid
+      (mk_state fs lock dirs)
+      (Some name)
+      (mk_state fs lock (FMap.add h (dirname, FSet.add name dirnames) dirs))
+      nil
+  | StepDirNextEOF : forall fs lock dirs dirname dirnames tid h u P,
+    FMap.MapsTo h (dirname, dirnames) dirs ->
+    (forall name, FMap.In (dirname, name) fs -> FMap.In name dirnames) ->
+    xstep (Slice (exist _ u P) (DirNext h)) tid
+      (mk_state fs lock dirs)
+      None
+      (mk_state fs lock dirs)
+      nil
+  | StepDirClose : forall fs lock dirs tid h u P,
+    xstep (Slice (exist _ u P) (DirClose h)) tid
+      (mk_state fs lock dirs)
+      tt
+      (mk_state fs lock (FMap.remove h dirs))
       nil
 
   | StepGetTID : forall s tid u P,

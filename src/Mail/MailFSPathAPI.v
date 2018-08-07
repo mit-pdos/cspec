@@ -17,6 +17,10 @@ Module MailFSPathOp <: Ops.
   | List : forall (dir : string), xOp (list string)
   | Read : forall (fn : string * string), xOp (option string)
 
+  | DirOpen : forall (dir : string), xOp readdir_handle
+  | DirNext : forall (h : readdir_handle), xOp (option string)
+  | DirClose : forall (h : readdir_handle), xOp unit
+
   | Lock : xOp unit
   | Unlock : xOp unit
 
