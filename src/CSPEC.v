@@ -13,6 +13,7 @@ Require Export Helpers.Sets.
 Require Export Helpers.Maps.
 Require Export Helpers.Ordering.
 Require Export Helpers.StringUtils.
+Require Export Helpers.RecordSet.
 
 Require Export Spec.ConcurExec.
 Require Export Spec.Compile.
