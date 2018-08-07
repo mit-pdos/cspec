@@ -77,6 +77,6 @@ Hint Extern 1 (Setter _) => SetInstance_t : typeclass_instances.
 
 Module RecordSetNotations.
   Notation "x [ proj := v ]" := (set proj v x)
-                                  (at level 12, left associativity,
+                                  (at level 8, left associativity,
                                    format "x [ proj  :=  v ]").
 End RecordSetNotations.

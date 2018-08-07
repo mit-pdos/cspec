@@ -1,14 +1,18 @@
 Require Import CSPEC.
 Require Import MailServerAPI.
+Import RecordSetNotations.
 
 Module MailServerLockAbsState <: State.
 
   Definition dir_contents := FMap.t (nat*nat) string.
-  
+
   Record state_rec := mk_state {
     maildir : MailServerState.dir_contents;
     locked : option nat;
   }.
+
+  Instance state_rec_settable : Settable _ :=
+    mkSettable (pure mk_state <*> maildir <*> locked).
 
   Definition State := state_rec.
   Definition initP (s : State) := True.
@@ -20,33 +24,33 @@ Module MailServerLockAbsAPI <: Layer MailServerOp MailServerLockAbsState.
 
   Import MailServerOp.
   Import MailServerLockAbsState.
-  
+
   Inductive xstep : forall T, Op T -> nat -> State -> T -> State -> list event -> Prop :=
-  | StepDeliverOK : forall m mbox fn tid lock,
-    ~ FMap.In fn mbox ->
+  | StepDeliverOK : forall s m fn tid,
+    ~ FMap.In fn (maildir s) ->
     xstep (Deliver m) tid
-      (mk_state mbox lock)
+      s
       true
-      (mk_state (FMap.add fn m mbox) lock)
+      s[maildir := FMap.add fn m (maildir s)]
       nil
-  | StepDeliverErr : forall m mbox tid lock,
+  | StepDeliverErr : forall s m tid,
     xstep (Deliver m) tid
-      (mk_state mbox lock)
+      s
       false
-      (mk_state mbox lock)
+      s
       nil
-  | StepPickup : forall mbox tid r lock,
-    FMap.is_permutation_kv r mbox ->
+  | StepPickup : forall s tid r,
+    FMap.is_permutation_kv r (maildir s) ->
     xstep Pickup tid
-      (mk_state mbox lock)
+      s
       r
-      (mk_state mbox lock)
+      s
       nil
-  | StepDelete : forall mbox tid id lock,
+  | StepDelete : forall s tid id,
     xstep (Delete id) tid
-      (mk_state mbox lock)
+      s
       tt
-      (mk_state (FMap.remove id mbox) lock)
+      s[maildir := FMap.remove id (maildir s)]
       nil
 
   | StepExt : forall s tid `(extop : extopT T) r,

@@ -40,6 +40,9 @@ Module MailFSMergedState <: State.
     locked : locked_map;
   }.
 
+  Instance state_rec_settable : Settable _ :=
+    mkSettable (pure mk_state <*> fs <*> locked).
+
   Definition State := state_rec.
   Definition initP (s : State) :=
     forall u,

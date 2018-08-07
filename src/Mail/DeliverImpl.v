@@ -77,24 +77,28 @@ Module AtomicDeliver' <:
   Hint Resolve FMap.in_remove.
   Hint Resolve FMap.in_remove_ne.
 
+  Hint Extern 1 (_ = _) => progress simpl set.
+
   Lemma createwritetmp_right_mover : forall data,
     right_mover
       DeliverRestrictedAPI.step
       (DeliverOp.CreateWriteTmp data).
   Proof.
     unfold right_mover; intros.
-    repeat step_inv; eauto 10.
+    repeat step_inv; simpl; eauto 10.
     - eexists; split; eauto 10.
       rewrite FMap.add_add_ne by congruence.
       eauto 10.
     - eexists; split; eauto 10.
+      simpl.
       rewrite FMap.add_add_ne by congruence.
-      eauto 10.
+      eauto.
     - eexists.
       rewrite FMap.add_add_ne by congruence.
       split.
-      2: eauto.
+      2: eauto 10.
       eauto.
+      eauto 10.
     - eexists; split.
       2: eauto 10.
       eauto.

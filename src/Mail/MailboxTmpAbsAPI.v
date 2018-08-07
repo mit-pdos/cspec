@@ -10,6 +10,9 @@ Module MailboxTmpAbsState <: State.
     locked : bool;
   }.
 
+  Instance state_rec_settable : Settable _ :=
+    mkSettable (pure mk_state <*> tmpdir <*> maildir <*> locked).
+
   Definition State := state_rec.
   Definition initP (s : State) := True.
 

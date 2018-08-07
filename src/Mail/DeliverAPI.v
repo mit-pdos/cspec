@@ -1,6 +1,8 @@
 Require Import CSPEC.
 Require Import MailServerAPI.
 Require Import MailboxTmpAbsAPI.
+Import RecordSetNotations.
+
 
 Module DeliverOp <: Ops.
 
@@ -32,97 +34,102 @@ Module DeliverAPI <: Layer DeliverOp MailboxTmpAbsState.
   Import MailboxTmpAbsState.
 
   Inductive xstep : forall T, Op T -> nat -> State -> T -> State -> list event -> Prop :=
-  | StepCreateWriteTmpOK : forall tmp mbox tid data lock,
+  | StepCreateWriteTmpOK : forall s s' tid data,
+    s' = s[tmpdir := FMap.add (tid, 0) data (tmpdir s)] ->
     xstep (CreateWriteTmp data) tid
-      (mk_state tmp mbox lock)
+      s
       true
-      (mk_state (FMap.add (tid, 0) data tmp) mbox lock)
+      s'
       nil
 
-  | StepCreateWriteTmpErr1 : forall tmp mbox tid data lock,
+  | StepCreateWriteTmpErr1 : forall s tid data,
     xstep (CreateWriteTmp data) tid
-      (mk_state tmp mbox lock)
+      s
       false
-      (mk_state tmp mbox lock)
+      s
       nil
-  | StepCreateWriteTmpErr2 : forall tmp mbox tid data data' lock,
+  | StepCreateWriteTmpErr2 : forall s s' tid data data',
+    s' = s[tmpdir := FMap.add (tid, 0) data' (tmpdir s)] ->
     xstep (CreateWriteTmp data) tid
-      (mk_state tmp mbox lock)
+      s
       false
-      (mk_state (FMap.add (tid, 0) data' tmp) mbox lock)
+      s'
       nil
 
-  | StepUnlinkTmp : forall tmp mbox tid lock,
-    xstep (UnlinkTmp) tid
-      (mk_state tmp mbox lock)
-      tt
-      (mk_state (FMap.remove (tid, 0) tmp) mbox lock)
-      nil
-  | StepLinkMailOK : forall tmp mbox tid mailfn data lock,
-    FMap.MapsTo (tid, 0) data tmp ->
-    ~ FMap.In (tid, mailfn) mbox ->
-    xstep (LinkMail) tid
-      (mk_state tmp mbox lock)
-      true
-      (mk_state tmp (FMap.add (tid, mailfn) data mbox) lock)
-      nil
-  | StepLinkMailErr : forall tmp mbox tid lock,
-    xstep (LinkMail) tid
-      (mk_state tmp mbox lock)
-      false
-      (mk_state tmp mbox lock)
-      nil
+  | StepUnlinkTmp :
+    `(s' = s[tmpdir := FMap.remove (tid, 0) (tmpdir s)] ->
+      xstep (UnlinkTmp) tid
+        s
+        tt
+        s'
+        nil)
+  | StepLinkMailOK :
+    `(FMap.MapsTo (tid, 0) data (tmpdir s) ->
+      ~ FMap.In (tid, mailfn) (maildir s) ->
+      s' = s[maildir := FMap.add (tid, mailfn) data (maildir s)] ->
+      xstep (LinkMail) tid
+        s
+        true
+        s'
+        nil)
+  | StepLinkMailErr :
+    `(xstep (LinkMail) tid
+        s
+        false
+        s
+        nil)
 
-  | StepList : forall tmp mbox tid r lock,
-    FMap.is_permutation_key r mbox ->
-    xstep List tid
-      (mk_state tmp mbox lock)
-      r
-      (mk_state tmp mbox lock)
-      nil
+  | StepList :
+    `(FMap.is_permutation_key r (maildir s) ->
+      xstep List tid
+        s
+        r
+        s
+        nil)
 
-  | StepRead : forall fn tmp mbox tid m lock,
-    FMap.MapsTo fn m mbox ->
+  | StepRead : forall fn s tid m,
+    FMap.MapsTo fn m (maildir s) ->
     xstep (Read fn) tid
-      (mk_state tmp mbox lock)
+      s
       (Some m)
-      (mk_state tmp mbox lock)
-      nil
-
-  | StepReadNone : forall fn tmp mbox tid lock,
-    ~ FMap.In fn mbox ->
-    xstep (Read fn) tid
-      (mk_state tmp mbox lock)
-      None
-      (mk_state tmp mbox lock)
-      nil
-
-  | StepDelete : forall fn tmp mbox tid lock,
-    xstep (Delete fn) tid
-      (mk_state tmp mbox lock)
-      tt
-      (mk_state tmp (FMap.remove fn mbox) lock)
-      nil
-
-  | StepLock : forall tmp mbox tid,
-    xstep Lock tid
-      (mk_state tmp mbox false)
-      tt
-      (mk_state tmp mbox true)
-      nil
-  | StepUnlock : forall tmp mbox tid lock,
-    xstep Unlock tid
-      (mk_state tmp mbox lock)
-      tt
-      (mk_state tmp mbox false)
-      nil
-
-  | StepExt : forall s tid `(extop : extopT T) r,
-    xstep (Ext extop) tid
       s
-      r
-      s
-      (Event (extop, r) :: nil)
+      nil
+
+  | StepReadNone :
+    `(~ FMap.In fn (maildir s) ->
+      xstep (Read fn) tid
+        s
+        None
+        s
+        nil)
+
+  | StepDelete :
+    `(xstep (Delete fn) tid
+        s
+        tt
+        s[maildir := FMap.remove fn (maildir s)]
+        nil)
+
+  | StepLock :
+    `(locked s = false ->
+      xstep Lock tid
+        s
+        tt
+        s[locked := true]
+        nil)
+  | StepUnlock :
+    `(xstep Unlock tid
+        s
+        tt
+        s[locked := false]
+        nil)
+
+  | StepExt :
+    `(xstep (@Ext T extop) tid
+        s
+        r
+        s
+        (Event (extop, r) :: nil))
   .
 
   Definition step := xstep.
@@ -137,11 +144,11 @@ Module DeliverProtocol <: Protocol DeliverOp MailboxTmpAbsState.
   Import MailboxTmpAbsState.
 
   Inductive xstep_allow : forall T, Op T -> nat -> State -> Prop :=
-  | AllowCreateWriteTmp : forall tid tmp mbox data lock,
-    xstep_allow (CreateWriteTmp data) tid (mk_state tmp mbox lock)
-  | AllowLinkMail : forall tid tmp mbox lock,
-    FMap.In (tid, 0) tmp ->
-    xstep_allow (LinkMail) tid (mk_state tmp mbox lock)
+  | AllowCreateWriteTmp : forall tid data s,
+    xstep_allow (CreateWriteTmp data) tid s
+  | AllowLinkMail : forall tid s,
+    FMap.In (tid, 0) (tmpdir s) ->
+    xstep_allow (LinkMail) tid s
   | AllowUnlinkTmp : forall tid s,
     xstep_allow (UnlinkTmp) tid s
   | AllowList : forall tid s,
