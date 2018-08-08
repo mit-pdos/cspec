@@ -442,18 +442,6 @@ Module MailFSMergedAbsImpl' <:
       {m:FMap.t UserIdx.indexT V |
        forall i, UserIdx.indexValid i -> FMap.MapsTo i v m}.
 
-  Ltac mapsto_unique :=
-    match goal with
-    | [ H: FMap.MapsTo ?x ?v ?m,
-           H': FMap.MapsTo ?x ?v' ?m |- _ ] =>
-      let Heq := fresh in
-      pose proof (FMap.mapsto_unique x v v' m H H') as Heq;
-        clear H';
-        (is_var v; subst v)
-        || (is_var v'; subst v')
-        || (rewrite <- Heq in *)
-    end.
-
   Definition initP_map (s1: MailFSMergedState.State) :
     {s2: MailFSPathAbsHState.State | MailFSMergedState.initP s1 ->
                                  absR s1 s2 /\ MailFSPathAbsHState.initP s2}.
@@ -480,7 +468,7 @@ Module MailFSMergedAbsImpl' <:
              | [ H: UserIdx.indexValid _,
                     H': forall u, UserIdx.indexValid u -> _ |- _ ] =>
                specialize (H' _ H)
-             | _ => mapsto_unique
+             | _ => FMap.mapsto_unique
              end;
       simpl;
       eauto.

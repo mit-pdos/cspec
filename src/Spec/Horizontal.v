@@ -118,7 +118,7 @@ Section HorizontalComposition.
     | |- context[FMap.in_mapsto_get ?a ?b ?c] => destruct (FMap.in_mapsto_get a b c)
     end.
     eapply FMap.mapsto_add_ne in m; eauto.
-    eapply FMap.mapsto_unique; eauto.
+    FMap.mapsto_unique; auto.
   Qed.
 
   Local Theorem hget_hadd_ne_general : forall i i' s S,
@@ -318,8 +318,7 @@ Section HorizontalCompositionAbs.
         pose proof (@hget_mapsto _ _ _ _ idx s2).
         specialize (H0 (proj1_sig idx) (proj2_sig idx)).
         eapply H0 in H1; deex.
-        replace s0 with (hget s2 idx) in * by ( eapply FMap.mapsto_unique; eauto ).
-        eauto.
+        FMap.mapsto_unique; eauto.
       }
     }
     {
@@ -366,9 +365,9 @@ Section HorizontalCompositionAbs.
       specialize (H _ H0); propositional.
       eapply initP_ok in H1; propositional.
       split; intros.
-      + pose proof (FMap.mapsto_unique _ _ _ _ H H3); subst; eauto.
+      + FMap.mapsto_unique; eauto.
       + eapply FMap.map_values_MapsTo_general in H3; propositional.
-        pose proof (FMap.mapsto_unique _ _ _ _ H H4); subst; eauto.
+        FMap.mapsto_unique; eauto.
     - specialize (H i); propositional.
       apply initP_ok in H1; propositional.
       eauto.

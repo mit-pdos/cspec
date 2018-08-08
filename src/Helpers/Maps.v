@@ -207,6 +207,18 @@ Module FMap.
       intuition simp.
     Qed.
 
+    Ltac mapsto_unique :=
+      match goal with
+      | [ H: MapsTo ?x ?v ?m,
+             H': MapsTo ?x ?v' ?m |- _ ] =>
+        let Heq := fresh in
+        pose proof (mapsto_unique x v v' m H H') as Heq;
+        clear H';
+        (is_var v; subst v)
+        || (is_var v'; subst v')
+        || (rewrite <- Heq in *)
+      end.
+
     Lemma mapsto_in : forall a v m,
         MapsTo a v m ->
         In a m.
@@ -951,6 +963,7 @@ Module FMap.
              | [ H: MapsTo _ _ (remove _ _) |- _ ] =>
                apply mapsto_remove in H; destruct H
              | _ => assumption
+             | _ => mapsto_unique
              end.
 
     Ltac map_ext :=
@@ -1061,9 +1074,6 @@ Module FMap.
         add a v m = m.
     Proof.
       map_ext.
-      - destruct (cmp_dec x a); fwd.
-        replace v0 with v in * by ( eapply mapsto_unique; eauto ).
-        fwd.
     Qed.
 
     Definition is_permutation_key (l : list A) (m : t) : Prop :=
@@ -1106,24 +1116,18 @@ Module FMap.
     Proof.
       unfold is_permutation_key.
       unfold is_permutation_val.
-      split; intros.
-      - eapply in_split in H1.
-        destruct H1. destruct H1. subst.
-        eapply Forall2_app_inv_r in H0.
-        destruct H0. destruct H0. intuition subst.
-        inversion H0; clear H0; subst.
-        eauto.
-      - destruct H1.
-        eapply mapsto_in in H1 as H1'.
+      split; propositional.
+      - eapply in_split in H1; propositional.
+        eapply Forall2_app_inv_r in H0; propositional.
+        invert H1; eauto.
+      - eapply mapsto_in in H1 as H1'.
         eapply H in H1'; clear H.
         eapply in_split in H1'.
-        destruct H1'. destruct H. subst.
-        eapply Forall2_app_inv_l in H0.
-        destruct H0. destruct H. intuition subst.
-        inversion H; clear H; subst.
-        eapply mapsto_unique in H1; eauto; subst.
-        eapply in_or_app; right.
-        constructor; eauto.
+        propositional.
+        eapply Forall2_app_inv_l in H0; propositional.
+        invert H0; propositional.
+        mapsto_unique.
+        eapply in_or_app; simpl; eauto.
     Qed.
 
     Definition is_permutation_kv (l : list (A*V)) (m : t) : Prop :=
@@ -1147,8 +1151,7 @@ Module FMap.
         intuition subst.
         eapply Forall_forall in H0; eauto.
         destruct x; simpl in *.
-        eapply mapsto_unique in H1; eauto.
-        subst; eauto.
+        mapsto_unique; eauto.
     Qed.
 
    Definition is_permutation (T:Type) (l1 : list T) (l2: list T) : Prop :=
@@ -1162,18 +1165,7 @@ Module FMap.
      intros.
      unfold is_permutation_val in *.
      unfold is_permutation in *.
-     intros; split; intros.
-     - specialize (H x).
-       destruct H; auto.
-       specialize (H H1).
-       specialize (H2 H).
-       specialize (H0 x).
-       destruct H0; auto.
-     - specialize (H0 x).
-       destruct H0; auto.
-       specialize (H0 H1).
-       specialize (H x).
-       destruct H; auto.
+     firstorder.
    Qed.
 
    Lemma permutation_is_permutation_val : forall (l1: list V)  (l2: list V)  (m : t),
@@ -1307,6 +1299,18 @@ Module FMap.
 
   Arguments t A V {Acmp}.
   Arguments empty {A} {V} {Acmp}.
+
+  Ltac mapsto_unique :=
+    match goal with
+    | [ H: MapsTo ?x ?v ?m,
+           H': MapsTo ?x ?v' ?m |- _ ] =>
+      let Heq := fresh in
+      pose proof (mapsto_unique x v v' m H H') as Heq;
+      clear H';
+      (is_var v; subst v)
+      || (is_var v'; subst v')
+      || (rewrite <- Heq in *)
+         end.
 
   Section MapKeys.
 
