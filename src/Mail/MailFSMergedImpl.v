@@ -438,9 +438,30 @@ Module MailFSMergedAbsImpl' <:
     all: try solve [ split; [ eauto | exfalso; eauto ] ].
   Qed.
 
-  Axiom fmap_all : forall V (v:V),
+  Fixpoint fmap_constant A {Acmp:Ordering A} V (v:V) (l: list A) : FMap.t A V :=
+    match l with
+    | nil => FMap.empty
+    | x::xs => FMap.add x v (fmap_constant v xs)
+    end.
+
+  Theorem fmap_constant_all : forall A (Acmp:Ordering A) V (v:V) (l: list A),
+      forall a, List.In a l ->
+           FMap.MapsTo a v (fmap_constant v l).
+  Proof.
+    induction l; simpl; intuition (subst; eauto).
+    destruct (cmp_dec a a0); subst.
+    apply FMap.add_mapsto.
+    apply FMap.mapsto_add_ne'; eauto.
+  Qed.
+
+  Definition fmap_all : forall V (v:V),
       {m:FMap.t UserIdx.indexT V |
        forall i, UserIdx.indexValid i -> FMap.MapsTo i v m}.
+    intros.
+    unfold UserIdx.indexValid.
+    exists (fmap_constant v (UserIdx.validUsers)); intros.
+    auto using fmap_constant_all.
+  Defined.
 
   Definition initP_map (s1: MailFSMergedState.State) :
     {s2: MailFSPathAbsHState.State | MailFSMergedState.initP s1 ->
@@ -453,16 +474,12 @@ Module MailFSMergedAbsImpl' <:
              {| HSMap :=
                   proj1_sig (fmap_all
                                {| MailFSPathAbsState.fs := FMap.empty;
-                                  MailFSPathAbsState.locked := false; |}) |}.
+                                  MailFSPathAbsState.locked := false; |}) |};
+      match goal with
+      | [ |- context[fmap_all ?v] ] => destruct (fmap_all v); simpl
+      end.
     intros.
-    match goal with
-    | [ |- context[fmap_all ?v] ] => destruct (fmap_all v); simpl
-    end.
     eapply FMap.mapsto_in; eauto.
-    simpl in *.
-    match goal with
-    | [ |- context[fmap_all ?v] ] => destruct (fmap_all v); simpl
-    end.
     (intuition eauto); propositional;
       repeat match goal with
              | [ H: UserIdx.indexValid _,
