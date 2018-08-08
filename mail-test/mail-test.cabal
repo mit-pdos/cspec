@@ -5,7 +5,7 @@ cabal-version:       >=1.10
 
 executable mail-test
   ghc-options:         -O2 -rtsopts
-  extensions:          OverloadedStrings
+  default-extensions:  OverloadedStrings
   hs-source-dirs:      extract, lib
   main-is:             Main.hs
   build-depends:       base >= 4.7 && < 5
