@@ -11,7 +11,9 @@ Module MailboxTmpAbsState <: State.
   }.
 
   Definition State := state_rec.
-  Definition initP (s : State) := True.
+  Definition initP (s : State) := locked s = false /\
+                              tmpdir s = FMap.empty /\
+                              maildir s = FMap.empty.
 
 End MailboxTmpAbsState.
 Module MailboxTmpAbsHState := HState MailboxTmpAbsState UserIdx.

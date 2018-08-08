@@ -19,6 +19,7 @@ Ltac propositional :=
   repeat match goal with
          | |- forall _, _ => intros
          | [ H: _ /\ _ |- _ ] => destruct H
+         | [ H: _ <-> _ |- _ ] => destruct H
          | [ H: False |- _ ] => solve [ destruct H ]
          | [ H: True |- _ ] => clear H
          | [ H: ?P -> _, H': ?P |- _ ] =>

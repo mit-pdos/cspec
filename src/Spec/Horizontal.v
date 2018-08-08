@@ -118,7 +118,7 @@ Section HorizontalComposition.
     | |- context[FMap.in_mapsto_get ?a ?b ?c] => destruct (FMap.in_mapsto_get a b c)
     end.
     eapply FMap.mapsto_add_ne in m; eauto.
-    eapply FMap.mapsto_unique; eauto.
+    FMap.mapsto_unique; auto.
   Qed.
 
   Local Theorem hget_hadd_ne_general : forall i i' s S,
@@ -278,6 +278,7 @@ Section HorizontalCompositionAbs.
   Definition horizAbsR (S1 : horizState indexT indexValid sliceState1)
                        (S2 : horizState indexT indexValid sliceState2) : Prop :=
     forall (i : indexT),
+      indexValid i ->
       ( forall s1,
           FMap.MapsTo i s1 (HSMap S1) ->
             exists s2, FMap.MapsTo i s2 (HSMap S2) /\ absR s1 s2 ) /\
@@ -304,20 +305,20 @@ Section HorizontalCompositionAbs.
         repeat destruct_validIndex.
         destruct (i == x); subst.
         - split; intros.
-          + eapply FMap.mapsto_add_eq in H3; subst; eauto.
-          + eapply FMap.mapsto_add_eq in H3; subst; eauto.
+          + eapply FMap.mapsto_add_eq in H4; subst; eauto.
+          + eapply FMap.mapsto_add_eq in H4; subst; eauto.
         - specialize (H0 i); intuition idtac.
-          + eapply FMap.mapsto_add_ne in H0; eauto.
-            specialize (H3 _ H0); deex; eauto.
-          + eapply FMap.mapsto_add_ne in H0; eauto.
-            specialize (H4 _ H0); deex; eauto.
+          + eapply FMap.mapsto_add_ne in H4; eauto.
+            specialize (H0 _ H4); propositional; eauto.
+          + eapply FMap.mapsto_add_ne in H4; eauto.
+            specialize (H5 _ H4); propositional; eauto.
       }
       {
         pose proof (@hget_mapsto _ _ _ _ idx s1).
         pose proof (@hget_mapsto _ _ _ _ idx s2).
+        specialize (H0 (proj1_sig idx) (proj2_sig idx)).
         eapply H0 in H1; deex.
-        replace s0 with (hget s2 idx) in * by ( eapply FMap.mapsto_unique; eauto ).
-        eauto.
+        FMap.mapsto_unique; eauto.
       }
     }
     {
@@ -333,22 +334,43 @@ Section HorizontalCompositionAbs.
   Variable initP1 : sliceState1 -> Prop.
   Variable initP2 : sliceState2 -> Prop.
 
+  (* this is like the normal absInitP but strengthens it to provide an explicit
+  function for the witness - this is needed to construct the horizontal abstract
+  state *)
+  Variable initP_map : sliceState1 -> sliceState2.
   Variable initP_ok :
-    forall s1 s2,
+    forall s1,
       initP1 s1 ->
-      absR s1 s2 ->
-      initP2 s2.
+      absR s1 (initP_map s1) /\
+      initP2 (initP_map s1).
+
+  Hint Resolve FMap.mapsto_in.
+  Hint Resolve FMap.map_values_MapsTo.
 
   Theorem horizAbsR_initP_ok :
-    forall s1 s2,
+    forall s1,
       horizInitP initP1 s1 ->
-      horizAbsR s1 s2 ->
-      horizInitP initP2 s2.
+      exists s2, horizAbsR s1 s2 /\
+            horizInitP initP2 s2.
   Proof.
-    unfold horizInitP, horizAbsR; intros.
-    specialize (H _ H1); deex.
-    eapply H0 in H; deex.
-    eapply initP_ok in H2; eauto.
+    unfold horizInitP; intros.
+
+    unshelve eexists {| HSMap := FMap.map_values initP_map s1.(HSMap) |};
+      simpl;
+      intuition idtac.
+    - intros.
+      specialize (H i); propositional.
+      rewrite <- FMap.map_values_in; eauto.
+    - unfold horizAbsR; simpl; intros.
+      specialize (H _ H0); propositional.
+      eapply initP_ok in H1; propositional.
+      split; intros.
+      + FMap.mapsto_unique; eauto.
+      + eapply FMap.map_values_MapsTo_general in H3; propositional.
+        FMap.mapsto_unique; eauto.
+    - specialize (H i); propositional.
+      apply initP_ok in H1; propositional.
+      eauto.
   Qed.
 
 End HorizontalCompositionAbs.
@@ -786,12 +808,49 @@ Module HProtocol (o : Ops) (s : State) (p : Protocol o s) (i : HIndex).
     end.
 End HProtocol.
 
+Module Type HLayerImplAbsT
+       (o:Ops)
+       (s1: State) (l1: Layer o s1)
+       (s2: State) (l2: Layer o s2).
+  Parameter absR : s1.State -> s2.State -> Prop.
+  Parameter absR_ok : op_abs absR l1.step l2.step.
+
+  Parameter initP_map: forall (s1:s1.State), {s2:s2.State | s1.initP s1 -> absR s1 s2 /\ s2.initP s2}.
+
+End HLayerImplAbsT.
+
+Module LayerImplAbsT_from_H
+       (o:Ops)
+       (s1:State) (l1:Layer o s1)
+       (s2:State) (l2:Layer o s2)
+       (a: HLayerImplAbsT o s1 l1 s2 l2) <: LayerImplAbsT o s1 l1 s2 l2.
+  Include a.
+
+  Theorem absInitP : forall s1,
+      s1.initP s1 ->
+      exists s2, absR s1 s2 /\
+            s2.initP s2.
+  Proof.
+    intros.
+    destruct (initP_map s1); eauto.
+  Qed.
+
+End LayerImplAbsT_from_H.
+
+Module HLayerImplAbs
+       (o:Ops)
+       (s1:State) (l1:Layer o s1)
+       (s2:State) (l2:Layer o s2)
+       (a: HLayerImplAbsT o s1 l1 s2 l2).
+  Module a' := LayerImplAbsT_from_H o s1 l1 s2 l2 a.
+  Include (LayerImplAbs o s1 l1 s2 l2 a').
+End HLayerImplAbs.
 
 Module LayerImplAbsHT
   (o : Ops)
   (s1 : State) (l1 : Layer o s1)
   (s2 : State) (l2 : Layer o s2)
-  (a : LayerImplAbsT o s1 l1 s2 l2)
+  (a : HLayerImplAbsT o s1 l1 s2 l2)
   (i : HIndex).
 
   Module ho := HOps o i.
@@ -804,13 +863,17 @@ Module LayerImplAbsHT
     @horizAbsR i.indexT i.indexCmp i.indexValid _ _ a.absR.
 
   Theorem absInitP :
-    forall s1 s2,
+    forall s1,
       hs1.initP s1 ->
-      absR s1 s2 ->
+      exists s2, absR s1 s2 /\
       hs2.initP s2.
   Proof.
-    eapply horizAbsR_initP_ok.
-    eapply a.absInitP.
+    intros.
+    eapply horizAbsR_initP_ok
+      with (initP_map := fun s1 => proj1_sig (a.initP_map s1)) in H;
+      propositional; eauto.
+    pose proof (proj2_sig (a.initP_map s0));
+      simpl in *; propositional; eauto.
   Qed.
 
   Theorem absR_ok :

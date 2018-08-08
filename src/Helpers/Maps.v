@@ -1,6 +1,7 @@
 Require Import List.
 Require Import Ordering.
 Require Import ProofIrrelevance.
+Require Import Helpers.ProofAutomation.
 
 Set Implicit Arguments.
 
@@ -45,6 +46,14 @@ Proof.
 Qed.
 
 Hint Constructors sorted.
+
+Lemma map_respects_funext : forall A B (f1 f2: A -> B),
+    (forall x, f1 x = f2 x) ->
+    forall l, map f1 l = map f2 l.
+Proof.
+  induction l; simpl; intros; auto.
+  f_equal; eauto.
+Qed.
 
 Import List.ListNotations.
 Open Scope list.
@@ -197,6 +206,18 @@ Module FMap.
       induction l; simp.
       intuition simp.
     Qed.
+
+    Ltac mapsto_unique :=
+      match goal with
+      | [ H: MapsTo ?x ?v ?m,
+             H': MapsTo ?x ?v' ?m |- _ ] =>
+        let Heq := fresh in
+        pose proof (mapsto_unique x v v' m H H') as Heq;
+        clear H';
+        (is_var v; subst v)
+        || (is_var v'; subst v')
+        || (rewrite <- Heq in *)
+      end.
 
     Lemma mapsto_in : forall a v m,
         MapsTo a v m ->
@@ -749,6 +770,17 @@ Module FMap.
       intuition simp.
     Qed.
 
+    Theorem mapsto_empty_def : forall m,
+        m = empty <-> (forall x v, ~MapsTo x v m).
+    Proof.
+      split; propositional.
+      - apply empty_mapsto.
+      - apply mapsto_extensionality; intros.
+        split; intros.
+        exfalso; eapply H; eauto.
+        exfalso; eapply empty_mapsto; eauto.
+    Qed.
+
     Fixpoint _filter (P: A -> bool) (l: list (A*V)) : list (A*V) :=
       match l with
       | [] => []
@@ -914,16 +946,6 @@ Module FMap.
       - eapply mapsto_add_ne in H; eauto.
     Qed.
 
-    Lemma mapsto_ext_sym : forall T (m1 m2: T -> t),
-        (forall t, forall a v, MapsTo a v (m1 t) -> MapsTo a v (m2 t)) ->
-        (forall t, (forall a v, MapsTo a v (m1 t) -> MapsTo a v (m2 t)) ->
-              (forall a v, MapsTo a v (m2 t) -> MapsTo a v (m1 t))) ->
-        (forall t, m1 t = m2 t).
-    Proof.
-      intros.
-      apply mapsto_extensionality; intuition.
-    Qed.
-
     Ltac fwd :=
       subst;
       repeat match goal with
@@ -941,27 +963,45 @@ Module FMap.
              | [ H: MapsTo _ _ (remove _ _) |- _ ] =>
                apply mapsto_remove in H; destruct H
              | _ => assumption
+             | _ => mapsto_unique
              end.
+
+    Ltac map_ext :=
+      intros; apply mapsto_extensionality; propositional;
+      split; intros;
+      try solve [ repeat match goal with
+                         | [ a1: A, a2: A |- _ ] =>
+                           lazymatch goal with
+                           | [ H: a1 <> a2 |- _ ] => fail
+                           | [ H: a2 <> a1 |- _ ] => fail
+                           | _ => idtac
+                           end;
+                           destruct (cmp_dec a1 a2); subst
+                         end;
+                  fwd].
+
+    Lemma mapsto_ext_sym : forall T (m1 m2: T -> t),
+        (forall t, forall a v, MapsTo a v (m1 t) -> MapsTo a v (m2 t)) ->
+        (forall t, (forall a v, MapsTo a v (m1 t) -> MapsTo a v (m2 t)) ->
+              (forall a v, MapsTo a v (m2 t) -> MapsTo a v (m1 t))) ->
+        (forall t, m1 t = m2 t).
+    Proof.
+      map_ext; eauto.
+    Qed.
 
     Theorem add_add_ne :
       forall a1 v1 a2 v2 m,
         a1 <> a2 ->
         add a1 v1 (add a2 v2 m) = add a2 v2 (add a1 v1 m).
     Proof.
-      intros.
-      apply mapsto_extensionality; intuition idtac.
-      - destruct (cmp_dec x a1), (cmp_dec x a2); fwd.
-      - destruct (cmp_dec x a1), (cmp_dec x a2); fwd.
+      map_ext.
     Qed.
 
     Theorem add_add :
       forall a v1 v2 m,
         add a v1 (add a v2 m) = add a v1 m.
     Proof.
-      intros.
-      apply mapsto_extensionality; intuition idtac.
-      - destruct (cmp_dec x a); fwd.
-      - destruct (cmp_dec x a); fwd.
+      map_ext.
     Qed.
 
     Lemma cmp_lt_neq1 : forall a1 a2,
@@ -988,21 +1028,14 @@ Module FMap.
         a1 <> a2 ->
         add a1 v1 (remove a2 m) = remove a2 (add a1 v1 m).
     Proof.
-      intros.
-      apply mapsto_extensionality; intuition idtac.
-      - destruct (cmp_dec x a1); fwd.
-      - fwd.
-        destruct (cmp_dec x a1); fwd.
+      map_ext.
     Qed.
 
     Theorem remove_remove :
       forall a1 a2 m,
         remove a1 (remove a2 m) = remove a2 (remove a1 m).
     Proof.
-      intros.
-      apply mapsto_extensionality; intuition idtac.
-      - fwd.
-      - fwd.
+      map_ext.
     Qed.
 
     Theorem remove_add :
@@ -1010,9 +1043,7 @@ Module FMap.
         ~ In a1 m ->
         remove a1 (add a1 v1 m) = m.
     Proof.
-      intros.
-      apply mapsto_extensionality; intuition idtac.
-      - fwd.
+      map_ext.
       - destruct (cmp_dec x a1); subst.
         apply mapsto_in in H0; eauto.
         fwd.
@@ -1042,12 +1073,7 @@ Module FMap.
         MapsTo a v m ->
         add a v m = m.
     Proof.
-      intros.
-      apply mapsto_extensionality; intuition idtac.
-      - destruct (cmp_dec x a); fwd.
-      - destruct (cmp_dec x a); fwd.
-        replace v0 with v in * by ( eapply mapsto_unique; eauto ).
-        fwd.
+      map_ext.
     Qed.
 
     Definition is_permutation_key (l : list A) (m : t) : Prop :=
@@ -1090,24 +1116,18 @@ Module FMap.
     Proof.
       unfold is_permutation_key.
       unfold is_permutation_val.
-      split; intros.
-      - eapply in_split in H1.
-        destruct H1. destruct H1. subst.
-        eapply Forall2_app_inv_r in H0.
-        destruct H0. destruct H0. intuition subst.
-        inversion H0; clear H0; subst.
-        eauto.
-      - destruct H1.
-        eapply mapsto_in in H1 as H1'.
+      split; propositional.
+      - eapply in_split in H1; propositional.
+        eapply Forall2_app_inv_r in H0; propositional.
+        invert H1; eauto.
+      - eapply mapsto_in in H1 as H1'.
         eapply H in H1'; clear H.
         eapply in_split in H1'.
-        destruct H1'. destruct H. subst.
-        eapply Forall2_app_inv_l in H0.
-        destruct H0. destruct H. intuition subst.
-        inversion H; clear H; subst.
-        eapply mapsto_unique in H1; eauto; subst.
-        eapply in_or_app; right.
-        constructor; eauto.
+        propositional.
+        eapply Forall2_app_inv_l in H0; propositional.
+        invert H0; propositional.
+        mapsto_unique.
+        eapply in_or_app; simpl; eauto.
     Qed.
 
     Definition is_permutation_kv (l : list (A*V)) (m : t) : Prop :=
@@ -1131,8 +1151,7 @@ Module FMap.
         intuition subst.
         eapply Forall_forall in H0; eauto.
         destruct x; simpl in *.
-        eapply mapsto_unique in H1; eauto.
-        subst; eauto.
+        mapsto_unique; eauto.
     Qed.
 
    Definition is_permutation (T:Type) (l1 : list T) (l2: list T) : Prop :=
@@ -1146,18 +1165,7 @@ Module FMap.
      intros.
      unfold is_permutation_val in *.
      unfold is_permutation in *.
-     intros; split; intros.
-     - specialize (H x).
-       destruct H; auto.
-       specialize (H H1).
-       specialize (H2 H).
-       specialize (H0 x).
-       destruct H0; auto.
-     - specialize (H0 x).
-       destruct H0; auto.
-       specialize (H0 H1).
-       specialize (H x).
-       destruct H; auto.
+     firstorder.
    Qed.
 
    Lemma permutation_is_permutation_val : forall (l1: list V)  (l2: list V)  (m : t),
@@ -1292,6 +1300,18 @@ Module FMap.
   Arguments t A V {Acmp}.
   Arguments empty {A} {V} {Acmp}.
 
+  Ltac mapsto_unique :=
+    match goal with
+    | [ H: MapsTo ?x ?v ?m,
+           H': MapsTo ?x ?v' ?m |- _ ] =>
+      let Heq := fresh in
+      pose proof (mapsto_unique x v v' m H H') as Heq;
+      clear H';
+      (is_var v; subst v)
+      || (is_var v'; subst v')
+      || (rewrite <- Heq in *)
+         end.
+
   Section MapKeys.
 
     Variable A1:Type.
@@ -1408,7 +1428,7 @@ Module FMap.
       induction elements0; simpl; intros; eauto.
       destruct a.
       inversion elem_sorted0; clear elem_sorted0; subst.
-      intuition idtac.
+      propositional.
       destruct (cmp k a) eqn:He.
       - apply cmp_eq in He; subst.
         rewrite add_add.
@@ -1454,7 +1474,7 @@ Module FMap.
 
           clear H3. clear H1. clear He'. clear H. clear f.
           induction elements0; simpl; eauto.
-          inversion H2; clear H2; subst; intuition idtac.
+          inversion H2; clear H2; subst; propositional.
           destruct a0.
           unfold cmp_lt in H1; simpl in *.
           eapply cmp_trans in H1; eauto.
@@ -1468,5 +1488,75 @@ Module FMap.
     Qed.
 
   End MapKeys.
+
+  Section MapValues.
+    Variable A:Type.
+    Variables V1 V2:Type.
+    Context {Acmp: Ordering A}.
+
+    Variable f : V1 -> V2.
+
+    Definition map_values (m: t A V1) : t A V2.
+      refine {| elements := List.map (fun '(k, v) => (k, f v)) m.(elements) |}.
+      rewrite map_map; simpl.
+      rewrite map_respects_funext with (f2 := @fst A V1).
+      apply elem_sorted.
+      destruct x; auto.
+    Defined.
+
+    Theorem map_values_keys : forall m,
+        keys (map_values m) = keys m.
+    Proof.
+      unfold keys; simpl; intros.
+      rewrite map_map.
+      apply map_respects_funext.
+      destruct x; auto.
+    Qed.
+
+    Theorem map_values_in : forall m a,
+        In a m <-> In a (map_values m).
+    Proof.
+      unfold In; intros.
+      rewrite map_values_keys; reflexivity.
+    Qed.
+
+    Theorem map_values_MapsTo : forall m a v,
+        MapsTo a v m -> MapsTo a (f v) (map_values m).
+    Proof.
+      unfold MapsTo; simpl; intros.
+      abstract_term (a, f v).
+      eapply List.in_map in H; eassumption.
+      auto.
+    Qed.
+
+    Theorem map_values_MapsTo_general : forall m a v2,
+        MapsTo a v2 (map_values m) ->
+        exists v1, f v1 = v2 /\
+              MapsTo a v1 m.
+    Proof.
+      unfold MapsTo; simpl; intros.
+      destruct m; simpl in *.
+      subst keys0.
+      induct elements0.
+      - destruct H.
+      - destruct a0; simpl in *.
+        invert elem_sorted0.
+        intuition idtac.
+        + invert H0; eauto.
+        + propositional; eauto.
+    Qed.
+
+    Theorem map_values_MapsTo' : forall m a v,
+        forall (Hinjective: forall x1 x2, f x1 = f x2 -> x1 = x2),
+          MapsTo a (f v) (map_values m) ->
+          MapsTo a v m.
+    Proof.
+      intros.
+      apply map_values_MapsTo_general in H.
+      destruct H; propositional.
+      apply Hinjective in H; subst; auto.
+    Qed.
+
+  End MapValues.
 
 End FMap.

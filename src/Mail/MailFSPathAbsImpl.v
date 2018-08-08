@@ -6,7 +6,7 @@ Require Import MailFSPathAbsAPI.
 
 
 Module MailFSPathAbsImpl' <:
-  LayerImplAbsT MailFSStringOp
+  HLayerImplAbsT MailFSStringOp
     MailFSPathAbsState MailFSPathAbsAPI
     MailFSStringAbsState MailFSStringAPI.
 
@@ -270,19 +270,20 @@ Module MailFSPathAbsImpl' <:
     eexists; split; eauto.
   Qed.
 
-  Theorem absInitP :
-    forall s1 s2,
-      MailFSPathAbsState.initP s1 ->
-      absR s1 s2 ->
-      MailFSStringAbsState.initP s2.
+  Definition initP_map (s1: MailFSPathAbsState.State) :
+    {s2: MailFSStringAbsState.State |
+     MailFSPathAbsState.initP s1 -> absR s1 s2 /\ MailFSStringAbsState.initP s2}.
   Proof.
-    eauto.
+    unfold MailFSPathAbsState.initP, MailFSStringAbsState.initP, absR; intros.
+    destruct s1; simpl.
+    exists_econstructor; (intuition eauto); propositional.
+    apply FMap.empty_mapsto in H; propositional.
   Qed.
 
 End MailFSPathAbsImpl'.
 
 Module MailFSPathAbsImpl :=
- LayerImplAbs MailFSStringOp
+ HLayerImplAbs MailFSStringOp
     MailFSPathAbsState MailFSPathAbsAPI
     MailFSStringAbsState MailFSStringAPI
     MailFSPathAbsImpl'.

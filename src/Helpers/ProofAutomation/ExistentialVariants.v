@@ -32,3 +32,13 @@ Ltac epose_proof H :=
   let H' := fresh in
   pose proof H as H';
   repeat (_especialize H').
+
+Ltac eexists_t t :=
+    match goal with
+    | |- exists (_:?T), _ =>
+      eexists (ltac:(t) : T)
+    | |- {_:?T | _} =>
+      eexists (ltac:(t) : T)
+    end.
+
+Ltac exists_econstructor := eexists_t ltac:(econstructor); simpl.

@@ -19,7 +19,8 @@ Admitted.
 
 Module UserIdx <: HIndex.
   Definition indexT := string.
-  Parameter indexValid : string -> Prop.
+  Parameter validUsers : list indexT.
+  Definition indexValid (s:string) := In s validUsers.
   Definition indexCmp := string_Ordering.
 End UserIdx.
 

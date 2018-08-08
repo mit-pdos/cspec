@@ -6,12 +6,13 @@ Require Import MailFSPathAbsAPI.
 
 
 Module MailFSMergedAbsImpl' <:
-  LayerImplAbsT MailFSPathHOp
+  HLayerImplAbsT MailFSPathHOp
     MailFSMergedState   MailFSMergedAbsAPI
     MailFSPathAbsHState MailFSPathHAPI.
 
   Definition absR (s1 : MailFSMergedState.State) (s2 : MailFSPathAbsHState.State) :=
     forall u,
+      UserIdx.indexValid u ->
       ( forall s2',
         FMap.MapsTo u s2' (HSMap s2) ->
           FMap.MapsTo u (MailFSPathAbsState.locked s2') (MailFSMergedState.locked s1) /\
@@ -105,7 +106,7 @@ Module MailFSMergedAbsImpl' <:
   Proof.
     unfold absR; simpl; intros.
     destruct (u == u0); subst.
-    - specialize (H u0); intuition idtac.
+    - specialize (H u0 H0); clear H0; intuition idtac.
       + eapply mapsto_hadd_eq in H1; subst; simpl in *.
         eapply H0; eauto.
       + eapply mapsto_hadd_eq in H1; subst; simpl in *.
@@ -136,7 +137,7 @@ Module MailFSMergedAbsImpl' <:
           rewrite H4 in *.
           simpl; eauto.
 
-    - specialize (H u0); simpl in *; intuition idtac.
+    - specialize (H u0 H0); clear H0; simpl in *; intuition idtac.
       + eapply mapsto_hadd_ne in H1; eauto.
         eapply H0 in H1.
         intuition eauto.
@@ -165,7 +166,7 @@ Module MailFSMergedAbsImpl' <:
   Proof.
     unfold absR; simpl; intros.
     destruct (u == u0); subst.
-    - specialize (H u0); simpl in *; intuition idtac.
+    - specialize (H u0 H0); clear H0; simpl in *; intuition idtac.
       + eapply mapsto_hadd_eq in H1; subst; simpl in *.
         eapply H0; eauto.
       + eapply mapsto_hadd_eq in H1; subst; simpl in *.
@@ -191,7 +192,7 @@ Module MailFSMergedAbsImpl' <:
         intro Hx; inversion Hx; clear Hx; subst.
         eauto.
 
-    - specialize (H u0); simpl in *; intuition idtac.
+    - specialize (H u0 H0); clear H0; simpl in *; intuition idtac.
       + eapply mapsto_hadd_ne in H1; eauto.
         eapply H0 in H1.
         intuition eauto.
@@ -233,7 +234,7 @@ Module MailFSMergedAbsImpl' <:
         (MailFSPathAbsState.fs (hget s2 (exist _ u P))).
   Proof.
     intros.
-    specialize (H u); simpl in *; intuition idtac.
+    specialize (H u P); simpl in *; intuition idtac.
     apply H0; clear H0.
     apply FMap.in_mapsto_exists in H1; deex.
     edestruct H2.
@@ -256,7 +257,7 @@ Module MailFSMergedAbsImpl' <:
             (hget s2 (exist _ u P))))).
   Proof.
     intros.
-    specialize (H u); simpl in *; intuition idtac.
+    specialize (H u P); simpl in *; intuition idtac.
     unfold FMap.is_permutation_key in *; split; intros.
     - eapply H0 in H2; clear H0.
       unfold drop_dirname in H2.
@@ -309,7 +310,7 @@ Module MailFSMergedAbsImpl' <:
       MailFSPathAbsState.locked (hget s2 (exist _ u P)) = v.
   Proof.
     intros.
-    specialize (H u); simpl in *; intuition idtac.
+    specialize (H u P); simpl in *; intuition idtac.
     eapply H in H0; deex.
     f_equal.
     eapply FMap.mapsto_unique; try eassumption.
@@ -329,7 +330,7 @@ Module MailFSMergedAbsImpl' <:
   Proof.
     unfold absR; simpl; intros.
     destruct (u == u0); subst.
-    - specialize (H u0); simpl in *; intuition idtac.
+    - specialize (H u0 H0); clear H0; simpl in *; intuition idtac.
       + eapply mapsto_hadd_eq in H1; subst; simpl in *.
         eauto.
       + eapply mapsto_hadd_eq in H1; subst; simpl in *.
@@ -344,7 +345,7 @@ Module MailFSMergedAbsImpl' <:
         rewrite H4 in *.
         simpl; eauto.
 
-    - specialize (H u0); simpl in *; intuition idtac.
+    - specialize (H u0 H0); clear H0; simpl in *; intuition idtac.
       + eapply mapsto_hadd_ne in H1; eauto.
         eapply H0 in H1.
         eapply FMap.mapsto_add_ne'; eauto.
@@ -367,9 +368,10 @@ Module MailFSMergedAbsImpl' <:
     FMap.In u locked.
   Proof.
     destruct s2; intros.
+    pose proof H0 as Hvalid.
     eapply HSValid in H0.
     eapply FMap.in_mapsto_exists in H0; deex.
-    specialize (H u); simpl in *; intuition idtac.
+    specialize (H u Hvalid); simpl in *; intuition idtac.
     eapply H1 in H0; intuition idtac.
     eapply FMap.mapsto_in; eauto.
   Qed.
@@ -436,32 +438,64 @@ Module MailFSMergedAbsImpl' <:
     all: try solve [ split; [ eauto | exfalso; eauto ] ].
   Qed.
 
-  Theorem absInitP :
-    forall s1 s2,
-      MailFSMergedState.initP s1 ->
-      absR s1 s2 ->
-      MailFSPathAbsHState.initP s2.
+  Fixpoint fmap_constant A {Acmp:Ordering A} V (v:V) (l: list A) : FMap.t A V :=
+    match l with
+    | nil => FMap.empty
+    | x::xs => FMap.add x v (fmap_constant v xs)
+    end.
+
+  Theorem fmap_constant_all : forall A (Acmp:Ordering A) V (v:V) (l: list A),
+      forall a, List.In a l ->
+           FMap.MapsTo a v (fmap_constant v l).
   Proof.
-    unfold MailFSPathAbsHState.initP.
-    unfold MailFSMergedState.initP.
-    unfold horizInitP.
-    unfold absR.
+    induction l; simpl; intuition (subst; eauto).
+    destruct (cmp_dec a a0); subst.
+    apply FMap.add_mapsto.
+    apply FMap.mapsto_add_ne'; eauto.
+  Qed.
+
+  Definition fmap_all : forall V (v:V),
+      {m:FMap.t UserIdx.indexT V |
+       forall i, UserIdx.indexValid i -> FMap.MapsTo i v m}.
     intros.
+    unfold UserIdx.indexValid.
+    exists (fmap_constant v (UserIdx.validUsers)); intros.
+    auto using fmap_constant_all.
+  Defined.
 
-    eapply H in H1.
-    eapply FMap.in_mapsto_exists in H1; deex.
-
-    eapply H0 in H1; deex.
-    eexists; split; eauto.
-
-    unfold MailFSPathAbsState.initP; eauto.
+  Definition initP_map (s1: MailFSMergedState.State) :
+    {s2: MailFSPathAbsHState.State | MailFSMergedState.initP s1 ->
+                                 absR s1 s2 /\ MailFSPathAbsHState.initP s2}.
+  Proof.
+    unfold MailFSMergedState.initP, MailFSPathAbsHState.initP, absR,
+    horizInitP, MailFSPathAbsState.initP; intros.
+    destruct s1; simpl.
+    unshelve eexists
+             {| HSMap :=
+                  proj1_sig (fmap_all
+                               {| MailFSPathAbsState.fs := FMap.empty;
+                                  MailFSPathAbsState.locked := false; |}) |};
+      match goal with
+      | [ |- context[fmap_all ?v] ] => destruct (fmap_all v); simpl
+      end.
+    intros.
+    eapply FMap.mapsto_in; eauto.
+    (intuition eauto); propositional;
+      repeat match goal with
+             | [ H: UserIdx.indexValid _,
+                    H': forall u, UserIdx.indexValid u -> _ |- _ ] =>
+               specialize (H' _ H)
+             | _ => FMap.mapsto_unique
+             end;
+      simpl;
+      eauto.
   Qed.
 
 End MailFSMergedAbsImpl'.
 
 
 Module MailFSMergedAbsImpl :=
- LayerImplAbs MailFSPathHOp
+ HLayerImplAbs MailFSPathHOp
     MailFSMergedState   MailFSMergedAbsAPI
     MailFSPathAbsHState MailFSPathHAPI
     MailFSMergedAbsImpl'.
