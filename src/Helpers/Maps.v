@@ -1500,6 +1500,7 @@ Module FMap.
       refine {| elements := List.map (fun '(k, v) => (k, f v)) m.(elements) |}.
       rewrite map_map; simpl.
       rewrite map_respects_funext with (f2 := @fst A V1).
+      fold (keys m).
       apply elem_sorted.
       destruct x; auto.
     Defined.
