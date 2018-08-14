@@ -219,9 +219,7 @@ Section Compiler.
       + epose_proof IHexec.
         eapply proc_match_del; eauto.
         apply proc_match_upd_opt; eauto.
-        eapply ExecPrefixOne with (tid:=tid) (tid':=tid');
-          autorewrite with t in *;
-          eauto.
+        ExecPrefix tid tid'.
         destruct result'; propositional; eauto.
 
       + destruct result'; propositional.
@@ -232,17 +230,13 @@ Section Compiler.
           rewrite exec_equiv_ret_None in H8.
 
           abstract_tr.
-          eapply ExecPrefixOne with (tid:=tid) (tid':=tid');
-            autorewrite with t in *;
-            eauto.
+          ExecPrefix tid tid'.
           reflexivity.
 
         * epose_proof IHexec.
             eapply proc_match_upd; eauto.
             apply proc_match_upd_opt; eauto.
-          eapply ExecPrefixOne with (tid:=tid) (tid':=tid');
-            autorewrite with t in *;
-            eauto.
+          ExecPrefix tid tid'.
   Qed.
 
 End Compiler.

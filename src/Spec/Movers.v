@@ -400,17 +400,10 @@ Section Movers.
 
       abstract_tr.
       ExecPrefix tid0 tid'.
-      eauto.
-      cbn beta iota; eauto.
       rewrite prepend_app; auto.
     + edestruct exec_tid_right_mover; eauto; propositional.
-      eapply ExecPrefixOne with (tid:=tid0) (tid':=tid');
-        autorewrite with t in *.
-      eauto.
-      eauto.
-      eauto.
-      rewrite ConcurExec.thread_upd_abc_to_cab in * by congruence; eauto.
-    + edestruct H; eauto; subst; simpl; eauto.
+      ExecPrefix tid0 tid'.
+    + edestruct H; eauto; propositional.
       rewrite prepend_nil; eauto.
   Qed.
 

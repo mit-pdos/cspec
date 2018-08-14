@@ -316,10 +316,7 @@ Section Compiler.
       edestruct atomic_compile_ok_exec_tid; eauto.
       repeat deex.
       assert (ts2 tid' = NoProc) by eauto using proc_match_none.
-      eapply ExecPrefixOne with (tid:=tid) (tid':=tid');
-        autorewrite with t in *;
-        eauto 7 with nocore;
-        cbn beta iota.
+      ExecPrefix tid tid'.
       eapply IHexec.
       destruct matches; propositional;
         eauto using proc_match_del, proc_match_upd, proc_match_upd_opt.
