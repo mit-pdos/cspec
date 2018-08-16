@@ -249,7 +249,7 @@ Proof.
       eauto.
     intuition idtac.
     eexists; split.
-    + eapply ExecPrefixOne with (tid := tid).
+    + eapply ExecOne with (tid := tid).
         eauto.
         eauto.
       eassumption.

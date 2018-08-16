@@ -52,27 +52,6 @@ Section Execution.
       eauto using ExecOne, ExecStop.
   Qed.
 
-  Theorem ExecPrefixOne
-       : forall (T : Type)
-           (tid : nat) (ts : threads_state Op) (tr : trace)
-           (p : proc Op T) (s s' : State)
-           (evs : list event) (result : T + proc Op T)
-           (tid' : nat) spawned,
-         thread_get ts tid = Proc p ->
-         thread_get ts tid' = NoProc ->
-         exec_tid op_step tid s p s' result spawned evs ->
-         exec op_step s'
-           (thread_upd (thread_upd ts tid' spawned) tid
-             (match result with
-              | inl _ => NoProc
-              | inr p' => Proc p'
-              end)) tr ->
-         exec op_step s ts (prepend tid evs tr).
-  Proof.
-    intros.
-    eapply ExecOne; eauto.
-  Qed.
-
   Inductive exec_any (tid : nat) (s : State) :
     forall T (p : proc Op T) (r : T) (s' : State), Prop :=
   | ExecAnyOther :
@@ -434,7 +413,7 @@ match goal with
 end : exec.
 
 (* basically the same as ExecPrefix, but applies [ExecTillOne] instead of
-[ExecPrefixOne] *)
+[ExecOne] *)
 Ltac ExecOne tid_arg tid'_arg :=
   eapply ExecTillOne with (tid:=tid_arg) (tid':=tid'_arg);
   autorewrite with t;
@@ -447,7 +426,7 @@ Hint Rewrite thread_spawn_none using congruence : t.
 Hint Rewrite thread_upd_aba using congruence : t.
 
 Ltac ExecPrefix tid_arg tid'_arg :=
-  eapply ExecPrefixOne with (tid:=tid_arg) (tid':=tid'_arg);
+  eapply ExecOne with (tid:=tid_arg) (tid':=tid'_arg);
   autorewrite with t;
   (* need to exclude core for performance reasons *)
   eauto 7 with nocore exec;
