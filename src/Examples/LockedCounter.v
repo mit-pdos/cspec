@@ -7,6 +7,30 @@ Import ListNotations.
 Global Set Implicit Arguments.
 Global Generalizable All Variables.
 
+Module TSOOp <: Ops.
+
+  Inductive addr := addr0 | addr1.
+
+  Inductive xOp : Type -> Type :=
+  | Read : addr -> xOp nat
+  | Write : addr -> nat -> xOp unit
+  | TestAndSet : addr -> nat -> xOp nat
+  | Mfence : xOp nat
+  .
+
+  Definition Op := xOp.
+
+End TSOOp.
+
+Module TSOState <: State.
+
+  Definition State := memT TSOOp.addr nat.
+
+  Definition initP (s:State) :=
+    s = {| MemValue := fun a => 0; SBuf := fun _ => [] |}.
+
+End TSOState.
+
 (** LAYER: TASAPI *)
 
 Module TASOp <: Ops.
@@ -25,14 +49,14 @@ End TASOp.
 Module TASState <: State.
 
   Record s := mkTASState {
-                  TASValue : memT nat;
+                  TASValue : memT unit nat;
                   TASLock : bool;
                 }.
 
   Definition State := s.
   Definition initP s :=
     TASLock s = false /\
-    TASValue s = {| MemValue := 0; SBuf := fun _ => [] |}.
+    TASValue s = {| MemValue := fun _ => 0; SBuf := fun _ => [] |}.
 
 End TASState.
 
@@ -64,9 +88,9 @@ Module TASAPI <: Layer TASOp TASState.
   | StepClear : forall tid v l,
       xstep Clear tid (mkTASState v l) tt (mkTASState v false) nil
   | StepRead : forall tid v l,
-      xstep Read tid (mkTASState v l) (mem_read v tid) (mkTASState v l) nil
+      xstep Read tid (mkTASState v l) (mem_read v tt tid) (mkTASState v l) nil
   | StepWrite : forall tid v0 v l,
-      xstep (Write v) tid (mkTASState v0 l) tt (mkTASState (mem_write v v0 tid) l) nil
+      xstep (Write v) tid (mkTASState v0 l) tt (mkTASState (mem_write tt v v0 tid) l) nil
   | StepFlush : forall tid v l,
       xstep Flush tid (mkTASState v l) tt (mkTASState (mem_flush v tid) l) nil
   .
@@ -89,9 +113,9 @@ Module TASDelayNondetAPI <: Layer TASOp TASState.
       xstep Clear tid (mkTASState v l) tt (mkTASState v false) nil
   | StepRead : forall tid v v' l,
       mem_bg v v' ->
-      xstep Read tid (mkTASState v l) (mem_read v' tid) (mkTASState v' l) nil
+      xstep Read tid (mkTASState v l) (mem_read v' tt tid) (mkTASState v' l) nil
   | StepWrite : forall tid v0 v l,
-      xstep (Write v) tid (mkTASState v0 l) tt (mkTASState (mem_write v v0 tid) l) nil
+      xstep (Write v) tid (mkTASState v0 l) tt (mkTASState (mem_write tt v v0 tid) l) nil
   | StepFlush : forall tid v v' l,
       mem_bg v v' ->
       xstep Flush tid (mkTASState v l) tt (mkTASState (mem_flush v' tid) l) nil
@@ -185,14 +209,14 @@ End LockOp.
 Module LockState <: State.
 
   Record s := mkState {
-                  Value : memT nat;
+                  Value : memT unit nat;
                   Lock : option nat;
                 }.
 
   Definition State := s.
   Definition initP s :=
     Lock s = None /\
-    Value s = {| MemValue := 0; SBuf := fun _ => [] |}.
+    Value s = {| MemValue := fun _ => 0; SBuf := fun _ => [] |}.
 
 End LockState.
 
@@ -210,9 +234,9 @@ Module TASLockAPI <: Layer TASOp LockState.
       xstep Clear tid (mkState v l) tt (mkState v None) nil
   | StepRead : forall tid v v' l,
       mem_bg v v' ->
-      xstep Read tid (mkState v l) (mem_read v' tid) (mkState v' l) nil
+      xstep Read tid (mkState v l) (mem_read v' tt tid) (mkState v' l) nil
   | StepWrite : forall tid v0 v l,
-      xstep (Write v) tid (mkState v0 l) tt (mkState (mem_write v v0 tid) l) nil
+      xstep (Write v) tid (mkState v0 l) tt (mkState (mem_write tt v v0 tid) l) nil
   | StepFlush : forall tid v v' l,
       mem_bg v v' ->
       xstep Flush tid (mkState v l) tt (mkState (mem_flush v' tid) l) nil
@@ -288,9 +312,9 @@ Module RawLockAPI <: Layer LockOp LockState.
       xstep Release tid (mkState v l) tt (mkState v None) nil
   | StepRead : forall tid v v' l,
       mem_bg v v' ->
-      xstep Read tid (mkState v l) (mem_read v' tid) (mkState v' l) nil
+      xstep Read tid (mkState v l) (mem_read v' tt tid) (mkState v' l) nil
   | StepWrite : forall tid v0 v l,
-      xstep (Write v) tid (mkState v0 l) tt (mkState (mem_write v v0 tid) l) nil
+      xstep (Write v) tid (mkState v0 l) tt (mkState (mem_write tt v v0 tid) l) nil
   | StepFlush : forall tid v v' l,
       mem_bg v v' ->
       xstep Flush tid (mkState v l) tt (mkState (mem_flush v' tid) l) nil
@@ -350,16 +374,16 @@ Module LockedCounterAPI <: Layer CounterOp LockState.
   Import LockState.
 
   Inductive xstep : forall T, Op T -> nat -> State -> T -> State -> list event -> Prop :=
-  | StepInc : forall tid v0 v v' r,
+  | StepInc : forall (tid: nat) v0 v v' r,
       mem_bg v0 v ->
-      r = mem_read v tid ->
-      mem_bg (mem_write (mem_read v tid + 1) v tid) v' ->
+      r = mem_read v tt tid ->
+      mem_bg (mem_write tt (mem_read v tt tid + 1) v tid) v' ->
       xstep Inc tid (mkState v0 None) r
             (mkState (mem_flush v' tid) None) nil
-  | StepDec : forall tid v0 v v' r,
+  | StepDec : forall (tid: nat) v0 v v' r,
       mem_bg v0 v ->
-      r = mem_read v tid ->
-      mem_bg (mem_write (mem_read v tid - 1) v tid) v' ->
+      r = mem_read v tt tid ->
+      mem_bg (mem_write tt (mem_read v tt tid - 1) v tid) v' ->
       xstep Dec tid (mkState v0 None) r
             (mkState (mem_flush v' tid) None) nil.
 
@@ -667,7 +691,7 @@ Module AbsCounter' <:
   Definition absR (s1 : LockState.State) (s2 : CounterState.State) :=
     Lock s1 = None /\
     empty_sb s1.(Value) /\
-    s1.(Value).(MemValue) = s2.
+    s1.(Value).(MemValue) tt = s2.
 
   Lemma step_inc : forall tid v r v',
       r = v ->
@@ -691,19 +715,22 @@ Module AbsCounter' <:
   Hint Resolve empty_sb_single_value_flush.
   Hint Resolve empty_sb_mem_read.
 
-  Lemma single_value_flush T : forall (m m': memT T) tid (f: T -> T),
+  Lemma single_value_flush A {_:EqualDec A} T : forall (m m': memT A T) tid (f: T -> T) (a:A),
       empty_sb m ->
-      single_value m' tid (f (mem_read m tid)) ->
-      MemValue (mem_flush m' tid) = f (MemValue m).
+      single_value m' tid a (f (mem_read m a tid)) ->
+      MemValue (mem_flush m' tid) a = f (MemValue m a).
   Proof.
     intros.
     assert (empty_sb (mem_flush m' tid)) by eauto.
     eapply single_value_mem_flush in H0; eauto.
     apply single_value_mem_read in H0.
+    (*
     erewrite (empty_sb_mem_read (m:=(mem_flush m' tid))) in * by auto.
     erewrite (empty_sb_mem_read (m:=m)) in * by auto.
     auto.
   Qed.
+     *)
+  Admitted.
 
   Hint Resolve single_value_flush.
 
@@ -718,7 +745,7 @@ Module AbsCounter' <:
 
     - eapply empty_sb_mem_bg_noop in H4; [ | solve [ eauto ] ]; subst.
 
-      assert (single_value v' tid (mem_read Value0 tid + 1)).
+      assert (single_value v' tid tt (mem_read Value0 tt tid + 1)).
       eapply empty_sb_single_value in H.
       eapply mem_write_single_value in H.
       eapply single_value_mem_bg in H; eauto.
@@ -729,7 +756,7 @@ Module AbsCounter' <:
 
     - eapply empty_sb_mem_bg_noop in H4; [ | solve [ eauto ] ]; subst.
 
-      assert (single_value v' tid (mem_read Value0 tid - 1)).
+      assert (single_value v' tid tt (mem_read Value0 tt tid - 1)).
       eapply empty_sb_single_value in H.
       eapply mem_write_single_value in H.
       eapply single_value_mem_bg in H; eauto.

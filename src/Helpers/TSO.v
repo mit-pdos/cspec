@@ -11,31 +11,47 @@ Open Scope list.
 
 Section TSOModel.
 
+  Context A {Adec: EqualDec A}.
   Variable T : Type.
 
   Record memT := mkMem {
-    MemValue : T;
-    SBuf : funmap nat (list T);
+    MemValue :> funmap A T;
+    SBuf : funmap nat (list (A*T));
   }.
 
-  Definition mem_read (m : memT) (tid : nat) : T :=
-    match SBuf m tid with
-    | nil => MemValue m
-    | v :: _ => v
+  Fixpoint sbuf_read (ws: list (A*T)) (a:A) (x:T) : T :=
+    match ws with
+    | nil => x
+    | (a', v) :: ws' => if a == a' then v else sbuf_read ws' a x
     end.
 
-  Definition mem_write (v : T) (m : memT) (tid : nat) : memT :=
-    mkMem (MemValue m) (fupd tid (v :: SBuf m tid) (SBuf m)).
+  Definition mem_read (m : memT) (a:A) (tid : nat) : T :=
+    sbuf_read (m.(SBuf) tid) a (m a).
+
+  Definition mem_write (a:A) (v:T) (m: memT) (tid: nat) : memT :=
+    mkMem (MemValue m) (fupd tid ((a,v) :: m.(SBuf) tid) m.(SBuf)).
+
+  Fixpoint sbuf_flush (ws: list (A*T)) (m: funmap A T) : funmap A T :=
+    match ws with
+    | nil => m
+    | (a,v) :: ws' => fupd a v (sbuf_flush ws' m)
+    end.
 
   Definition mem_flush (m : memT) (tid : nat) : memT :=
-    match SBuf m tid with
-    | nil => m
-    | v :: _ => mkMem v (fupd tid nil (SBuf m))
+    mkMem (sbuf_flush (m.(SBuf) tid) m.(MemValue)) (fupd tid nil m.(SBuf)).
+
+  Fixpoint last_error A (l: list A) : option A :=
+    match l with
+    | [] => None
+    | [a] => Some a
+    | x::xs => last_error xs
     end.
 
   Definition mem_bgflush (m : memT) (tid : nat) : memT :=
-    mkMem (last (SBuf m tid) (MemValue m))
-          (fupd tid (removelast (SBuf m tid)) (SBuf m)).
+    match last_error (m.(SBuf) tid) with
+    | Some (a, v) => mkMem (fupd a v m.(MemValue)) (fupd tid (removelast (m.(SBuf) tid)) m.(SBuf))
+    | None => m
+    end.
 
   Definition mem_bg : memT -> memT -> Prop :=
     clos_refl_trans_n1 memT (fun m m' => exists tid, m' = mem_bgflush m tid).
@@ -62,22 +78,12 @@ Section TSOModel.
     apply functional_extensionality; auto.
   Qed.
 
-  Lemma mem_bgflush_write_commute_ne : forall m tid tid' v,
+  Lemma mem_bgflush_write_commute_ne : forall a m tid tid' v,
       tid <> tid' ->
-      mem_write v (mem_bgflush m tid) tid' =
-      mem_bgflush (mem_write v m tid') tid.
+      mem_write a v (mem_bgflush m tid) tid' =
+      mem_bgflush (mem_write a v m tid') tid.
   Proof.
-    intros.
-    apply memT_eq; simpl; intros.
-    rewrite fupd_ne by auto; auto.
-    rewrite fupd_fupd_ne by auto.
-    destruct (tid0 == tid); subst;
-      rewrite ?fupd_eq, ?fupd_ne by congruence;
-      auto.
-    rewrite (fupd_ne (a:=tid) (a':=tid0)) by congruence.
-    destruct (tid' == tid0); subst;
-      rewrite ?fupd_eq, ?fupd_ne by congruence; auto.
-  Qed.
+  Admitted.
 
   Lemma mem_bgflush_noop : forall m tid,
       m.(SBuf) tid = [] ->
@@ -86,9 +92,6 @@ Section TSOModel.
     unfold mem_bgflush; intros.
     rewrite H; simpl.
     apply memT_eq; simpl; intros; auto.
-    destruct (tid == tid0); subst.
-    rewrite fupd_eq; auto.
-    rewrite fupd_ne; auto.
   Qed.
 
   Lemma last_prepend_nonempty : forall A (l: list A) (x:A) def,
@@ -118,28 +121,22 @@ Section TSOModel.
     eauto using mem_bg_trans.
   Qed.
 
-  Lemma mem_bgflush_write_commute_nonempty : forall m tid v,
+  Lemma mem_bgflush_write_commute_nonempty : forall m tid a v,
       m.(SBuf) tid <> [] ->
-      mem_write v (mem_bgflush m tid) tid =
-      mem_bgflush (mem_write v m tid) tid.
+      mem_write a v (mem_bgflush m tid) tid =
+      mem_bgflush (mem_write a v m tid) tid.
   Proof.
-    unfold mem_bgflush, mem_write.
-    destruct m; simpl; intros.
-    autorewrite with fupd.
-    rewrite last_prepend_nonempty,
-    removelast_prepend_nonempty by auto.
-    auto.
-  Qed.
+  Admitted.
 
-  Lemma mem_bg_commute_write : forall m1 m2 m3 m4 v tid,
+  Lemma mem_bg_commute_write : forall m1 m2 m3 m4 a v tid,
       mem_bg m1 m2 ->
-      m3 = mem_write v m2 tid ->
+      m3 = mem_write a v m2 tid ->
       mem_bg m3 m4 ->
-      mem_bg (mem_write v m1 tid) m4.
+      mem_bg (mem_write a v m1 tid) m4.
   Proof.
     intros; subst.
     eapply mem_bg_transform_commute with
-        (f := fun m => mem_write v m tid);
+        (f := fun m => mem_write a v m tid);
       intros; eauto.
     destruct (tid == tid0); subst.
     - destruct_with_eqn (m.(SBuf) tid0).
@@ -156,28 +153,7 @@ Section TSOModel.
       mem_flush (mem_bgflush m tid) tid =
       mem_flush m tid.
   Proof.
-    unfold mem_flush, mem_bgflush.
-    destruct m; simpl; intros.
-    autorewrite with fupd.
-    destruct_with_eqn (SBuf0 tid); simpl.
-    rewrite fupd_same by auto; auto.
-    destruct l; auto.
-  Qed.
-
-  Lemma mem_flush_bgflush_ne_commute : forall m tid tid',
-      tid <> tid' ->
-      mem_flush (mem_bgflush m tid) tid' =
-      mem_bgflush (mem_flush m tid') tid.
-  Proof.
-    unfold mem_flush, mem_bgflush.
-    destruct m; simpl; intros.
-    autorewrite with fupd.
-    destruct_with_eqn (SBuf0 tid'); simpl; auto.
-    rewrite fupd_ne by auto.
-    apply memT_eq; simpl.
-    (* oops, this isn't true - a bgflush before flush is overwritten, whereas a
-    bgflush after remains in memory *)
-  Abort.
+  Admitted.
 
   Definition empty_sb (m:memT) := forall tid, m.(SBuf) tid = [].
 
@@ -189,7 +165,7 @@ Section TSOModel.
     apply memT_eq; simpl; intros.
     rewrite H; auto.
     rewrite H; simpl.
-    rewrite fupd_same; auto.
+    auto.
   Qed.
 
   Theorem empty_sb_mem_bg_noop : forall m m',
@@ -209,122 +185,85 @@ Section TSOModel.
     apply memT_eq; simpl; intros.
     rewrite H; auto.
     rewrite H; auto.
+    rewrite fupd_same; auto.
   Qed.
 
-  Theorem empty_sb_mem_read : forall m tid,
+  Theorem empty_sb_mem_read : forall m a tid,
       empty_sb m ->
-      mem_read m tid = m.(MemValue).
+      mem_read m a tid = m.(MemValue) a.
   Proof.
     unfold empty_sb, mem_read; intros.
     rewrite H; auto.
   Qed.
 
-  Definition single_value (m:memT) tid v :=
+  Definition single_value (m:memT) tid a v :=
     (forall tid', tid <> tid' -> m.(SBuf) tid' = []) /\
-    mem_read m tid = v.
+    mem_read m a tid = v.
 
   Hint Unfold empty_sb single_value
        mem_read mem_write mem_bgflush : sb.
 
-  Theorem empty_sb_single_value : forall m,
+  Theorem empty_sb_single_value : forall m a,
       empty_sb m ->
-      forall tid, single_value m tid m.(MemValue).
+      forall tid, single_value m tid a (m.(MemValue) a).
   Proof.
     autounfold with sb; simpl; intuition eauto.
     rewrite H; auto.
   Qed.
 
-  Theorem mem_write_single_value : forall m tid v0 v,
-      single_value m tid v0 ->
-      single_value (mem_write v m tid) tid v.
+  Theorem mem_write_single_value : forall m tid a v0 v,
+      single_value m tid a v0 ->
+      single_value (mem_write a v m tid) tid a v.
   Proof.
-    autounfold with sb;
-      simpl; (intuition idtac);
-      autorewrite with fupd;
-      eauto.
-  Qed.
+  Admitted.
 
-  Lemma mem_read_bgflush : forall m tid,
-      mem_read (mem_bgflush m tid) tid = mem_read m tid.
+  Lemma mem_read_bgflush : forall a m tid,
+      mem_read (mem_bgflush m tid) a tid = mem_read m a tid.
   Proof.
-    destruct m; intros; simpl.
-    unfold mem_read; simpl.
-    autorewrite with fupd.
-    generalize dependent (SBuf0 tid); intros.
-    induction l; simpl; auto.
-    destruct l; auto.
-  Qed.
+  Admitted.
 
-  Theorem single_value_bgflush : forall m tid v m' tid',
-      single_value m tid v ->
+  Theorem single_value_bgflush : forall m tid a v m' tid',
+      single_value m tid a v ->
       m' = mem_bgflush m tid' ->
-      single_value m' tid v.
+      single_value m' tid a v.
   Proof.
-    unfold single_value; (intuition idtac); subst; simpl.
-    destruct (tid' == tid'0); subst;
-      autorewrite with fupd.
-    rewrite H1 by congruence; auto.
-    rewrite H1 by congruence; auto.
+  Admitted.
 
-    destruct (tid == tid'); subst.
-    - apply mem_read_bgflush.
-    - unfold mem_bgflush.
-      autorewrite with fupd;
-        rewrite H1 by congruence.
-      rewrite fupd_same by eauto.
-      simpl.
-      destruct m; simpl; auto.
-  Qed.
-
-  Theorem single_value_mem_bg : forall m tid v m',
-      single_value m tid v ->
+  Theorem single_value_mem_bg : forall m tid a v m',
+      single_value m tid a v ->
       mem_bg m m' ->
-      single_value m' tid v.
+      single_value m' tid a v.
   Proof.
     induction 2; repeat deex; eauto using single_value_bgflush.
   Qed.
 
   Hint Unfold mem_flush : sb.
 
-  Lemma empty_sb_single_value_flush : forall m v tid,
-      single_value m tid v ->
+  Lemma empty_sb_single_value_flush : forall m a v tid,
+      single_value m tid a v ->
       empty_sb (mem_flush m tid).
   Proof.
-    autounfold with sb;
-      (intuition idtac); subst; simpl.
-    destruct (tid == tid0); subst.
-    destruct_with_eqn (SBuf m tid0); simpl; eauto.
-    autorewrite with fupd; auto.
-    destruct_with_eqn (SBuf m tid); simpl; eauto.
-    autorewrite with fupd; auto.
-  Qed.
+  Admitted.
 
-  Theorem single_value_mem_flush : forall m tid v m',
-      single_value m tid v ->
+  Theorem single_value_mem_flush : forall m tid a v m',
+      single_value m tid a v ->
       m' = mem_flush m tid ->
-      single_value m' tid v.
+      single_value m' tid a v.
   Proof.
-    autounfold with sb;
-      (intuition idtac); subst; simpl;
-        destruct matches; simpl in *;
-          autorewrite with fupd in *;
-          eauto.
-    simpl_match; auto.
-    congruence.
-  Qed.
+  Admitted.
 
-  Lemma single_value_mem_read : forall m tid v,
-      single_value m tid v ->
-      mem_read m tid = v.
+  Lemma single_value_mem_read : forall m tid a v,
+      single_value m tid a v ->
+      mem_read m a tid = v.
   Proof.
     destruct 1; auto.
   Qed.
 
 End TSOModel.
 
-Arguments mem_bg {T} m1 m2.
+Arguments mem_bg {A Adec T} m1 m2.
 
-Instance mem_bg_PreOrder T : PreOrder (@mem_bg T).
+Instance mem_bg_PreOrder A {_:EqualDec A} T : PreOrder (mem_bg (A:=A) (T:=T)).
 Proof.
   constructor; hnf; intros.
   hnf; constructor.

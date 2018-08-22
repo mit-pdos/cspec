@@ -24,12 +24,10 @@ Class EqualDec A :=
 
 Notation " x == y " := (equal_dec (x :>) (y :>)) (no associativity, at level 70).
 
-(**
-    Here, we define some types for which we know how to compute
-    decidable equality (namely, equality for [nat]s, and equality
-    for [bool]s).
-  *)
-
+Instance unit_equal_dec : EqualDec unit :=
+  fun x y => left (match x, y with
+                | tt, tt => eq_refl
+                end).
 Instance nat_equal_dec : EqualDec nat := ltac:(hnf; decide equality).
 Instance bool_equal_dec : EqualDec bool := ltac:(hnf; decide equality).
 

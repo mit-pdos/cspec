@@ -63,3 +63,5 @@ End FunMap.
 Hint Rewrite fupd_eq : fupd.
 Hint Rewrite fupd_ne using congruence : fupd.
 Hint Rewrite fupd_fupd_eq using congruence : fupd.
+
+Identity Coercion funmap_apply : funmap >-> Funclass.
