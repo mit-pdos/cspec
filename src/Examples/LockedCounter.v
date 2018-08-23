@@ -280,9 +280,9 @@ Module TASState <: State.
 
 End TASState.
 
-(** LAYER: TASDelayNondetAPI *)
+(** LAYER: TASAPI *)
 
-Module TASDelayNondetAPI <: Layer TASOp TASState.
+Module TASAPI <: Layer TASOp TASState.
 
   Import TASOp.
   Import TASState.
@@ -304,7 +304,7 @@ Module TASDelayNondetAPI <: Layer TASOp TASState.
 
   Definition step := xstep.
 
-End TASDelayNondetAPI.
+End TASAPI.
 
 (** LAYER: TASLockAPI *)
 
@@ -361,13 +361,13 @@ Module TASLockAPI <: Layer TASOp LockState.
 
 End TASLockAPI.
 
-(** IMPL: TASLockAPI -> TASDelayNondetAPI
+(** IMPL: TASLockAPI -> TASAPI
 
 Adding ghost state to the test-and-set bit. *)
 
 Module AbsLock' <:
   LayerImplAbsT TASOp
-                TASState TASDelayNondetAPI
+                TASState TASAPI
                 LockState TASLockAPI.
 
   Import TASState.
@@ -381,7 +381,7 @@ Module AbsLock' <:
   Hint Constructors TASLockAPI.xstep.
 
   Theorem absR_ok :
-    op_abs absR TASDelayNondetAPI.step TASLockAPI.step.
+    op_abs absR TASAPI.step TASLockAPI.step.
   Proof.
     unfold op_abs; intros.
     destruct s1; destruct s2; unfold absR in *.
@@ -409,7 +409,7 @@ End AbsLock'.
 
 Module AbsLock :=
   LayerImplAbs TASOp
-               TASState TASDelayNondetAPI
+               TASState TASAPI
                LockState TASLockAPI
                AbsLock'.
 
@@ -969,7 +969,7 @@ Module LockImpl :=
 
   TASAPI ---------------+----+---------+
     [ AbsNondet ]       |    |         |
-  TASDelayNondetAPI    [c0]  |         |
+  TASAPI    [c0]  |         |
     [ AbsLock ]         |    |         |
   TASLockAPI -----------+   [c1]       |
     [ LockImpl ]             |         |
@@ -981,13 +981,6 @@ Module LockImpl :=
     [ AbsCounter ]                |    |
   CounterAPI ---------------------+----+
  *)
-
-Module c0 :=
-  Link
-    TASOp  TASState  TASAPI
-    TASOp  TASState  TASDelayNondetAPI
-    TASOp LockState TASLockAPI
-    AbsNondet AbsLock.
 
 Module c1 :=
   Link
