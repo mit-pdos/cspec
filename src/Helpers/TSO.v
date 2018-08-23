@@ -85,6 +85,30 @@ Section TSOModel.
   Proof.
   Admitted.
 
+  Theorem mem_write_flush_same : forall (m:memT) tid a v,
+      mem_read m a tid = v ->
+      mem_flush (mem_write a v m tid) tid = mem_flush m tid.
+  Proof.
+    intros.
+    unfold mem_read, mem_flush, mem_write in *.
+    destruct m; simpl in *.
+    apply memT_eq; simpl.
+    - generalize dependent (SBuf0 tid); intros ws **.
+      generalize dependent v.
+      induction ws; simpl; intros.
+      + rewrite fupd_eq; simpl.
+        rewrite fupd_same; auto.
+      + specialize (IHws _ eq_refl).
+        rewrite fupd_eq in *; simpl in *.
+        destruct a0.
+        destruct (a == a0); subst.
+        rewrite fupd_fupd_eq by auto; auto.
+        rewrite fupd_fupd_ne by auto.
+        f_equal; eauto.
+    - intros.
+      rewrite fupd_fupd_eq; eauto.
+  Qed.
+
   Lemma mem_bgflush_noop : forall m tid,
       m.(SBuf) tid = [] ->
       mem_bgflush m tid = m.
@@ -153,6 +177,18 @@ Section TSOModel.
       mem_flush (mem_bgflush m tid) tid =
       mem_flush m tid.
   Proof.
+  Admitted.
+
+  Theorem mem_bg_flush : forall (s s': memT) tid,
+      mem_bg s s' ->
+      mem_bg (mem_flush s tid) (mem_flush s' tid).
+  Proof.
+    intros.
+    induct H.
+    constructor.
+    destruct (tid == tid0); propositional.
+    rewrite mem_flush_bgflush_eq; eauto.
+    (* TODO: need a mem_flush_bgflush_ne which commutes *)
   Admitted.
 
   Definition empty_sb (m:memT) := forall tid, m.(SBuf) tid = [].

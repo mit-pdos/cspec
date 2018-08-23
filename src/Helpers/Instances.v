@@ -17,42 +17,62 @@ Require Import List.
 Class EqualDec A :=
   equal_dec : forall x y : A, { x = y } + { x <> y }.
 
+Ltac RelInstance_t :=
+  intros;
+  let refl := try solve [ hnf; intros; reflexivity ] in
+  let symm := try solve [ hnf; intros; try symmetry; eauto ] in
+  let trans := try solve [ hnf; intros; etransitivity; eauto ] in
+  try match goal with
+      | |- EqualDec _ =>
+        hnf; decide equality
+      | |- Reflexive _ =>
+        hnf; intros; refl
+      | |- Symmetric _ =>
+        hnf; intros; symm
+      | |- Transitive _ =>
+        hnf; intros; trans
+      | |- PreOrder _ =>
+        constructor; hnf; intros; [ refl | trans ]
+      | |- Equivalence _ =>
+        constructor; hnf; intros; [ refl | symm | trans ]
+      end.
+
+Notation RelInstance := (ltac:(RelInstance_t)) (only parsing).
+
 (**
     We define the notation [x == y] to mean our decidable equality
     between [x] and [y].
   *)
 
-Notation " x == y " := (equal_dec (x :>) (y :>)) (no associativity, at level 70).
+Notation " x == y " := (equal_dec x y) (no associativity, at level 70).
 
+(* For units, an explicit definition has better computational behavior.
+Specifically it is syntactically a [left], so any matches on [u == u']
+automatically reduce to the true case; [decide equality] would first destruct
+the arguments before producing [left]. *)
 Instance unit_equal_dec : EqualDec unit :=
   fun x y => left (match x, y with
                 | tt, tt => eq_refl
                 end).
-Instance nat_equal_dec : EqualDec nat := ltac:(hnf; decide equality).
-Instance bool_equal_dec : EqualDec bool := ltac:(hnf; decide equality).
+
+Instance nat_equal_dec : EqualDec nat := RelInstance.
+Instance bool_equal_dec : EqualDec bool := RelInstance.
 
 Instance string_equal_dec : EqualDec string := string_dec.
 Instance list_equal_dec A `{dec:EqualDec A} : EqualDec (list A) := list_eq_dec dec.
 
-Instance pair_equal_dec A B `{ea:EqualDec A} `{eb:EqualDec B} : EqualDec (A*B).
-  intro; intros.
-  destruct x; destruct y.
-  destruct (a == a0); subst.
-  destruct (b == b0); subst.
-  all: intuition congruence.
-Defined.
-
+Instance pair_equal_dec A B `{ea:EqualDec A} `{eb:EqualDec B} : EqualDec (A*B) :=
+  RelInstance.
 
 Local Hint Constructors clos_refl_trans_1n.
 Instance clos_rt1n_pre A (R: A -> A -> Prop) : PreOrder (clos_refl_trans_1n A R).
 Proof.
-  constructor; hnf; eauto.
-  induction 1; eauto.
+  RelInstance_t.
+  eauto.
+  induction H; eauto.
 Qed.
 
-Instance comparison_eq_dec : EqualDec comparison.
-hnf; decide equality.
-Qed.
+Instance comparison_eq_dec : EqualDec comparison := ltac:(hnf; decide equality).
 
 Instance ord_eq_dec A {o:Ordering A} : EqualDec A.
 Proof.
@@ -73,23 +93,3 @@ Proof.
   - intro.
     inversion H; congruence.
 Qed.
-
-Ltac RelInstance_t :=
-  intros;
-  let refl := try solve [ hnf; intros; reflexivity ] in
-  let symm := try solve [ hnf; intros; try symmetry; eauto ] in
-  let trans := try solve [ hnf; intros; etransitivity; eauto ] in
-  try match goal with
-  | |- Reflexive _ =>
-    hnf; intros; refl
-  | |- Symmetric _ =>
-    hnf; intros; symm
-  | |- Transitive _ =>
-    hnf; intros; trans
-  | |- PreOrder _ =>
-    constructor; hnf; intros; [ refl | trans ]
-  | |- Equivalence _ =>
-    constructor; hnf; intros; [ refl | symm | trans ]
-  end.
-
-Notation RelInstance := (ltac:(RelInstance_t)) (only parsing).

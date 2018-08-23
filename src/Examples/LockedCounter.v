@@ -15,6 +15,7 @@ Module TSOOp <: Ops.
   Definition Val := TSOOp.addr0.
   Definition Lock := TSOOp.addr1.
   Definition cLocked := 1.
+  (* this is the canonical unlocked value, but any value but cLocked will do *)
   Definition cUnlocked := 0.
 
   Inductive xOp : Type -> Type :=
@@ -34,7 +35,7 @@ Module TSOState <: State.
   Definition State := memT TSOOp.addr nat.
 
   Definition initP (s:State) :=
-    s = {| MemValue := fun a => 0; SBuf := fun _ => [] |}.
+    s = {| MemValue := fun a => TSOOp.cUnlocked; SBuf := fun _ => [] |}.
 
 End TSOState.
 
@@ -142,11 +143,13 @@ Module AbsNondet :=
 Module TASOp <: Ops.
 
   Inductive xOp : Type -> Type :=
-  | TestAndSet : xOp bool
+  | TryAcquire : xOp bool (* true if acquired *)
   | Clear : xOp unit
   | Read : xOp nat
   | Write : nat -> xOp unit
-  | Flush : xOp unit.
+  (* we won't actually use a fence *)
+  (* | Flush : xOp unit *)
+  .
 
   Definition Op := xOp.
 
@@ -158,12 +161,19 @@ Module TAS_TSOAPI <: Layer TASOp TSOState.
   Import TSOState.
 
   Inductive xstep : forall T, Op T -> nat -> State -> T -> State -> list event -> Prop :=
-  | StepTAS : forall tid s s',
+  | StepTryAcquireSuccess : forall tid s s',
       mem_bg s s' ->
-      xstep TestAndSet tid
+      mem_read s' Lock tid <> cLocked ->
+      xstep TryAcquire tid
             s
-            (if mem_read s' Lock tid == cLocked then true else false)
-            (mem_flush (mem_write Lock cLocked s' tid) tid)
+            true
+            (mem_flush (mem_write Lock cLocked s' tid) tid) nil
+  | StepTryAcquireFail : forall tid s s',
+      mem_bg s s' ->
+      xstep TryAcquire tid
+            s
+            false
+            (mem_flush s' tid)
             nil
   | StepClear : forall tid s,
       xstep Clear tid s tt (mem_write Lock cUnlocked s tid) nil
@@ -172,25 +182,14 @@ Module TAS_TSOAPI <: Layer TASOp TSOState.
       xstep Read tid s (mem_read s' Val tid) s' nil
   | StepWrite : forall tid s v,
       xstep (Write v) tid s tt (mem_write Val v s tid) nil
-  | StepFlush : forall tid s s',
+  (* | StepFlush : forall tid s s',
       mem_bg s s' ->
-      xstep Flush tid s tt (mem_flush s' tid) nil.
+      xstep Flush tid s tt (mem_flush s' tid) nil. *)
+  .
 
   Definition step := xstep.
 
 End TAS_TSOAPI.
-
-Theorem mem_bg_flush : forall A {Adec:EqualDec A} V (s s': memT A V) tid,
-    mem_bg s s' ->
-    mem_bg (mem_flush s tid) (mem_flush s' tid).
-Proof.
-  intros.
-  induct H.
-  reflexivity.
-  cmp_ts tid tid0.
-  rewrite mem_flush_bgflush_eq; eauto.
-  (* TODO: need a mem_fluush_bgflush_ne which commutes *)
-Admitted.
 
 Module TAS_TSOImpl <: LayerImplMoversT
                         TSOState
@@ -201,12 +200,13 @@ Module TAS_TSOImpl <: LayerImplMoversT
 
   Definition compile_op T (o: TASOp.Op T) : proc Op T :=
     match o with
-    | TASOp.TestAndSet => l <- Call (TestAndSet Lock cLocked);
-                           Ret (if l == cLocked then true else false)
+    | TASOp.TryAcquire => l <- Call (TestAndSet Lock cLocked);
+                           (* need to report true if lock was acquired *)
+                           Ret (if l == cLocked then false else true)
     | TASOp.Clear => Call (Write Lock cUnlocked)
     | TASOp.Read => Call (Read Val)
     | TASOp.Write v => Call (Write Val v)
-    | TASOp.Flush => Call Fence
+    (* | TASOp.Flush => Call (Fence) *)
     end.
 
   Theorem compile_op_no_atomics : forall T (op: TASOp.Op T),
@@ -216,28 +216,6 @@ Module TAS_TSOImpl <: LayerImplMoversT
   Qed.
 
   Hint Constructors xstep.
-
-  Theorem fence_left_mover :
-    left_mover step Fence.
-  Proof.
-    unfold step.
-    hnf; split; intros.
-    - repeat (hnf; intros).
-      descend.
-      constructor.
-      reflexivity.
-    - unfold bg_step in H; propositional.
-      invert H; clear H.
-      intuition eauto.
-      invert H0; clear H0.
-      descend; intuition eauto.
-      + constructor; reflexivity.
-      + abstract_term (mem_read s0 a tid0).
-        constructor.
-        assert (mem_bg s s') by (etransitivity; eauto).
-        eauto using mem_bg_flush.
-        admit. (* not sure this is true - need some restrictions on pending writes in store buffers *)
-  Admitted.
 
   Theorem ysa_movers :
     forall (T : Type) (op : TASOp.Op T),
@@ -261,21 +239,140 @@ Module TAS_TSOImpl <: LayerImplMoversT
                invert H; clear H
              end;
       simpl; eauto.
+
+    destruct (mem_read s'0 Lock tid == cLocked).
+    rewrite mem_write_flush_same; auto.
+    constructor; eauto.
   Qed.
 
 End TAS_TSOImpl.
 
+Module LockOwnerState <: State.
+
+  Record s := mkLOState {
+                  TASValue : memT TSOOp.addr nat;
+                  TASLock : option nat;
+                }.
+  Definition State := s.
+
+  Definition initP s :=
+    TASValue s = {| MemValue := fun _ => 0; SBuf := fun _ => [] |} /\
+    TASLock s = None.
+End LockOwnerState.
+
+
+Module LockOwnerAPI <: Layer TASOp LockOwnerState.
+
+  Import TSOOp.
+  Import TASOp.
+  Import LockOwnerState.
+
+  Inductive xstep : forall T, Op T -> nat -> State -> T -> State -> list event -> Prop :=
+  | StepTryAcquireSuccess : forall tid s s' l,
+      mem_bg s s' ->
+      xstep TryAcquire tid
+            (mkLOState s l)
+            true
+            (mkLOState (mem_flush (mem_write Lock cLocked s' tid) tid) (Some tid))
+            nil
+  | StepTryAcquireFail : forall tid s l s',
+      mem_bg s s' ->
+      xstep TryAcquire tid
+            (mkLOState s l)
+            false
+            (mkLOState (mem_flush s' tid) None)
+            nil
+  | StepClear : forall tid s l,
+      xstep Clear tid (mkLOState s l)
+            tt
+            (mkLOState (mem_write Lock cUnlocked s tid) l)
+            nil
+  | StepRead : forall tid s s' l,
+      mem_bg s s' ->
+      xstep Read tid
+            (mkLOState s l)
+            (mem_read s' Val tid)
+            (mkLOState s' l)
+            nil
+  | StepWrite : forall tid s v l,
+      xstep (Write v) tid
+            (mkLOState s l)
+            tt
+            (mkLOState (mem_write Val v s tid) l)
+            nil
+  (* | StepFlush : forall tid s s' l,
+      mem_bg s s' ->
+      xstep Flush tid
+            (mkLOState s l)
+            tt
+            (mkLOState (mem_flush s' tid) l)
+            nil *)
+  .
+
+  Definition step := xstep.
+
+End LockOwnerAPI.
+
+
+Module AbsLockOwner' <: LayerImplAbsT
+                          TASOp
+                          TSOState TAS_TSOAPI
+                          LockOwnerState LockOwnerAPI.
+  Import TSOOp.
+  Import TASOp.
+  Import TSOState LockOwnerState.
+
+  Definition absR (s1: TSOState.State) (s2: State) :=
+    s2.(TASValue) = s1.
+
+  Lemma absR_unfold : forall s1 s l,
+      s = s1 ->
+      absR s1 (mkLOState s l).
+  Proof.
+    unfold absR; propositional; intuition auto.
+  Qed.
+
+  Import LockOwnerAPI.
+
+  Hint Resolve absR_unfold.
+  Hint Constructors xstep.
+
+  Theorem absR_ok : op_abs absR TAS_TSOAPI.step step.
+  Proof.
+    unfold step.
+    hnf; intros.
+    destruct s2; unfold absR in * |- ; simpl in *; propositional.
+    invert H0; clear H0;
+      try solve [ exists_econstructor; eauto ].
+  Qed.
+
+  Theorem absInitP :
+    forall s1,
+      TSOState.initP s1 ->
+      exists s2 : State, absR s1 s2 /\ initP s2.
+  Proof.
+    unfold TSOState.initP, initP; propositional.
+    exists_econstructor; eauto.
+  Qed.
+
+End AbsLockOwner'.
+
+Module AbsLockOwner :=
+  LayerImplAbs TASOp
+               TSOState TAS_TSOAPI
+               LockOwnerState LockOwnerAPI
+               AbsLockOwner'.
 
 Module TASState <: State.
 
   Record s := mkTASState {
                   TASValue : memT unit nat;
-                  TASLock : bool;
+                  TASLock : option nat;
                 }.
 
   Definition State := s.
   Definition initP s :=
-    TASLock s = false /\
+    TASLock s = None /\
     TASValue s = {| MemValue := fun _ => 0; SBuf := fun _ => [] |}.
 
 End TASState.
@@ -288,10 +385,14 @@ Module TASAPI <: Layer TASOp TASState.
   Import TASState.
 
   Inductive xstep : forall T, Op T -> nat -> State -> T -> State -> list event -> Prop :=
-  | StepTAS : forall tid v l,
-      xstep TestAndSet tid (mkTASState v l) l (mkTASState v true) nil
+  | StepTryAcquireSuccess : forall tid v,
+      xstep TryAcquire tid (mkTASState v None) true (mkTASState v (Some tid)) nil
+  | StepTryAcquireFail : forall tid v l,
+      (* the lock is freed when the release is in the store buffer, but you
+      might still not acquire the lock if you don't see the release *)
+      xstep TryAcquire tid (mkTASState v l) false (mkTASState v l) nil
   | StepClear : forall tid v l,
-      xstep Clear tid (mkTASState v l) tt (mkTASState v false) nil
+      xstep Clear tid (mkTASState v l) tt (mkTASState v None) nil
   | StepRead : forall tid v v' l,
       mem_bg v v' ->
       xstep Read tid (mkTASState v l) (mem_read v' tt tid) (mkTASState v' l) nil
@@ -305,6 +406,110 @@ Module TASAPI <: Layer TASOp TASState.
   Definition step := xstep.
 
 End TASAPI.
+
+(** IMPL: TSO_TASAPI -> TASAPI *)
+
+Module AbsTSO' <: LayerImplAbsT
+                    TASOp
+                    TSOState TAS_TSOAPI
+                    TASState TASAPI.
+
+  Import TSOOp.
+  Import TSOState TASState.
+
+  Fixpoint filter_writes (ws: list (addr*nat)) : list (unit*nat) :=
+    match ws with
+    | nil => nil
+    | (a,v)::ws' => if a == Val
+                   then (tt,v)::filter_writes ws'
+                   else filter_writes ws'
+    end.
+
+  Definition Forall_writes (a:addr) (P: nat -> Prop) : list (addr*nat) -> Prop :=
+    List.Forall (fun '(a', v) => a = a' -> P v).
+
+  Definition absR (s2: TSOState.State) (s1: State) :=
+    (forall tid, s1.(TASValue).(SBuf) tid = filter_writes (s2.(SBuf) tid)) /\
+    (* if the lock is supposedly held, it must be visibile to everyone *)
+    (forall tid, s1.(TASLock) = Some tid ->
+            forall tid', mem_read s2 Lock tid' = cLocked /\
+                    Forall_writes Lock (fun _ => False) (s2.(SBuf) tid)) /\
+    (forall tid, mem_read s2 Lock tid = cLocked ->
+            s1.(TASLock) <> None) /\
+    (* if you find the lock unheld, you're never being lied to *)
+    (forall tid, mem_read s2 Lock tid <> cLocked ->
+            s1.(TASLock) = None).
+
+  Import TASAPI.
+
+  Theorem absR_stable {s1 s1' s2} :
+      absR s1 s2 ->
+      mem_bg s1 s1' ->
+      absR s1' s2.
+  Proof.
+  Admitted.
+
+  Theorem absR_unlocked {s1 s2 tid} :
+      absR s1 s2 ->
+      mem_read s1 Lock tid <> cLocked ->
+      s2.(TASLock) = None.
+  Proof.
+  Admitted.
+
+  Theorem absR_preserved_lock : forall s1 tid v,
+      absR s1 {| TASValue := v; TASLock := None |} ->
+      absR (mem_flush (mem_write Lock cLocked s1 tid) tid)
+           {| TASValue := v; TASLock := Some tid |}.
+  Admitted.
+
+  Ltac absR :=
+    repeat match goal with
+           | [ H: absR ?s _,
+                  H': mem_bg ?s ?s' |- _ ] =>
+             pose proof (absR_stable H H');
+             clear H H';
+             try clear s
+           | [ H: absR ?s _,
+                  H': mem_read ?s Lock _ <> cLocked |- _ ] =>
+             apply (absR_unlocked H) in H';
+             simpl in H';
+             subst
+           end.
+
+  Theorem absR_ok : op_abs absR TAS_TSOAPI.step step.
+  Proof.
+    unfold step.
+    hnf; intros.
+    cut (exists s2', xstep op tid s2 r s2' evs /\ absR s1' s2');
+      [ now (propositional; eauto) | ].
+    destruct op.
+    - invert H0; clear H0; absR.
+      + destruct s2; simpl in *; propositional.
+        exists_econstructor; split.
+        econstructor.
+        eapply absR_preserved_lock; eauto.
+      + destruct s2.
+        exists_econstructor; split.
+        econstructor.
+
+
+  Admitted.
+
+  Theorem absInitP :
+    forall s1 : TSOState.State,
+      TSOState.initP s1 -> exists s2 : State, absR s1 s2 /\ initP s2.
+  Proof.
+    unfold TSOState.initP, initP, absR; propositional.
+    exists (mkTASState (mkMem (fun _ => cUnlocked) (fun _ => [])) None);
+      simpl;
+      (intuition auto);
+      try congruence.
+    unfold mem_read in H; simpl in *.
+    invert H.
+  Qed.
+
+End AbsTSO'.
+
 
 (** LAYER: TASLockAPI *)
 
