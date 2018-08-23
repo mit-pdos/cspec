@@ -10,12 +10,19 @@ Global Generalizable All Variables.
 Module TSOOp <: Ops.
 
   Inductive addr := addr0 | addr1.
+  Global Instance addr_equal_dec : EqualDec addr := ltac:(hnf; decide equality).
+
+  Definition Val := TSOOp.addr0.
+  Definition Lock := TSOOp.addr1.
+  Definition cLocked := 1.
+  Definition cUnlocked := 0.
 
   Inductive xOp : Type -> Type :=
   | Read : addr -> xOp nat
   | Write : addr -> nat -> xOp unit
   | TestAndSet : addr -> nat -> xOp nat
-  | Mfence : xOp nat
+  (* this is specifically an MFENCE *)
+  | Fence : xOp unit
   .
 
   Definition Op := xOp.
@@ -30,6 +37,105 @@ Module TSOState <: State.
     s = {| MemValue := fun a => 0; SBuf := fun _ => [] |}.
 
 End TSOState.
+
+Definition bg_step `(step: OpSemantics Op State) (bg: State -> State -> Prop) : OpSemantics Op State :=
+  fun _ op tid s r s' evs =>
+    exists s0 s1, bg s0 s /\
+          step _ op tid s r s1 evs /\
+          bg s1 s'.
+
+Module TSOAPI <: Layer TSOOp TSOState.
+  Import TSOOp.
+  Import TSOState.
+
+  Inductive xstep : forall T, Op T -> nat -> State -> T -> State -> list event -> Prop :=
+  | StepRead : forall tid a s,
+      xstep (Read a) tid s (mem_read s a tid) s nil
+  | StepWrite : forall tid a v s,
+      xstep (Write a v) tid s tt (mem_write a v s tid) nil
+  | StepTestAndSet : forall tid a v s,
+      xstep (TestAndSet a v) tid
+            s
+            (mem_read s a tid)
+            (mem_flush (mem_write a v s tid) tid) nil
+  | StepFence : forall tid s,
+      xstep Fence tid s tt (mem_flush s tid) nil
+  .
+
+  Definition step := bg_step xstep mem_bg.
+
+End TSOAPI.
+
+Module TSODelayNondetAPI <: Layer TSOOp TSOState.
+  Import TSOOp TSOState.
+
+  Inductive xstep : forall T, Op T -> nat -> State -> T -> State -> list event -> Prop :=
+  | StepRead : forall tid a s s',
+      mem_bg s s' ->
+      xstep (Read a) tid s (mem_read s' a tid) s' nil
+  | StepWrite : forall tid a v s,
+      xstep (Write a v) tid s tt (mem_write a v s tid) nil
+  | StepTestAndSet : forall tid a v s s',
+      mem_bg s s' ->
+      xstep (TestAndSet a v) tid
+            s
+            (mem_read s' a tid)
+            (mem_flush (mem_write a v s' tid) tid) nil
+  | StepFence : forall tid s s',
+      mem_bg s s' ->
+      xstep Fence tid s tt (mem_flush s' tid) nil
+  .
+
+  Definition step := xstep.
+
+End TSODelayNondetAPI.
+
+(** IMPL: TSODelayNondetAPI -> TSOAPI *)
+
+Module AbsNondet' <:
+  LayerImplAbsT TSOOp
+                TSOState TSOAPI
+                TSOState TSODelayNondetAPI.
+
+  Import TSOState.
+
+  (* absR is from low (full nondeterminism) to high (careful nondeterminism) *)
+  Definition absR (s1 : State) (s2 : State) :=
+    mem_bg s2 s1.
+
+  Hint Resolve mem_bg_commute_write.
+  Hint Constructors TSODelayNondetAPI.xstep.
+
+  Theorem absR_ok :
+    op_abs absR TSOAPI.step TSODelayNondetAPI.step.
+  Proof.
+    unfold op_abs, TSODelayNondetAPI.step; intros.
+    unfold absR in *.
+    hnf in H0; repeat deex.
+    destruct op; inv_clear H1; eauto.
+    descend; split; [ | eauto ]; eauto.
+  Qed.
+
+  Theorem absInitP :
+    forall s1,
+      TSOState.initP s1 ->
+      exists s2, absR s1 s2 /\
+            TSOState.initP s2.
+  Proof.
+    unfold initP, absR; intros.
+    destruct s1; propositional.
+    invert H; clear H.
+    exists_econstructor; intuition eauto.
+    reflexivity.
+  Qed.
+
+End AbsNondet'.
+
+Module AbsNondet :=
+  LayerImplAbs TSOOp
+               TSOState TSOAPI
+               TSOState TSODelayNondetAPI
+               AbsNondet'.
 
 (** LAYER: TASAPI *)
 
@@ -46,6 +152,120 @@ Module TASOp <: Ops.
 
 End TASOp.
 
+Module TAS_TSOAPI <: Layer TASOp TSOState.
+  Import TSOOp.
+  Import TASOp.
+  Import TSOState.
+
+  Inductive xstep : forall T, Op T -> nat -> State -> T -> State -> list event -> Prop :=
+  | StepTAS : forall tid s s',
+      mem_bg s s' ->
+      xstep TestAndSet tid
+            s
+            (if mem_read s' Lock tid == cLocked then true else false)
+            (mem_flush (mem_write Lock cLocked s' tid) tid)
+            nil
+  | StepClear : forall tid s,
+      xstep Clear tid s tt (mem_write Lock cUnlocked s tid) nil
+  | StepRead : forall tid s s',
+      mem_bg s s' ->
+      xstep Read tid s (mem_read s' Val tid) s' nil
+  | StepWrite : forall tid s v,
+      xstep (Write v) tid s tt (mem_write Val v s tid) nil
+  | StepFlush : forall tid s s',
+      mem_bg s s' ->
+      xstep Flush tid s tt (mem_flush s' tid) nil.
+
+  Definition step := xstep.
+
+End TAS_TSOAPI.
+
+Theorem mem_bg_flush : forall A {Adec:EqualDec A} V (s s': memT A V) tid,
+    mem_bg s s' ->
+    mem_bg (mem_flush s tid) (mem_flush s' tid).
+Proof.
+  intros.
+  induct H.
+  reflexivity.
+  cmp_ts tid tid0.
+  rewrite mem_flush_bgflush_eq; eauto.
+  (* TODO: need a mem_fluush_bgflush_ne which commutes *)
+Admitted.
+
+Module TAS_TSOImpl <: LayerImplMoversT
+                        TSOState
+                        TSOOp TSODelayNondetAPI
+                        TASOp TAS_TSOAPI.
+  Import TSOOp.
+  Import TSODelayNondetAPI.
+
+  Definition compile_op T (o: TASOp.Op T) : proc Op T :=
+    match o with
+    | TASOp.TestAndSet => l <- Call (TestAndSet Lock cLocked);
+                           Ret (if l == cLocked then true else false)
+    | TASOp.Clear => Call (Write Lock cUnlocked)
+    | TASOp.Read => Call (Read Val)
+    | TASOp.Write v => Call (Write Val v)
+    | TASOp.Flush => Call Fence
+    end.
+
+  Theorem compile_op_no_atomics : forall T (op: TASOp.Op T),
+      no_atomics (compile_op op).
+  Proof.
+    destruct op; simpl; eauto using no_atomics.
+  Qed.
+
+  Hint Constructors xstep.
+
+  Theorem fence_left_mover :
+    left_mover step Fence.
+  Proof.
+    unfold step.
+    hnf; split; intros.
+    - repeat (hnf; intros).
+      descend.
+      constructor.
+      reflexivity.
+    - unfold bg_step in H; propositional.
+      invert H; clear H.
+      intuition eauto.
+      invert H0; clear H0.
+      descend; intuition eauto.
+      + constructor; reflexivity.
+      + abstract_term (mem_read s0 a tid0).
+        constructor.
+        assert (mem_bg s s') by (etransitivity; eauto).
+        eauto using mem_bg_flush.
+        admit. (* not sure this is true - need some restrictions on pending writes in store buffers *)
+  Admitted.
+
+  Theorem ysa_movers :
+    forall (T : Type) (op : TASOp.Op T),
+      ysa_movers step (compile_op op).
+  Proof.
+    destruct op; simpl; eauto.
+  Qed.
+
+  Hint Constructors TAS_TSOAPI.xstep.
+
+  Theorem compile_correct :
+    compile_correct compile_op step TAS_TSOAPI.step.
+  Proof.
+    unfold TAS_TSOAPI.step.
+    hnf; intros.
+    destruct op; simpl in *;
+      repeat match goal with
+             | [ H: atomic_exec _ _ _ _ _ _ _ |- _ ] =>
+               invert H; clear H
+             | [ H: step _ _ _ _ _ _ |- _ ] =>
+               invert H; clear H
+             end;
+      simpl; eauto.
+  Qed.
+
+End TAS_TSOImpl.
+
+
 Module TASState <: State.
 
   Record s := mkTASState {
@@ -59,45 +279,6 @@ Module TASState <: State.
     TASValue s = {| MemValue := fun _ => 0; SBuf := fun _ => [] |}.
 
 End TASState.
-
-Definition bg_step `(step: OpSemantics Op State) (bg: State -> State -> Prop) : OpSemantics Op State :=
-  fun _ op tid s r s' evs =>
-    exists s0 s1, bg s0 s /\
-          step _ op tid s r s1 evs /\
-          bg s1 s'.
-
-Definition tas_bg (s1 s2: TASState.State) :=
-  mem_bg s1.(TASState.TASValue) s2.(TASState.TASValue) /\
-  s1.(TASState.TASLock) = s2.(TASState.TASLock).
-
-Instance tas_bg_PreOrder : PreOrder tas_bg.
-Proof.
-  constructor; hnf; intros; unfold tas_bg in *; intuition eauto.
-  reflexivity.
-  etransitivity; eauto.
-Qed.
-
-Module TASAPI <: Layer TASOp TASState.
-
-  Import TASOp.
-  Import TASState.
-
-  Inductive xstep : forall T, Op T -> nat -> State -> T -> State -> list event -> Prop :=
-  | StepTAS : forall tid v l,
-      xstep TestAndSet tid (mkTASState v l) l (mkTASState v true) nil
-  | StepClear : forall tid v l,
-      xstep Clear tid (mkTASState v l) tt (mkTASState v false) nil
-  | StepRead : forall tid v l,
-      xstep Read tid (mkTASState v l) (mem_read v tt tid) (mkTASState v l) nil
-  | StepWrite : forall tid v0 v l,
-      xstep (Write v) tid (mkTASState v0 l) tt (mkTASState (mem_write tt v v0 tid) l) nil
-  | StepFlush : forall tid v l,
-      xstep Flush tid (mkTASState v l) tt (mkTASState (mem_flush v tid) l) nil
-  .
-
-  Definition step := bg_step xstep tas_bg.
-
-End TASAPI.
 
 (** LAYER: TASDelayNondetAPI *)
 
@@ -124,72 +305,6 @@ Module TASDelayNondetAPI <: Layer TASOp TASState.
   Definition step := xstep.
 
 End TASDelayNondetAPI.
-
-(** IMPL: TASDelayNondetAPI -> TASAPI *)
-
-Module AbsNondet' <:
-  LayerImplAbsT TASOp
-                TASState TASAPI
-                TASState TASDelayNondetAPI.
-
-  Import TASState.
-
-  Lemma tas_bg_intro : forall v1 v2 l1 l2,
-      mem_bg v1 v2 ->
-      l1 = l2 ->
-      tas_bg (mkTASState v1 l1) (mkTASState v2 l2).
-  Proof.
-    unfold tas_bg; intuition eauto.
-  Qed.
-
-  (* absR is from low (full nondeterminism) to high (careful nondeterminism) *)
-  Definition absR (s1 : State) (s2 : State) :=
-    tas_bg s2 s1.
-
-  Hint Resolve tas_bg_intro.
-  Hint Resolve mem_bg_commute_write.
-  Hint Constructors TASDelayNondetAPI.xstep.
-
-  Ltac split_state :=
-    repeat match goal with
-           | [ s: TASState.State |- _ ] => destruct s
-           | [ H: tas_bg (mkTASState _ _) (mkTASState _ _) |- _ ] =>
-             destruct H; simpl in *; subst
-           | [ H: mem_bg ?s1 ?s2,
-                  H': mem_bg ?s2 ?s3 |- _ ] =>
-             learn that (mem_bg_trans H H')
-           end.
-
-  Theorem absR_ok :
-    op_abs absR TASAPI.step TASDelayNondetAPI.step.
-  Proof.
-    unfold op_abs, TASDelayNondetAPI.step; intros.
-    destruct s1; inversion H; clear H.
-    simpl in *; subst.
-    unfold absR.
-    hnf in H0; repeat deex.
-    destruct op; inv_clear H0; split_state; eauto.
-  Qed.
-
-  Theorem absInitP :
-    forall s1,
-      TASState.initP s1 ->
-      exists s2, absR s1 s2 /\
-            TASState.initP s2.
-  Proof.
-    unfold initP, absR, tas_bg; intros.
-    destruct s1; simpl in *; propositional.
-    exists_econstructor; intuition eauto.
-    reflexivity.
-  Qed.
-
-End AbsNondet'.
-
-Module AbsNondet :=
-  LayerImplAbs TASOp
-               TASState TASAPI
-               TASState TASDelayNondetAPI
-               AbsNondet'.
 
 (** LAYER: TASLockAPI *)
 
