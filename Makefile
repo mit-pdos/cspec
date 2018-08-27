@@ -4,15 +4,11 @@ CODE += $(wildcard src/Helpers/*/*.v)
 CODE += $(wildcard src/Spec/*.v)
 CODE += $(wildcard src/Spec/*/*.v)
 CODE += $(wildcard src/*.v)
-CODE += $(wildcard src/Mail/*.v)
-CODE += $(wildcard src/Examples/*.v)
 
-COQRFLAGS := -R build POCS
-
-BINS	:= concur-test mail-test
+COQRFLAGS := -R build CSPEC
 
 .PHONY: default
-default: $(patsubst %,bin/%,$(BINS)) docs bin/mclnt bin/gomail
+default: build/CSPEC.vo docs bin/mclnt bin/gomail
 
 build/%.v: src/%.v
 	@mkdir -p $(@D)
@@ -38,19 +34,6 @@ docs: coq
 	@mkdir -p doc
 	coqdoc $(COQRFLAGS) -g --interpolate -d doc $(patsubst src/%.v,build/%.v,$(CODE))
 
-.PHONY: %/extract
-%/extract: %/Extract.v %/fiximports.py
-	@mkdir -p $@
-	coqtop $(COQRFLAGS) -batch -noglob -load-vernac-source $<
-	./scripts/add-preprocess.sh $@/*.hs
-
-concur-test/extract: build/Examples/LockedCounter.vo
-mail-test/extract: build/Mail/MailServer.vo
-
-bin/%: %/extract %/lib/*.hs
-	mkdir -p $(@D)
-	cd $(patsubst %/extract,%,$<) && PATH="$(PATH):"$(shell pwd)"/bin" stack build --copy-bins --local-bin-path ../bin
-
 bin/mclnt: gomail/mclnt/mclnt.go
 	go build -o bin/mclnt $<
 bin/gomail: gomail/msrv/msrv.go
@@ -60,6 +43,3 @@ bin/gomail: gomail/msrv/msrv.go
 clean:
 	rm -rf build
 	rm -rf doc
-	rm -rf $(foreach d,$(BINS),$(d)/extract)
-	rm -rf $(foreach d,$(BINS),$(d)/.stack-work)
-	rm -f $(foreach b,$(BINS),bin/$(b))
