@@ -10,21 +10,17 @@ Require Import Helpers.Instances.
 Require Import List.
 Require Import ListStuff.
 
-Require Import Spec.ConcurProc.
-
 Set Implicit Arguments.
 
 Section Map.
   Notation A := nat.
-
-  Variable Op : Type -> Type.
-  Notation V := (maybe_proc Op).
+  Variable V:Type.
 
   Local Record threads_state :=
-    { thread_get :> A -> V;
+    { thread_get :> A -> option V;
       thread_max : nat;
-      mapping_finite : forall a, thread_max < a -> thread_get a = NoProc;
-      thread_max_minimal : (thread_get thread_max <> NoProc) \/ thread_max = 0 }.
+      mapping_finite : forall a, thread_max < a -> thread_get a = None;
+      thread_max_minimal : (thread_get thread_max <> None) \/ thread_max = 0 }.
 
   Notation t := threads_state.
 
@@ -38,8 +34,8 @@ Section Map.
     match n with
     | 0 => 0
     | S n' => match x n' with
-             | Proc _ => n'
-             | NoProc => lower_mapping x n'
+             | Some _ => n'
+             | None => lower_mapping x n'
              end
     end.
 
@@ -52,7 +48,7 @@ Section Map.
   Qed.
 
   Theorem lower_mapping_not_none : forall (x:t) n,
-      x (lower_mapping x n) <> NoProc \/
+      x (lower_mapping x n) <> None \/
       lower_mapping x n = 0.
   Proof.
     induction n; simpl; auto.
@@ -60,7 +56,7 @@ Section Map.
   Qed.
 
   Theorem lower_mapping_thread_maximal : forall x n,
-      forall a, lower_mapping x n < a -> a < n -> x a = NoProc.
+      forall a, lower_mapping x n < a -> a < n -> x a = None.
   Proof.
     intros.
     induction n; simpl in *; intros.
@@ -69,19 +65,19 @@ Section Map.
     destruct (a == n); subst; auto.
   Qed.
 
-  Definition thread_upd (x:t) (a:A) (v:V) : t.
+  Definition thread_upd (x:t) (a:A) (v:option V) : t.
     refine {| thread_get :=
                 fun a' => if a == a' then v else x a';
               thread_max :=
                 if lt_dec (thread_max x) a then
                   (* modification past current end *)
                   match v with
-                  | Proc _ => a
-                  | NoProc => thread_max x (* no-op *)
+                  | Some _ => a
+                  | None => thread_max x (* no-op *)
                   end else
                   match v with
-                  | Proc _ => thread_max x
-                  | NoProc => (* deleting from the middle; might need to lower thread_max *)
+                  | Some _ => thread_max x
+                  | None => (* deleting from the middle; might need to lower thread_max *)
                     if a == thread_max x then
                       lower_mapping x (thread_max x) else
                       thread_max x
@@ -188,9 +184,9 @@ Section Map.
     omega.
   Qed.
 
-  Theorem thread_upd_thread_max_extend : forall (x:t) a T v,
+  Theorem thread_upd_thread_max_extend : forall (x:t) a v,
       a > thread_max x ->
-      thread_max (thread_upd x a (Proc (T:=T) v)) > thread_max x.
+      thread_max (thread_upd x a (Some v)) > thread_max x.
   Proof.
     simpl; intros.
     generalize dependent (thread_max x); intros m **.
@@ -212,7 +208,7 @@ Section Map.
   Qed.
 
   Theorem thread_upd_thread_max_shrink : forall (x:t) a,
-      thread_max (thread_upd x a NoProc) <= thread_max x.
+      thread_max (thread_upd x a None) <= thread_max x.
   Proof.
     simpl; intros.
     generalize dependent (thread_max x); intros m **.
@@ -222,38 +218,38 @@ Section Map.
     omega.
   Qed.
 
-  Theorem thread_upd_unchanged : forall (x:t) a T (v: proc Op T),
+  Theorem thread_upd_unchanged : forall (x:t) a (v: V),
       a <= thread_max x ->
-      thread_max (thread_upd x a (Proc v)) = thread_max x.
+      thread_max (thread_upd x a (Some v)) = thread_max x.
   Proof.
   Abort.
 
   Theorem past_thread_max_empty : forall (x:t),
-      x (1 + thread_max x) = NoProc.
+      x (1 + thread_max x) = None.
   Proof.
     intros.
     apply mapping_finite; omega.
   Qed.
 
   Definition thread_empty : t.
-    refine {| thread_get := fun _ => NoProc;
+    refine {| thread_get := fun _ => None;
               thread_max := 0; |}; auto.
   Defined.
 
   Theorem empty_is_empty : forall a,
-      thread_empty a = NoProc.
+      thread_empty a = None.
   Proof.
     simpl; auto.
   Qed.
 
-  Theorem thread_empty_not_some : forall a T (v: proc Op T),
-      ~thread_empty a = Proc v.
+  Theorem thread_empty_not_some : forall a (v: V),
+      ~thread_empty a = Some v.
   Proof.
     simpl; auto.
   Qed.
 
   Theorem thread_empty_unique : forall (x:t),
-      (forall a, x a = NoProc) ->
+      (forall a, x a = None) ->
       x = thread_empty.
   Proof.
     t.
@@ -265,13 +261,13 @@ Section Map.
     t.
   Qed.
 
-  Definition thread_Forall (P: forall T, proc Op T -> Prop) (ts:t) :=
-    forall tid T (p: proc Op T), ts tid = Proc p -> P _ p.
+  Definition thread_Forall (P: V -> Prop) (ts:t) :=
+    forall tid (p: V), ts tid = Some p -> P p.
 
-  Theorem thread_Forall_some : forall P x a T (v: proc Op T),
+  Theorem thread_Forall_some : forall P x a (v: V),
       thread_Forall P x ->
-      x a = Proc v ->
-      P _ v.
+      x a = Some v ->
+      P v.
   Proof.
     unfold thread_Forall; eauto.
   Qed.
@@ -283,10 +279,10 @@ Section Map.
     apply thread_empty_not_some in H; contradiction.
   Qed.
 
-  Theorem thread_Forall_thread_upd_some : forall P ts tid T (p: proc Op T),
+  Theorem thread_Forall_thread_upd_some : forall P ts tid (p: V),
       thread_Forall P ts ->
-      P _ p ->
-      thread_Forall P (thread_upd ts tid (Proc p)).
+      P p ->
+      thread_Forall P (thread_upd ts tid (Some p)).
   Proof.
     unfold thread_Forall.
     t.
@@ -297,8 +293,8 @@ Section Map.
     invert H1.
   Qed.
 
-  Theorem thread_Forall_forall : forall (P: forall T, proc Op T -> Prop) (x:t),
-      (forall a T (v: proc _ T), x a = Proc v -> P _ v) ->
+  Theorem thread_Forall_forall : forall (P: V -> Prop) (x:t),
+      (forall a (v:V), x a = Some v -> P v) ->
       thread_Forall P x.
   Proof.
     unfold thread_Forall; eauto.
@@ -306,7 +302,7 @@ Section Map.
 
   Theorem thread_Forall_thread_upd_none : forall P x tid,
       thread_Forall P x ->
-      thread_Forall P (thread_upd x tid NoProc).
+      thread_Forall P (thread_upd x tid None).
   Proof.
     unfold thread_Forall.
     t.
@@ -317,30 +313,25 @@ Section Map.
     congruence.
   Qed.
 
-  Definition thread_from_list (l: list {T & proc Op T}) : t.
-    refine {| thread_get := fun a => match List.nth_error l a with
-                                  | Some (existT _ _ p) => Proc p
-                                  | None => NoProc
-                                  end;
+  Definition thread_from_list (l: list V) : t.
+    refine {| thread_get := fun a => List.nth_error l a;
               thread_max := length l - 1; |}.
     intros.
     assert (length l <= a) by omega.
-    apply List.nth_error_None in H0.
-    simpl_match; auto.
+    apply List.nth_error_None in H0; auto.
     destruct_with_eqn (List.nth_error l (length l - 1)); eauto.
-    destruct s; left; congruence.
     right.
     apply List.nth_error_None in Heqo.
     omega.
   Defined.
 
-  Local Fixpoint _to_list (x:t) n : list V :=
+  Local Fixpoint _to_list (x:t) n : list (option V) :=
     match n with
     | 0 => nil
     | S n' => _to_list x n' ++ (x n'::nil)
     end.
 
-  Definition thread_to_list (x:t) : list V := _to_list x (1 + thread_max x).
+  Definition thread_to_list (x:t) : list (option V) := _to_list x (1 + thread_max x).
 
   Lemma firstn_map : forall A B (f: A -> B) n (l: list A),
       List.firstn n (List.map f l) = List.map f (List.firstn n l).
@@ -358,7 +349,7 @@ Section Map.
 
   Lemma from_list__to_list : forall l n,
       n <= length l ->
-      _to_list (thread_from_list l) n = List.firstn n (List.map (fun '(existT _ _ p) => Proc p) l).
+      _to_list (thread_from_list l) n = List.firstn n (List.map Some l).
   Proof.
     induction n; intros; auto.
     cbn [_to_list thread_get thread_from_list].
@@ -396,7 +387,7 @@ Section Map.
 
   Theorem thread_from_list_to_list : forall l,
       0 < length l ->
-      thread_to_list (thread_from_list l) = List.map (fun '(existT _ _ p) => Proc p) l.
+      thread_to_list (thread_from_list l) = List.map Some l.
   Proof.
     unfold thread_to_list; intros.
     unfold thread_to_list.
@@ -408,13 +399,13 @@ Section Map.
 
 End Map.
 
-Theorem thread_max_eq : forall Op1 Op2 (ts1:threads_state Op1) (ts2:threads_state Op2),
-    (forall tid, ts1 tid = NoProc <-> ts2 tid = NoProc) ->
+Theorem thread_max_eq : forall V1 V2 (ts1:threads_state V1) (ts2:threads_state V2),
+    (forall tid, ts1 tid = None <-> ts2 tid = None) ->
     thread_max ts1 = thread_max ts2.
 Proof.
   (* will do proof by symmetry *)
   assert (forall V1 V2 (x1:threads_state V1) (x2:threads_state V2),
-             (forall a, x1 a = NoProc <-> x2 a = NoProc) ->
+             (forall a, x1 a = None <-> x2 a = None) ->
              thread_max x1 < thread_max x2 -> False).
   intros.
   pose proof (@mapping_finite _ x1 (thread_max x2) ltac:(omega)).
@@ -423,7 +414,7 @@ Proof.
   omega.
 
   intros.
-  assert (forall a, ts2 a = NoProc <-> ts1 a = NoProc).
+  assert (forall a, ts2 a = None <-> ts1 a = None).
   split; intuition auto.
   apply H0; auto.
   apply H0; auto.
@@ -435,52 +426,52 @@ Qed.
 
 Section Map_map.
 
-  Variable Op1:Type -> Type.
-  Variable Op2:Type -> Type.
-  Variable f:forall T, proc Op1 T -> proc Op2 T.
+  Variable V1:Type.
+  Variable V2:Type.
+  Variable f: V1 -> V2.
 
-  Definition thread_map (x:threads_state Op1) : threads_state Op2.
+  Definition thread_map (x:threads_state V1) : threads_state V2.
     refine {| thread_get := fun a => match x a with
-                                  | NoProc => NoProc
-                                  | Proc v => Proc (f v)
+                                  | None => None
+                                  | Some v => Some (f v)
                                   end;
               thread_max := thread_max x; |}; intros.
     destruct_with_eqn (x a); eauto.
-    rewrite mapping_finite in Heqm by auto; congruence.
+    rewrite mapping_finite in Heqo by auto; congruence.
 
     destruct (thread_max_minimal x); auto.
     destruct (x (thread_max x)); auto.
     left; congruence.
   Defined.
 
-  Theorem thread_map_get_match : forall (x:threads_state Op1) a,
+  Theorem thread_map_get_match : forall (x:threads_state V1) a,
       thread_map x a = match x a with
-                       | Proc v => Proc (f v)
-                       | NoProc => NoProc
+                       | Some v => Some (f v)
+                       | None => None
                        end.
   Proof.
     simpl; auto.
   Qed.
 
-  Theorem map_thread_get_some : forall (x:threads_state Op1) a T (v: proc Op1 T),
-      x a = Proc v ->
-      thread_map x a = Proc (f v).
+  Theorem map_thread_get_some : forall (x:threads_state V1) a (v: V1),
+      x a = Some v ->
+      thread_map x a = Some (f v).
   Proof.
     simpl; intros.
     rewrite H; auto.
   Qed.
 
-  Theorem map_thread_get_none : forall (x:threads_state Op1) a,
-      x a = NoProc ->
-      thread_map x a = NoProc.
+  Theorem map_thread_get_none : forall (x:threads_state V1) a,
+      x a = None ->
+      thread_map x a = None.
   Proof.
     simpl; intros.
     rewrite H; auto.
   Qed.
 
-  Theorem map_thread_Forall : forall (P: forall T, proc Op1 T -> Prop) (Q:forall T, proc Op2 T -> Prop) (x:threads_state Op1),
+  Theorem map_thread_Forall : forall (P: V1 -> Prop) (Q:V2 -> Prop) (x:threads_state V1),
       thread_Forall P x ->
-      (forall T v, P T v -> Q T (f v)) ->
+      (forall v, P v -> Q (f v)) ->
       thread_Forall Q (thread_map x).
   Proof.
     unfold thread_Forall; simpl; intros.
@@ -493,24 +484,21 @@ End Map_map.
 
 
 Theorem thread_map_eq :
-  forall Op1 Op2
-         (f g : forall T, proc Op1 T -> proc Op2 T)
-         ts,
-    (forall T p, f T p = g T p) ->
+  forall V1 V2 (f g : V1 -> V2) ts,
+    (forall p, f p = g p) ->
     thread_map f ts = thread_map g ts.
 Proof.
   intros.
   replace g with f; auto.
-  apply functional_extensionality_dep; intros.
   apply functional_extensionality; eauto.
 Qed.
 
 Theorem thread_map_thread_map :
-  forall Op1 Op2 Op3
-         (f : forall T, proc Op1 T -> proc Op2 T)
-         (g : forall T, proc Op2 T -> proc Op3 T)
+  forall V1 V2 V3
+         (f : V1 -> V2)
+         (g : V2 -> V3)
          ts,
-    thread_map g (thread_map f ts) = thread_map (fun T t => g T (f T t)) ts.
+    thread_map g (thread_map f ts) = thread_map (fun t => g (f t)) ts.
 Proof.
   intros.
   apply thread_ext_eq; intros; cbn.
@@ -528,11 +516,11 @@ Proof.
 Qed.
 
 Theorem thread_map_thread_from_list :
-  forall Op1 Op2
-         (f : forall T, proc Op1 T -> proc Op2 T)
+  forall V1 V2
+         (f : V1 -> V2)
          tl,
     thread_map f (thread_from_list tl) =
-    thread_from_list (map (fun '(existT _ T p) => existT _ T (f T p)) tl).
+    thread_from_list (map f tl).
 Proof.
   intros.
   apply thread_ext_eq; intros; cbn.
@@ -543,10 +531,10 @@ Proof.
 Qed.
 
 Theorem thread_upd_thread_from_list :
-  forall Op tl tid T (p : proc Op T),
+  forall V tl tid (p : V),
     tid < length tl ->
-    thread_upd (thread_from_list tl) tid (Proc p) =
-    thread_from_list (list_upd tl tid (existT _ T p)).
+    thread_upd (thread_from_list tl) tid (Some p) =
+    thread_from_list (list_upd tl tid p).
 Proof.
   intros.
   apply thread_ext_eq; intros; simpl.
@@ -564,7 +552,7 @@ Global Opaque
        thread_to_list
        thread_map.
 
-Arguments thread_empty {Op}.
+Arguments thread_empty {V}.
 
 Hint Rewrite thread_upd_eq : t.
 Hint Rewrite thread_upd_ne using solve [ auto ] : t.
