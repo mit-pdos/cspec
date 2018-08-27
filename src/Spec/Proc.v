@@ -1,12 +1,18 @@
+Global Set Implicit Arguments.
+
 Section Proc.
 
-  Variable Op:Type.
+  Context {Op:Type}.
 
   Inductive proc :=
   | Ret
-  | Call (op:Op) (p:proc)
-  | Spawn (p:proc)
-  | Atomic (p:proc)
+  | Exec (a:Action) (p:proc)
+  with Action :=
+       | Call (op:Op)
+       | Spawn (p:proc)
+       | Atomic (p:proc)
   .
 
 End Proc.
+
+Arguments proc Op : clear implicits.
