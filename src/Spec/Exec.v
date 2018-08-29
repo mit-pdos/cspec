@@ -4,12 +4,15 @@ Require Import Spec.ThreadsState.
 Require Import Helpers.TransitionSystem.
 Require Import Helpers.ProofAutomation.
 Require Import Helpers.RecordSet.
+Require Import Helpers.Instances.
 
 Require Import Morphisms.
 Require Import List.
 
-Notation "ts [[ tid  :=  p ]]" := (thread_upd ts tid (Some p)) (at level 11).
-Notation "ts [[ - tid ]]" := (thread_upd ts tid None) (at level 11).
+Notation "ts [[ tid  :=  p ]]" := (thread_upd ts tid (Some p))
+                                    (at level 12, left associativity).
+Notation "ts [[ - tid ]]" := (thread_upd ts tid None)
+                               (at level 12, left associativity).
 
 Definition TID := nat.
 Implicit Types (tid:TID).
@@ -47,26 +50,90 @@ Section Execution.
   Notation threads := (threads_state (proc Op)).
   Implicit Types (ts:threads).
 
-  Inductive exec_step : Relation (threads * State * trace) :=
-  | exec_proc : forall ts p p' tid,
+  Inductive exec_at tid : Relation (threads * State * trace) :=
+  | exec_proc : forall ts p p',
       ts tid = Some p ->
       forall s s' tr tr',
         proc_step tid (p, s, tr) (p', s', tr') ->
-        exec_step (ts, s, tr) (ts [[tid := p']], s', tr')
-  | exec_atomic : forall ts p p' tid,
+        exec_at tid (ts, s, tr) (ts [[tid := p']], s', tr')
+  | exec_atomic : forall ts p p',
       ts tid = Some (Exec (Atomic p) p') ->
       forall s s' tr tr',
         kleene_star (proc_step tid) (p, s, tr) (Ret, s', tr') ->
-        exec_step (ts, s, tr) (ts [[tid := p']], s', tr')
-  | exec_spawn : forall ts p p' tid,
+        exec_at tid (ts, s, tr) (ts [[tid := p']], s', tr')
+  | exec_spawn : forall ts p p',
       ts tid = Some (Exec (Spawn p) p') ->
       forall tid',
         tid <> tid' ->
-        forall s tr, exec_step (ts, s, tr) (ts [[tid := p']] [[tid' := p]], s, tr)
-  | exec_terminate : forall ts op p tid,
+        ts tid' = None ->
+        forall s tr, exec_at tid (ts, s, tr) (ts [[tid := p']] [[tid' := p]], s, tr)
+  | exec_terminate : forall ts op p,
       ts tid = Some (Ret) ->
-      forall s tr, exec_step (ts, s, tr) (ts [[-tid]], s, tr)
+      forall s tr, exec_at tid (ts, s, tr) (ts [[-tid]], s, tr)
   .
+
+  Definition exec_step : Relation (threads * State * trace) :=
+    fun '(ts, s, tr) '(ts', s', tr') =>
+      exists tid, exec_at tid (ts, s, tr) (ts', s', tr').
+
+  Ltac cmp_ts tid tid' :=
+    destruct (equal_dec tid tid');
+    subst;
+    autorewrite with t in *;
+    [ repeat match goal with
+             | [ H: Some _ = Some _ |- _ ] =>
+               inversion H; subst; clear H
+             | [ H: Some _ = None |- _ ] =>
+               solve [ inversion H ]
+             end | ];
+    trivial.
+
+  Theorem thread_upd_aba_ba : forall ts tid tid' p1 p2 p3,
+      ts [[tid := p1]] [[tid' := p2]] [[tid := p3]] =
+      ts [[tid' := p2]] [[tid := p3]].
+  Proof.
+    intros.
+    cmp_ts tid tid'.
+    rewrite thread_upd_ne_comm with (tid:=tid) (tid':=tid') by auto;
+      autorewrite with t;
+      auto.
+  Qed.
+
+  Theorem thread_upd_aba : forall ts tid tid' p1 p2 p3,
+      tid <> tid' ->
+      ts [[tid := p1]] [[tid' := p2]] [[tid := p3]] =
+      ts [[tid := p3]] [[tid' := p2]].
+  Proof.
+    intros.
+    rewrite thread_upd_aba_ba.
+    rewrite thread_upd_ne_comm; auto.
+  Qed.
+
+  Hint Rewrite thread_upd_aba using solve [ auto ] : t.
+
+  Hint Constructors exec_at.
+
+  Theorem exec_step_inv : forall ts tid p s tr ts' s' tr',
+      exec_step (ts [[tid := p]], s, tr) (ts', s', tr') ->
+      exec_at tid (ts [[tid := p]], s, tr) (ts', s', tr') \/
+      exists tid', tid <> tid' /\
+              exec_at tid' (ts [[tid := p]], s, tr) (ts' [[tid := p]], s', tr').
+  Proof.
+    intros.
+    intuition eauto.
+    unfold exec_step in H; propositional.
+    cmp_ts tid tid0; eauto.
+    right; exists tid0; intuition eauto.
+    invert H; autorewrite with t in *; eauto.
+    - cmp_ts tid tid'.
+      rewrite thread_upd_same_eq with
+        (ts:=ts [[tid := p]] [[tid0 := p']] [[tid' := p0]]);
+        autorewrite with t;
+        auto.
+    - rewrite thread_upd_ne_comm with (tid := tid0) (tid' := tid) by auto;
+        autorewrite with t;
+        eauto.
+  Qed.
 
   Definition exec := kleene_star exec_step.
 
@@ -101,11 +168,12 @@ Section Execution.
   Proof.
     unfold Proper, "==>"; intros.
     cbv [set Set_etrace]; destruct matches; subst.
-    invert H; eauto using exec_step.
+    unfold exec_step in *; propositional.
+    exists tid.
+    invert H; eauto using exec_at.
     eapply exec_proc; eauto.
     apply (proc_step_prepend tr0) in H7; simpl in *; eauto.
     apply (proc_step_star_prepend tr0) in H7; simpl in *; eauto.
-    eapply exec_atomic; eauto.
   Qed.
 
 End Execution.

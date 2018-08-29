@@ -1,4 +1,7 @@
-Require Import Instances.
+Require Import Helpers.Instances.
+Require Import Helpers.ProofAutomation.
+
+Require Import Morphisms.
 
 Set Implicit Arguments.
 
@@ -9,6 +12,22 @@ Section TransitionSystem.
 
   Definition Relation := A -> A -> Prop.
   Implicit Types (R:Relation).
+
+  Definition rimpl R1 R2 := forall x y, R1 x y -> R2 x y.
+  Definition riff R1 R2 := rimpl R1 R2 /\ rimpl R2 R1.
+
+  Infix "--->" := rimpl (at level 14, no associativity).
+  Infix "<--->" := riff (at level 14, no associativity).
+
+  Global Instance rimpl_PreOrder : PreOrder rimpl.
+  Proof.
+    firstorder.
+  Qed.
+
+  Global Instance riff_Equivalence : Equivalence riff.
+  Proof.
+    firstorder.
+  Qed.
 
   Inductive kleene_star R : Relation :=
   | star_refl : forall x,
@@ -25,8 +44,9 @@ Section TransitionSystem.
     - induction H; eauto using kleene_star.
   Qed.
 
-  Theorem kleene_star_one : forall R x1 x2, R x1 x2 -> kleene_star R x1 x2.
+  Theorem kleene_star_one : forall R, R ---> kleene_star R.
   Proof.
+    unfold rimpl.
     eauto using kleene_star.
   Qed.
 
@@ -50,7 +70,40 @@ Section TransitionSystem.
       invariant I R.
   Proof.
     unfold invariant; intros.
-    eapply H; eauto using kleene_star_one.
+    eapply H; eauto.
+    eapply kleene_star_one; eauto.
+  Qed.
+
+  Definition rel_app R1 R2 : Relation :=
+    fun x z => exists y, R1 x y /\ R2 y z.
+
+  Infix ">>" := rel_app (at level 12, left associativity).
+
+  Theorem rel_app_assoc : forall R1 R2 R3,
+      R1 >> R2 >> R3 <---> R1 >> (R2 >> R3).
+  Proof.
+    firstorder.
+  Qed.
+
+  Global Instance rel_app_impl :
+    Proper (rimpl ==> rimpl ==> rimpl) rel_app.
+  Proof.
+    firstorder.
+  Qed.
+
+  Global Instance rel_app_iff :
+    Proper (riff ==> riff ==> riff) rel_app.
+  Proof.
+    firstorder.
+  Qed.
+
+  Theorem kleene_star_duplicate : forall R,
+      kleene_star R >> kleene_star R <---> kleene_star R.
+  Proof.
+    unfold rel_app, riff, rimpl; split; propositional.
+    - etransitivity; eauto.
+    - exists x; split; eauto.
+      reflexivity.
   Qed.
 
 End TransitionSystem.
