@@ -1,5 +1,6 @@
 Require Import Spec.Proc.
 Require Import Spec.ThreadsState.
+Require Import Spec.Automation.
 
 Require Import Helpers.TransitionSystem.
 Require Import Helpers.ProofAutomation.
@@ -75,18 +76,6 @@ Section Execution.
   Definition exec_step : Relation (threads * State * trace) :=
     fun '(ts, s, tr) '(ts', s', tr') =>
       exists tid, exec_at tid (ts, s, tr) (ts', s', tr').
-
-  Ltac cmp_ts tid tid' :=
-    destruct (equal_dec tid tid');
-    subst;
-    autorewrite with t in *;
-    [ repeat match goal with
-             | [ H: Some _ = Some _ |- _ ] =>
-               inversion H; subst; clear H
-             | [ H: Some _ = None |- _ ] =>
-               solve [ inversion H ]
-             end | ];
-    trivial.
 
   Theorem thread_upd_aba_ba : forall ts tid tid' p1 p2 p3,
       ts [[tid := p1]] [[tid' := p2]] [[tid := p3]] =
@@ -177,3 +166,18 @@ Section Execution.
   Qed.
 
 End Execution.
+
+Local Notation proc_step_pat := (proc_step _ _ _ _).
+
+Tactic Notation "check_pat" uconstr(pat) :=
+  let x := constr:(ltac:(tryif assert_succeeds refine pat
+                          then exact True
+                          else refine pat) : Prop) in idtac.
+
+Goal True. check_pat proc_step_pat. Abort.
+
+Ltac inv_proc_step :=
+  match goal with
+  | [ H: proc_step_pat |- _ ] =>
+    invert H
+  end.
