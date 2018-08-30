@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"math/rand"
+	"os"
 	"strconv"
 	"sync"
 	"testing"
@@ -10,7 +11,6 @@ import (
 )
 
 const (
-	N     = 1
 	NUSER = 100
 )
 
@@ -46,20 +46,36 @@ func do_bench_loop(tid int, msg string, niter int, nsmtpiter int, npopiter int) 
 }
 
 func TestMixedLoad(t *testing.T) {
+	nprocEnv := os.Getenv("GOMAIL_NPROC")
+	nproc64, err := strconv.ParseInt(nprocEnv, 10, 64)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	niterEnv := os.Getenv("GOMAIL_NITER")
+	niter64, err := strconv.ParseInt(niterEnv, 10, 64)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	nproc := int(nproc64)
+	niter := int(niter64)
+
 	var wg sync.WaitGroup
 	start := time.Now()
-	wg.Add(N)
-	for g := 0; g < N; g++ {
+	wg.Add(nproc)
+	for g := 0; g < nproc; g++ {
 		go func() {
 			defer wg.Done()
-			err := do_bench_loop(g, "msg", 100000/N, 1, 1)
+			err := do_bench_loop(g, "Hello world.", niter, 1, 1)
 			if err != nil {
 				t.Fatal(err)
 			}
 		}()
 	}
 	wg.Wait()
+
 	end := time.Now()
 	elapsed := end.Sub(start)
-	fmt.Printf("time %v\n", elapsed)
+	fmt.Printf("%d threads, %d iter, %v elapsed\n", nproc, niter, elapsed)
 }
