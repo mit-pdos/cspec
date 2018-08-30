@@ -19,18 +19,26 @@ func do_bench_loop(tid int, msg string, niter int, nsmtpiter int, npopiter int) 
 	for l := 0; l < niter; l++ {
 		for i := 0; i < nsmtpiter; i++ {
 			u := "u" + strconv.Itoa(r.Int()%NUSER)
-			m := &Message{To: u, Data: []string{msg}}
-			m.process_msg(tid)
+			if validUser(u) {
+				m := &Message{To: u, Data: []string{msg}}
+				m.process_msg(tid)
+			} else {
+				return fmt.Errorf("Invalid user %v", u)
+			}
 		}
 		for i := 0; i < npopiter; i++ {
 			u := "u" + strconv.Itoa(r.Int()%NUSER)
-			mbox, err := mkMailbox(u)
-			if err != nil {
-				return err
-			}
-			for _, f := range mbox.files {
-				mbox.retr(&f)
-				mbox.dele(&f)
+			if validUser(u) {
+				mbox, err := mkMailbox(u)
+				if err != nil {
+					return err
+				}
+				for _, f := range mbox.files {
+					mbox.retr(&f)
+					mbox.dele(&f)
+				}
+			} else {
+				return fmt.Errorf("Invalid user %v", u)
 			}
 		}
 	}

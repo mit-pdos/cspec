@@ -38,6 +38,16 @@ func reply(c net.Conn, format string, elems ...interface{}) {
 	}
 }
 
+func validUser(user string) bool {
+	mboxDir := dir + "/" + user
+	_, err := os.Stat(mboxDir)
+	if err == nil {
+		return true
+	} else {
+		return false
+	}
+}
+
 func (msg *Message) process_msg(tid int) error {
 	// fmt.Printf("process msg %v tid %v\n", msg, tid)
 
