@@ -21,7 +21,10 @@ func do_bench_loop(tid int, msg string, niter int, nsmtpiter int, npopiter int) 
 			u := "u" + strconv.Itoa(r.Int()%NUSER)
 			if validUser(u) {
 				m := &Message{To: u, Data: []string{msg}}
-				m.process_msg(tid)
+				err := m.process_msg(tid)
+				if err != nil {
+					return err
+				}
 			} else {
 				return fmt.Errorf("Invalid user %v", u)
 			}
@@ -34,8 +37,15 @@ func do_bench_loop(tid int, msg string, niter int, nsmtpiter int, npopiter int) 
 					return err
 				}
 				for _, f := range mbox.files {
-					mbox.retr(&f)
-					mbox.dele(&f)
+					_, err = mbox.retr(&f)
+					if err != nil {
+						return err
+					}
+
+					err = mbox.dele(&f)
+					if err != nil {
+						return err
+					}
 				}
 			} else {
 				return fmt.Errorf("Invalid user %v", u)
@@ -65,13 +75,13 @@ func TestMixedLoad(t *testing.T) {
 	start := time.Now()
 	wg.Add(nproc)
 	for g := 0; g < nproc; g++ {
-		go func() {
+		go func(g int) {
 			defer wg.Done()
 			err := do_bench_loop(g, "Hello world.", niter, 1, 1)
 			if err != nil {
 				t.Fatal(err)
 			}
-		}()
+		}(g)
 	}
 	wg.Wait()
 
