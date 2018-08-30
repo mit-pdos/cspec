@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	N = 1
+	N     = 1
 	NUSER = 100
 )
 
@@ -18,12 +18,12 @@ func do_bench_loop(tid int, msg string, niter int, nsmtpiter int, npopiter int) 
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 	for l := 0; l < niter; l++ {
 		for i := 0; i < nsmtpiter; i++ {
-			u := "u" + strconv.Itoa(r.Int() % NUSER)
+			u := "u" + strconv.Itoa(r.Int()%NUSER)
 			m := &Message{To: u, Data: []string{msg}}
 			m.process_msg(tid)
 		}
 		for i := 0; i < npopiter; i++ {
-			u := "u" + strconv.Itoa(r.Int() % NUSER)
+			u := "u" + strconv.Itoa(r.Int()%NUSER)
 			mbox, err := mkMailbox(u)
 			if err != nil {
 				return err
@@ -42,9 +42,9 @@ func TestMixedLoad(t *testing.T) {
 	start := time.Now()
 	wg.Add(N)
 	for g := 0; g < N; g++ {
-		go func () {
+		go func() {
 			defer wg.Done()
-			err := do_bench_loop(g, "msg", 100000 / N, 1, 1)
+			err := do_bench_loop(g, "msg", 100000/N, 1, 1)
 			if err != nil {
 				t.Fatal(err)
 			}

@@ -3,8 +3,8 @@ package main
 import (
 	"bufio"
 	"bytes"
-	"io/ioutil"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"net"
 	"net/textproto"
@@ -23,9 +23,9 @@ const dir = "/dev/shm/mailtest"
 
 type Message struct {
 	Client string
-	From string
-	To string
-	Data []string
+	From   string
+	To     string
+	Data   []string
 }
 
 func reply(c net.Conn, format string, elems ...interface{}) {
@@ -41,7 +41,7 @@ func reply(c net.Conn, format string, elems ...interface{}) {
 func (msg *Message) process_msg(tid int) error {
 	// fmt.Printf("process msg %v tid %v\n", msg, tid)
 
-	tpn := dir+"/" + msg.To + "/tmp/" + strconv.Itoa(tid)
+	tpn := dir + "/" + msg.To + "/tmp/" + strconv.Itoa(tid)
 	file, err := os.Create(tpn)
 	if err != nil {
 		return err
@@ -58,7 +58,7 @@ func (msg *Message) process_msg(tid int) error {
 	file.Close()
 
 	for {
-		fpn := dir+"/" + msg.To + "/mail/" + strconv.FormatInt(time.Now().UnixNano(), 16)
+		fpn := dir + "/" + msg.To + "/mail/" + strconv.FormatInt(time.Now().UnixNano(), 16)
 		err = os.Link(tpn, fpn)
 		if err == nil {
 			break
@@ -69,7 +69,7 @@ func (msg *Message) process_msg(tid int) error {
 			return err
 		}
 	}
-	
+
 	err = os.Remove(tpn)
 	if err != nil {
 		log.Fatalf("Unlink error %v\n", err)
@@ -141,7 +141,7 @@ func process_smtp(c net.Conn, tid int) {
 			} else {
 				reply(c, "250 OK")
 			}
-	        case "QUIT":
+		case "QUIT":
 			reply(c, "221 Bye")
 			break
 		default:
@@ -149,8 +149,8 @@ func process_smtp(c net.Conn, tid int) {
 			reply(c, "500 Error")
 			break
 		}
-		
-	}	
+
+	}
 }
 
 func smtp() {
@@ -159,7 +159,7 @@ func smtp() {
 		log.Fatal(err)
 	}
 	defer conn.Close()
-	for c := 0;  ; c++ {
+	for c := 0; ; c++ {
 		nc, err := conn.Accept()
 		if err == nil {
 			go process_smtp(nc, c)
@@ -167,8 +167,8 @@ func smtp() {
 	}
 }
 
-type mailbox struct  {
-	u string
+type mailbox struct {
+	u     string
 	files []os.FileInfo
 }
 
@@ -238,7 +238,6 @@ func (mbox *mailbox) dele(file *os.FileInfo) error {
 	return err
 }
 
-
 func send_data(tw *textproto.Writer, data []byte) bool {
 	tw.PrintfLine("+OK")
 	dwr := tw.DotWriter()
@@ -255,15 +254,15 @@ func send_data(tw *textproto.Writer, data []byte) bool {
 
 func process_pop(c net.Conn, tid int) {
 	defer c.Close()
-	
+
 	reader := bufio.NewReader(c)
 	tr := textproto.NewReader(reader)
 	writer := bufio.NewWriter(c)
 	tw := textproto.NewWriter(writer)
 	var mbox *mailbox
-	
+
 	tw.PrintfLine("+OK")
-	
+
 	for {
 		line, err := tr.ReadLine()
 		if err != nil {
@@ -322,7 +321,7 @@ func process_pop(c net.Conn, tid int) {
 				tw.PrintfLine("-ERR data")
 				break
 			}
-	        case "DELE":
+		case "DELE":
 			if mbox == nil {
 				tw.PrintfLine("-ERR mbox")
 				break
@@ -341,13 +340,12 @@ func process_pop(c net.Conn, tid int) {
 		case "QUIT":
 			tw.PrintfLine("+OK")
 			break
-	        default:
+		default:
 			tw.PrintfLine("-ERR")
 			break
 		}
 	}
 }
-
 
 func pop() {
 	conn, err := net.Listen("tcp", "localhost:2110")
@@ -355,14 +353,13 @@ func pop() {
 		log.Fatal(err)
 	}
 	defer conn.Close()
-	for c := 0;  ; c++ {
+	for c := 0; ; c++ {
 		nc, err := conn.Accept()
 		if err == nil {
 			go process_pop(nc, c)
 		}
 	}
 }
-
 
 func main() {
 	go smtp()

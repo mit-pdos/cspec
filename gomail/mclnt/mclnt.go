@@ -9,17 +9,17 @@ import (
 	"net"
 	"net/smtp"
 	"net/textproto"
-	"strconv"
-	"sync"
 	"os"
+	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
 const (
-	NGO=1
-	NUSER=100
-	NMSG=1000
+	NGO   = 1
+	NUSER = 100
+	NMSG  = 1000
 )
 
 func sendmail(u string) {
@@ -83,17 +83,17 @@ func pickup(u string) {
 		log.Fatal(err)
 	}
 	defer c.Close()
-	
+
 	reader := bufio.NewReader(c)
 	writer := bufio.NewWriter(c)
 	tr := textproto.NewReader(reader)
 	tw := textproto.NewWriter(writer)
 
 	read_ok(tr)
-	
+
 	tw.PrintfLine("USER %s", u)
 	read_ok(tr)
-	
+
 	tw.PrintfLine("LIST")
 	read_ok(tr)
 
@@ -114,14 +114,14 @@ func pickup(u string) {
 }
 
 func smtp_client(c int) {
-	for i := 0; i < (NMSG * NUSER) / NGO; i++ {
-		u := (i+c) % NUSER
+	for i := 0; i < (NMSG*NUSER)/NGO; i++ {
+		u := (i + c) % NUSER
 		sendmail("u" + strconv.Itoa(u))
 	}
 }
 
 func pop_client(c int) {
-	n := NUSER/NGO
+	n := NUSER / NGO
 	o := c * n
 	for u := 0; u < n; u++ {
 		pickup("u" + strconv.Itoa(u+o))
@@ -133,7 +133,7 @@ func measure(s string, f func(int)) {
 	start := time.Now()
 	wg.Add(NGO)
 	for c := 0; c < NGO; c++ {
-		go func (c int) {
+		go func(c int) {
 			defer wg.Done()
 			f(c)
 		}(c)
@@ -150,13 +150,13 @@ func main() {
 	}
 	var wg sync.WaitGroup
 	wg.Add(2)
-	go func () {
+	go func() {
 		defer wg.Done()
 		if os.Args[1] == "1" {
 			measure("smtp", smtp_client)
 		}
 	}()
-	go func () {
+	go func() {
 		defer wg.Done()
 		if os.Args[2] == "1" {
 			measure("pop", pop_client)
