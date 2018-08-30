@@ -161,7 +161,7 @@ run_proc s@S{childrenRef} (Spawn p) = do
   child <- forkProcess $ do
     pid <- getProcessID
     putStrLn $ "Spawned " ++ show pid
-    _ <- run_proc s p
+    _ <- run_proc (s { tid = fromIntegral pid }) p
     return ()
   modifyMVar_ childrenRef (\l -> return $ child:l)
   return $ unsafeCoerce ()
