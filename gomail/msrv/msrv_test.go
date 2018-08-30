@@ -41,10 +41,15 @@ func do_bench_loop(tid int, msg string, niter int, nsmtpiter int, npopiter int) 
 					if err != nil {
 						return err
 					}
+				}
 
+				mbox.unlock()
+
+				for _, f := range mbox.files {
 					err = mbox.dele(&f)
 					if err != nil {
-						return err
+						// benchmark artifact; matches cmail/haskell
+						// return err
 					}
 				}
 			} else {

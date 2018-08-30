@@ -180,6 +180,7 @@ func smtp() {
 type mailbox struct {
 	u     string
 	files []os.FileInfo
+	fd    int
 }
 
 func mkMailbox(u string) (*mailbox, error) {
@@ -188,14 +189,18 @@ func mkMailbox(u string) (*mailbox, error) {
 	if err != nil {
 		return nil, err
 	}
-	err = syscall.Flock(fd, 2)
+	mbox.fd = fd
+	err = syscall.Flock(mbox.fd, 2)
 	if err != nil {
 		return nil, err
 	}
 	mbox.files, err = ioutil.ReadDir(mbox.pn())
-	_ = syscall.Flock(fd, 8)
-	syscall.Close(fd)
 	return mbox, err
+}
+
+func (mbox *mailbox) unlock() {
+	syscall.Flock(mbox.fd, 8)
+	syscall.Close(mbox.fd)
 }
 
 func (mbox *mailbox) pn() string {
@@ -293,11 +298,16 @@ func process_pop(c net.Conn, tid int) {
 				tw.PrintfLine("-ERR")
 				break
 			}
+			if mbox != nil {
+				tw.PrintfLine("-ERR already logged in")
+				break
+			}
 			mbox, err = mkMailbox(words[1])
 			if err != nil {
 				tw.PrintfLine("-ERR readdir")
 				break
 			}
+			mbox.unlock()
 			tw.PrintfLine("+OK")
 		case "LIST":
 			if mbox == nil {
