@@ -64,6 +64,8 @@ Instance list_equal_dec A `{dec:EqualDec A} : EqualDec (list A) := list_eq_dec d
 Instance pair_equal_dec A B `{ea:EqualDec A} `{eb:EqualDec B} : EqualDec (A*B) :=
   RelInstance.
 
+Instance option_equal_dec A `{ea:EqualDec A} : EqualDec (option A) := RelInstance.
+
 Local Hint Constructors clos_refl_trans_1n.
 Instance clos_rt1n_pre A (R: A -> A -> Prop) : PreOrder (clos_refl_trans_1n A R).
 Proof.
