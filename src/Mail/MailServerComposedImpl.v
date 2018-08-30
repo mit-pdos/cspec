@@ -10,6 +10,8 @@ Module MailServerComposedImpl' <:
 
   Import MailServerComposedOp.
 
+  (* START CODE *)
+
   Definition compile_op T (op : MailServerComposedOp.Op T) : proc MailServerHOp.Op T :=
     match op with
     | Deliver u m => Call (Slice u (MailServerOp.Deliver m))
@@ -18,6 +20,8 @@ Module MailServerComposedImpl' <:
     | Delete u id => Call (Slice u (MailServerOp.Delete id))
     | Ext extop => Call (Slice nouser (MailServerOp.Ext extop))
     end.
+
+  (* END CODE *)
 
   Theorem compile_op_no_atomics :
     forall `(op : _ T),

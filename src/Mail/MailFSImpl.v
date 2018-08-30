@@ -11,6 +11,8 @@ Module MailFSImpl' <:
     MailFSOp  MailFSAPI
     DeliverListTidOp DeliverListTidAPI.
 
+  (* START CODE *)
+
   Definition same_tid (tid : nat) (fn : nat * nat) : bool :=
     if tid == fst fn then
       true
@@ -35,6 +37,8 @@ Module MailFSImpl' <:
     | DeliverListTidOp.Unlock => Call (MailFSOp.Unlock)
     | DeliverListTidOp.Ext extop => Call (MailFSOp.Ext extop)
     end.
+
+  (* END CODE *)
 
   Theorem compile_op_no_atomics :
     forall `(op : _ T),

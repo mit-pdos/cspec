@@ -12,6 +12,8 @@ Module TryDeliverImpl' <:
     MailFSOp     MailFSAPI
     TryDeliverOp TryDeliverAPI.
 
+  (* START CODE *)
+
   Definition linkmail_core :=
     ts <- Call MailFSOp.Random;
     ok <- Call (MailFSOp.LinkMail ts);
@@ -29,6 +31,8 @@ Module TryDeliverImpl' <:
     | TryDeliverOp.Unlock => Call (MailFSOp.Unlock)
     | TryDeliverOp.Ext extop => Call (MailFSOp.Ext extop)
     end.
+
+  (* END CODE *)
 
   Theorem compile_op_no_atomics :
     forall `(op : _ T),

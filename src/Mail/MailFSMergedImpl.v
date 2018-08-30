@@ -509,6 +509,8 @@ Module MailFSMergedOpImpl' <:
 
   Import MailFSPathOp.
 
+  (* START CODE *)
+
   Definition compile_op T (op : MailFSPathHOp.Op T) : proc MailFSMergedOp.Op T :=
     match op with
     | Slice (exist _ u _) op' =>
@@ -537,6 +539,8 @@ Module MailFSMergedOpImpl' <:
     | CheckSlice u =>
       Call (MailFSMergedOp.Exists u)
     end.
+
+  (* END CODE *)
 
   Ltac break_pairs :=
     match goal with

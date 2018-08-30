@@ -12,6 +12,8 @@ Module DeliverListTidImpl' <:
     DeliverOp        DeliverAPI
     DeliverListTidProtocol.
 
+  (* START CODE *)
+
   Fixpoint nextfn (files : list nat) (r : nat) : nat :=
     match files with
     | nil => r
@@ -24,6 +26,27 @@ Module DeliverListTidImpl' <:
         in
       nextfn files' r'
     end.
+
+  Definition linkmail_core :=
+    files <- Call DeliverListTidOp.ListTid;
+    let newname := nextfn files 0 in
+    ok <- Call (DeliverListTidOp.LinkMail newname);
+    Ret ok.
+
+  Definition compile_op T (op : DeliverOp.Op T) : proc _ T :=
+    match op with
+    | DeliverOp.CreateWriteTmp data => Call (DeliverListTidOp.CreateWriteTmp data)
+    | DeliverOp.LinkMail => linkmail_core
+    | DeliverOp.UnlinkTmp => Call (DeliverListTidOp.UnlinkTmp)
+    | DeliverOp.List => Call (DeliverListTidOp.List)
+    | DeliverOp.Read fn => Call (DeliverListTidOp.Read fn)
+    | DeliverOp.Delete fn => Call (DeliverListTidOp.Delete fn)
+    | DeliverOp.Lock => Call (DeliverListTidOp.Lock)
+    | DeliverOp.Unlock => Call (DeliverListTidOp.Unlock)
+    | DeliverOp.Ext extop => Call (DeliverListTidOp.Ext extop)
+    end.
+
+  (* END CODE *)
 
   Lemma nextfn_ok' : forall (tid : nat) `(s : FMap.t _ V) r1 r0 n,
     ( forall fn, FMap.In (tid, fn) s -> In fn (r0 ++ r1) ) ->
@@ -53,25 +76,6 @@ Module DeliverListTidImpl' <:
     eapply H; eauto.
     omega.
   Qed.
-
-  Definition linkmail_core :=
-    files <- Call DeliverListTidOp.ListTid;
-    let newname := nextfn files 0 in
-    ok <- Call (DeliverListTidOp.LinkMail newname);
-    Ret ok.
-
-  Definition compile_op T (op : DeliverOp.Op T) : proc _ T :=
-    match op with
-    | DeliverOp.CreateWriteTmp data => Call (DeliverListTidOp.CreateWriteTmp data)
-    | DeliverOp.LinkMail => linkmail_core
-    | DeliverOp.UnlinkTmp => Call (DeliverListTidOp.UnlinkTmp)
-    | DeliverOp.List => Call (DeliverListTidOp.List)
-    | DeliverOp.Read fn => Call (DeliverListTidOp.Read fn)
-    | DeliverOp.Delete fn => Call (DeliverListTidOp.Delete fn)
-    | DeliverOp.Lock => Call (DeliverListTidOp.Lock)
-    | DeliverOp.Unlock => Call (DeliverListTidOp.Unlock)
-    | DeliverOp.Ext extop => Call (DeliverListTidOp.Ext extop)
-    end.
 
   Theorem compile_op_no_atomics :
     forall `(op : _ T),

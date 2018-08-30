@@ -12,6 +12,8 @@ Module AtomicReader' <:
     MailServerOp MailServerLockAbsAPI
     MailboxProtocol.
 
+  (* START CODE *)
+
   Fixpoint read_list (l : list (nat*nat)) (r : list ((nat*nat) * string)) :=
     match l with
     | nil =>
@@ -43,6 +45,8 @@ Module AtomicReader' <:
     | MailServerOp.Delete fn => delete_core fn
     | MailServerOp.Ext extop => Call (MailboxOp.Ext extop)
     end.
+
+  (* END CODE *)
 
   Lemma read_list_no_atomics : forall l r,
     no_atomics (read_list l r).

@@ -12,6 +12,8 @@ Module LinkRetryImpl' <:
     TryDeliverOp TryDeliverAPI
     DeliverOp DeliverAPI.
 
+  (* START CODE *)
+
   Definition retry_cond (r : bool) := r.
   Definition once_cond {T} (r : T) := true.
 
@@ -27,6 +29,8 @@ Module LinkRetryImpl' <:
     | DeliverOp.Unlock => (fun _ => TryDeliverOp.Unlock, once_cond, None)
     | DeliverOp.Ext extop => (fun _ => TryDeliverOp.Ext extop, once_cond, None)
     end.
+
+  (* END CODE *)
 
   Ltac step_inv :=
     match goal with

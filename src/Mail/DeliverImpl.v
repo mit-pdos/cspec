@@ -12,6 +12,8 @@ Module AtomicDeliver' <:
     MailboxOp MailboxTmpAbsAPI
     DeliverProtocol.
 
+  (* START CODE *)
+
   Definition deliver_core (m : string) :=
     ok <- Call (DeliverOp.CreateWriteTmp m);
     match ok with
@@ -34,6 +36,8 @@ Module AtomicDeliver' <:
     | MailboxOp.Unlock => Call (DeliverOp.Unlock)
     | MailboxOp.Ext extop => Call (DeliverOp.Ext extop)
     end.
+
+  (* END CODE *)
 
   Theorem compile_op_no_atomics :
     forall `(op : _ T),

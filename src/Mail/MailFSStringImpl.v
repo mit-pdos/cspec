@@ -10,7 +10,9 @@ Module MailFSStringImpl' <:
     MailFSStringAbsState
     MailFSStringOp MailFSStringAPI
     MailFSOp MailFSStringAbsAPI.
-    
+
+  (* START CODE *)
+
   Definition createwritetmp_core data :=
     tid <- Call (MailFSStringOp.GetTID);
     r <- Call (MailFSStringOp.CreateWriteTmp (encode_tid_fn tid 0) data);
@@ -44,6 +46,8 @@ Module MailFSStringImpl' <:
     | MailFSOp.GetTID => Call (MailFSStringOp.GetTID)
     | MailFSOp.Random => Call (MailFSStringOp.Random)
     end.
+
+  (* END CODE *)
 
   
   Theorem compile_op_no_atomics :

@@ -11,6 +11,8 @@ Module MailFSPathImpl' <:
     MailFSPathOp MailFSPathAPI
     MailFSStringOp MailFSPathAbsAPI.
 
+  (* START CODE *)
+
   Definition compile_op T (op : MailFSStringOp.Op T) : proc _ T :=
     match op with
     | MailFSStringOp.LinkMail tmpfn mailfn => Call (MailFSPathOp.Link (tmp_string, tmpfn) (mail_string, mailfn))
@@ -25,6 +27,8 @@ Module MailFSPathImpl' <:
     | MailFSStringOp.GetTID => Call (MailFSPathOp.GetTID)
     | MailFSStringOp.Random => Call (MailFSPathOp.Random)
     end.
+
+  (* END CODE *)
 
   Theorem compile_op_no_atomics :
     forall `(op : _ T),
