@@ -866,154 +866,6 @@ Module AbsSeqMem := LayerImplAbs
                       SeqMemState SeqMemAPI
                       AbsSeqMem'.
 
-Module TASState <: State.
-
-  Record s := mkTASState {
-                  TASValue : memT unit nat;
-                  TASLock : option nat;
-                }.
-
-  Definition State := s.
-  Definition initP s :=
-    TASLock s = None /\
-    TASValue s = {| MemValue := fun _ => 0; SBuf := fun _ => [] |}.
-
-End TASState.
-
-(** LAYER: TASAPI *)
-
-Module TASAPI <: Layer TASOp TASState.
-
-  Import TASOp.
-  Import TASState.
-
-  Inductive xstep : forall T, Op T -> nat -> State -> T -> State -> list event -> Prop :=
-  | StepTryAcquireSuccess : forall tid v,
-      xstep TryAcquire tid (mkTASState v None) true (mkTASState v (Some tid)) nil
-  | StepTryAcquireFail : forall tid v l,
-      (* the lock is freed when the release is in the store buffer, but you
-      might still not acquire the lock if you don't see the release *)
-      xstep TryAcquire tid (mkTASState v l) false (mkTASState v l) nil
-  | StepClear : forall tid v l,
-      xstep Clear tid (mkTASState v l) tt (mkTASState v None) nil
-  | StepRead : forall tid v v' l,
-      mem_bg v v' ->
-      xstep Read tid (mkTASState v l) (mem_read v' tt tid) (mkTASState v' l) nil
-  | StepWrite : forall tid v0 v l,
-      xstep (Write v) tid (mkTASState v0 l) tt (mkTASState (mem_write tt v v0 tid) l) nil
-  | StepFlush : forall tid v v' l,
-      mem_bg v v' ->
-      xstep Flush tid (mkTASState v l) tt (mkTASState (mem_flush v' tid) l) nil
-  .
-
-  Definition step := xstep.
-
-End TASAPI.
-
-(** IMPL: TSO_TASAPI -> TASAPI *)
-
-Module AbsTSO' <: LayerImplAbsT
-                    TASOp
-                    TSOState TAS_TSOAPI
-                    TASState TASAPI.
-
-  Import TSOOp.
-  Import TSOState TASState.
-
-  Fixpoint filter_writes (ws: list (addr*nat)) : list (unit*nat) :=
-    match ws with
-    | nil => nil
-    | (a,v)::ws' => if a == Val
-                   then (tt,v)::filter_writes ws'
-                   else filter_writes ws'
-    end.
-
-  Definition Forall_writes (a:addr) (P: nat -> Prop) : list (addr*nat) -> Prop :=
-    List.Forall (fun '(a', v) => a = a' -> P v).
-
-  Definition absR (s2: TSOState.State) (s1: State) :=
-    (forall tid, s1.(TASValue).(SBuf) tid = filter_writes (s2.(SBuf) tid)) /\
-    (* if the lock is supposedly held, it must be visibile to everyone *)
-    (forall tid, s1.(TASLock) = Some tid ->
-            forall tid', mem_read s2 Lock tid' = cLocked /\
-                    Forall_writes Lock (fun _ => False) (s2.(SBuf) tid)) /\
-    (forall tid, mem_read s2 Lock tid = cLocked ->
-            s1.(TASLock) <> None) /\
-    (* if you find the lock unheld, you're never being lied to *)
-    (forall tid, mem_read s2 Lock tid <> cLocked ->
-            s1.(TASLock) = None).
-
-  Import TASAPI.
-
-  Theorem absR_stable {s1 s1' s2} :
-      absR s1 s2 ->
-      mem_bg s1 s1' ->
-      absR s1' s2.
-  Proof.
-  Admitted.
-
-  Theorem absR_unlocked {s1 s2 tid} :
-      absR s1 s2 ->
-      mem_read s1 Lock tid <> cLocked ->
-      s2.(TASLock) = None.
-  Proof.
-  Admitted.
-
-  Theorem absR_preserved_lock : forall s1 tid v,
-      absR s1 {| TASValue := v; TASLock := None |} ->
-      absR (mem_flush (mem_write Lock cLocked s1 tid) tid)
-           {| TASValue := v; TASLock := Some tid |}.
-  Admitted.
-
-  Ltac absR :=
-    repeat match goal with
-           | [ H: absR ?s _,
-                  H': mem_bg ?s ?s' |- _ ] =>
-             pose proof (absR_stable H H');
-             clear H H';
-             try clear s
-           | [ H: absR ?s _,
-                  H': mem_read ?s Lock _ <> cLocked |- _ ] =>
-             apply (absR_unlocked H) in H';
-             simpl in H';
-             subst
-           end.
-
-  Theorem absR_ok : op_abs absR TAS_TSOAPI.step step.
-  Proof.
-    unfold step.
-    hnf; intros.
-    cut (exists s2', xstep op tid s2 r s2' evs /\ absR s1' s2');
-      [ now (propositional; eauto) | ].
-    destruct op.
-    - invert H0; clear H0; absR.
-      + destruct s2; simpl in *; propositional.
-        exists_econstructor; split.
-        econstructor.
-        eapply absR_preserved_lock; eauto.
-      + destruct s2.
-        exists_econstructor; split.
-        econstructor.
-
-
-  Admitted.
-
-  Theorem absInitP :
-    forall s1 : TSOState.State,
-      TSOState.initP s1 -> exists s2 : State, absR s1 s2 /\ initP s2.
-  Proof.
-    unfold TSOState.initP, initP, absR; propositional.
-    exists (mkTASState (mkMem (fun _ => cUnlocked) (fun _ => [])) None);
-      simpl;
-      (intuition auto);
-      try congruence.
-    unfold mem_read in H; simpl in *.
-    invert H.
-  Qed.
-
-End AbsTSO'.
-
-
 (** LAYER: TASLockAPI *)
 
 Module LockOp <: Ops.
@@ -1022,150 +874,129 @@ Module LockOp <: Ops.
   | Acquire : xOp bool
   | Release : xOp unit
   | Read : xOp nat
-  | Write : nat -> xOp unit
-  | Flush : xOp unit.
+  | Write : nat -> xOp unit.
 
   Definition Op := xOp.
 
 End LockOp.
 
-Module LockState <: State.
-
-  Record s := mkState {
-                  Value : memT unit nat;
-                  Lock : option nat;
-                }.
-
-  Definition State := s.
-  Definition initP s :=
-    Lock s = None /\
-    Value s = {| MemValue := fun _ => 0; SBuf := fun _ => [] |}.
-
-End LockState.
-
-Module TASLockAPI <: Layer TASOp LockState.
-
-  Import TASOp.
-  Import LockState.
-
-  Inductive xstep : forall T, Op T -> nat -> State -> T -> State -> list event -> Prop :=
-  | StepTAS0 : forall tid v,
-      xstep TestAndSet tid (mkState v None) false (mkState v (Some tid)) nil
-  | StepTAS1 : forall tid tid' v,
-      xstep TestAndSet tid (mkState v (Some tid')) true (mkState v (Some tid')) nil
-  | StepClear : forall tid v l,
-      xstep Clear tid (mkState v l) tt (mkState v None) nil
-  | StepRead : forall tid v v' l,
-      mem_bg v v' ->
-      xstep Read tid (mkState v l) (mem_read v' tt tid) (mkState v' l) nil
-  | StepWrite : forall tid v0 v l,
-      xstep (Write v) tid (mkState v0 l) tt (mkState (mem_write tt v v0 tid) l) nil
-  | StepFlush : forall tid v v' l,
-      mem_bg v v' ->
-      xstep Flush tid (mkState v l) tt (mkState (mem_flush v' tid) l) nil
-  .
-
-  Definition step := xstep.
-
-End TASLockAPI.
-
-(** IMPL: TASLockAPI -> TASAPI
-
-Adding ghost state to the test-and-set bit. *)
-
-Module AbsLock' <:
-  LayerImplAbsT TASOp
-                TASState TASAPI
-                LockState TASLockAPI.
-
-  Import TASState.
-  Import LockState.
-
-  Definition absR (s1 : TASState.State) (s2 : LockState.State) :=
-    TASValue s1 = Value s2 /\
-    ((TASLock s1 = false /\ Lock s2 = None) \/
-     (exists tid, TASLock s1 = true /\ Lock s2 = Some tid)).
-
-  Hint Constructors TASLockAPI.xstep.
-
-  Theorem absR_ok :
-    op_abs absR TASAPI.step TASLockAPI.step.
-  Proof.
-    unfold op_abs; intros.
-    destruct s1; destruct s2; unfold absR in *.
-    unfold TASLockAPI.step.
-    ( intuition idtac ); simpl in *; subst; repeat deex.
-    - inversion H0; clear H0; subst; repeat sigT_eq; simpl in *.
-      all: eexists; (intuition idtac); [ | | eauto ].
-      all: simpl; eauto.
-    - inversion H0; clear H0; subst; repeat sigT_eq; simpl in *.
-      all: eexists; (intuition idtac); [ | | eauto ].
-      all: simpl; eauto.
-  Qed.
-
-  Theorem absInitP :
-    forall s1,
-      TASState.initP s1 ->
-      exists s2, absR s1 s2 /\
-      LockState.initP s2.
-  Proof.
-    unfold absR, TASState.initP, LockState.initP; intros.
-    exists_econstructor; intuition eauto.
-  Qed.
-
-End AbsLock'.
-
-Module AbsLock :=
-  LayerImplAbs TASOp
-               TASState TASAPI
-               LockState TASLockAPI
-               AbsLock'.
-
 (** LAYER: RawLockAPI *)
 
-Module RawLockAPI <: Layer LockOp LockState.
+Module RawLockAPI <: Layer LockOp SeqMemState.
 
   Import LockOp.
-  Import LockState.
+  Import SeqMemState.
 
-  Inductive xstep : forall T, Op T -> nat -> State -> T -> State -> list event -> Prop :=
-  | StepAcquire : forall tid v r,
-      xstep Acquire tid (mkState v None) r (mkState v (Some tid)) nil
+  Inductive xstep : OpSemantics Op s :=
+  | StepAcquire : forall tid v l r,
+      xstep Acquire tid (mkSMState v l) r (mkSMState v (Some tid)) nil
   | StepRelease : forall tid v l,
-      xstep Release tid (mkState v l) tt (mkState v None) nil
-  | StepRead : forall tid v v' l,
-      mem_bg v v' ->
-      xstep Read tid (mkState v l) (mem_read v' tt tid) (mkState v' l) nil
+      xstep Release tid (mkSMState v l) tt (mkSMState v None) nil
+  | StepRead : forall tid v l,
+      xstep Read tid (mkSMState v l) v (mkSMState v l) nil
   | StepWrite : forall tid v0 v l,
-      xstep (Write v) tid (mkState v0 l) tt (mkState (mem_write tt v v0 tid) l) nil
-  | StepFlush : forall tid v v' l,
-      mem_bg v v' ->
-      xstep Flush tid (mkState v l) tt (mkState (mem_flush v' tid) l) nil
+      xstep (Write v) tid (mkSMState v0 l) tt (mkSMState v l) nil
   .
 
-  Definition step := xstep.
+  Definition step := error_step xstep (fun T op tid s => match op with
+                                                      | Acquire => False
+                                                      | _ => s.(LockOwner) = Some tid
+                                                      end).
 
 End RawLockAPI.
 
-Module LockProtocol <: Protocol LockOp LockState.
+Module LockImpl' <:
+  LayerImplLoopT
+    SeqMemState
+    TASOp  SeqMemAPI
+    LockOp RawLockAPI.
+
+  Definition acquire_cond (r : bool) := r.
+
+  Definition once_cond {T} (r : T) :=
+    true.
+
+  Import TASOp.
+  Import LockOp.
+
+  Definition compile_op T (op : LockOp.Op T) : (option T -> TASOp.Op T) * (T -> bool) * option T :=
+    match op with
+    | Acquire => (fun _ => TryAcquire, acquire_cond, None)
+    | Release => (fun _ => Clear, once_cond, None)
+    | Read => (fun _ => TASOp.Read, once_cond, None)
+    | Write v => (fun _ => TASOp.Write v, once_cond, None)
+    end.
+
+  Ltac step_inv :=
+    match goal with
+    | H : SeqMemAPI.step _ _ _ _ _ _ |- _ =>
+      inversion H; clear H; subst; repeat sigT_eq
+    | H : RawLockAPI.step _ _ _ _ _ _ |- _ =>
+      inversion H; clear H; subst; repeat sigT_eq
+    end.
+
+  Ltac pair_inv :=
+    match goal with
+    | H : (_, _) = (_, _) |- _ =>
+      inversion H; clear H; subst; repeat sigT_eq
+    end.
+
+  Hint Constructors RawLockAPI.xstep.
+
+  Theorem noop_or_success :
+    noop_or_success compile_op SeqMemAPI.step RawLockAPI.step.
+  Proof.
+    unfold noop_or_success.
+    unfold RawLockAPI.step.
+    intros.
+
+    assert (match cond r with
+            | false => s = s' /\ evs = []
+            | true =>
+              error_step RawLockAPI.xstep
+                         (fun (T0 : Type) (op : Op T0) (tid0 : nat) (s0 : SeqMemState.s) =>
+                            match op with
+                            | Acquire => False
+                            | _ => s0.(SeqMemState.LockOwner) = Some tid0
+                            end) T opM tid s r s' evs
+            end).
+    destruct opM; simpl in *; intros; repeat pair_inv;
+      unfold acquire_cond.
+    - invert H0; simpl in *; propositional.
+      invert H5; eauto.
+      invert H0; eauto.
+      admit. (* oops, loops can create spurious events during errors *)
+  Qed.
+
+End LockImpl'.
+
+Module LockImpl :=
+  LayerImplLoop
+    LockState
+    TASOp  TASLockAPI
+    LockOp RawLockAPI
+    LockImpl'.
+
+
+
+Module LockProtocol <: Protocol LockOp SeqMemState.
 
   Import LockOp.
-  Import LockState.
+  Import SeqMemState.
 
-  Inductive xstep_allow : forall T, Op T -> nat -> State -> Prop :=
+  Inductive xstep_allow : forall T, Op T -> nat -> s -> Prop :=
   | StepAcquire : forall tid s,
       xstep_allow Acquire tid s
   | StepRelease : forall tid v,
-      xstep_allow Release tid (mkState v (Some tid))
+      xstep_allow Release tid (mkSMState v (Some tid))
   | StepRead : forall tid v,
-      xstep_allow Read tid (mkState v (Some tid))
+      xstep_allow Read tid (mkSMState v (Some tid))
   | StepWrite : forall tid v0 v,
-      xstep_allow (Write v) tid (mkState v0 (Some tid))
-  | StepFlush : forall tid v,
-      xstep_allow Flush tid (mkState v (Some tid))
+      xstep_allow (Write v) tid (mkSMState v0 (Some tid))
   .
 
-  Definition step_allow := xstep_allow.
+  Definition step_allow T (op: Op T) tid s :=
+    forall s', s = Valid s' -> xstep_allow op tid s'.
 
 End LockProtocol.
 
@@ -1612,64 +1443,6 @@ Module AbsCounter :=
 
 
 (** Implement [Acquire] on top of test-and-set *)
-
-Module LockImpl' <:
-  LayerImplLoopT
-    LockState
-    TASOp  TASLockAPI
-    LockOp RawLockAPI.
-
-  Definition acquire_cond (r : bool) :=
-    if r == false then true else false.
-
-  Definition once_cond {T} (r : T) :=
-    true.
-
-  Import TASOp.
-  Import LockOp.
-
-  Definition compile_op T (op : LockOp.Op T) : (option T -> TASOp.Op T) * (T -> bool) * option T :=
-    match op with
-    | Acquire => (fun _ => TestAndSet, acquire_cond, None)
-    | Release => (fun _ => Clear, once_cond, None)
-    | Read => (fun _ => TASOp.Read, once_cond, None)
-    | Write v => (fun _ => TASOp.Write v, once_cond, None)
-    | Flush => (fun _ => TASOp.Flush, once_cond, None)
-    end.
-
-  Ltac step_inv :=
-    match goal with
-    | H : TASLockAPI.step _ _ _ _ _ _ |- _ =>
-      inversion H; clear H; subst; repeat sigT_eq
-    | H : RawLockAPI.step _ _ _ _ _ _ |- _ =>
-      inversion H; clear H; subst; repeat sigT_eq
-    end.
-
-  Ltac pair_inv :=
-    match goal with
-    | H : (_, _) = (_, _) |- _ =>
-      inversion H; clear H; subst; repeat sigT_eq
-    end.
-
-  Hint Constructors RawLockAPI.xstep.
-
-  Theorem noop_or_success :
-    noop_or_success compile_op TASLockAPI.step RawLockAPI.step.
-  Proof.
-    unfold noop_or_success.
-    unfold RawLockAPI.step.
-    destruct opM; simpl; intros; pair_inv; step_inv; eauto.
-  Qed.
-
-End LockImpl'.
-
-Module LockImpl :=
-  LayerImplLoop
-    LockState
-    TASOp  TASLockAPI
-    LockOp RawLockAPI
-    LockImpl'.
-
 
 (** Linking *)
 
