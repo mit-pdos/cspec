@@ -16,18 +16,15 @@ Section TransitionSystem.
   Definition rimpl R1 R2 := forall x y, R1 x y -> R2 x y.
   Definition riff R1 R2 := rimpl R1 R2 /\ rimpl R2 R1.
 
-  Infix "--->" := rimpl (at level 14, no associativity).
-  Infix "<--->" := riff (at level 14, no associativity).
+  Infix "--->" := rimpl (at level 40, no associativity).
+  Infix "<--->" := riff (at level 40, no associativity).
 
-  Global Instance rimpl_PreOrder : PreOrder rimpl.
-  Proof.
-    firstorder.
-  Qed.
+  Notation magic := (ltac:(firstorder)) (only parsing).
 
-  Global Instance riff_Equivalence : Equivalence riff.
-  Proof.
-    firstorder.
-  Qed.
+  Global Instance rimpl_PreOrder : PreOrder rimpl := magic.
+  Global Instance riff_Equivalence : Equivalence riff := magic.
+
+  Global Instance riff_rimpl : subrelation riff rimpl := magic.
 
   Inductive kleene_star R : Relation :=
   | star_refl : forall x,
@@ -79,23 +76,16 @@ Section TransitionSystem.
 
   Infix ">>" := rel_app (at level 12, left associativity).
 
-  Theorem rel_app_assoc : forall R1 R2 R3,
-      R1 >> R2 >> R3 <---> R1 >> (R2 >> R3).
-  Proof.
-    firstorder.
-  Qed.
+  Definition rel_app_assoc R1 R2 R3 :
+    R1 >> (R2 >> R3) <---> R1 >> R2 >> R3 := magic.
+
+  Hint Rewrite rel_app_assoc : rel.
 
   Global Instance rel_app_impl :
-    Proper (rimpl ==> rimpl ==> rimpl) rel_app.
-  Proof.
-    firstorder.
-  Qed.
+    Proper (rimpl ==> rimpl ==> rimpl) rel_app := magic.
 
   Global Instance rel_app_iff :
-    Proper (riff ==> riff ==> riff) rel_app.
-  Proof.
-    firstorder.
-  Qed.
+    Proper (riff ==> riff ==> riff) rel_app := magic.
 
   Theorem kleene_star_duplicate : forall R,
       kleene_star R >> kleene_star R <---> kleene_star R.
@@ -105,5 +95,41 @@ Section TransitionSystem.
     - exists x; split; eauto.
       reflexivity.
   Qed.
+
+  Definition rel_plus R1 R2 : Relation :=
+    fun x y => R1 x y \/ R2 x y.
+
+  Infix "+++" := (rel_plus) (at level 13, left associativity).
+
+  Global Instance rel_plus_impl :
+    Proper (rimpl ==> rimpl ==> rimpl) rel_plus := magic.
+  Global Instance rel_plus_iff :
+    Proper (riff ==> riff ==> riff) rel_plus := magic.
+
+  Definition rel_app_distr_r R1 R2 R3 :
+      (R1 +++ R2) >> R3 <---> R1 >> R3 +++ R2 >> R3 := magic.
+
+  Definition rel_app_distr_l R1 R2 R3 :
+      R1 >> (R2 +++ R3) <---> R1 >> R2 +++ R1 >> R3 := magic.
+
+  Hint Rewrite rel_app_distr_r rel_app_distr_l : rel.
+
+  Definition rel_plus_assoc R1 R2 R3 :
+      R1 +++ (R2 +++ R3) <---> R1 +++ R2 +++ R3 := magic.
+
+  Hint Rewrite rel_plus_assoc : rel.
+
+  Definition rel_next R1 R2 : Relation :=
+    R1 +++ R1 >> R2.
+
+  Infix "?>" := (rel_next) (at level 11, right associativity).
+
+  Global Instance proper_rimpl :
+      Proper (rimpl ==> riff ==> Basics.flip Basics.impl) rimpl := magic.
+
+  Definition rel_next_associative R1 R2 R3 :
+      R1 ?> R2 ?> R3 ---> (R1 ?> R2) ?> R3 := magic.
+
+  Definition noop : Relation := eq.
 
 End TransitionSystem.
