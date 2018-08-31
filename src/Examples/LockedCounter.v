@@ -324,7 +324,7 @@ Module LockOwnerAPI <: Layer TASOp LockOwnerState.
   | StepClear : forall tid s,
       xstep Clear tid (mkLOState s (Some tid))
             tt
-            (mkLOState (mem_write Lock cUnlocked s tid) (Some tid))
+            (mkLOState (mem_write Lock cUnlocked s tid) None)
             nil
   | StepRead : forall tid s s',
       mem_bg s s' ->
@@ -438,8 +438,14 @@ Definition empty_sb_except A T (m: memT A T) tid :=
   forall tid', tid <> tid' ->
           m.(SBuf) tid' = [].
 
+
+Definition unlock_last (sbuf: list (TSOOp.addr * nat)) :=
+  exists l, sbuf = (TSOOp.Lock, TSOOp.cUnlocked) :: l /\
+       List.Forall (fun '(a, _) => a = TSOOp.Val) l.
+
 Module LockInvariantAPI <: Layer TASOp LockInvariantState.
 
+  Import TSOOp.
   Import TASOp.
   Import LockInvariantState.
 
@@ -447,32 +453,43 @@ Module LockInvariantAPI <: Layer TASOp LockInvariantState.
     match s.(InvLock) with
     | Some tid => empty_sb_except s.(InvValue) tid /\
                  s.(PrevOwner) = tid
-    | None => empty_sb_except s.(InvValue) s.(PrevOwner)
+    | None => (s.(InvValue).(MemValue) Lock <> cLocked /\
+              empty_sb s.(InvValue)) \/
+             (s.(InvValue).(MemValue) Lock = cLocked /\
+              empty_sb_except s.(InvValue) s.(PrevOwner) /\
+              unlock_last (s.(InvValue).(SBuf) s.(PrevOwner)))
     end.
 
   Inductive xstep : OpSemantics Op s :=
-  | StepTryAcquireSuccess : forall tid s pl,
-      xstep TryAcquire tid (mkLIState s None pl) true (mkLIState s (Some tid) tid) nil
-  | StepTryAcquireFail : forall tid tid' s pl,
+  | StepTryAcquireSuccess : forall tid s s' l pl,
+      mem_bg s s' ->
+      mem_read s' Lock tid <> cLocked ->
       xstep TryAcquire tid
-            (mkLIState s (Some tid') pl)
+            (mkLIState s l pl)
+            true
+            (mkLIState (mem_flush (mem_write Lock cLocked s' tid) tid) (Some tid) tid) nil
+  | StepTryAcquireFail : forall tid s s' l pl,
+      mem_bg s s' ->
+      xstep TryAcquire tid
+            (mkLIState s l pl)
             false
-            (mkLIState s (Some tid') pl) nil
+            (mkLIState (mem_flush s' tid) l pl) nil
   | StepClear : forall tid v pl,
       xstep Clear tid
             (mkLIState v (Some tid) pl)
             tt
-            (mkLIState v None tid) nil
-  | StepRead : forall tid s pl,
+            (mkLIState (mem_write Lock cUnlocked v tid) None pl) nil
+  | StepRead : forall tid s s' pl,
+      mem_bg s s' ->
       xstep Read tid
             (mkLIState s (Some tid) pl)
-            (mem_read s TSOOp.Val tid)
-            (mkLIState s (Some tid) pl) nil
+            (mem_read s' Val tid)
+            (mkLIState s' (Some tid) pl) nil
   | StepWrite : forall tid s v' pl,
       xstep (Write v') tid
             (mkLIState s (Some tid) pl)
             tt
-            (mkLIState (mem_write TSOOp.Val v' s tid) (Some tid) pl) nil
+            (mkLIState (mem_write Val v' s tid) (Some tid) pl) nil
   .
 
   Definition invariant_step (s1 s2:s) :=
@@ -485,7 +502,7 @@ End LockInvariantAPI.
 
 Inductive error_absR {State1 State2} {absR: State1 -> State2 -> Prop} :
   OrError State1 -> OrError State2 -> Prop :=
-| absR_error : error_absR Error Error
+| absR_error : forall s1, error_absR s1 Error
 | absR_valid : forall s1 s2,
     absR s1 s2 ->
     error_absR (Valid s1) (Valid s2).
@@ -498,6 +515,7 @@ Module AbsLockInvariant' <: LayerImplAbsT
                               TASOp
                               LockOwnerState LockOwnerAPI
                               LockInvariantState LockInvariantAPI.
+  Import TSOOp.
   Import TASOp.
   Import LockOwnerState LockInvariantState.
 
@@ -508,21 +526,209 @@ Module AbsLockInvariant' <: LayerImplAbsT
     s2.(InvLock) = s1.(TASLock) /\
     invariant s2.
 
+  Lemma abstr_invlock : forall s1 s2,
+      abstr s1 s2 ->
+      s2.(InvLock) = s1.(TASLock).
+  Proof.
+    firstorder.
+  Qed.
+
   Definition absR := error_absR abstr.
+
+  Lemma abstr_intro : forall v l pl,
+      invariant (mkLIState v l pl) ->
+      error_absR abstr (Valid (mkLOState v l)) (Valid (mkLIState v l pl)).
+  Proof.
+    intros.
+    constructor.
+    unfold abstr; intuition eauto.
+  Qed.
+
+  Lemma abstr_invariant : forall s1 s2,
+      abstr s1 s2 ->
+      invariant s2.
+  Proof.
+    firstorder.
+  Qed.
+
+  Hint Resolve abstr_invariant.
+
+  Lemma bg_invariant : forall T (op: Op T) tid s v s' evs,
+      xstep op tid s v s' evs ->
+      invariant s ->
+      invariant s' ->
+      bg_step xstep invariant_step op tid s v s' evs.
+  Proof.
+    intros.
+    unfold bg_step.
+    unfold invariant_step.
+    descend; (intuition idtac);
+      try reflexivity;
+      eauto.
+  Qed.
+
+  Hint Constructors xstep.
+
+  Lemma mem_bgflush_other_tid : forall A {Adec:EqualDec A} V (m: memT A V) tid tid',
+      tid <> tid' ->
+      (mem_bgflush m tid').(SBuf) tid = m.(SBuf) tid.
+  Proof.
+    unfold mem_bgflush; intros.
+    destruct matches; subst; simpl.
+    autorewrite with fupd; auto.
+  Qed.
+
+  Theorem mem_bg_empty_sb_except : forall A {Aeq:EqualDec A} V (s s': memT A V) tid,
+      empty_sb_except s tid ->
+      mem_bg s s' ->
+      empty_sb_except s' tid.
+  Proof.
+    unfold empty_sb_except; intros.
+    specialize (H _ ltac:(eauto)).
+    induction H0; propositional.
+    destruct (tid' == tid0); subst.
+    rewrite mem_bgflush_noop by auto; auto.
+    rewrite mem_bgflush_other_tid by auto; auto.
+  Qed.
+
+  Hint Resolve mem_bg_empty_sb_except.
+
+  Theorem last_error_app : forall A (l l': list A) a,
+      last_error (l ++ a::l') = last_error (a::l').
+  Proof.
+    induction l; simpl; intros; eauto.
+    rewrite IHl.
+    simpl.
+    destruct_with_eqn (l ++ a0 :: l'); auto.
+    apply app_eq_nil in Heql0; intuition congruence.
+  Qed.
+
+  Theorem last_error_app1 : forall A (l: list A) x,
+      last_error (l ++ [x]) = Some x.
+  Proof.
+    intros.
+    rewrite last_error_app.
+    auto.
+  Qed.
+
+  Lemma unlocked_not_locked : cUnlocked = cLocked -> False.
+  Proof.
+    unfold cUnlocked, cLocked; omega.
+  Qed.
+
+  Hint Resolve unlocked_not_locked.
+
+  Lemma empty_sb_except_to_all : forall A {Aeq:EqualDec A} V (m: memT A V) a,
+      empty_sb_except m a ->
+      m.(SBuf) a = [] ->
+      empty_sb m.
+  Proof.
+    unfold empty_sb, empty_sb_except; intros.
+    destruct (a == tid); subst; eauto.
+  Qed.
+
+  Theorem invariant_mem_bg : forall s s' l pl,
+      invariant (mkLIState s l pl) ->
+      mem_bg s s' ->
+      invariant (mkLIState s' l pl).
+  Proof.
+    unfold invariant; simpl; intuition eauto.
+    destruct l; intuition eauto.
+    eapply empty_sb_mem_bg_noop in H0; eauto; subst; eauto.
+    induction H0; intros; eauto.
+    propositional.
+    destruct IHclos_refl_trans_n1; propositional.
+    - rewrite ?empty_sb_mem_bgflush_noop by auto; eauto.
+    - destruct (tid == pl); subst.
+      + admit.
+      + specialize (H4 tid ltac:(eauto)).
+        rewrite mem_bgflush_noop by auto; eauto.
+  Admitted.
+
+  Theorem invariant_mem_flush : forall s s' l pl tid,
+      invariant (mkLIState s l pl) ->
+      s' = mem_flush s tid ->
+      invariant (mkLIState s' l pl).
+  Proof.
+  Admitted.
+
+  Theorem invariant_write_lock : forall s tid l pl,
+      invariant (mkLIState s l pl) ->
+      mem_read s Lock tid <> cLocked ->
+      invariant (mkLIState
+                   (mem_flush (mem_write Lock cLocked s tid) tid)
+                   (Some tid)
+                   tid).
+  Proof.
+    unfold invariant; simpl; propositional.
+    split; [ | now auto ].
+    destruct l; propositional.
+  Admitted.
+
+  Lemma invariant_write_unlock : forall s tid pl,
+      invariant (mkLIState s (Some tid) pl) ->
+      invariant (mkLIState (mem_write Lock cUnlocked s tid) None pl).
+  Proof.
+    unfold invariant; simpl; propositional.
+  Admitted.
+
+  Lemma invariant_write_val : forall s v tid pl,
+      invariant (mkLIState s (Some tid) pl) ->
+      invariant (mkLIState (mem_write Val v s tid) (Some tid) pl).
+  Proof.
+    unfold invariant; simpl; propositional.
+  Admitted.
 
   Theorem absR_ok : op_abs absR LockOwnerAPI.step step.
   Proof.
     unfold LockOwnerAPI.step, step, absR.
     hnf; intros.
     invert H0; clear H0.
-    - admit.
+    - invert H; clear H; eauto.
+      destruct (decide_violation op tid s0.(TASLock)).
+      + exists Error; split; eauto.
+        constructor.
+        rewrite (abstr_invlock H1) in *; auto.
+      + unfold abstr in * |- .
+        destruct s3; simpl in *; propositional.
+        invert H6; simpl in *.
+        * eexists; split; [ eapply abstr_intro with (pl:=tid) | ].
+          eapply invariant_mem_bg in H1; eauto.
+          eapply invariant_write_lock; eauto.
+          constructor.
+          apply bg_invariant; eauto.
+          eapply invariant_mem_bg in H1; eauto.
+          eapply invariant_write_lock; eauto.
+        * eexists; split; [ eapply abstr_intro with (pl:=PrevOwner0) | ].
+          eapply invariant_mem_bg in H10; eauto.
+          eapply invariant_mem_flush; eauto.
+          constructor.
+          apply bg_invariant; eauto.
+          eapply invariant_mem_bg in H10; eauto.
+          eapply invariant_mem_flush; eauto.
+        * eexists; split; [ eapply abstr_intro with (pl := PrevOwner0) | ].
+          eapply invariant_write_unlock; eauto.
+          constructor.
+          apply bg_invariant; eauto.
+          eapply invariant_write_unlock; eauto.
+        * eexists; split; [ eapply abstr_intro with (pl := PrevOwner0) | ].
+          eapply invariant_mem_bg; eauto.
+          constructor.
+          apply bg_invariant; eauto.
+          eapply invariant_mem_bg; eauto.
+        * eexists; split; [ eapply abstr_intro with (pl := PrevOwner0) | ].
+          eapply invariant_write_val; eauto.
+          constructor.
+          apply bg_invariant; eauto.
+          eapply invariant_write_val; eauto.
     - invert H; clear H.
       exists Error; intuition eauto.
-      constructor; eauto.
+      exists Error; intuition eauto.
+      econstructor; eauto.
       unfold abstr in *; propositional; congruence.
     - invert H; clear H.
       exists Error; split; eauto.
-  Admitted.
+  Qed.
 
   Theorem absInitP :
     forall s1,
@@ -534,6 +740,9 @@ Module AbsLockInvariant' <: LayerImplAbsT
     constructor.
     unfold abstr; intuition eauto.
     hnf; simpl; eauto.
+    left.
+    intuition eauto.
+    unfold empty_sb; intros; eauto.
   Qed.
 
 End AbsLockInvariant'.
