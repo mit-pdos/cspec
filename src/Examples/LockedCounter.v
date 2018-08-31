@@ -438,10 +438,12 @@ Definition empty_sb_except A T (m: memT A T) tid :=
   forall tid', tid <> tid' ->
           m.(SBuf) tid' = [].
 
+Definition only_val (sbuf: list (TSOOp.addr * nat)) :=
+  List.Forall (fun '(a, _) => a = TSOOp.Val) sbuf.
 
 Definition unlock_last (sbuf: list (TSOOp.addr * nat)) :=
   exists l, sbuf = (TSOOp.Lock, TSOOp.cUnlocked) :: l /\
-       List.Forall (fun '(a, _) => a = TSOOp.Val) l.
+       only_val l.
 
 Module LockInvariantAPI <: Layer TASOp LockInvariantState.
 
@@ -452,7 +454,8 @@ Module LockInvariantAPI <: Layer TASOp LockInvariantState.
   Definition invariant (s:LockInvariantState.s) :=
     match s.(InvLock) with
     | Some tid => empty_sb_except s.(InvValue) tid /\
-                 s.(PrevOwner) = tid
+                 s.(PrevOwner) = tid /\
+                 only_val (s.(InvValue).(SBuf) tid)
     | None => (s.(InvValue).(MemValue) Lock <> cLocked /\
               empty_sb s.(InvValue)) \/
              (s.(InvValue).(MemValue) Lock = cLocked /\
@@ -635,14 +638,6 @@ Module AbsLockInvariant' <: LayerImplAbsT
     unfold invariant; simpl; intuition eauto.
     destruct l; intuition eauto.
     eapply empty_sb_mem_bg_noop in H0; eauto; subst; eauto.
-    induction H0; intros; eauto.
-    propositional.
-    destruct IHclos_refl_trans_n1; propositional.
-    - rewrite ?empty_sb_mem_bgflush_noop by auto; eauto.
-    - destruct (tid == pl); subst.
-      + admit.
-      + specialize (H4 tid ltac:(eauto)).
-        rewrite mem_bgflush_noop by auto; eauto.
   Admitted.
 
   Theorem invariant_mem_flush : forall s s' l pl tid,
@@ -661,8 +656,7 @@ Module AbsLockInvariant' <: LayerImplAbsT
                    tid).
   Proof.
     unfold invariant; simpl; propositional.
-    split; [ | now auto ].
-    destruct l; propositional.
+    autorewrite with fupd.
   Admitted.
 
   Lemma invariant_write_unlock : forall s tid pl,
@@ -774,10 +768,10 @@ Module SeqMemAPI <: Layer TASOp SeqMemState.
   Import SeqMemState.
 
   Inductive xstep : OpSemantics Op s :=
-  | StepTryAcquireSuccess : forall tid v,
-      xstep TryAcquire tid (mkSMState v None) true (mkSMState v (Some tid)) nil
-  | StepTryAcquireFail : forall tid tid' v,
-      xstep TryAcquire tid (mkSMState v (Some tid')) false (mkSMState v (Some tid')) nil
+  | StepTryAcquireSuccess : forall tid v l,
+      xstep TryAcquire tid (mkSMState v l) true (mkSMState v (Some tid)) nil
+  | StepTryAcquireFail : forall tid v l,
+      xstep TryAcquire tid (mkSMState v l) false (mkSMState v l) nil
   | StepClear : forall tid v,
       xstep Clear tid (mkSMState v (Some tid)) tt (mkSMState v None) nil
   | StepRead : forall tid v,
@@ -786,104 +780,79 @@ Module SeqMemAPI <: Layer TASOp SeqMemState.
       xstep (Write v') tid (mkSMState v (Some tid)) tt (mkSMState v' (Some tid)) nil
   .
 
-  Inductive violation : forall T, Op T -> nat -> s -> Prop :=
-  | InvalidWrite : forall v' tid v l,
-      l <> Some tid ->
-      violation (Write v') tid (mkSMState v l)
-  | InvalidRead : forall tid v l,
-      l <> Some tid ->
-      violation (Read) tid (mkSMState v l)
-  | InvalidClear : forall tid v l,
-      l <> Some tid ->
-      violation (Clear) tid (mkSMState v l).
-
-  Definition step := error_step xstep violation.
+  Definition step := error_step xstep (fun T op tid s => bad_lock op tid s.(LockOwner)).
 End SeqMemAPI.
 
 
 Module AbsSeqMem' <: LayerImplAbsT
                        TASOp
-                       LockOwnerState LockOwnerAPI
+                       LockInvariantState LockInvariantAPI
                        SeqMemState SeqMemAPI.
 
   Import TSOOp.
   Import TASOp.
-  Import LockOwnerState SeqMemState.
+  Import LockInvariantState SeqMemState.
 
-  Definition thread_holds_value tid (m: memT addr nat) v :=
-    mem_read m Val tid = v /\
-    forall tid', tid <> tid' ->
-            m.(SBuf) tid' = nil.
+  Definition abstr (s1: LockInvariantState.s) (s2: SeqMemState.s) : Prop :=
+    s1.(InvLock) = s2.(LockOwner) /\
+    mem_read s1.(InvValue) Val s1.(PrevOwner) = s2.(Value).
 
-  Definition abstr (s1: LockOwnerState.s) (s2: SeqMemState.s) : Prop :=
-    s1.(LockOwnerState.TASLock) = s2.(LockOwner) /\
-    (forall tid, s2.(LockOwner) = Some tid ->
-            thread_holds_value tid s1.(TASValue) s2.(Value)) /\
-    (s2.(LockOwner) = None ->
-     exists tid, thread_holds_value tid s1.(TASValue) s2.(Value)) /\
-    (forall tid, mem_read s1.(TASValue) Lock tid <> cLocked ->
-            s2.(LockOwner) = None /\
-            forall tid', tid <> tid' ->
-                    s1.(TASValue).(SBuf) tid' = nil).
-
-  Lemma mem_bg_preserves_thread_holds_value : forall tid s s' v,
-      thread_holds_value tid s v ->
-      mem_bg s s' ->
-      thread_holds_value tid s' v.
+  Lemma abstr_lockowner : forall s1 s2,
+      abstr s1 s2 ->
+      s1.(InvLock) = s2.(LockOwner).
   Proof.
-    unfold thread_holds_value; intros.
-    induct H0; eauto.
-    destruct (tid == tid0); subst.
-    - rewrite mem_read_bgflush; split; eauto.
-      intros.
-      specialize (H3 _ ltac:(eauto)).
+    firstorder.
+  Qed.
+
+  Theorem mem_bg_preserves_abstr : forall s s' l pl l' v,
+      abstr (mkLIState s l pl) (mkSMState v l') ->
+      mem_bg s s' ->
+      abstr (mkLIState s' l pl) (mkSMState v l').
+  Proof.
   Admitted.
 
-  Theorem mem_bg_preserves_abstr : forall s s' l l' v,
-      abstr (mkLOState s l) (mkSMState v l') ->
-      mem_bg s s' ->
-      abstr (mkLOState s' l) (mkSMState v l').
-  Proof.
-    intros.
-    assert (l = l'); subst.
-    unfold abstr in *; intuition auto.
-    unfold abstr in *; simpl in *; (intuition auto); subst.
-    - clear H2.
-      specialize (H _ eq_refl).
-      eapply mem_bg_preserves_thread_holds_value; eauto.
-    - propositional.
-      exists tid.
-      eapply mem_bg_preserves_thread_holds_value; eauto.
-    -
-      apply (H4 tid).
-      intros.
+  Definition absR := error_absR abstr.
 
-
-
-  Inductive absR' : LockOwnerState.State -> SeqMemState.State -> Prop :=
-  | absR_error : absR' Error Error
-  | absR_valid : forall s1 s2,
-      abstr s1 s2 ->
-      absR' (Valid s1) (Valid s2).
-
-  Definition absR := absR'.
-
+  Import LockInvariantAPI.
   Import SeqMemAPI.
 
-  Theorem absR_ok : op_abs absR LockOwnerAPI.step step.
+  Lemma bg_invariant : forall T (op: Op T) tid s r s' evs,
+      bg_step LockInvariantAPI.xstep invariant_step op tid s r s' evs ->
+      invariant s /\
+      LockInvariantAPI.xstep op tid s r s' evs /\
+      invariant s'.
   Proof.
-    unfold absR, LockOwnerAPI.step, step.
+    intros.
+    unfold bg_step, invariant_step in *; propositional; eauto.
+  Qed.
+
+  Theorem absR_ok : op_abs absR LockInvariantAPI.step step.
+  Proof.
+    unfold LockInvariantAPI.step, step, absR.
     hnf; intros.
-    invert H0; clear H0.
-    - invert H.
-      rename s3 into s1.
-      invert H6.
-      eexists (Valid _); split; eauto.
+    invert H0; clear H0;
+      repeat match goal with
+             | [ H: bg_step _ _ _ _ _ _ _ _ |- _ ] =>
+               apply bg_invariant in H
+             end; propositional.
+    - invert H; clear H; eauto.
+      destruct (decide_violation op tid s0.(InvLock)).
+      + exists Error; split; eauto.
+        constructor.
+        erewrite abstr_lockowner in * by eauto; auto.
+      + admit.
+    - invert H; clear H.
+      exists Error; intuition eauto.
+      exists Error; intuition eauto.
+      econstructor; eauto.
+      unfold abstr in *; propositional; congruence.
+    - invert H; clear H.
+      exists Error; split; eauto.
   Admitted.
 
   Theorem absInitP :
     forall s1,
-      LockOwnerState.initP s1 ->
+      LockInvariantState.initP s1 ->
       exists s2 : State, absR s1 s2 /\ initP s2.
   Proof.
   Admitted.
@@ -891,6 +860,11 @@ Module AbsSeqMem' <: LayerImplAbsT
 End AbsSeqMem'.
 
 
+Module AbsSeqMem := LayerImplAbs
+                      TASOp
+                      LockInvariantState LockInvariantAPI
+                      SeqMemState SeqMemAPI
+                      AbsSeqMem'.
 
 Module TASState <: State.
 
