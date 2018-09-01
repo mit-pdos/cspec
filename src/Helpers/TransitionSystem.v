@@ -132,4 +132,26 @@ Section TransitionSystem.
 
   Definition noop : Relation := eq.
 
+  Theorem star_expand_or : forall R,
+      kleene_star R <---> noop +++ R >> kleene_star R.
+  Proof.
+    unfold noop.
+    split; repeat (hnf; intros).
+    - destruct H; firstorder.
+    - firstorder; subst; eauto using kleene_star.
+  Qed.
+
+  Global Instance riff_proper :
+    Proper (riff ==> riff ==> Basics.flip Basics.impl) riff := magic.
+
+  Theorem star_expand_next : forall R,
+      kleene_star R <---> noop ?> R ?> kleene_star R.
+  Proof.
+    intros.
+    unfold noop.
+    split; repeat (hnf; intros).
+    - destruct H; firstorder.
+    - firstorder; subst; eauto using kleene_star.
+  Qed.
+
 End TransitionSystem.
