@@ -264,7 +264,8 @@ Inductive error_step Op State
 | invalid_step : forall T (op: Op T) tid s r evs,
     violation _ op tid s ->
     error_step op tid (Valid s) r Error evs
-| invalid_preserved : forall T (op: Op T) tid r evs,
+| invalid_preserved : forall T (op: Op T) tid s r s' evs,
+    step _ op tid s r s' evs ->
     error_step op tid Error r Error evs
 .
 
@@ -383,6 +384,7 @@ Module AbsLockOwner' <: LayerImplAbsT
   Hint Resolve absR_error absR_intro.
   Hint Constructors error_step.
   Hint Constructors xstep.
+  Hint Resolve None.
 
   Theorem absR_ok : op_abs absR TAS_TSOAPI.step step.
   Proof.
@@ -395,7 +397,10 @@ Module AbsLockOwner' <: LayerImplAbsT
       + destruct s0; simpl in *.
         invert H0; subst;
           try solve [ eexists (Valid _); split; eauto ].
-    - eexists; split; [ apply absR_error | apply invalid_preserved ].
+    - eexists; split; [ apply absR_error | ].
+      invert H0; eauto.
+      Grab Existential Variables.
+      all: auto.
   Qed.
 
   Theorem absInitP :
@@ -681,8 +686,8 @@ Module AbsLockInvariant' <: LayerImplAbsT
     - invert H; clear H; eauto.
       destruct (decide_violation op tid s0.(TASLock)).
       + exists Error; split; eauto.
-        constructor.
-        rewrite (abstr_invlock H1) in *; auto.
+        invert H6; simpl in *; propositional; try congruence.
+      + admit.
       + unfold abstr in * |- .
         destruct s3; simpl in *; propositional.
         invert H6; simpl in *.
@@ -715,8 +720,16 @@ Module AbsLockInvariant' <: LayerImplAbsT
           constructor.
           apply bg_invariant; eauto.
           eapply invariant_write_val; eauto.
-    - invert H; clear H.
+    - invert H.
       exists Error; intuition eauto.
+      (* TODO: need to handle low-level violation turning into a high-level
+      Error -> Error transition; invariant in high level breaks this *)
+      admit.
+      destruct op; eauto.
+      econstructor; eauto.
+      unfold bg_step.
+      reflexivity.
+      eauto.
       exists Error; intuition eauto.
       econstructor; eauto.
       unfold abstr in *; propositional; congruence.
@@ -900,7 +913,7 @@ Module RawLockAPI <: Layer LockOp SeqMemState.
 
   Definition step := error_step xstep (fun T op tid s => match op with
                                                       | Acquire => False
-                                                      | _ => s.(LockOwner) = Some tid
+                                                      | _ => s.(LockOwner) <> Some tid
                                                       end).
 
 End RawLockAPI.
@@ -957,14 +970,48 @@ Module LockImpl' <:
                          (fun (T0 : Type) (op : Op T0) (tid0 : nat) (s0 : SeqMemState.s) =>
                             match op with
                             | Acquire => False
-                            | _ => s0.(SeqMemState.LockOwner) = Some tid0
+                            | _ => s0.(SeqMemState.LockOwner) <> Some tid0
                             end) T opM tid s r s' evs
             end).
-    destruct opM; simpl in *; intros; repeat pair_inv;
-      unfold acquire_cond.
+    { destruct opM; simpl in *; repeat pair_inv;
+        unfold acquire_cond, once_cond.
+      all: invert H0;
+        try match goal with
+            | [ H: SeqMemAPI.xstep _ _ _ _ _ _ |- _ ] => invert H; clear H; eauto
+            | [ H: bad_lock _ _ _ |- _ ] => unfold bad_lock in H; propositional
+            end;
+        destruct r;
+        eauto.
+      admit.
+      constructor.
+      unfold bad_lock in H5.
+      invert H
+             constructor.
+      destruct r; eauto; is_one_goal.
+      invert H0;
+        try solve [ match goal with
+                    | [ H: SeqMemAPI.xstep _ _ _ _ _ _ |- _ ] => invert H; eauto
+                    | [ H: bad_lock _ _ _ |- _ ] => invert H; eauto
+                    end ].
+
+
+    invert H0; clear H0.
+    { destruct opM; simpl in *; repeat pair_inv;
+        unfold acquire_cond, once_cond;
+        try solve [ invert H6; eauto ]. }
+    { destruct opM; simpl in *; repeat pair_inv;
+        unfold acquire_cond, once_cond.
+      invert H6.
+      destruct r; eauto.
+
+      destruct r; eauto.
     - invert H0; simpl in *; propositional.
       invert H5; eauto.
       invert H0; eauto.
+      assert (evs = nil) by admit. (* oops, loops can create spurious events;
+      this isn't true *)
+      destruct r; intuition eauto.
+    - invert H0.
       admit. (* oops, loops can create spurious events during errors *)
   Qed.
 
