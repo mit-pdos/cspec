@@ -13,7 +13,7 @@ Definition ap {E}
            (f: Reader E (fun e => forall (a:A e), B e a)) :
   forall (x: Reader E A), Reader E (fun e => B e (x e))  :=
   fun x => fun e => f e (x e).
-Infix "<*>" := (ap) (at level 11, left associativity).
+Infix "<*>" := (ap) (at level 15, left associativity).
 
 (** Settable is a way of accessing a constructor for a record of type T. The
 syntactic form of this definition is important: it must be an eta-expanded
@@ -77,7 +77,7 @@ Hint Extern 1 (Setter _) => SetInstance_t : typeclass_instances.
 
 Module RecordSetNotations.
   Notation "x [ proj  :=  v ]" := (set proj (pure v) x)
-                                    (at level 12, left associativity).
+                                    (at level 15, left associativity).
   Notation "x [ proj  ::=  f ]" := (set proj f x)
-                                     (at level 12, f at next level, left associativity).
+                                     (at level 15, f at next level, left associativity).
 End RecordSetNotations.

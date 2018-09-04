@@ -63,19 +63,16 @@ Section Semantics.
   Qed.
 
   Lemma exec_prefix:
-    forall tid s s' tr tr' s0 tr0 ts p p' ts1',
-      kleene_star (exec_step step) (ts [[tid := p']], s0, tr0) (ts1', s', tr') ->
-      kleene_star (proc_step step tid) (p, s, tr) (Ret, s0, tr0) ->
-      exec (ts [[tid := p;; p']], s, tr) (ts1', s', tr').
+    forall tid s s' tr tr' ts p p',
+      kleene_star (proc_step step tid) (p, s, tr) (Ret, s', tr') ->
+      exec (ts [[tid := p;; p']], s, tr) (ts [[tid := p']], s', tr').
   Proof.
     intros.
-    etransitivity; eauto.
-    clear H.
-    exec_ind H0.
+    exec_ind H.
     generalize dependent s.
     generalize dependent tr.
     generalize dependent p.
-    induct H0;
+    induct H;
       repeat match goal with
              | [ H: (_, _) = (_, _) |- _ ] =>
                invert H; clear H
@@ -88,6 +85,17 @@ Section Semantics.
     eapply exec_proc; autorewrite with t; eauto using proc_step.
   Qed.
 
+  Lemma exec_prefix':
+    forall tid s s' tr tr' s0 tr0 ts p p' ts1',
+      kleene_star (exec_step step) (ts [[tid := p']], s0, tr0) (ts1', s', tr') ->
+      kleene_star (proc_step step tid) (p, s, tr) (Ret, s0, tr0) ->
+      exec (ts [[tid := p;; p']], s, tr) (ts1', s', tr').
+  Proof.
+    intros.
+    etransitivity; eauto.
+    eapply exec_prefix; eauto.
+  Qed.
+
   Theorem atomic_trace_incl : forall p p',
       trace_incl (Exec (Atomic p) p') (p;; p').
   Proof.
@@ -97,6 +105,8 @@ Section Semantics.
       remember ss as ss1;
         remember ss' as ss2
     end.
+    generalize dependent s.
+    generalize dependent tr.
     generalize dependent ts.
     generalize dependent ts1'.
     generalize dependent s'.
@@ -110,11 +120,9 @@ Section Semantics.
       + invert H;
           cleanup_upd;
           try inv_proc_step.
-        eauto using exec_prefix.
-      + exists ts1'.
-        (* TODO: why do we have an execution to ts0 [[tid := Atomic p ~ p']],
-        but then another one from just ts0? what happened to knowing Atomic p ~
-        p' is still there? *)
+        eexists.
+        etransitivity; eauto using exec_prefix.
+      + (* TODO: is the induction hypothesis correctly generalized? *)
   Abort.
 
 End Semantics.

@@ -50,6 +50,20 @@ Section TransitionSystem.
   Global Instance kleene_star_sub : subrelation R (kleene_star R) :=
     kleene_star_one.
 
+  Global Instance kleene_star_respects_sub :
+    Proper (rimpl ==> rimpl) kleene_star.
+  Proof.
+    unfold Proper, rimpl, "==>"; intros.
+    induction H0; eauto using kleene_star.
+  Qed.
+
+  Global Instance kleene_star_respects_sub_expanded :
+    Proper (rimpl ==> eq ==> eq ==> Basics.impl) kleene_star.
+  Proof.
+    unfold Proper, rimpl, Basics.impl, "==>"; propositional.
+    eapply kleene_star_respects_sub; eauto.
+  Qed.
+
   Definition invariant (I: A -> Prop) R :=
     forall x1, I x1 ->
           forall x2, R x1 x2 -> I x2.
@@ -87,13 +101,19 @@ Section TransitionSystem.
   Global Instance rel_app_iff :
     Proper (riff ==> riff ==> riff) rel_app := magic.
 
-  Theorem kleene_star_duplicate : forall R,
-      kleene_star R >> kleene_star R <---> kleene_star R.
+  Theorem po_dup R {tr:PreOrder R} : R <---> R >> R.
   Proof.
-    unfold rel_app, riff, rimpl; split; propositional.
-    - etransitivity; eauto.
-    - exists x; split; eauto.
-      reflexivity.
+    split; unfold rimpl; propositional.
+    - exists x; split; [ reflexivity | ]; auto.
+    - destruct H; propositional.
+      transitivity x0; auto.
+  Qed.
+
+  Theorem kleene_star_dup : forall R,
+      kleene_star R <---> kleene_star R >> kleene_star R.
+  Proof.
+    intros.
+    apply po_dup.
   Qed.
 
   Definition rel_plus R1 R2 : Relation :=
@@ -123,6 +143,11 @@ Section TransitionSystem.
     R1 +++ R1 >> R2.
 
   Infix "?>" := (rel_next) (at level 11, right associativity).
+
+  Global Instance rel_next_impl :
+    Proper (rimpl ==> rimpl ==> rimpl) rel_next := magic.
+  Global Instance rel_next_iff :
+    Proper (riff ==> riff ==> riff) rel_next := magic.
 
   Global Instance proper_rimpl :
       Proper (rimpl ==> riff ==> Basics.flip Basics.impl) rimpl := magic.
@@ -154,4 +179,121 @@ Section TransitionSystem.
     - firstorder; subst; eauto using kleene_star.
   Qed.
 
+  Definition seq_star_eps : forall R1 R2,
+      R1 --->
+      R1 >> kleene_star R2 := magic.
+
+  Lemma star_intro1 R :
+    noop ---> kleene_star R.
+  Proof.
+    unfold ">>", "--->", noop; propositional.
+    eauto using kleene_star.
+  Qed.
+
+  Lemma star_intro2 R :
+    R >> kleene_star R ---> kleene_star R.
+  Proof.
+    unfold ">>", "--->"; propositional.
+    eauto using kleene_star.
+  Qed.
+
+  Theorem noop_seq_l R :
+    noop >> R <---> R.
+  Proof.
+    split; unfold ">>", "--->", noop; propositional.
+    eexists; intuition eauto.
+  Qed.
+
+  Theorem noop_seq_r R :
+    R >> noop <---> R.
+  Proof.
+    split; unfold ">>", "--->", noop; propositional.
+    eexists; intuition eauto.
+  Qed.
+
+  Definition rel_plus_distr_app R1 R2 R3 :
+    (R1 >> R3) +++ (R2 >> R3) <--->
+               (R1 +++ R2) >> R3 := magic.
+
+  Definition rel_plus_distr_next R1 R2 R3 :
+    (R1 ?> R3) +++ (R2 ?> R3) <--->
+               (R1 +++ R2) ?> R3 := magic.
+
+  Definition rel_plus_elim R1 R2 R3 :
+    R1 ---> R3 ->
+    R2 ---> R3 ->
+    R1 +++ R2 ---> R3 := magic.
+
+  Definition next_cancel_r R1 R2 R2' :
+    R2 ---> R2' ->
+    R2 ?> R1 ---> R2' ?> R1 := magic.
+
+  Definition next_cancel_l R1 R2 R2' :
+    R2 ---> R2' ->
+    R1 ?> R2 ---> R1 ?> R2' := magic.
+
+  Definition app_cancel_r R1 R2 R2' :
+    R2 ---> R2' ->
+    R2 >> R1 ---> R2' >> R1 := magic.
+
+  Definition app_cancel_l R1 R2 R2' :
+    R2 ---> R2' ->
+    R1 >> R2 ---> R1 >> R2' := magic.
+
+  Lemma next_star_prepend : forall R1 R2,
+      R1 >> kleene_star R1 ?> R2 --->
+         kleene_star R1 ?> R2.
+  Proof.
+    unfold ">>", "--->"; propositional.
+    destruct H0.
+    left; eauto using kleene_star.
+    right.
+    destruct H0; propositional.
+    exists x0; intuition eauto using kleene_star.
+  Qed.
+
+  Lemma app_star_prepend : forall R1 R2,
+      R1 >> kleene_star R1 >> R2 --->
+         kleene_star R1 >> R2.
+  Proof.
+    unfold ">>", "--->"; propositional.
+    exists y0; intuition eauto using kleene_star.
+  Qed.
+
+  Definition next_kleene_star R1 R2 :
+      R1 ?> kleene_star R2 <---> R1 >> kleene_star R2 := magic.
+
+  Definition trans_dup R {tr:Transitive R} : R <---> R ?> R := magic.
+
+  Theorem kleene_star_dup_next R :
+      kleene_star R <---> kleene_star R ?> kleene_star R.
+  Proof.
+    apply trans_dup.
+  Qed.
+
+  Theorem star_ind R1 R2 :
+    noop ---> R2 ->
+    R1 >> R2 ---> R2 ->
+    kleene_star R1 ---> R2.
+  Proof.
+    unfold "--->", ">>", noop; intros.
+    induction H1; eauto.
+  Qed.
+
+  Definition app_next_assoc R1 R2 R3 :
+    R1 >> R2 ?> R3 <--->
+       (R1 >> R2) ?> R3 := magic.
+
+  Definition next_intro1 R1 R2 : R1 ---> R1 ?> R2 := magic.
+  Definition next_intro2 R1 R2 : R1 >> R2 ---> R1 ?> R2 := magic.
+
 End TransitionSystem.
+
+Arguments noop {A}.
+
+Infix "--->" := rimpl (at level 40, no associativity) : relation_scope.
+Infix "<--->" := riff (at level 40, no associativity) : relation_scope.
+Infix "+++" := (rel_plus) (at level 18, left associativity).
+Infix ">>" := rel_app (at level 11, right associativity) : relation_scope.
+Infix "?>" := (rel_next) (at level 11, right associativity) : relation_scope.
+Delimit Scope relation_scope with rel.

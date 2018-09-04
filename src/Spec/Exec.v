@@ -105,6 +105,20 @@ Section Execution.
   Theorem exec_step_inv : forall ts tid p s tr ts' s' tr',
       exec_step (ts [[tid := p]], s, tr) (ts', s', tr') ->
       exec_at tid (ts [[tid := p]], s, tr) (ts', s', tr') \/
+      ts' tid = Some p.
+  Proof.
+    intros.
+    intuition eauto.
+    unfold exec_step in H; propositional.
+    cmp_ts tid tid0; eauto.
+    right.
+    invert H; autorewrite with t in *; eauto.
+    cmp_ts tid tid'.
+  Qed.
+
+  Theorem exec_step_inv' : forall ts tid p s tr ts' s' tr',
+      exec_step (ts [[tid := p]], s, tr) (ts', s', tr') ->
+      exec_at tid (ts [[tid := p]], s, tr) (ts', s', tr') \/
       exists tid', tid <> tid' /\
               exec_at tid' (ts [[tid := p]], s, tr) (ts' [[tid := p]], s', tr').
   Proof.
@@ -163,6 +177,83 @@ Section Execution.
     eapply exec_proc; eauto.
     apply (proc_step_prepend tr0) in H7; simpl in *; eauto.
     apply (proc_step_star_prepend tr0) in H7; simpl in *; eauto.
+  Qed.
+
+  Open Scope rel.
+
+  Ltac destruct_ss x :=
+    let ts := fresh "ts" in
+    let s := fresh "s" in
+    let tr := fresh "tr" in
+    destruct x as ((ts & s) & tr).
+
+  Definition exec_not_at tid :=
+    fun ss ss' => exists tid', tid <> tid' /\ exec_at tid' ss ss'.
+
+  Lemma exec_not_at_exec_step : forall tid,
+      exec_not_at tid ---> exec_step.
+  Proof.
+    unfold exec_not_at, exec_step, "--->"; propositional.
+    destruct_ss x.
+    destruct_ss y.
+    eauto.
+  Qed.
+
+  Lemma exec_at_exec_step : forall tid,
+      exec_at tid ---> exec_step.
+  Proof.
+    unfold exec_step, "--->"; intros.
+    destruct matches; subst; eauto.
+  Qed.
+
+  Lemma exec_step_split : forall tid,
+      exec_step ---> exec_at tid +++ exec_not_at tid.
+  Proof.
+    unfold exec_step, exec_not_at, "--->", "+++"; propositional.
+    destruct_ss x.
+    destruct_ss y.
+    propositional.
+    cmp_ts tid tid0; eauto.
+  Qed.
+
+  Theorem exec_split_tid' : forall tid,
+      kleene_star (exec_not_at tid) ?>
+                  exec_at tid >>
+                  kleene_star exec_step --->
+                  kleene_star exec_step.
+  Proof.
+    intros.
+    rewrite exec_not_at_exec_step.
+    rewrite exec_at_exec_step.
+    rewrite (kleene_star_one exec_step) at 2.
+    setoid_rewrite kleene_star_dup_next at 4.
+    apply next_cancel_l.
+    setoid_rewrite kleene_star_dup at 3.
+    reflexivity.
+  Qed.
+
+  Theorem exec_split_tid : forall tid,
+      kleene_star exec_step --->
+           kleene_star (exec_not_at tid) ?>
+           exec_at tid >>
+           kleene_star exec_step.
+  Proof.
+    unfold exec; intros.
+    apply star_ind.
+    - rewrite <- next_intro1.
+      rewrite star_intro1.
+      reflexivity.
+    - rewrite (exec_step_split tid) at 1.
+      rewrite <- ?rel_plus_distr_app, <- ?rel_plus_distr_next.
+      apply rel_plus_elim.
+      + rewrite exec_split_tid' at 1.
+        rewrite <- next_intro2.
+        setoid_rewrite <- star_intro1 at 2.
+        rewrite noop_seq_l.
+        reflexivity.
+      + rewrite app_next_assoc.
+        rewrite star_intro2.
+        reflexivity.
   Qed.
 
 End Execution.
