@@ -510,7 +510,7 @@ End LockInvariantAPI.
 
 Inductive error_absR {State1 State2} {absR: State1 -> State2 -> Prop} :
   OrError State1 -> OrError State2 -> Prop :=
-| absR_error : forall s1, error_absR s1 Error
+| absR_error : error_absR Error Error
 | absR_valid : forall s1 s2,
     absR s1 s2 ->
     error_absR (Valid s1) (Valid s2).
@@ -678,6 +678,25 @@ Module AbsLockInvariant' <: LayerImplAbsT
     unfold invariant; simpl; propositional.
   Admitted.
 
+  Lemma no_step_on_violation:
+    forall (T : Type) (op : Op T) (tid : nat) (r : T) (evs : list event)
+      (s0 s' : LockOwnerState.s),
+      LockOwnerAPI.xstep op tid s0 r s' evs ->
+      bad_lock op tid s0.(TASLock) ->
+      False.
+  Proof.
+    unfold bad_lock.
+    intros.
+    invert H; eauto.
+  Qed.
+
+  Theorem abstr_lock_same : forall s s',
+      abstr s s' ->
+      s'.(InvLock) = s.(TASLock).
+  Proof.
+    firstorder.
+  Qed.
+
   Theorem absR_ok : op_abs absR LockOwnerAPI.step step.
   Proof.
     unfold LockOwnerAPI.step, step, absR.
@@ -685,9 +704,8 @@ Module AbsLockInvariant' <: LayerImplAbsT
     invert H0; clear H0.
     - invert H; clear H; eauto.
       destruct (decide_violation op tid s0.(TASLock)).
-      + exists Error; split; eauto.
-        invert H6; simpl in *; propositional; try congruence.
-      + admit.
+      + exfalso.
+        eauto using no_step_on_violation.
       + unfold abstr in * |- .
         destruct s3; simpl in *; propositional.
         invert H6; simpl in *.
@@ -722,20 +740,12 @@ Module AbsLockInvariant' <: LayerImplAbsT
           eapply invariant_write_val; eauto.
     - invert H.
       exists Error; intuition eauto.
-      (* TODO: need to handle low-level violation turning into a high-level
-      Error -> Error transition; invariant in high level breaks this *)
-      admit.
-      destruct op; eauto.
-      econstructor; eauto.
-      unfold bg_step.
-      reflexivity.
-      eauto.
-      exists Error; intuition eauto.
-      econstructor; eauto.
-      unfold abstr in *; propositional; congruence.
+      econstructor.
+      erewrite abstr_lock_same by eauto; eauto.
     - invert H; clear H.
       exists Error; split; eauto.
-  Qed.
+      admit. (* TODO: show some execution exists for Error -> Error *)
+  Admitted.
 
   Theorem absInitP :
     forall s1,
@@ -839,6 +849,18 @@ Module AbsSeqMem' <: LayerImplAbsT
     unfold bg_step, invariant_step in *; propositional; eauto.
   Qed.
 
+  Lemma no_step_on_violation:
+    forall (T : Type) (op : Op T) (tid : nat) (r : T) (evs : list event)
+      s0 s',
+      LockInvariantAPI.xstep op tid s0 r s' evs ->
+      bad_lock op tid s0.(InvLock) ->
+      False.
+  Proof.
+    unfold bad_lock.
+    intros.
+    invert H; eauto.
+  Qed.
+
   Theorem absR_ok : op_abs absR LockInvariantAPI.step step.
   Proof.
     unfold LockInvariantAPI.step, step, absR.
@@ -850,17 +872,20 @@ Module AbsSeqMem' <: LayerImplAbsT
              end; propositional.
     - invert H; clear H; eauto.
       destruct (decide_violation op tid s0.(InvLock)).
-      + exists Error; split; eauto.
+      + exfalso; eauto using no_step_on_violation.
+      + eexists (Valid _); intuition eauto.
         constructor.
-        erewrite abstr_lockowner in * by eauto; auto.
-      + admit.
+        * admit.
+        * econstructor; eauto.
+          admit.
     - invert H; clear H.
-      exists Error; intuition eauto.
       exists Error; intuition eauto.
       econstructor; eauto.
       unfold abstr in *; propositional; congruence.
     - invert H; clear H.
       exists Error; split; eauto.
+      econstructor.
+      admit. (* TODO: show some execution *)
   Admitted.
 
   Theorem absInitP :
@@ -962,8 +987,7 @@ Module LockImpl' <:
     unfold noop_or_success.
     unfold RawLockAPI.step.
     intros.
-
-    assert (match cond r with
+    cut (match cond r with
             | false => s = s' /\ evs = []
             | true =>
               error_step RawLockAPI.xstep
@@ -972,8 +996,10 @@ Module LockImpl' <:
                             | Acquire => False
                             | _ => s0.(SeqMemState.LockOwner) <> Some tid0
                             end) T opM tid s r s' evs
-            end).
-    { destruct opM; simpl in *; repeat pair_inv;
+         end).
+    destruct (cond r); eauto.
+
+    destruct opM; simpl in *; repeat pair_inv;
         unfold acquire_cond, once_cond.
       all: invert H0;
         try match goal with
@@ -982,49 +1008,19 @@ Module LockImpl' <:
             end;
         destruct r;
         eauto.
-      admit.
-      constructor.
-      unfold bad_lock in H5.
-      invert H
-             constructor.
-      destruct r; eauto; is_one_goal.
-      invert H0;
-        try solve [ match goal with
-                    | [ H: SeqMemAPI.xstep _ _ _ _ _ _ |- _ ] => invert H; eauto
-                    | [ H: bad_lock _ _ _ |- _ ] => invert H; eauto
-                    end ].
 
-
-    invert H0; clear H0.
-    { destruct opM; simpl in *; repeat pair_inv;
-        unfold acquire_cond, once_cond;
-        try solve [ invert H6; eauto ]. }
-    { destruct opM; simpl in *; repeat pair_inv;
-        unfold acquire_cond, once_cond.
-      invert H6.
-      destruct r; eauto.
-
-      destruct r; eauto.
-    - invert H0; simpl in *; propositional.
-      invert H5; eauto.
-      invert H0; eauto.
-      assert (evs = nil) by admit. (* oops, loops can create spurious events;
-      this isn't true *)
-      destruct r; intuition eauto.
-    - invert H0.
-      admit. (* oops, loops can create spurious events during errors *)
+    Grab Existential Variables.
+    all: auto.
   Qed.
 
 End LockImpl'.
 
 Module LockImpl :=
   LayerImplLoop
-    LockState
-    TASOp  TASLockAPI
+    SeqMemState
+    TASOp  SeqMemAPI
     LockOp RawLockAPI
     LockImpl'.
-
-
 
 Module LockProtocol <: Protocol LockOp SeqMemState.
 
