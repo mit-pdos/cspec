@@ -85,6 +85,9 @@ Section TransitionSystem.
     eapply kleene_star_one; eauto.
   Qed.
 
+  Global Instance invariant_impl I :
+    Proper (riff ==> Basics.impl) (invariant I) := magic.
+
   Definition rel_app R1 R2 : Relation :=
     fun x z => exists y, R1 x y /\ R2 y z.
 
@@ -286,6 +289,16 @@ Section TransitionSystem.
 
   Definition next_intro1 R1 R2 : R1 ---> R1 ?> R2 := magic.
   Definition next_intro2 R1 R2 : R1 >> R2 ---> R1 ?> R2 := magic.
+
+  Definition rel_apply R (f1 f2: A -> A) : Relation :=
+    fun x y => R (f1 x) (f2 y).
+
+  Theorem rel_apply_star_commute : forall R f,
+      kleene_star (rel_apply R f f) --->  rel_apply (kleene_star R) f f.
+  Proof.
+    unfold "--->", rel_apply; intros.
+    induction H; eauto using kleene_star.
+  Qed.
 
 End TransitionSystem.
 

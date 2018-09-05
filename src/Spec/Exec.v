@@ -256,6 +256,105 @@ Section Execution.
         reflexivity.
   Qed.
 
+  Theorem exec_not_proc : forall tid p,
+      invariant
+        (fun '(ts, _, _) => thread_get ts tid = Some p)
+        (kleene_star (exec_not_at tid)).
+  Proof.
+    intros.
+    apply invariant_star.
+    unfold invariant, exec_not_at; intros.
+    destruct_ss x1.
+    destruct_ss x2.
+    propositional.
+    invert H1; autorewrite with t; eauto.
+    cmp_ts tid tid'0; congruence.
+  Qed.
+
+  Definition add_proc tid p (ss: threads * State * trace) : threads * State * trace :=
+    let '(ts, s, tr) := ss in (ts [[tid := p]], s, tr).
+
+  Ltac cleanup_ts :=
+    repeat match goal with
+           | [ H: match _ with
+                  | Build_threads_state get _ _ => get
+                  end = match _ with
+                        | Build_threads_state get' _ _ => get'
+                        end |- _ ] =>
+             apply thread_get_eq in H
+           | [ H: match _ with
+                  | @Build_threads_state _ _ m _ _ => m
+                  end = match _ with
+                        | @Build_threads_state _ _ m' _ _ => m'
+                        end |- _ ] =>
+             clear H
+           end.
+
+  Lemma equal_ts tid : forall ts ts',
+      ts = ts' ->
+      thread_get ts tid = thread_get ts' tid.
+  Proof.
+    congruence.
+  Qed.
+
+  Lemma thread_change_upd:
+    forall (ts ts' : threads) tid p p' tid',
+      tid <> tid' ->
+      forall p2 : proc Op,
+        ts [[tid := p]] [[tid' := p2]] = ts' [[tid := p]] ->
+        ts' [[tid := p']] = ts [[tid := p']] [[tid' := p2]].
+  Proof.
+    intros.
+    symmetry.
+    eapply thread_ext_eq; intros.
+    apply (equal_ts tid0) in H0.
+    cmp_ts tid' tid0.
+    cmp_ts tid tid0.
+  Qed.
+
+  Lemma thread_spawn_change_upd:
+    forall (ts ts' : threads) tid p p' tid' tid'',
+      tid <> tid' ->
+      tid <> tid'' ->
+      forall p2 p3 : proc Op,
+        ts [[tid := p]] [[tid' := p2]] [[tid'' := p3]] = ts' [[tid := p]] ->
+        ts' [[tid := p']] = ts [[tid := p']] [[tid' := p2]] [[tid'' := p3]].
+  Proof.
+    intros.
+    symmetry.
+    eapply thread_ext_eq; intros.
+    apply (equal_ts tid0) in H1.
+    cmp_ts tid'' tid0.
+    cmp_ts tid' tid0.
+    cmp_ts tid tid0.
+  Qed.
+
+  Theorem exec_not : forall tid p p',
+      rel_apply (exec_not_at tid)
+                (add_proc tid p)
+                (add_proc tid p) --->
+                rel_apply (exec_not_at tid)
+                (add_proc tid p')
+                (add_proc tid p').
+  Proof.
+    intros.
+    unfold rel_apply, "--->", exec_not_at; propositional.
+    exists tid'; intuition eauto.
+    destruct_ss x.
+    destruct_ss y.
+    cbn [add_proc] in *.
+
+    invert H0; cleanup_ts; autorewrite with t in *.
+    - erewrite (thread_change_upd _ ltac:(eauto) H5).
+      eapply exec_proc; autorewrite with t; eauto.
+    - erewrite (thread_change_upd _ ltac:(eauto) H5).
+      eapply exec_atomic; autorewrite with t; eauto.
+    - cmp_ts tid tid'0.
+      erewrite (thread_spawn_change_upd _ _ _ H4).
+      eapply exec_spawn; autorewrite with t; eauto.
+    - admit.
+  Admitted.
+
 End Execution.
 
 Local Notation proc_step_pat := (proc_step _ _ _ _).

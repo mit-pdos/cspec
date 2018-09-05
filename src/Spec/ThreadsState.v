@@ -124,6 +124,21 @@ Section Map.
     f_equal; auto using proof_irrelevance.
   Qed.
 
+  Lemma thread_get_eq : forall ts ts',
+      match ts with
+      | Build_threads_state get _ _ => get
+      end =
+      match ts' with
+      | Build_threads_state get _ _ => get
+      end ->
+      ts = ts'.
+  Proof.
+    intros.
+    apply thread_ext_eq; intros.
+    destruct ts, ts'; simpl.
+    congruence.
+  Qed.
+
   Ltac t :=
     intros;
     try lazymatch goal with

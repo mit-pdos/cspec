@@ -100,6 +100,9 @@ Section Semantics.
       trace_incl (Exec (Atomic p) p') (p;; p').
   Proof.
     unfold trace_incl; intros.
+    apply exec_split_tid with (tid:=tid) in H.
+    destruct H.
+
     match goal with
     | [ H: exec ?ss ?ss' |- _ ] =>
       remember ss as ss1;
