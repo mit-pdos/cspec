@@ -928,8 +928,9 @@ Module RawLockAPI <: Layer LockOp SeqMemState.
   Import SeqMemState.
 
   Inductive xstep : OpSemantics Op s :=
-  | StepAcquire : forall tid v l,
-      xstep Acquire tid (mkSMState v l) true (mkSMState v (Some tid)) nil
+  | StepAcquire : forall tid v,
+      (* TODO: TryAcquire must start from l = None in order to succeed *)
+      xstep Acquire tid (mkSMState v None) true (mkSMState v (Some tid)) nil
   | StepRelease : forall tid v l,
       xstep Release tid (mkSMState v l) tt (mkSMState v None) nil
   | StepRead : forall tid v l,
@@ -1009,12 +1010,13 @@ Module LockImpl' <:
             | [ H: SeqMemAPI.xstep _ _ _ _ _ _ |- _ ] => invert H; clear H; eauto
             | [ H: bad_lock _ _ _ |- _ ] => unfold bad_lock in H; propositional
             end;
-        destruct r;
+        destruct matches;
         eauto.
+      admit. (* propagate TryAcquire None *)
 
     Grab Existential Variables.
     all: auto.
-  Qed.
+  Admitted.
 
 End LockImpl'.
 
@@ -1058,9 +1060,9 @@ Module LockAPI <: Layer LockOp SeqMemState.
   Import SeqMemState.
 
   Inductive step' : OpSemantics Op State :=
-  | StepAcquire : forall tid v l,
+  | StepAcquire : forall tid v,
       step' Acquire tid
-            (Valid (mkSMState v l))
+            (Valid (mkSMState v None))
             true
             (Valid (mkSMState v (Some tid))) nil
   | StepRelease : forall tid v,
@@ -1218,24 +1220,6 @@ Module LockingCounter' <:
   Qed.
 
 
-  Ltac step_inv :=
-    match goal with
-    | H : LockAPI.step _ _ _ _ _ _ |- _ =>
-      invert H; clear H
-    | H : LockAPI.step_allow _ _ _ |- _ =>
-      invert H; clear H
-    | H : LockAPI.step_allow _ _ _ -> False |- _ =>
-      solve [ exfalso; eauto ]
-    | H : RawLockAPI.step _ _ _ _ _ _ |- _ =>
-      invert H; clear H
-    | H : RawLockAPI.xstep _ _ _ _ _ _ |- _ =>
-      invert H; clear H
-    | H : LockedCounterAPI.step _ _ _ _ _ _ |- _ =>
-      invert H; clear H
-    | [ H: Valid _ = Valid _ |- _ ] =>
-      invert H; clear H
-    end; intuition idtac.
-
   Hint Extern 1 (RawLockAPI.step _ _ _ _ _ _) => econstructor.
   Hint Extern 1 (LockAPI.step _ _ _ _ _ _) => left.
   Hint Extern 1 (LockAPI.step _ _ _ _ _ _) => right.
@@ -1246,54 +1230,34 @@ Module LockingCounter' <:
 
   Ltac cleanup :=
     repeat match goal with
-           | _ => progress unfold LockAPI.step_allow, LockProtocol.step_allow in *
+           | [ H: context[LockAPI.step] |- _ ] => setoid_rewrite LockAPI.step'_is_step in H
+           | [ |- context[LockAPI.step] ] => setoid_rewrite LockAPI.step'_is_step
            | [ H: forall _, Valid _ = Valid _ -> _ |- _ ] =>
              specialize (H _ eq_refl)
+           | [ |- _ /\ _ ] => split; [ solve [auto] | ]
+           | [ |- _ /\ _ ] => split; [ | solve [auto] ]
            | _ => progress propositional
            end.
 
   Ltac invertc H := invert H; clear H; cleanup.
+  Hint Constructors LockAPI.step'.
+
+  Definition none_not_some A (v:A) : None <> Some v := ltac:(congruence).
+  Hint Resolve none_not_some.
 
   Lemma acquire_right_mover :
     right_mover LockAPI.step Acquire.
   Proof.
     unfold right_mover; intros.
-
+    cleanup.
     invertc H.
-    invertc H1.
-    invertc H0.
-    invertc H6.
-    intuition eauto.
-    - admit.
-    - assert (s = Error).
-      { destruct s; eauto.
-        exfalso.
-        apply H0.
-        eexists; intuition eauto.
-        constructor. }
-      clear H0; subst.
-      intuition eauto.
-      invert H0.
-      invert H1; try congruence.
-      exists Error; intuition eauto.
-      left; intuition eauto.
-      constructor.
-      right.
-      constructor; intuition eauto.
-
-    repeat step_inv; eauto 10.
-
-
-    destruct op1; repeat step_inv; eauto 10.
+    - invertc H0.
+      destruct op1; cleanup; eauto.
+    - invertc H0; eauto.
   Qed.
 
-  Lemma flush_right_mover :
-    right_mover LockAPI.step Flush.
-  Proof.
-    unfold right_mover; intros.
-    repeat step_inv; eauto 15.
-    destruct op1; repeat step_inv; eauto 15.
-  Qed.
+  Definition some_not_eq A (x y:A) : x <> y -> Some x <> Some y := ltac:(congruence).
+  Hint Resolve some_not_eq.
 
   Lemma release_left_mover :
     left_mover LockAPI.step Release.
@@ -1301,33 +1265,46 @@ Module LockingCounter' <:
     split.
     - eapply always_enabled_to_stable.
       unfold always_enabled, enabled_in; intros.
-      destruct s. destruct Lock. destruct (n == tid); subst.
+      cleanup.
+      destruct s. destruct s. destruct (LockOwner == Some tid); subst.
       all: eauto 10.
     - unfold left_mover; intros.
-      repeat step_inv; subst; eauto 15.
-      destruct op0; eauto 15.
-      Unshelve.
-      all: exact tt.
+      cleanup.
+      invertc H.
+      + invertc H0.
+        destruct op0; cleanup; eauto.
+      + invertc H0; eauto.
+      + invertc H0; eauto.
+
+        Grab Existential Variables.
+        all: exact tt.
   Qed.
 
   Lemma read_right_mover :
     right_mover LockAPI.step Read.
   Proof.
     unfold right_mover; intros.
-    repeat step_inv; subst; eauto 15.
-    destruct op1; eauto 15.
+    cleanup.
+    invertc H.
+    - invertc H0.
+      destruct op1; cleanup; eauto.
+    - invertc H0; eauto.
+    - invertc H0; eauto.
   Qed.
 
   Lemma write_right_mover : forall v,
       right_mover LockAPI.step (Write v).
   Proof.
     unfold right_mover; intros.
-    repeat step_inv; subst; eauto 15.
-    destruct op1; eauto 15.
+    cleanup.
+    invertc H.
+    - invertc H0.
+      destruct op1; cleanup; eauto.
+    - invertc H0; eauto.
+    - invertc H0; eauto.
   Qed.
 
   Hint Resolve acquire_right_mover.
-  Hint Resolve flush_right_mover.
   Hint Resolve release_left_mover.
   Hint Resolve read_right_mover.
   Hint Resolve write_right_mover.
@@ -1340,6 +1317,14 @@ Module LockingCounter' <:
     - unfold dec_core; eauto 20.
   Qed.
 
+  Ltac step_inv :=
+    match goal with
+    | [ H: LockAPI.step' _ _ _ _ _ _ |- _ ] => invertc H
+    | |- LockedCounterAPI.step _ _ _ _ _ _ => hnf
+    end.
+
+  Hint Constructors LockedCounterAPI.xstep.
+
   Theorem compile_correct :
     compile_correct compile_op LockAPI.step LockedCounterAPI.step.
   Proof.
@@ -1347,20 +1332,23 @@ Module LockingCounter' <:
     destruct op.
 
     + repeat atomic_exec_inv.
-      simpl; intuition eauto.
-      repeat step_inv; eauto.
+      cleanup.
+      repeat step_inv; simpl; eauto.
     + repeat atomic_exec_inv.
-      simpl; intuition eauto.
-      repeat step_inv; eauto.
+      cleanup.
+      repeat step_inv; simpl; eauto.
+
+      Grab Existential Variables.
+      all: auto.
   Qed.
 
-  Import LockState.
+  Import SeqMemState.
 
   Theorem exec_others_preserves_lock :
     forall tid s s',
-      exec_others (restricted_step RawLockAPI.step LockAPI.step_allow) tid s s' ->
-      Lock s = Some tid ->
-      Lock s' = Some tid.
+      exec_others (restricted_step RawLockAPI.step LockAPI.step_allow) tid (Valid s) (Valid s') ->
+      LockOwner s = Some tid ->
+      LockOwner s' = Some tid.
   Proof.
     induction 1; intros; eauto.
     repeat deex.

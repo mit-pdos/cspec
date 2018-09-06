@@ -22,6 +22,7 @@ Ltac propositional :=
          | [ H: _ <-> _ |- _ ] => destruct H
          | [ H: False |- _ ] => solve [ destruct H ]
          | [ H: True |- _ ] => clear H
+         | [ H: ~?P |- _ ] => solve [ destruct (H ltac:(trivial)) ]
          | [ H: ?P -> _, H': ?P |- _ ] =>
            match type of P with
            | Prop => specialize (H H')
