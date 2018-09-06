@@ -929,7 +929,6 @@ Module RawLockAPI <: Layer LockOp SeqMemState.
 
   Inductive xstep : OpSemantics Op s :=
   | StepAcquire : forall tid v,
-      (* TODO: TryAcquire must start from l = None in order to succeed *)
       xstep Acquire tid (mkSMState v None) true (mkSMState v (Some tid)) nil
   | StepRelease : forall tid v l,
       xstep Release tid (mkSMState v l) tt (mkSMState v None) nil
@@ -1044,7 +1043,7 @@ Module LockProtocol <: Protocol LockOp SeqMemState.
   .
 
   Definition step_allow T (op: Op T) tid s :=
-    exists s', s = Valid s' /\
+    forall s', s = Valid s' ->
           xstep_allow op tid s'.
 
 End LockProtocol.
@@ -1118,11 +1117,21 @@ Module LockAPI <: Layer LockOp SeqMemState.
     unfold step_allow, LockProtocol.step_allow.
     destruct op; simpl; eauto.
     - destruct (l == Some tid); subst; eauto.
+      right; cleanup; eauto.
     - destruct (l == Some tid); subst; eauto.
+      right; cleanup; eauto.
     - destruct (l == Some tid); subst; eauto.
+      right; cleanup; eauto.
   Qed.
 
   Hint Resolve valid_step.
+
+  Lemma step_allow_valid : forall T (op: Op T) tid s,
+      step_allow op tid (Valid s) ->
+      LockProtocol.xstep_allow op tid s.
+  Proof.
+    unfold step_allow; eauto.
+  Qed.
 
   Theorem step'_is_step : forall T (op: Op T) tid s r s' evs,
       step op tid s r s' evs <-> step' op tid s r s' evs.
@@ -1130,7 +1139,7 @@ Module LockAPI <: Layer LockOp SeqMemState.
     split; intros.
     - repeat match goal with
              | [ H: step _ _ _ _ _ _ |- _ ] => invertc H
-             | [ H: step_allow _ _ _ |- _ ] => invertc H
+             | [ H: step_allow _ _ _ |- _ ] => apply step_allow_valid in H
              | [ H: RawLockAPI.step _ _ _ _ _ _ |- _ ] => invertc H
              | [ H: RawLockAPI.xstep _ _ _ _ _ _ |- _ ] => invertc H
              | [ H: LockProtocol.xstep_allow _ _ _ |- _ ] => invertc H
@@ -1142,12 +1151,16 @@ Module LockAPI <: Layer LockOp SeqMemState.
       unfold step_allow, LockProtocol.step_allow.
       destruct s0.
       + unfold RawLockAPI.step.
-        invertc H; eauto 10.
+        invertc H; eauto 10;
+          try solve [ left + right; (intuition cleanup); eauto ].
         right; (intuition eauto); cleanup.
-        invertc H0.
+        specialize (H _ eq_refl).
+        invertc H.
       + invertc H.
-        right; (intuition eauto); cleanup.
-  Qed.
+        left; (intuition cleanup); eauto.
+        econstructor.
+        admit. (* TODO: error step is always enabled *)
+  Admitted.
 
 End LockAPI.
 
@@ -1234,6 +1247,8 @@ Module LockingCounter' <:
            | [ |- context[LockAPI.step] ] => setoid_rewrite LockAPI.step'_is_step
            | [ H: forall _, Valid _ = Valid _ -> _ |- _ ] =>
              specialize (H _ eq_refl)
+           | [ H: context[(SeqMemState.mkSMState _ _).(SeqMemState.LockOwner)] |- _ ] =>
+             simpl in H
            | [ |- _ /\ _ ] => split; [ solve [auto] | ]
            | [ |- _ /\ _ ] => split; [ | solve [auto] ]
            | _ => progress propositional
@@ -1344,96 +1359,96 @@ Module LockingCounter' <:
 
   Import SeqMemState.
 
+  Theorem exec_others_preserves_lock' :
+    forall tid ss ss',
+      exec_others (restricted_step RawLockAPI.step LockAPI.step_allow) tid ss ss' ->
+      (forall s, ss = Valid s -> LockOwner s = Some tid) ->
+      (forall s', ss' = Valid s' -> LockOwner s' = Some tid).
+  Proof.
+    induction 1; (intuition eauto); propositional.
+    invertc H3.
+    repeat match goal with
+           | [ H: RawLockAPI.step _ _ _ _ _ _ |- _ ] => invertc H
+           | [ H: LockProtocol.xstep_allow _ _ _ |- _ ] => invertc H
+           | [ H: RawLockAPI.xstep _ _ _ _ _ _ |- _ ] => invertc H
+           | [ H: LockAPI.step_allow _ _ _ |- _ ] => apply LockAPI.step_allow_valid in H
+           | _ => congruence
+           end.
+  Qed.
+
   Theorem exec_others_preserves_lock :
     forall tid s s',
       exec_others (restricted_step RawLockAPI.step LockAPI.step_allow) tid (Valid s) (Valid s') ->
       LockOwner s = Some tid ->
       LockOwner s' = Some tid.
   Proof.
-    induction 1; intros; eauto.
-    repeat deex.
-    clear H0.
-    assert (Lock x = Lock y).
-    {
-      clear IHclos_refl_trans_1n.
-      unfold restricted_step in *; intuition idtac;
-        repeat step_inv; simpl in *; congruence.
-    }
-    rewrite IHclos_refl_trans_1n; congruence.
+    intros.
+    eapply exec_others_preserves_lock' in H; eauto.
+    intros; congruence.
   Qed.
 
+  Lemma exec_others_preserves_error : forall tid s',
+      exec_others (restricted_step RawLockAPI.step LockAPI.step_allow) tid Error s' ->
+      s' = Error.
+  Proof.
+    intros.
+    remember Error.
+    induction H; propositional; eauto.
+    invertc H1.
+    invertc H3; eauto.
+  Qed.
+
+  Theorem step_allow_error : forall T (op: LockOp.Op T) tid,
+      LockAPI.step_allow op tid Error.
+  Proof.
+    repeat (hnf; intros).
+    congruence.
+  Qed.
+
+  Theorem step_allow_valid : forall T (op: LockOp.Op T) tid s,
+      LockProtocol.xstep_allow op tid s ->
+      LockAPI.step_allow op tid (Valid s).
+  Proof.
+    repeat (hnf; intros).
+    invertc H0; eauto.
+  Qed.
+
+  Hint Resolve step_allow_error step_allow_valid.
+
   Ltac exec_propagate :=
-    match goal with
-    | s : LockState.State |- _ =>
-      destruct s
-    | H : exec_any _ _ _ (Call _) _ _ |- _ =>
-      eapply exec_any_op in H; repeat deex
-    | H : exec_others _ _ _ _ |- _ =>
-      eapply exec_others_preserves_lock in H; simpl in *; subst; [ | congruence ]
-    end.
+    repeat match goal with
+           | s : SeqMemState.State |- _ =>
+             destruct s
+           | H : exec_any _ _ _ (Call _) _ _ |- _ =>
+             eapply exec_any_op in H; repeat deex
+           | H: restricted_step _ _ _ _ _ _ _ _ |- _ => invertc H
+           | H: RawLockAPI.step _ _ _ _ _ _ |- _ => invertc H
+           | H: RawLockAPI.xstep _ _ _ _ _ _ |- _ => invertc H
+           | H : exec_others _ _ (Valid _) (Valid _) |- _ =>
+             eapply exec_others_preserves_lock in H; simpl in *; subst; [ | congruence ]
+           | H : exec_others _ _ Error (Valid _) |- _ =>
+             eapply exec_others_preserves_error in H; simpl in H; congruence
+           | |- LockAPI.step_allow _ _ (Valid _) => apply step_allow_valid
+           end.
 
   Lemma inc_follows_protocol : forall tid s,
       follows_protocol_proc RawLockAPI.step LockAPI.step_allow tid s inc_core.
   Proof.
     intros.
-    constructor; intros.
-    constructor; intros. eauto.
-
-    repeat exec_propagate.
-    unfold restricted_step in *; intuition idtac; repeat step_inv.
-    constructor; intros.
-    constructor; intros. eauto.
-
-    repeat exec_propagate.
-    unfold restricted_step in *; intuition idtac; repeat step_inv.
-    constructor; intros.
-    constructor; intros. eauto.
-
-    repeat exec_propagate.
-    unfold restricted_step in *; intuition idtac; repeat step_inv.
-    constructor; intros.
-    constructor; intros. eauto.
-
-    repeat exec_propagate.
-    unfold restricted_step in *; intuition idtac; repeat step_inv.
-    constructor; intros.
-    constructor; intros. eauto.
-
-    repeat exec_propagate.
-    unfold restricted_step in *; intuition idtac; repeat step_inv.
-    constructor; intros.
+    repeat constructor.
+    - repeat exec_propagate; eauto.
+    - repeat exec_propagate; eauto.
+    - repeat exec_propagate; eauto.
   Qed.
 
   Lemma dec_follows_protocol : forall tid s,
       follows_protocol_proc RawLockAPI.step LockAPI.step_allow tid s dec_core.
   Proof.
     intros.
-    constructor; intros.
-    constructor; intros. eauto.
-
-    repeat exec_propagate.
-    unfold restricted_step in *; intuition idtac; repeat step_inv.
-    constructor; intros.
-    constructor; intros. eauto.
-
-    repeat exec_propagate.
-    unfold restricted_step in *; intuition idtac; repeat step_inv.
-    constructor; intros.
-    constructor; intros. eauto.
-
-    repeat exec_propagate.
-    unfold restricted_step in *; intuition idtac; repeat step_inv.
-    constructor; intros.
-    constructor; intros. eauto.
-
-    repeat exec_propagate.
-    unfold restricted_step in *; intuition idtac; repeat step_inv.
-    constructor; intros.
-    constructor; intros. eauto.
-
-    repeat exec_propagate.
-    unfold restricted_step in *; intuition idtac; repeat step_inv.
-    constructor; intros.
+    repeat constructor.
+    - repeat exec_propagate; eauto.
+    - repeat exec_propagate; eauto.
+    - repeat exec_propagate; eauto.
   Qed.
 
   Hint Resolve inc_follows_protocol.
@@ -1453,7 +1468,15 @@ Module LockingCounter' <:
       LockAPI.step_allow op tid s'.
   Proof.
     intros.
-    destruct op; destruct op'; repeat step_inv; subst; eauto.
+    destruct op, op';
+      repeat match goal with
+             | [ H: LockAPI.step_allow _ _ (Valid _) |- _ ] =>
+               apply LockAPI.step_allow_valid in H
+             | [ H: LockProtocol.xstep_allow _ _ _ |- _ ] => invertc H
+             | [ H: LockAPI.step _ _ _ _ _ _ |- _ ] => invertc H
+             | [ H: RawLockAPI.step _ _ _ _ _ _ |- _ ] => invertc H
+             | [ H: RawLockAPI.xstep _ _ _ _ _ _ |- _ ] => invertc H
+             end; eauto.
   Qed.
 
   Theorem raw_step_ok :
