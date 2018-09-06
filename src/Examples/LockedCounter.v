@@ -264,9 +264,11 @@ Inductive error_step Op State
 | invalid_step : forall T (op: Op T) tid s r evs,
     violation _ op tid s ->
     error_step op tid (Valid s) r Error evs
-| invalid_preserved : forall T (op: Op T) tid s r s' evs,
+| invalid_preserved : forall T (op: Op T) tid s r r' s' evs,
     step _ op tid s r s' evs ->
-    error_step op tid Error r Error evs
+    (* any return value - makes things a bit more convenient since we don't need
+    restricted return values *)
+    error_step op tid Error r' Error evs
 .
 
 Arguments error_step {Op State} step violation.
@@ -926,8 +928,8 @@ Module RawLockAPI <: Layer LockOp SeqMemState.
   Import SeqMemState.
 
   Inductive xstep : OpSemantics Op s :=
-  | StepAcquire : forall tid v l r,
-      xstep Acquire tid (mkSMState v l) r (mkSMState v (Some tid)) nil
+  | StepAcquire : forall tid v l,
+      xstep Acquire tid (mkSMState v l) true (mkSMState v (Some tid)) nil
   | StepRelease : forall tid v l,
       xstep Release tid (mkSMState v l) tt (mkSMState v None) nil
   | StepRead : forall tid v l,
@@ -980,6 +982,7 @@ Module LockImpl' <:
     end.
 
   Hint Constructors RawLockAPI.xstep.
+  Hint Resolve true.
 
   Theorem noop_or_success :
     noop_or_success compile_op SeqMemAPI.step RawLockAPI.step.
@@ -1039,16 +1042,110 @@ Module LockProtocol <: Protocol LockOp SeqMemState.
   .
 
   Definition step_allow T (op: Op T) tid s :=
-    forall s', s = Valid s' -> xstep_allow op tid s'.
+    exists s', s = Valid s' /\
+          xstep_allow op tid s'.
 
 End LockProtocol.
 
 
-Module LockAPI <: Layer LockOp LockState.
+Module LockAPI <: Layer LockOp SeqMemState.
 
   Definition step_allow := LockProtocol.step_allow.
   Definition step :=
     nilpotent_step RawLockAPI.step step_allow.
+
+  Import LockOp.
+  Import SeqMemState.
+
+  Inductive step' : OpSemantics Op State :=
+  | StepAcquire : forall tid v l,
+      step' Acquire tid
+            (Valid (mkSMState v l))
+            true
+            (Valid (mkSMState v (Some tid))) nil
+  | StepRelease : forall tid v,
+      step' Release tid
+            (Valid (mkSMState v (Some tid)))
+            tt
+            (Valid (mkSMState v None)) nil
+  | StepRead : forall tid v,
+      step' Read tid
+            (Valid (mkSMState v (Some tid)))
+            v
+            (Valid (mkSMState v (Some tid))) nil
+  | StepWrite : forall tid v v',
+      step' (Write v') tid
+            (Valid (mkSMState v (Some tid)))
+            tt
+            (Valid (mkSMState v' (Some tid))) nil
+  | StepError : forall tid T (op: Op T) r,
+      (* TODO: for Ext allow an event *)
+      step' op tid Error r Error nil
+  | StepNilpotent : forall tid T (op: Op T) v l r,
+      match op with
+      | Acquire => False
+      | _ => l <> Some tid
+      end ->
+      step' op tid
+            (Valid (mkSMState v l))
+            r
+            (Valid (mkSMState v l)) nil
+  .
+
+
+  Ltac cleanup :=
+    repeat match goal with
+           | [ H: Valid _ = Valid _ |- _ ] => invert H; clear H
+           | [ H: Error = Valid _ |- _ ] => solve [ invert H ]
+           | [ H: context[(mkSMState _ _).(LockOwner)] |- _ ] => simpl in H
+           | [ H: Some ?tid <> Some ?tid |- _ ] => contradiction H
+           | _ => progress propositional
+           end.
+
+  Ltac invertc H := invert H; clear H; cleanup; eauto.
+
+  Hint Constructors step'.
+  Hint Constructors LockProtocol.xstep_allow.
+
+  Definition decide_invalid T (op: Op T) tid l :
+    {match op with
+     | Acquire => False
+     | _ => l <> Some tid
+     end} + {forall v, step_allow op tid (Valid (mkSMState v l))}.
+  Proof.
+    unfold step_allow, LockProtocol.step_allow.
+    destruct op; simpl; eauto.
+    - destruct (l == Some tid); subst; eauto.
+    - destruct (l == Some tid); subst; eauto.
+    - destruct (l == Some tid); subst; eauto.
+  Qed.
+
+  Hint Resolve valid_step.
+
+  Theorem step'_is_step : forall T (op: Op T) tid s r s' evs,
+      step op tid s r s' evs <-> step' op tid s r s' evs.
+  Proof.
+    split; intros.
+    - repeat match goal with
+             | [ H: step _ _ _ _ _ _ |- _ ] => invertc H
+             | [ H: step_allow _ _ _ |- _ ] => invertc H
+             | [ H: RawLockAPI.step _ _ _ _ _ _ |- _ ] => invertc H
+             | [ H: RawLockAPI.xstep _ _ _ _ _ _ |- _ ] => invertc H
+             | [ H: LockProtocol.xstep_allow _ _ _ |- _ ] => invertc H
+             end.
+      destruct s0; eauto.
+      destruct s0.
+      destruct (decide_invalid op tid LockOwner0); solve [ eauto || exfalso; eauto ].
+    - hnf.
+      unfold step_allow, LockProtocol.step_allow.
+      destruct s0.
+      + unfold RawLockAPI.step.
+        invertc H; eauto 10.
+        right; (intuition eauto); cleanup.
+        invertc H0.
+      + invertc H.
+        right; (intuition eauto); cleanup.
+  Qed.
 
 End LockAPI.
 
@@ -1065,26 +1162,19 @@ Module CounterOp <: Ops.
 End CounterOp.
 
 
-Module LockedCounterAPI <: Layer CounterOp LockState.
+Module LockedCounterAPI <: Layer CounterOp SeqMemState.
 
   Import CounterOp.
-  Import LockState.
+  Import SeqMemState.
 
-  Inductive xstep : forall T, Op T -> nat -> State -> T -> State -> list event -> Prop :=
-  | StepInc : forall (tid: nat) v0 v v' r,
-      mem_bg v0 v ->
-      r = mem_read v tt tid ->
-      mem_bg (mem_write tt (mem_read v tt tid + 1) v tid) v' ->
-      xstep Inc tid (mkState v0 None) r
-            (mkState (mem_flush v' tid) None) nil
-  | StepDec : forall (tid: nat) v0 v v' r,
-      mem_bg v0 v ->
-      r = mem_read v tt tid ->
-      mem_bg (mem_write tt (mem_read v tt tid - 1) v tid) v' ->
-      xstep Dec tid (mkState v0 None) r
-            (mkState (mem_flush v' tid) None) nil.
+  Inductive xstep : forall T, Op T -> nat -> s -> T -> s -> list event -> Prop :=
+  | StepInc : forall (tid: nat) v,
+      xstep Inc tid (mkSMState v None) v (mkSMState (v+1) None) nil
+  | StepDec : forall (tid: nat) v,
+      xstep Dec tid (mkSMState v None) v (mkSMState (v-1) None) nil
+  .
 
-  Definition step := xstep.
+  Definition step := error_step xstep (fun T op tid s => False).
 
 End LockedCounterAPI.
 
@@ -1092,7 +1182,7 @@ End LockedCounterAPI.
 
 Module LockingCounter' <:
   LayerImplMoversProtocolT
-    LockState
+    SeqMemState
     LockOp    RawLockAPI LockAPI
     CounterOp LockedCounterAPI
     LockProtocol.
@@ -1104,7 +1194,6 @@ Module LockingCounter' <:
     _ <- Call Acquire;
       v <- Call Read;
       _ <- Call (Write (v + 1));
-      _ <- Call Flush;
       _ <- Call Release;
       Ret v.
 
@@ -1112,7 +1201,6 @@ Module LockingCounter' <:
     _ <- Call Acquire;
       v <- Call Read;
       _ <- Call (Write (v - 1));
-      _ <- Call Flush;
       _ <- Call Release;
       Ret v.
 
@@ -1133,15 +1221,19 @@ Module LockingCounter' <:
   Ltac step_inv :=
     match goal with
     | H : LockAPI.step _ _ _ _ _ _ |- _ =>
-      inversion H; clear H; subst; repeat sigT_eq
+      invert H; clear H
     | H : LockAPI.step_allow _ _ _ |- _ =>
-      inversion H; clear H; subst; repeat sigT_eq
+      invert H; clear H
     | H : LockAPI.step_allow _ _ _ -> False |- _ =>
       solve [ exfalso; eauto ]
     | H : RawLockAPI.step _ _ _ _ _ _ |- _ =>
-      inversion H; clear H; subst; repeat sigT_eq
+      invert H; clear H
+    | H : RawLockAPI.xstep _ _ _ _ _ _ |- _ =>
+      invert H; clear H
     | H : LockedCounterAPI.step _ _ _ _ _ _ |- _ =>
-      inversion H; clear H; subst; repeat sigT_eq
+      invert H; clear H
+    | [ H: Valid _ = Valid _ |- _ ] =>
+      invert H; clear H
     end; intuition idtac.
 
   Hint Extern 1 (RawLockAPI.step _ _ _ _ _ _) => econstructor.
@@ -1152,11 +1244,46 @@ Module LockingCounter' <:
   Hint Extern 1 (~ LockAPI.step_allow _ _ _) => intro H'; inversion H'.
   Hint Extern 1 (LockAPI.step_allow _ _ _ -> False) => intro H'; inversion H'.
 
+  Ltac cleanup :=
+    repeat match goal with
+           | _ => progress unfold LockAPI.step_allow, LockProtocol.step_allow in *
+           | [ H: forall _, Valid _ = Valid _ -> _ |- _ ] =>
+             specialize (H _ eq_refl)
+           | _ => progress propositional
+           end.
+
+  Ltac invertc H := invert H; clear H; cleanup.
+
   Lemma acquire_right_mover :
     right_mover LockAPI.step Acquire.
   Proof.
     unfold right_mover; intros.
+
+    invertc H.
+    invertc H1.
+    invertc H0.
+    invertc H6.
+    intuition eauto.
+    - admit.
+    - assert (s = Error).
+      { destruct s; eauto.
+        exfalso.
+        apply H0.
+        eexists; intuition eauto.
+        constructor. }
+      clear H0; subst.
+      intuition eauto.
+      invert H0.
+      invert H1; try congruence.
+      exists Error; intuition eauto.
+      left; intuition eauto.
+      constructor.
+      right.
+      constructor; intuition eauto.
+
     repeat step_inv; eauto 10.
+
+
     destruct op1; repeat step_inv; eauto 10.
   Qed.
 
