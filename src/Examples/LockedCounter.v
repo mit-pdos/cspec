@@ -655,22 +655,38 @@ Module AbsLockInvariant' <: LayerImplAbsT
     destruct (a == tid); subst; eauto.
   Qed.
 
+  Theorem invariant_mem_bgflush : forall s s' l pl tid,
+      invariant (mkLIState s l pl) ->
+      s' = mem_bgflush s tid ->
+      invariant (mkLIState s' l pl).
+  Proof.
+    unfold invariant; simpl; propositional; intuition eauto.
+    destruct l; intuition eauto.
+  Admitted.
+
   Theorem invariant_mem_bg : forall s s' l pl,
       invariant (mkLIState s l pl) ->
       mem_bg s s' ->
       invariant (mkLIState s' l pl).
   Proof.
-    unfold invariant; simpl; intuition eauto.
-    destruct l; intuition eauto.
-    eapply empty_sb_mem_bg_noop in H0; eauto; subst; eauto.
-  Admitted.
+    intros.
+    eapply mem_bgflush_mem_bg_invariant with
+        (I:=fun s => invariant (mkLIState s l pl)); eauto.
+    intros.
+    eapply invariant_mem_bgflush; eauto.
+  Qed.
 
   Theorem invariant_mem_flush : forall s s' l pl tid,
       invariant (mkLIState s l pl) ->
       s' = mem_flush s tid ->
       invariant (mkLIState s' l pl).
   Proof.
-  Admitted.
+    intros; subst.
+    eapply mem_bgflush_mem_flush_invariant with
+        (I:=fun s => invariant (mkLIState s l pl)); eauto.
+    intros.
+    eapply invariant_mem_bgflush; eauto.
+  Qed.
 
   Theorem invariant_write_lock : forall s tid l pl,
       invariant (mkLIState s l pl) ->
@@ -968,17 +984,49 @@ Module AbsSeqMem' <: LayerImplAbsT
     firstorder.
   Qed.
 
+  Hint Resolve (ltac:(inversion 1) : Val <> Lock).
+
+  Hint Rewrite mem_read_mem_flush_eq : tso.
+  Hint Rewrite mem_read_mem_bgflush_eq : tso.
+  Hint Rewrite mem_read_mem_write_ne using solve [ auto ] : tso.
+  Hint Rewrite mem_read_mem_write_eq : tso.
+  Hint Rewrite mem_flush_empty_sbuf using solve [ auto ] : tso.
+  Hint Rewrite mem_bgflush_empty_sbuf using solve [ auto ] : tso.
+
+  Import LockInvariantAPI.
+  Import SeqMemAPI.
+
+  Theorem mem_bg_preserves_abstr' : forall s s' l pl l' v,
+      invariant (mkLIState s l pl) /\
+      abstr (mkLIState s l pl) (mkSMState v l') ->
+      mem_bg s s' ->
+      invariant (mkLIState s' l pl) /\
+      abstr (mkLIState s' l pl) (mkSMState v l').
+  Proof.
+    intros.
+    eapply mem_bgflush_mem_bg_invariant with
+        (I := fun s => invariant (mkLIState s l pl) /\ abstr (mkLIState s l pl) (mkSMState v l')); eauto.
+
+    clear.
+    unfold abstr; simpl; propositional; autorewrite with tso; intuition eauto.
+    eapply AbsLockInvariant'.invariant_mem_bgflush; eauto.
+    unfold invariant in *; simpl in *; propositional.
+    destruct l'; (intuition idtac); autorewrite with tso; eauto.
+    destruct (n == tid); subst; autorewrite with tso; eauto.
+    destruct (pl == tid); subst; autorewrite with tso; eauto.
+  Qed.
+
   Theorem mem_bg_preserves_abstr : forall s s' l pl l' v,
+      invariant (mkLIState s l pl) ->
       abstr (mkLIState s l pl) (mkSMState v l') ->
       mem_bg s s' ->
       abstr (mkLIState s' l pl) (mkSMState v l').
   Proof.
-  Admitted.
+    intros.
+    eapply mem_bg_preserves_abstr' in H1; propositional; eauto.
+  Qed.
 
   Definition absR := error_absR abstr.
-
-  Import LockInvariantAPI.
-  Import SeqMemAPI.
 
   Lemma bg_invariant : forall T (op: Op T) tid s r s' evs,
       bg_step LockInvariantAPI.xstep invariant_step op tid s r s' evs ->
@@ -1029,8 +1077,9 @@ Module AbsSeqMem' <: LayerImplAbsT
   Proof.
     unfold abstr; simpl; propositional.
     intuition eauto.
-    admit. (* mem_read (mem_flush ...) at same tid, and also mem_read (mem_write ...) of other address *)
-  Admitted.
+    autorewrite with tso.
+    (* TODO: oops, need to know didn't flush any new values using invariant *)
+  Abort.
 
   Lemma abstr_flush:
     forall (tid : nat) (s' : s) (l : option nat) (pl : nat) (s0 : memT addr nat),
@@ -1042,27 +1091,20 @@ Module AbsSeqMem' <: LayerImplAbsT
   Proof.
     unfold invariant, abstr; simpl; propositional.
     intuition eauto.
-    destruct (pl == tid); subst.
-    admit. (* reads are unaffected by flushing the local store buffer, [mem_read
-    (mem_flush ...] for same tid) *)
-    destruct s'.(LockOwner); (intuition eauto); propositional.
-    admit. (* mem_flush of an empty store buffer (empty_sb_except) *)
-    admit. (* mem_flush of all empty store buffer (empty_sb) *)
-    admit. (* mem_flush of an empty store buffer (empty_sb_except) *)
-  Admitted.
+    destruct (pl == tid); subst; autorewrite with tso; eauto.
+    destruct s'.(LockOwner); (intuition eauto); propositional; autorewrite with tso; eauto.
+  Qed.
 
   Lemma abstr_clear:
-    forall (tid : nat) (s3 : s) (v : memT addr nat) (pl : nat),
-      abstr {| InvValue := v; InvLock := Some tid; PrevOwner := pl |} s3 ->
+    forall (tid : nat) (s3 : s) (v : memT addr nat),
+      abstr {| InvValue := v; InvLock := Some tid; PrevOwner := tid |} s3 ->
       abstr
-        {| InvValue := mem_write Lock cUnlocked v tid; InvLock := None; PrevOwner := pl |}
+        {| InvValue := mem_write Lock cUnlocked v tid; InvLock := None; PrevOwner := tid |}
         {| Value := s3.(Value); LockOwner := None |}.
   Proof.
     destruct s3.
-    unfold invariant, abstr; simpl; propositional.
-    intuition eauto.
-    admit. (* mem_read (mem_write ...) for unrelated address *)
-  Admitted.
+    unfold invariant, abstr; simpl; propositional; autorewrite with tso; eauto.
+  Qed.
 
   Lemma abstr_write:
     forall (tid : nat) (s3 : s) (s1 : memT addr nat) (v' : nat),
@@ -1072,10 +1114,8 @@ Module AbsSeqMem' <: LayerImplAbsT
         {| InvValue := mem_write Val v' s1 tid; InvLock := Some tid; PrevOwner := tid |}
         {| Value := v'; LockOwner := Some tid |}.
   Proof.
-    unfold invariant, abstr; simpl; propositional.
-    intuition eauto.
-    admit. (* mem_read (mem_write ...) for same address *)
-  Admitted.
+    unfold invariant, abstr; simpl; propositional; autorewrite with tso; eauto.
+  Qed.
 
   Theorem absR_ok : op_abs absR LockInvariantAPI.step step.
   Proof.
@@ -1095,7 +1135,7 @@ Module AbsSeqMem' <: LayerImplAbsT
             intuition eauto.
           constructor.
           eapply mem_bg_preserves_abstr in H4; eauto.
-          eapply abstr_write_lock; eauto.
+          (* eapply abstr_write_lock; eauto. *) admit.
           constructor.
           destruct s3.
           unfold abstr in H4; simpl in *; propositional.
@@ -1112,6 +1152,9 @@ Module AbsSeqMem' <: LayerImplAbsT
           unfold abstr in H4; simpl in *; propositional.
           constructor.
         * (* Clear *)
+          assert (pl = tid).
+          unfold invariant in H0; simpl in *; propositional.
+          subst.
           exists (Valid (mkSMState s3.(Value) None));
             intuition eauto.
           constructor.
@@ -1163,7 +1206,7 @@ Module AbsSeqMem' <: LayerImplAbsT
 
       Grab Existential Variables.
       all: eauto.
-  Qed.
+  Admitted.
 
   Theorem absInitP :
     forall s1,
