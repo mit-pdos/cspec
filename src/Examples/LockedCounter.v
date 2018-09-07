@@ -1518,15 +1518,15 @@ End CounterAPI.
 
 Module AbsCounter' <:
   LayerImplAbsT CounterOp
-                LockState    LockedCounterAPI
+                SeqMemState   LockedCounterAPI
                 CounterState CounterAPI.
 
-  Import LockState.
+  Import SeqMemState.
 
-  Definition absR (s1 : LockState.State) (s2 : CounterState.State) :=
-    Lock s1 = None /\
-    empty_sb s1.(Value) /\
-    s1.(Value).(MemValue) tt = s2.
+  Definition absR (s1 : State) (s2 : CounterState.State) :=
+    exists s, s1 = Valid s /\
+         s.(LockOwner) = None /\
+         s.(Value) = s2.
 
   Lemma step_inc : forall tid v r v',
       r = v ->
@@ -1547,77 +1547,43 @@ Module AbsCounter' <:
   Qed.
 
   Hint Resolve step_inc step_dec.
-  Hint Resolve empty_sb_single_value_flush.
-  Hint Resolve empty_sb_mem_read.
 
-  Lemma single_value_flush A {_:EqualDec A} T : forall (m m': memT A T) tid (f: T -> T) (a:A),
-      empty_sb m ->
-      single_value m' tid a (f (mem_read m a tid)) ->
-      MemValue (mem_flush m' tid) a = f (MemValue m a).
+  Ltac invertc H := invert H; clear H; propositional.
+
+  Lemma absR_from_valid : forall s s2,
+      s.(LockOwner) = None ->
+      s2 = s.(Value) ->
+      absR (Valid s) s2.
   Proof.
-    intros.
-    assert (empty_sb (mem_flush m' tid)) by eauto.
-    eapply single_value_mem_flush in H0; eauto.
-    apply single_value_mem_read in H0.
-    (*
-    erewrite (empty_sb_mem_read (m:=(mem_flush m' tid))) in * by auto.
-    erewrite (empty_sb_mem_read (m:=m)) in * by auto.
-    auto.
+    unfold absR; intuition eauto.
   Qed.
-     *)
-  Admitted.
 
-  Hint Resolve single_value_flush.
+  Hint Resolve absR_from_valid.
 
   Theorem absR_ok :
     op_abs absR LockedCounterAPI.step CounterAPI.step.
   Proof.
     unfold op_abs; intros.
-    destruct s1; inversion H; clear H.
-    simpl in *; subst; destruct_ands.
-    unfold absR.
-    destruct op; inv_clear H0; simpl.
-
-    - eapply empty_sb_mem_bg_noop in H4; [ | solve [ eauto ] ]; subst.
-
-      assert (single_value v' tid tt (mem_read Value0 tt tid + 1)).
-      eapply empty_sb_single_value in H.
-      eapply mem_write_single_value in H.
-      eapply single_value_mem_bg in H; eauto.
-
-      eexists; (intuition eauto).
-      eapply step_inc; eauto.
-      eapply single_value_flush with (f := fun x => x + 1); eauto.
-
-    - eapply empty_sb_mem_bg_noop in H4; [ | solve [ eauto ] ]; subst.
-
-      assert (single_value v' tid tt (mem_read Value0 tt tid - 1)).
-      eapply empty_sb_single_value in H.
-      eapply mem_write_single_value in H.
-      eapply single_value_mem_bg in H; eauto.
-
-      eexists; (intuition eauto).
-      eapply step_dec; eauto.
-      eapply single_value_flush with (f := fun x => x - 1); eauto.
+    unfold absR in * |-; propositional.
+    invertc H0.
+    invertc H6; simpl in *; eauto.
   Qed.
 
   Theorem absInitP :
     forall s1,
-      LockState.initP s1 ->
+      SeqMemState.initP s1 ->
       exists s2, absR s1 s2 /\
       CounterState.initP s2.
   Proof.
-    unfold absR, LockState.initP, CounterState.initP; intros.
-    destruct s1; simpl in *; propositional.
-    exists 0; intuition eauto.
-    unfold empty_sb; simpl; auto.
+    unfold absR, SeqMemState.initP, CounterState.initP; propositional.
+    exists 0; eauto.
   Qed.
 
 End AbsCounter'.
 
 Module AbsCounter :=
   LayerImplAbs CounterOp
-               LockState    LockedCounterAPI
+               SeqMemState    LockedCounterAPI
                CounterState CounterAPI
                AbsCounter'.
 
