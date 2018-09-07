@@ -26,6 +26,7 @@ Module TSOOp <: Ops.
   | TestAndSet : addr -> nat -> xOp nat
   (* this is specifically an MFENCE *)
   | Fence : xOp unit
+  | Ext : event -> xOp unit
   .
 
   Definition Op := xOp.
@@ -63,6 +64,8 @@ Module TSOAPI <: Layer TSOOp TSOState.
             (mem_flush (mem_write a v s tid) tid) nil
   | StepFence : forall tid s,
       xstep Fence tid s tt (mem_flush s tid) nil
+  | StepExt : forall tid ev s,
+      xstep (Ext ev) tid s tt s [ev]
   .
 
   Definition step := bg_step xstep mem_bg.
@@ -87,6 +90,8 @@ Module TSODelayNondetAPI <: Layer TSOOp TSOState.
   | StepFence : forall tid s s',
       mem_bg s s' ->
       xstep Fence tid s tt (mem_flush s' tid) nil
+  | StepExt : forall tid ev s,
+      xstep (Ext ev) tid s tt s [ev]
   .
 
   Definition step := xstep.
@@ -117,6 +122,8 @@ Module AbsNondet' <:
     hnf in H0; repeat deex.
     destruct op; inv_clear H1; eauto.
     descend; split; [ | eauto ]; eauto.
+    descend; split; [ | eauto ].
+    etransitivity; eauto.
   Qed.
 
   Theorem absInitP :
@@ -149,6 +156,7 @@ Module TASOp <: Ops.
   | Clear : xOp unit
   | Read : xOp nat
   | Write : nat -> xOp unit
+  | Ext : event -> xOp unit
   (* we won't actually use a fence *)
   (* | Flush : xOp unit *)
   .
@@ -184,6 +192,8 @@ Module TAS_TSOAPI <: Layer TASOp TSOState.
       xstep Read tid s (mem_read s' Val tid) s' nil
   | StepWrite : forall tid s v,
       xstep (Write v) tid s tt (mem_write Val v s tid) nil
+  | StepExt : forall tid ev s,
+      xstep (Ext ev) tid s tt s [ev]
   (* | StepFlush : forall tid s s',
       mem_bg s s' ->
       xstep Flush tid s tt (mem_flush s' tid) nil. *)
@@ -208,6 +218,7 @@ Module TAS_TSOImpl <: LayerImplMoversT
     | TASOp.Clear => Call (Write Lock cUnlocked)
     | TASOp.Read => Call (Read Val)
     | TASOp.Write v => Call (Write Val v)
+    | TASOp.Ext ev => Call (Ext ev)
     (* | TASOp.Flush => Call (Fence) *)
     end.
 
@@ -290,12 +301,14 @@ End LockOwnerState.
 Definition bad_lock T (op: TASOp.Op T) tid (l: option nat) :=
   match op with
   | TASOp.TryAcquire => False
+  | TASOp.Ext _ => False
   | _ => l <> Some tid
   end.
 
 Definition decide_violation T (op: TASOp.Op T) tid l :
   {bad_lock op tid l} + {match op with
-                          | TASOp.TryAcquire => True
+                         | TASOp.TryAcquire => True
+                         | TASOp.Ext _ => True
                           | _ => l = Some tid
                           end}.
 Proof.
@@ -342,6 +355,8 @@ Module LockOwnerAPI <: Layer TASOp LockOwnerState.
             tt
             (mkLOState (mem_write Val v s tid) (Some tid))
             nil
+  | StepExt : forall tid ev s,
+      xstep (Ext ev) tid s tt s [ev]
   (* | StepFlush : forall tid s s' l,
       mem_bg s s' ->
       xstep Flush tid
@@ -403,6 +418,7 @@ Module AbsLockOwner' <: LayerImplAbsT
       invert H0; eauto.
       Grab Existential Variables.
       all: auto.
+      constructor; eauto.
   Qed.
 
   Theorem absInitP :
@@ -500,6 +516,8 @@ Module LockInvariantAPI <: Layer TASOp LockInvariantState.
             (mkLIState s (Some tid) pl)
             tt
             (mkLIState (mem_write Val v' s tid) (Some tid) pl) nil
+  | StepExt : forall tid ev s,
+      xstep (Ext ev) tid s tt s [ev]
   .
 
   Definition invariant_step (s1 s2:s) :=
@@ -740,6 +758,10 @@ Module AbsLockInvariant' <: LayerImplAbsT
           constructor.
           apply bg_invariant; eauto.
           eapply invariant_write_val; eauto.
+        * destruct s'.
+          eexists; split; [ eapply abstr_intro with (pl := PrevOwner0) | ]; eauto.
+          constructor.
+          apply bg_invariant; eauto.
     - invert H.
       exists Error; intuition eauto.
       econstructor.
@@ -803,6 +825,8 @@ Module SeqMemAPI <: Layer TASOp SeqMemState.
       xstep Read tid (mkSMState v (Some tid)) v (mkSMState v (Some tid)) nil
   | StepWrite : forall tid v v',
       xstep (Write v') tid (mkSMState v (Some tid)) tt (mkSMState v' (Some tid)) nil
+  | StepExt : forall tid ev s,
+      xstep (Ext ev) tid s tt s [ev]
   .
 
   Definition step := error_step xstep (fun T op tid s => bad_lock op tid s.(LockOwner)).
@@ -914,7 +938,9 @@ Module LockOp <: Ops.
   | Acquire : xOp bool
   | Release : xOp unit
   | Read : xOp nat
-  | Write : nat -> xOp unit.
+  | Write : nat -> xOp unit
+  | Ext : event -> xOp unit
+  .
 
   Definition Op := xOp.
 
@@ -936,10 +962,13 @@ Module RawLockAPI <: Layer LockOp SeqMemState.
       xstep Read tid (mkSMState v l) v (mkSMState v l) nil
   | StepWrite : forall tid v0 v l,
       xstep (Write v) tid (mkSMState v0 l) tt (mkSMState v l) nil
+  | StepExt : forall tid ev s,
+      xstep (Ext ev) tid s tt s [ev]
   .
 
   Definition step := error_step xstep (fun T op tid s => match op with
                                                       | Acquire => False
+                                                      | Ext _ => False
                                                       | _ => s.(LockOwner) <> Some tid
                                                       end).
 
@@ -965,6 +994,7 @@ Module LockImpl' <:
     | Release => (fun _ => Clear, once_cond, None)
     | Read => (fun _ => TASOp.Read, once_cond, None)
     | Write v => (fun _ => TASOp.Write v, once_cond, None)
+    | Ext ev => (fun _ => TASOp.Ext ev, once_cond, None)
     end.
 
   Ltac step_inv :=
@@ -997,6 +1027,7 @@ Module LockImpl' <:
                          (fun (T0 : Type) (op : Op T0) (tid0 : nat) (s0 : SeqMemState.s) =>
                             match op with
                             | Acquire => False
+                            | Ext _ => False
                             | _ => s0.(SeqMemState.LockOwner) <> Some tid0
                             end) T opM tid s r s' evs
          end).
@@ -1040,6 +1071,8 @@ Module LockProtocol <: Protocol LockOp SeqMemState.
       xstep_allow Read tid (mkSMState v (Some tid))
   | StepWrite : forall tid v0 v,
       xstep_allow (Write v) tid (mkSMState v0 (Some tid))
+  | StepExt : forall tid ev s,
+      xstep_allow (Ext ev) tid s
   .
 
   Definition step_allow T (op: Op T) tid s :=
@@ -1079,12 +1112,22 @@ Module LockAPI <: Layer LockOp SeqMemState.
             (Valid (mkSMState v (Some tid)))
             tt
             (Valid (mkSMState v' (Some tid))) nil
-  | StepError : forall tid T (op: Op T) r,
-      (* TODO: for Ext allow an event *)
-      step' op tid Error r Error nil
+  | StepExt : forall tid ev s,
+      step' (Ext ev) tid
+            (Valid s)
+            tt
+            (Valid s)
+            [ev]
+  | StepError : forall tid T (op: Op T) r evs,
+      evs = match op with
+            | Ext ev => [ev]
+            | _ => nil
+                    end ->
+      step' op tid Error r Error evs
   | StepNilpotent : forall tid T (op: Op T) v l r,
       match op with
       | Acquire => False
+      | Ext _ => False
       | _ => l <> Some tid
       end ->
       step' op tid
@@ -1111,6 +1154,7 @@ Module LockAPI <: Layer LockOp SeqMemState.
   Definition decide_invalid T (op: Op T) tid l :
     {match op with
      | Acquire => False
+     | Ext _ => False
      | _ => l <> Some tid
      end} + {forall v, step_allow op tid (Valid (mkSMState v l))}.
   Proof.
@@ -1147,6 +1191,9 @@ Module LockAPI <: Layer LockOp SeqMemState.
       destruct s0; eauto.
       destruct s0.
       destruct (decide_invalid op tid LockOwner0); solve [ eauto || exfalso; eauto ].
+      destruct op; eauto.
+      exfalso; eapply H0.
+      constructor.
     - hnf.
       unfold step_allow, LockProtocol.step_allow.
       destruct s0.
@@ -1170,7 +1217,9 @@ Module CounterOp <: Ops.
 
   Inductive xOp : Type -> Type :=
   | Inc : xOp nat
-  | Dec : xOp nat.
+  | Dec : xOp nat
+  | Ext : event -> xOp unit
+  .
 
   Definition Op := xOp.
 
@@ -1187,6 +1236,8 @@ Module LockedCounterAPI <: Layer CounterOp SeqMemState.
       xstep Inc tid (mkSMState v None) v (mkSMState (v+1) None) nil
   | StepDec : forall (tid: nat) v,
       xstep Dec tid (mkSMState v None) v (mkSMState (v-1) None) nil
+  | StepExt : forall tid ev s,
+      xstep (Ext ev) tid s tt s [ev]
   .
 
   Definition step := error_step xstep (fun T op tid s => False).
@@ -1224,6 +1275,7 @@ Module LockingCounter' <:
     match op with
     | Inc => inc_core
     | Dec => dec_core
+    | Ext ev => Call (LockOp.Ext ev)
     end.
 
   Theorem compile_op_no_atomics : forall T (op : CounterOp.Op T),
@@ -1266,7 +1318,7 @@ Module LockingCounter' <:
     unfold right_mover; intros.
     cleanup.
     invertc H.
-    - invertc H0.
+    - invertc H0; eauto.
       destruct op1; cleanup; eauto.
     - invertc H0; eauto.
   Qed.
@@ -1286,7 +1338,7 @@ Module LockingCounter' <:
     - unfold left_mover; intros.
       cleanup.
       invertc H.
-      + invertc H0.
+      + invertc H0; eauto.
         destruct op0; cleanup; eauto.
       + invertc H0; eauto.
       + invertc H0; eauto.
@@ -1301,8 +1353,7 @@ Module LockingCounter' <:
     unfold right_mover; intros.
     cleanup.
     invertc H.
-    - invertc H0.
-      destruct op1; cleanup; eauto.
+    - invertc H0; eauto.
     - invertc H0; eauto.
     - invertc H0; eauto.
   Qed.
@@ -1313,8 +1364,7 @@ Module LockingCounter' <:
     unfold right_mover; intros.
     cleanup.
     invertc H.
-    - invertc H0.
-      destruct op1; cleanup; eauto.
+    - invertc H0; eauto.
     - invertc H0; eauto.
     - invertc H0; eauto.
   Qed.
@@ -1330,6 +1380,7 @@ Module LockingCounter' <:
     destruct op; unfold ysa_movers; simpl.
     - unfold inc_core; eauto 20.
     - unfold dec_core; eauto 20.
+    - eauto.
   Qed.
 
   Ltac step_inv :=
@@ -1352,9 +1403,13 @@ Module LockingCounter' <:
     + repeat atomic_exec_inv.
       cleanup.
       repeat step_inv; simpl; eauto.
+    + repeat atomic_exec_inv.
+      cleanup.
+      repeat step_inv; simpl; eauto.
 
       Grab Existential Variables.
       all: auto.
+      constructor; auto.
   Qed.
 
   Import SeqMemState.
@@ -1374,6 +1429,8 @@ Module LockingCounter' <:
            | [ H: LockAPI.step_allow _ _ _ |- _ ] => apply LockAPI.step_allow_valid in H
            | _ => congruence
            end.
+    specialize (IHclos_refl_trans_1n ltac:(congruence)).
+    auto.
   Qed.
 
   Theorem exec_others_preserves_lock :
@@ -1451,13 +1508,21 @@ Module LockingCounter' <:
     - repeat exec_propagate; eauto.
   Qed.
 
+  Lemma ext_follows_protocol : forall tid ev s,
+      follows_protocol_proc RawLockAPI.step LockAPI.step_allow tid s (Call (LockOp.Ext ev)).
+  Proof.
+    intros.
+    repeat constructor.
+  Qed.
+
   Hint Resolve inc_follows_protocol.
   Hint Resolve dec_follows_protocol.
+  Hint Resolve ext_follows_protocol.
 
   Theorem op_follows_protocol : forall tid s `(op : CounterOp.Op T),
       follows_protocol_proc RawLockAPI.step LockProtocol.step_allow tid s (compile_op op).
   Proof.
-    destruct op; eauto.
+    destruct op; simpl; eauto.
   Qed.
 
   Theorem allowed_stable :
@@ -1507,7 +1572,10 @@ Module CounterAPI <: Layer CounterOp CounterState.
   | StepInc : forall tid v,
       xstep Inc tid v v (v + 1) nil
   | StepDec : forall tid v,
-      xstep Dec tid v v (v - 1) nil.
+      xstep Dec tid v v (v - 1) nil
+  | StepExt : forall tid ev s,
+      xstep (Ext ev) tid s tt s [ev]
+  .
 
   Definition step := xstep.
 
@@ -1546,7 +1614,16 @@ Module AbsCounter' <:
     constructor.
   Qed.
 
-  Hint Resolve step_inc step_dec.
+  Lemma step_ext : forall tid ev s r s',
+      s = s' ->
+      CounterAPI.step (CounterOp.Ext ev) tid s r s' [ev].
+  Proof.
+    propositional.
+    destruct r.
+    constructor.
+  Qed.
+
+  Hint Resolve step_inc step_dec step_ext.
 
   Ltac invertc H := invert H; clear H; propositional.
 
