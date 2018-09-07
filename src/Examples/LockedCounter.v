@@ -717,6 +717,109 @@ Module AbsLockInvariant' <: LayerImplAbsT
     firstorder.
   Qed.
 
+  Section ErrorStep.
+
+    Definition trivial_mem l : memT addr nat := {| MemValue := fun a => if a == Lock then l else 0; SBuf := fun _ => [] |}.
+
+    Lemma trivial_read_lock : forall tid l,
+        mem_read (trivial_mem l) Lock tid = l.
+    Proof.
+      reflexivity.
+    Qed.
+
+    Lemma trivial_empty_sb l : empty_sb (trivial_mem l).
+    Proof.
+      repeat (hnf; intros); eauto.
+    Qed.
+
+    Hint Resolve trivial_empty_sb.
+
+    Lemma only_val_empty : only_val [].
+    Proof.
+      unfold only_val; eauto.
+    Qed.
+
+    Hint Resolve only_val_empty.
+
+    Lemma try_acquire_step : forall tid,
+        exists s r s',
+          bg_step xstep invariant_step TryAcquire tid s r s' [].
+    Proof.
+      intros.
+      eexists
+        (mkLIState (trivial_mem cUnlocked) None tid),
+      true,
+      (mkLIState _ (Some tid) tid).
+      eapply bg_invariant; eauto.
+      eapply StepTryAcquireSuccess.
+      reflexivity.
+      rewrite trivial_read_lock; eauto.
+      unfold invariant; simpl; eauto.
+      unfold invariant; simpl; eauto.
+      autorewrite with fupd; intuition eauto.
+      unfold empty_sb_except, trivial_mem; simpl; intros.
+      autorewrite with fupd; auto.
+    Qed.
+
+    Hint Resolve try_acquire_step.
+
+    Lemma empty_sb_to_empty_sb_except : forall A V (m: memT A V) (a:nat),
+        empty_sb m ->
+        empty_sb_except m a.
+    Proof.
+      firstorder.
+    Qed.
+
+    Hint Resolve empty_sb_to_empty_sb_except.
+
+    Lemma step_any_op : forall T (op: Op T) tid s0 r0 s1 evs,
+        LockOwnerAPI.xstep op tid s0 r0 s1 evs ->
+        exists s r s',
+          bg_step xstep invariant_step op tid s r s' evs.
+    Proof.
+      intros.
+      invert H; eauto.
+      - eexists
+          (mkLIState (trivial_mem cLocked) (Some tid) tid),
+        tt,
+        (mkLIState _ None tid).
+        eapply bg_invariant; eauto.
+        + unfold invariant; simpl; eauto.
+        + unfold invariant; simpl; eauto.
+          right; intuition eauto.
+          unfold empty_sb_except, trivial_mem; simpl; intros.
+          autorewrite with fupd; auto.
+          unfold unlock_last; autorewrite with fupd; eauto.
+      - eexists
+          (mkLIState (trivial_mem cLocked) (Some tid) tid),
+        _,
+          (mkLIState (trivial_mem cLocked) (Some tid) tid).
+        eapply bg_invariant; eauto.
+        + constructor.
+          reflexivity.
+        + unfold invariant; simpl; eauto.
+        + unfold invariant; simpl; eauto.
+      - eexists
+          (mkLIState (trivial_mem cLocked) (Some tid) tid),
+        _,
+          (mkLIState _ (Some tid) tid).
+        eapply bg_invariant; eauto.
+        + unfold invariant; simpl; eauto.
+        + unfold invariant; simpl; intuition eauto.
+          unfold empty_sb_except, trivial_mem; simpl; intros.
+          autorewrite with fupd; auto.
+          unfold unlock_last; autorewrite with fupd; eauto.
+          unfold only_val; auto.
+      - eexists
+          (mkLIState (trivial_mem cUnlocked) None 0),
+        tt,
+        _.
+        eapply bg_invariant; eauto.
+        + unfold invariant; simpl; eauto.
+        + unfold invariant; simpl; eauto.
+    Qed.
+  End ErrorStep.
+
   Theorem absR_ok : op_abs absR LockOwnerAPI.step step.
   Proof.
     unfold LockOwnerAPI.step, step, absR.
@@ -768,8 +871,8 @@ Module AbsLockInvariant' <: LayerImplAbsT
       erewrite abstr_lock_same by eauto; eauto.
     - invert H; clear H.
       exists Error; split; eauto.
-      admit. (* TODO: show some execution exists for Error -> Error *)
-  Admitted.
+      apply step_any_op in H6; propositional; eauto.
+  Qed.
 
   Theorem absInitP :
     forall s1,
@@ -887,6 +990,21 @@ Module AbsSeqMem' <: LayerImplAbsT
     invert H; eauto.
   Qed.
 
+  Lemma step_any_op : forall T (op: Op T) tid evs,
+      evs = match op with
+            | Ext ev => [ev]
+            | _ => nil
+            end ->
+      exists s r s',
+        xstep op tid s r s' evs.
+  Proof.
+    subst; intros.
+    destruct op; propositional; eauto using xstep.
+    Grab Existential Variables.
+    all: auto.
+    constructor; auto.
+  Qed.
+
   Theorem absR_ok : op_abs absR LockInvariantAPI.step step.
   Proof.
     unfold LockInvariantAPI.step, step, absR.
@@ -910,8 +1028,11 @@ Module AbsSeqMem' <: LayerImplAbsT
       unfold abstr in *; propositional; congruence.
     - invert H; clear H.
       exists Error; split; eauto.
-      econstructor.
-      admit. (* TODO: show some execution *)
+      pose proof (@step_any_op _ op tid evs) as Hstep.
+      invert H1; specialize (Hstep eq_refl); propositional; eauto.
+
+      Grab Existential Variables.
+      all: eauto.
   Admitted.
 
   Theorem absInitP :
@@ -919,7 +1040,11 @@ Module AbsSeqMem' <: LayerImplAbsT
       LockInvariantState.initP s1 ->
       exists s2 : State, absR s1 s2 /\ initP s2.
   Proof.
-  Admitted.
+    unfold LockInvariantState.initP, absR, initP, abstr; propositional.
+    eexists (Valid _); intuition eauto.
+    constructor.
+    simpl; eauto.
+  Qed.
 
 End AbsSeqMem'.
 
@@ -1177,6 +1302,21 @@ Module LockAPI <: Layer LockOp SeqMemState.
     unfold step_allow; eauto.
   Qed.
 
+  Lemma step_any_op : forall T (op: Op T) tid evs,
+      evs = match op with
+            | Ext ev => [ev]
+            | _ => nil
+            end ->
+      exists s r s',
+        RawLockAPI.xstep op tid s r s' evs.
+  Proof.
+    subst; intros.
+    destruct op; propositional; eauto using RawLockAPI.xstep.
+    Grab Existential Variables.
+    all: auto.
+    constructor; auto.
+  Qed.
+
   Theorem step'_is_step : forall T (op: Op T) tid s r s' evs,
       step op tid s r s' evs <-> step' op tid s r s' evs.
   Proof.
@@ -1205,9 +1345,10 @@ Module LockAPI <: Layer LockOp SeqMemState.
         invertc H.
       + invertc H.
         left; (intuition cleanup); eauto.
+        pose proof (step_any_op op tid eq_refl); propositional.
         econstructor.
-        admit. (* TODO: error step is always enabled *)
-  Admitted.
+        eauto.
+  Qed.
 
 End LockAPI.
 
