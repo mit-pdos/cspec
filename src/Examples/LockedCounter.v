@@ -322,7 +322,7 @@ Module LockOwnerAPI <: Layer TASOp LockOwnerState.
   Import LockOwnerState.
 
   Inductive xstep : OpSemantics Op s :=
-  | StepTryAcquireSuccess : forall tid s s' l,
+  | StepTryAcquireSuccess : forall tid s l s',
       mem_bg s s' ->
       mem_read s' Lock tid <> cLocked ->
       xstep TryAcquire tid
@@ -487,11 +487,11 @@ Module LockInvariantAPI <: Layer TASOp LockInvariantState.
     end.
 
   Inductive xstep : OpSemantics Op s :=
-  | StepTryAcquireSuccess : forall tid s s' l pl,
+  | StepTryAcquireSuccess : forall tid s s' pl,
       mem_bg s s' ->
       mem_read s' Lock tid <> cLocked ->
       xstep TryAcquire tid
-            (mkLIState s l pl)
+            (mkLIState s None pl)
             true
             (mkLIState (mem_flush (mem_write Lock cLocked s' tid) tid) (Some tid) tid) nil
   | StepTryAcquireFail : forall tid s s' l pl,
@@ -820,6 +820,15 @@ Module AbsLockInvariant' <: LayerImplAbsT
     Qed.
   End ErrorStep.
 
+  Lemma observe_unlock_mem_read :
+    forall (tid PrevOwner0 : nat) (s1 : memT addr nat) (l : option nat),
+      invariant {| InvValue := s1; InvLock := l; PrevOwner := PrevOwner0 |} ->
+      forall s'0 : memT addr nat,
+        mem_bg s1 s'0 -> mem_read s'0 Lock tid <> cLocked -> l = None.
+  Proof.
+    intros.
+  Admitted.
+
   Theorem absR_ok : op_abs absR LockOwnerAPI.step step.
   Proof.
     unfold LockOwnerAPI.step, step, absR.
@@ -837,6 +846,9 @@ Module AbsLockInvariant' <: LayerImplAbsT
           eapply invariant_write_lock; eauto.
           constructor.
           apply bg_invariant; eauto.
+          assert (l = None); subst.
+          eauto using observe_unlock_mem_read.
+          constructor; eauto.
           eapply invariant_mem_bg in H1; eauto.
           eapply invariant_write_lock; eauto.
         * eexists; split; [ eapply abstr_intro with (pl:=PrevOwner0) | ].
@@ -918,8 +930,8 @@ Module SeqMemAPI <: Layer TASOp SeqMemState.
   Import SeqMemState.
 
   Inductive xstep : OpSemantics Op s :=
-  | StepTryAcquireSuccess : forall tid v l,
-      xstep TryAcquire tid (mkSMState v l) true (mkSMState v (Some tid)) nil
+  | StepTryAcquireSuccess : forall tid v,
+      xstep TryAcquire tid (mkSMState v None) true (mkSMState v (Some tid)) nil
   | StepTryAcquireFail : forall tid v l,
       xstep TryAcquire tid (mkSMState v l) false (mkSMState v l) nil
   | StepClear : forall tid v,
@@ -1005,6 +1017,66 @@ Module AbsSeqMem' <: LayerImplAbsT
     constructor; auto.
   Qed.
 
+  Lemma abstr_write_lock:
+    forall tid l pl s s',
+      abstr {| InvValue := s; InvLock := l; PrevOwner := pl |}
+            {| Value := s'.(Value); LockOwner := s'.(LockOwner) |} ->
+      abstr {| InvValue := mem_flush (mem_write Lock cLocked s tid) tid;
+               InvLock := Some tid;
+               PrevOwner := tid |}
+            {| Value := s'.(Value);
+               LockOwner := Some tid |}.
+  Proof.
+    unfold abstr; simpl; propositional.
+    intuition eauto.
+    admit. (* mem_read (mem_flush ...) at same tid, and also mem_read (mem_write ...) of other address *)
+  Admitted.
+
+  Lemma abstr_flush:
+    forall (tid : nat) (s' : s) (l : option nat) (pl : nat) (s0 : memT addr nat),
+      invariant {| InvValue := s0; InvLock := l; PrevOwner := pl |} ->
+      abstr {| InvValue := s0; InvLock := l; PrevOwner := pl |}
+            {| Value := s'.(Value); LockOwner := s'.(LockOwner) |} ->
+      abstr {| InvValue := mem_flush s0 tid; InvLock := l; PrevOwner := pl |}
+            {| Value := s'.(Value); LockOwner := l |}.
+  Proof.
+    unfold invariant, abstr; simpl; propositional.
+    intuition eauto.
+    destruct (pl == tid); subst.
+    admit. (* reads are unaffected by flushing the local store buffer, [mem_read
+    (mem_flush ...] for same tid) *)
+    destruct s'.(LockOwner); (intuition eauto); propositional.
+    admit. (* mem_flush of an empty store buffer (empty_sb_except) *)
+    admit. (* mem_flush of all empty store buffer (empty_sb) *)
+    admit. (* mem_flush of an empty store buffer (empty_sb_except) *)
+  Admitted.
+
+  Lemma abstr_clear:
+    forall (tid : nat) (s3 : s) (v : memT addr nat) (pl : nat),
+      abstr {| InvValue := v; InvLock := Some tid; PrevOwner := pl |} s3 ->
+      abstr
+        {| InvValue := mem_write Lock cUnlocked v tid; InvLock := None; PrevOwner := pl |}
+        {| Value := s3.(Value); LockOwner := None |}.
+  Proof.
+    destruct s3.
+    unfold invariant, abstr; simpl; propositional.
+    intuition eauto.
+    admit. (* mem_read (mem_write ...) for unrelated address *)
+  Admitted.
+
+  Lemma abstr_write:
+    forall (tid : nat) (s3 : s) (s1 : memT addr nat) (v' : nat),
+      invariant {| InvValue := s1; InvLock := Some tid; PrevOwner := tid |} ->
+      abstr {| InvValue := s1; InvLock := Some tid; PrevOwner := tid |} s3 ->
+      abstr
+        {| InvValue := mem_write Val v' s1 tid; InvLock := Some tid; PrevOwner := tid |}
+        {| Value := v'; LockOwner := Some tid |}.
+  Proof.
+    unfold invariant, abstr; simpl; propositional.
+    intuition eauto.
+    admit. (* mem_read (mem_write ...) for same address *)
+  Admitted.
+
   Theorem absR_ok : op_abs absR LockInvariantAPI.step step.
   Proof.
     unfold LockInvariantAPI.step, step, absR.
@@ -1017,11 +1089,69 @@ Module AbsSeqMem' <: LayerImplAbsT
     - invert H; clear H; eauto.
       destruct (decide_violation op tid s0.(InvLock)).
       + exfalso; eauto using no_step_on_violation.
-      + eexists (Valid _); intuition eauto.
-        constructor.
-        * admit.
-        * econstructor; eauto.
-          admit.
+      + invert H1.
+        * (* TryAcquire, success *)
+          exists (Valid (mkSMState s3.(Value) (Some tid)));
+            intuition eauto.
+          constructor.
+          eapply mem_bg_preserves_abstr in H4; eauto.
+          eapply abstr_write_lock; eauto.
+          constructor.
+          destruct s3.
+          unfold abstr in H4; simpl in *; propositional.
+          constructor.
+        * (* TryAcquire, failure *)
+          exists (Valid (mkSMState s3.(Value) l));
+            intuition eauto.
+          constructor.
+          eapply mem_bg_preserves_abstr in H4; eauto.
+          eapply AbsLockInvariant'.invariant_mem_bg in H0; eauto.
+          eapply abstr_flush; eauto.
+          constructor.
+          destruct s3; simpl.
+          unfold abstr in H4; simpl in *; propositional.
+          constructor.
+        * (* Clear *)
+          exists (Valid (mkSMState s3.(Value) None));
+            intuition eauto.
+          constructor.
+          eapply abstr_clear; eauto.
+          constructor.
+          destruct s3.
+          unfold abstr in H4; simpl in *; propositional.
+          constructor.
+        * (* Read *)
+          simpl in *.
+          eapply mem_bg_preserves_abstr in H4; eauto.
+          exists (Valid (mkSMState s3.(Value) (Some tid)));
+            intuition eauto.
+          constructor.
+          replace s3.(LockOwner) with (Some tid) in H4; eauto.
+          unfold abstr in H4; simpl in *; propositional; eauto.
+          constructor.
+          destruct s3.
+          unfold abstr in H4; simpl in *; propositional.
+          unfold invariant in H2; simpl in *; propositional.
+          constructor.
+        * (* Write *)
+          simpl in *.
+          destruct s3.
+          assert (pl = tid).
+          { unfold invariant in H0; simpl in *; propositional; auto. }
+          assert (LockOwner0 = Some tid).
+          { unfold abstr in H4; simpl in *; propositional. }
+          subst.
+          exists (Valid (mkSMState v' (Some tid)));
+            intuition eauto.
+          constructor.
+          eapply abstr_write; eauto.
+          constructor.
+          constructor.
+        * (* Ext *)
+          exists (Valid s3); intuition eauto.
+          constructor.
+          constructor.
+
     - invert H; clear H.
       exists Error; intuition eauto.
       econstructor; eauto.
@@ -1033,7 +1163,7 @@ Module AbsSeqMem' <: LayerImplAbsT
 
       Grab Existential Variables.
       all: eauto.
-  Admitted.
+  Qed.
 
   Theorem absInitP :
     forall s1,
@@ -1167,11 +1297,10 @@ Module LockImpl' <:
             end;
         destruct matches;
         eauto.
-      admit. (* propagate TryAcquire None *)
 
     Grab Existential Variables.
     all: auto.
-  Admitted.
+  Qed.
 
 End LockImpl'.
 
