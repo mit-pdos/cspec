@@ -464,6 +464,13 @@ Definition empty_sb_except A T (m: memT A T) tid :=
 Definition only_val (sbuf: list (TSOOp.addr * nat)) :=
   List.Forall (fun '(a, _) => a = TSOOp.Val) sbuf.
 
+Lemma only_val_empty : only_val [].
+Proof.
+  unfold only_val; eauto.
+Qed.
+
+Hint Resolve only_val_empty.
+
 Definition unlock_last (sbuf: list (TSOOp.addr * nat)) :=
   exists l, sbuf = (TSOOp.Lock, TSOOp.cUnlocked) :: l /\
        only_val l.
@@ -655,13 +662,96 @@ Module AbsLockInvariant' <: LayerImplAbsT
     destruct (a == tid); subst; eauto.
   Qed.
 
+  Lemma empty_sb_except_mem_bgflush : forall A {Aeq:EqualDec A} V (m: memT A V) tid tid',
+      empty_sb_except m tid ->
+      empty_sb_except (mem_bgflush m tid') tid.
+  Proof.
+    unfold empty_sb_except; intros.
+    destruct (tid == tid'); subst.
+    - unfold mem_bgflush.
+      destruct matches; subst; simpl;
+        autorewrite with fupd;
+        auto.
+    - rewrite mem_bgflush_empty_sbuf by auto; eauto.
+  Qed.
+
+  Lemma empty_sb_except_mem_flush : forall A {Aeq:EqualDec A} V (m: memT A V) tid tid',
+      empty_sb_except m tid ->
+      empty_sb_except (mem_flush m tid') tid.
+  Proof.
+    unfold empty_sb_except; intros.
+    unfold mem_flush; simpl.
+    destruct (tid' == tid'0); subst; autorewrite with fupd; auto.
+  Qed.
+
+  Lemma empty_sb_except_write : forall A {Aeq:EqualDec A} V (m: memT A V) tid a v,
+      empty_sb_except m tid ->
+      empty_sb_except (mem_write a v m tid) tid.
+  Proof.
+    unfold empty_sb_except; intros.
+    unfold mem_write; simpl; autorewrite with fupd; eauto.
+  Qed.
+
+  Lemma empty_sb_except_mem_flush_write : forall A {Aeq:EqualDec A} V (m: memT A V) tid a v tid',
+      empty_sb_except m tid ->
+      empty_sb_except (mem_flush (mem_write a v m tid') tid') tid.
+  Proof.
+    unfold empty_sb_except; simpl; intros.
+    destruct (tid' == tid'0); subst; autorewrite with fupd; eauto.
+  Qed.
+
+  Hint Resolve
+       empty_sb_except_mem_bgflush
+       empty_sb_except_mem_flush
+       empty_sb_except_write
+       empty_sb_except_mem_flush_write.
+
+  Lemma Forall_app : forall A (P: A -> Prop) (l1 l2: list A),
+      Forall P (l1 ++ l2) ->
+      Forall P l1 /\ Forall P l2.
+  Proof.
+    induction l1; simpl; intros; auto.
+    invert H.
+    epose_proof IHl1; eauto; propositional.
+    eauto.
+  Qed.
+
+  Lemma Forall_removelast : forall A (l: list A) (P: A -> Prop),
+      Forall P l ->
+      Forall P (removelast l).
+  Proof.
+    induction l using rev_ind; intros; eauto.
+    apply Forall_app in H; propositional.
+    rewrite removelast_app_one; auto.
+  Qed.
+
+  Hint Resolve Forall_removelast.
+
+  Lemma only_val_mem_bgflush:
+    forall (m : memT addr nat) (tid tid' : nat),
+      only_val (m.(SBuf) tid) ->
+      only_val ((mem_bgflush m tid').(SBuf) tid).
+  Proof.
+    unfold only_val; intros.
+    unfold mem_bgflush; simpl.
+    destruct (tid == tid');
+      destruct matches; subst; simpl; autorewrite with fupd; eauto.
+  Qed.
+
+  Hint Resolve only_val_mem_bgflush.
+  Hint Rewrite mem_flush_empty_sbuf using solve [ auto ] : tso.
+  Hint Rewrite mem_bgflush_empty_sbuf using solve [ auto ] : tso.
+
   Theorem invariant_mem_bgflush : forall s s' l pl tid,
       invariant (mkLIState s l pl) ->
       s' = mem_bgflush s tid ->
       invariant (mkLIState s' l pl).
   Proof.
     unfold invariant; simpl; propositional; intuition eauto.
-    destruct l; intuition eauto.
+    destruct l; (intuition eauto); propositional;
+      autorewrite with tso;
+      eauto.
+    (* TODO: depends on whether or not this flush is the last one *)
   Admitted.
 
   Theorem invariant_mem_bg : forall s s' l pl,
@@ -688,6 +778,8 @@ Module AbsLockInvariant' <: LayerImplAbsT
     eapply invariant_mem_bgflush; eauto.
   Qed.
 
+  Hint Resolve addr_equal_dec.
+
   Theorem invariant_write_lock : forall s tid l pl,
       invariant (mkLIState s l pl) ->
       mem_read s Lock tid <> cLocked ->
@@ -697,7 +789,8 @@ Module AbsLockInvariant' <: LayerImplAbsT
                    tid).
   Proof.
     unfold invariant; simpl; propositional.
-    autorewrite with fupd.
+    destruct l; propositional; autorewrite with fupd; intuition eauto.
+    (* TODO: doesn't appear true... *)
   Admitted.
 
   Lemma invariant_write_unlock : forall s tid pl,
@@ -749,11 +842,6 @@ Module AbsLockInvariant' <: LayerImplAbsT
     Qed.
 
     Hint Resolve trivial_empty_sb.
-
-    Lemma only_val_empty : only_val [].
-    Proof.
-      unfold only_val; eauto.
-    Qed.
 
     Hint Resolve only_val_empty.
 
