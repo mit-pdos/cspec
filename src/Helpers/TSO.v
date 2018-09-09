@@ -85,7 +85,13 @@ Section TSOModel.
       mem_write a v (mem_bgflush m tid) tid' =
       mem_bgflush (mem_write a v m tid') tid.
   Proof.
-  Admitted.
+    intros.
+    unfold mem_bgflush, mem_write; simpl.
+    autorewrite with fupd.
+    destruct_with_eqn (last_error (m.(SBuf) tid)); auto.
+    destruct p; simpl; autorewrite with fupd.
+    rewrite fupd_fupd_ne by auto; auto.
+  Qed.
 
   Theorem mem_write_flush_same : forall (m:memT) tid a v,
       mem_read m a tid = v ->
@@ -219,6 +225,14 @@ Section TSOModel.
       rewrite sbuf_flush_last; auto.
   Qed.
 
+  Theorem mem_bgflush_after_flush : forall m tid,
+      mem_bgflush (mem_flush m tid) tid = mem_flush m tid.
+  Proof.
+    intros.
+    unfold mem_flush, mem_bgflush; simpl.
+    autorewrite with fupd; simpl; auto.
+  Qed.
+
   Theorem mem_flush_is_mem_bg : forall m tid,
       mem_bg m (mem_flush m tid).
   Proof.
@@ -295,18 +309,6 @@ Section TSOModel.
       exists tid0.
       apply mem_bgflush_write_commute_ne; auto.
   Qed.
-
-  Theorem mem_bg_flush : forall (s s': memT) tid,
-      mem_bg s s' ->
-      mem_bg (mem_flush s tid) (mem_flush s' tid).
-  Proof.
-    intros.
-    induct H.
-    constructor.
-    destruct (tid == tid0); propositional.
-    rewrite mem_flush_after_bgflush; eauto.
-    (* TODO: need a mem_flush_bgflush_ne which commutes *)
-  Admitted.
 
   Lemma sbuf_flush_read_comm:
     forall f a (l : list (A * T)),

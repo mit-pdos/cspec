@@ -742,6 +742,28 @@ Module AbsLockInvariant' <: LayerImplAbsT
   Hint Rewrite mem_flush_empty_sbuf using solve [ auto ] : tso.
   Hint Rewrite mem_bgflush_empty_sbuf using solve [ auto ] : tso.
 
+  Lemma mem_bgflush_last : forall A {Aeq:EqualDec A} V (m: memT A V) tid (a:A) l v,
+      m.(SBuf) tid = l ++ [(a,v)] ->
+      (mem_bgflush m tid).(MemValue) a = v.
+  Proof.
+    unfold mem_bgflush; simpl; intros.
+    rewrite H.
+    rewrite last_error_append; simpl; autorewrite with fupd; auto.
+  Qed.
+
+  Lemma empty_sb_bgflush_last : forall A {Aeq:EqualDec A} V (m:memT A V) tid w,
+      m.(SBuf) tid = [w] ->
+      empty_sb_except m tid ->
+      empty_sb (mem_bgflush m tid).
+  Proof.
+    destruct w; intros.
+    eapply empty_sb_except_to_all; eauto.
+    unfold mem_bgflush.
+    rewrite H; simpl; autorewrite with fupd; auto.
+  Qed.
+
+  Hint Resolve empty_sb_bgflush_last.
+
   Theorem invariant_mem_bgflush : forall s s' l pl tid,
       invariant (mkLIState s l pl) ->
       s' = mem_bgflush s tid ->
@@ -751,7 +773,15 @@ Module AbsLockInvariant' <: LayerImplAbsT
     destruct l; (intuition eauto); propositional;
       autorewrite with tso;
       eauto.
-    (* TODO: depends on whether or not this flush is the last one *)
+    destruct (tid == pl); subst.
+    - unfold unlock_last in H2; propositional.
+      destruct (list_last_dec l); propositional.
+      + left.
+        erewrite mem_bgflush_last with (l:=nil); simpl; eauto.
+      + right.
+        unfold only_val in H2; apply Forall_app in H2; propositional.
+        destruct a.
+        invert H3.
   Admitted.
 
   Theorem invariant_mem_bg : forall s s' l pl,
