@@ -468,6 +468,8 @@ Proof.
   firstorder.
 Qed.
 
+Hint Resolve empty_sb_to_empty_sb_except.
+
 Definition only_val (sbuf: list (TSOOp.addr * nat)) :=
   List.Forall (fun '(a, _) => a = TSOOp.Val) sbuf.
 
@@ -515,7 +517,6 @@ Module LockInvariantAPI <: Layer TASOp LockInvariantState.
     unfold invariant; simpl; intros.
     destruct l; propositional.
     intuition eauto.
-    eapply empty_sb_to_empty_sb_except; eauto.
   Qed.
 
   Inductive xstep : OpSemantics Op s :=
@@ -935,6 +936,35 @@ Module AbsLockInvariant' <: LayerImplAbsT
 
   Hint Resolve addr_equal_dec.
 
+  Lemma mem_read_empty_sbuf : forall A {Aeq:EqualDec A} V (m: memT A V) a tid,
+      m.(SBuf) tid = [] ->
+      mem_read m a tid = m.(MemValue) a.
+  Proof.
+    unfold mem_read; intros.
+    rewrite H; simpl; auto.
+  Qed.
+
+  Hint Rewrite mem_read_empty_sbuf using solve [ auto ] : tso.
+
+  Lemma mem_read_only_val:
+    forall (m : memT addr nat) (tid' tid : nat),
+      empty_sb_except m tid ->
+      only_val (m.(SBuf) tid) ->
+      mem_read m Lock tid' = m.(MemValue) Lock.
+  Proof.
+    unfold empty_sb_except; intros.
+    destruct (tid == tid'); subst; autorewrite with tso; auto.
+    clear H.
+    unfold mem_read; simpl.
+    unfold only_val in *.
+    generalize dependent (m.(SBuf) tid'); intros.
+    induction l; simpl; auto.
+    invert H0; clear H0.
+    destruct a; subst.
+    destruct (Lock == Val); subst; eauto.
+    exfalso; eauto.
+  Qed.
+
   Theorem invariant_write_lock : forall s tid l pl,
       invariant (mkLIState s l pl) ->
       mem_read s Lock tid <> cLocked ->
@@ -945,22 +975,29 @@ Module AbsLockInvariant' <: LayerImplAbsT
   Proof.
     unfold invariant; simpl; propositional.
     destruct l; propositional; autorewrite with fupd; intuition eauto.
-    (* TODO: doesn't appear true... *)
-  Admitted.
+    - erewrite mem_read_only_val in H0 by eauto; contradiction.
+    - destruct (tid == pl); subst; eauto.
+      autorewrite with tso in *; contradiction.
+  Qed.
 
   Lemma invariant_write_unlock : forall s tid pl,
       invariant (mkLIState s (Some tid) pl) ->
       invariant (mkLIState (mem_write Lock cUnlocked s tid) None pl).
   Proof.
-    unfold invariant; simpl; propositional.
-  Admitted.
+    unfold invariant; simpl; propositional; autorewrite with fupd.
+    right; intuition eauto.
+    unfold unlock_last.
+    eexists; eauto.
+  Qed.
 
   Lemma invariant_write_val : forall s v tid pl,
       invariant (mkLIState s (Some tid) pl) ->
       invariant (mkLIState (mem_write Val v s tid) (Some tid) pl).
   Proof.
-    unfold invariant; simpl; propositional.
-  Admitted.
+    unfold invariant; simpl; propositional; autorewrite with fupd.
+    intuition eauto.
+    constructor; eauto.
+  Qed.
 
   Lemma no_step_on_violation:
     forall (T : Type) (op : Op T) (tid : nat) (r : T) (evs : list event)
@@ -1016,8 +1053,6 @@ Module AbsLockInvariant' <: LayerImplAbsT
       unfold invariant; simpl; eauto.
       unfold invariant; simpl; eauto.
       autorewrite with fupd; intuition eauto.
-      unfold empty_sb_except, trivial_mem; simpl; intros.
-      autorewrite with fupd; auto.
     Qed.
 
     Hint Resolve try_acquire_step.
@@ -1073,13 +1108,21 @@ Module AbsLockInvariant' <: LayerImplAbsT
   End ErrorStep.
 
   Lemma observe_unlock_mem_read :
-    forall (tid PrevOwner0 : nat) (s1 : memT addr nat) (l : option nat),
-      invariant {| InvValue := s1; InvLock := l; PrevOwner := PrevOwner0 |} ->
-      forall s'0 : memT addr nat,
-        mem_bg s1 s'0 -> mem_read s'0 Lock tid <> cLocked -> l = None.
+    forall tid pl (s : memT addr nat) (l : option nat),
+      invariant {| InvValue := s; InvLock := l; PrevOwner := pl |} ->
+      forall s' : memT addr nat,
+        mem_bg s s' ->
+        mem_read s' Lock tid <> cLocked ->
+        l = None.
   Proof.
     intros.
-  Admitted.
+    eapply invariant_mem_bg in H; eauto.
+    unfold invariant in *; simpl in *; propositional.
+    destruct l; propositional; auto.
+    exfalso.
+    destruct (n == tid); subst; autorewrite with tso in *; eauto.
+    erewrite mem_read_only_val in H1 by eauto; congruence.
+  Qed.
 
   Ltac fwd :=
     repeat match goal with
@@ -1305,8 +1348,10 @@ Module AbsSeqMem' <: LayerImplAbsT
   Qed.
 
   Lemma abstr_write_lock:
-    forall tid l pl s s',
-      abstr {| InvValue := s; InvLock := l; PrevOwner := pl |}
+    forall tid pl s s',
+      invariant {| InvValue := s; InvLock := None; PrevOwner := pl |} ->
+      mem_read s Lock tid <> cLocked ->
+      abstr {| InvValue := s; InvLock := None; PrevOwner := pl |}
             {| Value := s'.(Value); LockOwner := s'.(LockOwner) |} ->
       abstr {| InvValue := mem_flush (mem_write Lock cLocked s tid) tid;
                InvLock := Some tid;
@@ -1317,8 +1362,10 @@ Module AbsSeqMem' <: LayerImplAbsT
     unfold abstr; simpl; propositional.
     intuition eauto.
     autorewrite with tso.
-    (* TODO: oops, need to know didn't flush any new values using invariant *)
-  Abort.
+    unfold invariant in H; simpl in *.
+    destruct (pl == tid); subst; eauto.
+    (intuition idtac); autorewrite with tso in *; congruence.
+  Qed.
 
   Lemma abstr_flush:
     forall (tid : nat) (s' : s) (l : option nat) (pl : nat) (s0 : memT addr nat),
@@ -1331,7 +1378,7 @@ Module AbsSeqMem' <: LayerImplAbsT
     unfold invariant, abstr; simpl; propositional.
     intuition eauto.
     destruct (pl == tid); subst; autorewrite with tso; eauto.
-    destruct s'.(LockOwner); (intuition eauto); propositional; autorewrite with tso; eauto.
+    destruct s'.(LockOwner); (intuition eauto); propositional; autorewrite with tso in *; eauto.
   Qed.
 
   Lemma abstr_clear:
@@ -1374,7 +1421,8 @@ Module AbsSeqMem' <: LayerImplAbsT
             intuition eauto.
           constructor.
           eapply mem_bg_preserves_abstr in H4; eauto.
-          (* eapply abstr_write_lock; eauto. *) admit.
+          eapply AbsLockInvariant'.invariant_mem_bg in H0; eauto.
+          eapply abstr_write_lock; eauto.
           constructor.
           destruct s3.
           unfold abstr in H4; simpl in *; propositional.
@@ -1445,7 +1493,7 @@ Module AbsSeqMem' <: LayerImplAbsT
 
       Grab Existential Variables.
       all: eauto.
-  Admitted.
+  Qed.
 
   Theorem absInitP :
     forall s1,
