@@ -203,7 +203,7 @@ Module TAS_TSOAPI <: Layer TASOp TSOState.
 
 End TAS_TSOAPI.
 
-Module TAS_TSOImpl <: LayerImplMoversT
+Module TAS_TSOImpl' <: LayerImplMoversT
                         TSOState
                         TSOOp TSODelayNondetAPI
                         TASOp TAS_TSOAPI.
@@ -258,7 +258,13 @@ Module TAS_TSOImpl <: LayerImplMoversT
     constructor; eauto.
   Qed.
 
-End TAS_TSOImpl.
+End TAS_TSOImpl'.
+
+Module TAS_TSOImpl := LayerImplMovers
+                        TSOState
+                        TSOOp TSODelayNondetAPI
+                        TASOp TAS_TSOAPI
+                        TAS_TSOImpl'.
 
 Inductive OrError State :=
 | Valid (s:State)
@@ -2287,34 +2293,69 @@ Module AbsCounter :=
   CounterAPI ---------------------+----+
  *)
 
+
 Module c1 :=
   Link
-    TASOp  TASState  TASAPI
-    TASOp  LockState TASLockAPI
-    LockOp LockState RawLockAPI
-    c0 LockImpl.
+    TSOOp TSOState TSOAPI
+    TSOOp TSOState TSODelayNondetAPI
+    TASOp TSOState TAS_TSOAPI
+    AbsNondet TAS_TSOImpl.
+
 Module c2 :=
+  Link
+    TSOOp TSOState TSOAPI
+    TASOp TSOState TAS_TSOAPI
+    TASOp LockOwnerState LockOwnerAPI
+    c1 AbsLockOwner.
+
+Module c3 :=
+  Link
+    TSOOp TSOState TSOAPI
+    TASOp LockOwnerState LockOwnerAPI
+    TASOp LockInvariantState LockInvariantAPI
+    c2 AbsLockInvariant.
+
+Module c4 :=
+  Link
+    TSOOp TSOState TSOAPI
+    TASOp LockInvariantState LockInvariantAPI
+    TASOp SeqMemState SeqMemAPI
+    c3 AbsSeqMem.
+
+Module c5 :=
+  Link
+    TSOOp TSOState TSOAPI
+    TASOp SeqMemState SeqMemAPI
+    LockOp SeqMemState RawLockAPI
+    c4 LockImpl.
+
+Module LockingCounter <: LayerImpl
+                           LockOp SeqMemState RawLockAPI
+                           CounterOp SeqMemState LockedCounterAPI :=
   LayerImplMoversProtocol
-    LockState
+    SeqMemState
     LockOp    RawLockAPI LockAPI
     CounterOp LockedCounterAPI
     LockProtocol
     LockingCounter'.
-Module c3 :=
+
+Module c6 :=
   Link
-    LockOp    LockState    RawLockAPI
-    CounterOp LockState    LockedCounterAPI
-    CounterOp CounterState CounterAPI
-    c2 AbsCounter.
-Module c :=
+    TSOOp TSOState TSOAPI
+    LockOp SeqMemState RawLockAPI
+    CounterOp SeqMemState LockedCounterAPI
+    c5 LockingCounter.
+
+Module c <: LayerImpl
+               TSOOp TSOState TSOAPI
+               CounterOp CounterState CounterAPI :=
   Link
-    TASOp     TASState     TASAPI
-    LockOp    LockState    RawLockAPI
+    TSOOp TSOState TSOAPI
+    CounterOp SeqMemState LockedCounterAPI
     CounterOp CounterState CounterAPI
-    c1 c3.
+    c6 AbsCounter.
 
 Print Assumptions c.compile_traces_match.
-
 
 Import CounterOp.
 
