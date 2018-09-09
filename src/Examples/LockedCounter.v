@@ -461,6 +461,13 @@ Definition empty_sb_except A T (m: memT A T) tid :=
   forall tid', tid <> tid' ->
           m.(SBuf) tid' = [].
 
+Lemma empty_sb_to_empty_sb_except : forall A V (m: memT A V) (a:nat),
+    empty_sb m ->
+    empty_sb_except m a.
+Proof.
+  firstorder.
+Qed.
+
 Definition only_val (sbuf: list (TSOOp.addr * nat)) :=
   List.Forall (fun '(a, _) => a = TSOOp.Val) sbuf.
 
@@ -485,13 +492,31 @@ Module LockInvariantAPI <: Layer TASOp LockInvariantState.
     match s.(InvLock) with
     | Some tid => empty_sb_except s.(InvValue) tid /\
                  s.(PrevOwner) = tid /\
-                 only_val (s.(InvValue).(SBuf) tid)
+                 only_val (s.(InvValue).(SBuf) tid) /\
+                 s.(InvValue).(MemValue) Lock = cLocked
     | None => (s.(InvValue).(MemValue) Lock <> cLocked /\
               empty_sb s.(InvValue)) \/
              (s.(InvValue).(MemValue) Lock = cLocked /\
               empty_sb_except s.(InvValue) s.(PrevOwner) /\
               unlock_last (s.(InvValue).(SBuf) s.(PrevOwner)))
     end.
+
+  Lemma invariant_owned_pl : forall s tid pl,
+      invariant (mkLIState s (Some tid) pl) ->
+      pl = tid.
+  Proof.
+    unfold invariant; simpl; propositional.
+  Qed.
+
+  Lemma invariant_empty_sb : forall s l pl,
+      invariant (mkLIState s l pl) ->
+      empty_sb_except s pl.
+  Proof.
+    unfold invariant; simpl; intros.
+    destruct l; propositional.
+    intuition eauto.
+    eapply empty_sb_to_empty_sb_except; eauto.
+  Qed.
 
   Inductive xstep : OpSemantics Op s :=
   | StepTryAcquireSuccess : forall tid s s' pl,
@@ -725,14 +750,21 @@ Module AbsLockInvariant' <: LayerImplAbsT
     rewrite removelast_app_one; auto.
   Qed.
 
-  Hint Resolve Forall_removelast.
+  Lemma only_val_removelast : forall l,
+      only_val l ->
+      only_val (removelast l).
+  Proof.
+    unfold only_val; eauto using Forall_removelast.
+  Qed.
+
+  Hint Resolve only_val_removelast.
 
   Lemma only_val_mem_bgflush:
     forall (m : memT addr nat) (tid tid' : nat),
       only_val (m.(SBuf) tid) ->
       only_val ((mem_bgflush m tid').(SBuf) tid).
   Proof.
-    unfold only_val; intros.
+    intros.
     unfold mem_bgflush; simpl.
     destruct (tid == tid');
       destruct matches; subst; simpl; autorewrite with fupd; eauto.
@@ -764,6 +796,97 @@ Module AbsLockInvariant' <: LayerImplAbsT
 
   Hint Resolve empty_sb_bgflush_last.
 
+  Theorem val_not_lock : Val <> Lock.
+  Proof.
+    compute; congruence.
+  Qed.
+
+  Hint Resolve val_not_lock.
+
+  Lemma flush_only_val_lock : forall m tid,
+      only_val (m.(SBuf) tid) ->
+      (mem_bgflush m tid).(MemValue) Lock = m.(MemValue) Lock.
+  Proof.
+    unfold only_val, mem_bgflush; intros.
+    generalize dependent (m.(SBuf) tid); intros.
+    destruct (list_last_dec l); propositional; simpl; auto.
+    destruct a.
+    apply Forall_app in H; propositional.
+    invert H0; clear H0.
+    rewrite last_error_append; simpl; autorewrite with fupd; auto.
+  Qed.
+
+  Hint Rewrite flush_only_val_lock using solve [ auto ] : tso.
+
+  Lemma flush_val_lock : forall V (m: memT addr V) tid l v,
+      m.(SBuf) tid = l ++ [(Val, v)] ->
+      (mem_bgflush m tid).(MemValue) Lock = m.(MemValue) Lock.
+  Proof.
+    unfold mem_bgflush; intros.
+    rewrite H.
+    rewrite last_error_append; simpl; autorewrite with fupd; auto.
+  Qed.
+
+  Lemma last_error_cons : forall A (a:A) l,
+      last_error (a :: l) <> None.
+  Proof.
+    induction l; simpl in *; try congruence.
+    destruct l; try congruence.
+  Qed.
+
+  Lemma last_error_cons2 : forall A (l: list A) x y,
+      last_error (x :: y :: l) = last_error (y :: l).
+  Proof.
+    simpl; auto.
+  Qed.
+
+  Lemma last_error_Forall : forall A a (l: list A) P,
+      Forall P (a :: l) ->
+      exists y, last_error (a :: l) = Some y /\
+           P y.
+  Proof.
+    intros.
+    simpl.
+    induction l using rev_ind.
+    - invert H; eauto.
+    - rewrite app_comm_cons in H.
+      apply Forall_app in H; propositional.
+      invert H0; clear H0.
+      rewrite last_error_append.
+      destruct l; simpl; eauto.
+  Qed.
+
+  Definition unlock_last_bgflush : forall m tid,
+      unlock_last (m.(SBuf) tid) ->
+      { (mem_bgflush m tid).(MemValue) Lock = cUnlocked /\
+        (mem_bgflush m tid).(SBuf) tid = []} +
+      {(mem_bgflush m tid).(MemValue) Lock = m.(MemValue) Lock /\
+       unlock_last ((mem_bgflush m tid).(SBuf) tid) }.
+  Proof.
+    unfold mem_bgflush; simpl; propositional.
+    generalize dependent (m.(SBuf) tid); intros.
+    destruct l.
+    - exfalso.
+      unfold unlock_last in H; propositional; congruence.
+    - destruct l;
+        [ left | right ];
+        unfold unlock_last in *; propositional.
+      + invert H; clear H; simpl; autorewrite with fupd; auto.
+      + destruct p0.
+        invert H; clear H; autorewrite with fupd; auto.
+        invert H0.
+        split.
+        * rewrite last_error_cons2.
+          pose proof (last_error_Forall H0); propositional.
+          rewrite H.
+          destruct y; subst; simpl; autorewrite with fupd; auto.
+        * exists (removelast ((Val,n) :: l)); (intuition auto).
+          destruct matches; simpl; autorewrite with fupd; auto.
+          apply last_error_cons in Heqo; propositional.
+  Qed.
+
+  Hint Resolve addr_equal_dec.
+
   Theorem invariant_mem_bgflush : forall s s' l pl tid,
       invariant (mkLIState s l pl) ->
       s' = mem_bgflush s tid ->
@@ -773,16 +896,18 @@ Module AbsLockInvariant' <: LayerImplAbsT
     destruct l; (intuition eauto); propositional;
       autorewrite with tso;
       eauto.
+    destruct (n == tid); subst; autorewrite with tso; auto.
+
     destruct (tid == pl); subst.
-    - unfold unlock_last in H2; propositional.
-      destruct (list_last_dec l); propositional.
-      + left.
-        erewrite mem_bgflush_last with (l:=nil); simpl; eauto.
-      + right.
-        unfold only_val in H2; apply Forall_app in H2; propositional.
-        destruct a.
-        invert H3.
-  Admitted.
+    - destruct (unlock_last_bgflush s0 pl ltac:(eassumption)); propositional;
+        [ left | right ].
+      + intuition eauto.
+        cut (cUnlocked = cLocked); try congruence; eauto.
+        eapply empty_sb_except_to_all; eauto.
+      + intuition eauto.
+        congruence.
+    - autorewrite with tso; eauto.
+  Qed.
 
   Theorem invariant_mem_bg : forall s s' l pl,
       invariant (mkLIState s l pl) ->
@@ -897,13 +1022,6 @@ Module AbsLockInvariant' <: LayerImplAbsT
 
     Hint Resolve try_acquire_step.
 
-    Lemma empty_sb_to_empty_sb_except : forall A V (m: memT A V) (a:nat),
-        empty_sb m ->
-        empty_sb_except m a.
-    Proof.
-      firstorder.
-    Qed.
-
     Hint Resolve empty_sb_to_empty_sb_except.
 
     Lemma step_any_op : forall T (op: Op T) tid s0 r0 s1 evs,
@@ -963,6 +1081,13 @@ Module AbsLockInvariant' <: LayerImplAbsT
     intros.
   Admitted.
 
+  Ltac fwd :=
+    repeat match goal with
+           | [ H: invariant (mkLIState ?s ?l ?pl),
+                  H': mem_bg ?s _ |- _ ] =>
+             learn that (invariant_mem_bg l pl H H')
+           end.
+
   Theorem absR_ok : op_abs absR LockOwnerAPI.step step.
   Proof.
     unfold LockOwnerAPI.step, step, absR.
@@ -975,7 +1100,7 @@ Module AbsLockInvariant' <: LayerImplAbsT
       + unfold abstr in * |- .
         destruct s3; simpl in *; propositional.
         invert H6; simpl in *.
-        * eexists; split; [ eapply abstr_intro with (pl:=tid) | ].
+        * eexists; split; [ eapply abstr_intro with (pl:=tid) | ]; fwd.
           eapply invariant_mem_bg in H1; eauto.
           eapply invariant_write_lock; eauto.
           constructor.
@@ -983,32 +1108,28 @@ Module AbsLockInvariant' <: LayerImplAbsT
           assert (l = None); subst.
           eauto using observe_unlock_mem_read.
           constructor; eauto.
-          eapply invariant_mem_bg in H1; eauto.
           eapply invariant_write_lock; eauto.
-        * eexists; split; [ eapply abstr_intro with (pl:=PrevOwner0) | ].
-          eapply invariant_mem_bg in H10; eauto.
+        * eexists; split; [ eapply abstr_intro with (pl:=PrevOwner0) | ]; fwd.
           eapply invariant_mem_flush; eauto.
           constructor.
           apply bg_invariant; eauto.
-          eapply invariant_mem_bg in H10; eauto.
           eapply invariant_mem_flush; eauto.
-        * eexists; split; [ eapply abstr_intro with (pl := PrevOwner0) | ].
+        * eexists; split; [ eapply abstr_intro with (pl := PrevOwner0) | ]; fwd.
           eapply invariant_write_unlock; eauto.
           constructor.
           apply bg_invariant; eauto.
           eapply invariant_write_unlock; eauto.
-        * eexists; split; [ eapply abstr_intro with (pl := PrevOwner0) | ].
-          eapply invariant_mem_bg; eauto.
+        * eexists; split; [ eapply abstr_intro with (pl := PrevOwner0) | ]; fwd.
+          eauto.
           constructor.
           apply bg_invariant; eauto.
-          eapply invariant_mem_bg; eauto.
-        * eexists; split; [ eapply abstr_intro with (pl := PrevOwner0) | ].
+        * eexists; split; [ eapply abstr_intro with (pl := PrevOwner0) | ]; fwd.
           eapply invariant_write_val; eauto.
           constructor.
           apply bg_invariant; eauto.
           eapply invariant_write_val; eauto.
         * destruct s'.
-          eexists; split; [ eapply abstr_intro with (pl := PrevOwner0) | ]; eauto.
+          eexists; split; [ eapply abstr_intro with (pl := PrevOwner0) | ]; eauto; fwd.
           constructor.
           apply bg_invariant; eauto.
     - invert H.
