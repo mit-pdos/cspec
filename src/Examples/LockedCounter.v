@@ -70,6 +70,8 @@ Module TSOAPI <: Layer TSOOp TSOState.
 
   Definition step := bg_step xstep mem_bg.
 
+  Definition initP := TSOState.initP.
+
 End TSOAPI.
 
 Module TSODelayNondetAPI <: Layer TSOOp TSOState.
@@ -95,6 +97,8 @@ Module TSODelayNondetAPI <: Layer TSOOp TSOState.
   .
 
   Definition step := xstep.
+
+  Definition initP := TSOState.initP.
 
 End TSODelayNondetAPI.
 
@@ -196,6 +200,8 @@ Module TAS_TSOAPI <: Layer TASOp TSOState.
 
   Definition step := xstep.
 
+  Definition initP := TSOState.initP.
+
 End TAS_TSOAPI.
 
 Module TAS_TSOImpl' <: LayerImplMoversT
@@ -251,6 +257,9 @@ Module TAS_TSOImpl' <: LayerImplMoversT
     rewrite mem_write_flush_same; auto.
     constructor; eauto.
   Qed.
+
+  Definition initP_compat : forall s,
+      TAS_TSOAPI.initP s -> initP s := ltac:(auto).
 
 End TAS_TSOImpl'.
 
@@ -361,6 +370,8 @@ Module LockOwnerAPI <: Layer TASOp LockOwnerState.
 
   Definition step := error_step xstep (fun T op tid s => bad_lock op tid s.(TASLock)).
 
+  Definition initP := LockOwnerState.initP.
+
 End LockOwnerAPI.
 
 
@@ -419,7 +430,7 @@ Module AbsLockOwner' <: LayerImplAbsT
       TSOState.initP s1 ->
       exists s2 : State, absR s1 s2 /\ initP s2.
   Proof.
-    unfold TSOState.initP, initP; propositional.
+    unfold TSOState.initP, initP, LockOwnerState.initP; propositional.
     exists_econstructor; eauto.
   Qed.
 
@@ -552,6 +563,8 @@ Module LockInvariantAPI <: Layer TASOp LockInvariantState.
   Definition step := error_step
                        (bg_step xstep invariant_step)
                        (fun T op tid s => bad_lock op tid s.(InvLock)).
+
+  Definition initP := initP.
 End LockInvariantAPI.
 
 Inductive error_absR {State1 State2} {absR: State1 -> State2 -> Prop} :
@@ -1182,7 +1195,7 @@ Module AbsLockInvariant' <: LayerImplAbsT
       LockOwnerState.initP s1 ->
       exists s2 : State, absR s1 s2 /\ initP s2.
   Proof.
-    unfold LockOwnerState.initP, initP; propositional.
+    unfold LockOwnerState.initP, initP, LockInvariantState.initP; propositional.
     exists_econstructor; intuition eauto.
     constructor.
     unfold abstr; intuition eauto.
@@ -1236,6 +1249,8 @@ Module SeqMemAPI <: Layer TASOp SeqMemState.
   .
 
   Definition step := error_step xstep (fun T op tid s => bad_lock op tid s.(LockOwner)).
+
+  Definition initP := initP.
 End SeqMemAPI.
 
 
@@ -1493,7 +1508,8 @@ Module AbsSeqMem' <: LayerImplAbsT
       LockInvariantState.initP s1 ->
       exists s2 : State, absR s1 s2 /\ initP s2.
   Proof.
-    unfold LockInvariantState.initP, absR, initP, abstr; propositional.
+    unfold LockInvariantState.initP, absR, initP, SeqMemState.initP, abstr;
+      propositional.
     eexists (Valid _); intuition eauto.
     constructor.
     simpl; eauto.
@@ -1549,6 +1565,8 @@ Module RawLockAPI <: Layer LockOp SeqMemState.
                                                       | Ext _ => False
                                                       | _ => s.(LockOwner) <> Some tid
                                                       end).
+
+  Definition initP := initP.
 
 End RawLockAPI.
 
@@ -1624,6 +1642,8 @@ Module LockImpl' <:
     Grab Existential Variables.
     all: auto.
   Qed.
+
+  Definition initP_compat : forall s, SeqMemAPI.initP s -> RawLockAPI.initP s := ltac:(auto).
 
 End LockImpl'.
 
@@ -1802,6 +1822,8 @@ Module LockAPI <: Layer LockOp SeqMemState.
         eauto.
   Qed.
 
+  Definition initP := initP.
+
 End LockAPI.
 
 (** LAYER: LockedCounterAPI *)
@@ -1834,6 +1856,8 @@ Module LockedCounterAPI <: Layer CounterOp SeqMemState.
   .
 
   Definition step := error_step xstep (fun T op tid s => False).
+
+  Definition initP := initP.
 
 End LockedCounterAPI.
 
@@ -2145,6 +2169,9 @@ Module LockingCounter' <:
     eauto.
   Qed.
 
+  Definition initP_compat : forall s, LockAPI.initP s -> LockedCounterAPI.initP s := ltac:(auto).
+  Definition raw_initP_compat : forall s, RawLockAPI.initP s -> LockAPI.initP s := ltac:(auto).
+
 End LockingCounter'.
 
 (** LAYER: CounterAPI *)
@@ -2171,6 +2198,8 @@ Module CounterAPI <: Layer CounterOp CounterState.
   .
 
   Definition step := xstep.
+
+  Definition initP := initP.
 
 End CounterAPI.
 

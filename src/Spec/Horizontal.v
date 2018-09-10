@@ -788,12 +788,12 @@ End HOps.
 
 Module HState (s : State) (i : HIndex) <: State.
   Definition State := @horizState i.indexT i.indexCmp i.indexValid s.State.
-  Definition initP : State -> Prop :=
-    horizInitP s.initP.
 End HState.
 
 Module HLayer (o : Ops) (s : State) (l : Layer o s) (i : HIndex).
   Definition step := @horizStep i.indexT i.indexCmp i.indexValid _ _ l.step.
+  Definition initP : @horizState i.indexT i.indexCmp i.indexValid s.State -> Prop :=
+    horizInitP l.initP.
 End HLayer.
 
 Module HProtocol (o : Ops) (s : State) (p : Protocol o s) (i : HIndex).
@@ -815,7 +815,7 @@ Module Type HLayerImplAbsT
   Parameter absR : s1.State -> s2.State -> Prop.
   Parameter absR_ok : op_abs absR l1.step l2.step.
 
-  Parameter initP_map: forall (s1:s1.State), {s2:s2.State | s1.initP s1 -> absR s1 s2 /\ s2.initP s2}.
+  Parameter initP_map: forall (s1:s1.State), {s2:s2.State | l1.initP s1 -> absR s1 s2 /\ l2.initP s2}.
 
 End HLayerImplAbsT.
 
@@ -827,9 +827,9 @@ Module LayerImplAbsT_from_H
   Include a.
 
   Theorem absInitP : forall s1,
-      s1.initP s1 ->
+      l1.initP s1 ->
       exists s2, absR s1 s2 /\
-            s2.initP s2.
+            l2.initP s2.
   Proof.
     intros.
     destruct (initP_map s1); eauto.
@@ -864,9 +864,9 @@ Module LayerImplAbsHT
 
   Theorem absInitP :
     forall s1,
-      hs1.initP s1 ->
+      hl1.initP s1 ->
       exists s2, absR s1 s2 /\
-      hs2.initP s2.
+      hl2.initP s2.
   Proof.
     intros.
     eapply horizAbsR_initP_ok
