@@ -157,8 +157,6 @@ Module TASOp <: Ops.
   | Read : xOp nat
   | Write : nat -> xOp unit
   | Ext : event -> xOp unit
-  (* we won't actually use a fence *)
-  (* | Flush : xOp unit *)
   .
 
   Definition Op := xOp.
@@ -194,9 +192,6 @@ Module TAS_TSOAPI <: Layer TASOp TSOState.
       xstep (Write v) tid s tt (mem_write Val v s tid) nil
   | StepExt : forall tid ev s,
       xstep (Ext ev) tid s tt s [ev]
-  (* | StepFlush : forall tid s s',
-      mem_bg s s' ->
-      xstep Flush tid s tt (mem_flush s' tid) nil. *)
   .
 
   Definition step := xstep.
@@ -219,7 +214,6 @@ Module TAS_TSOImpl' <: LayerImplMoversT
     | TASOp.Read => Call (Read Val)
     | TASOp.Write v => Call (Write Val v)
     | TASOp.Ext ev => Call (Ext ev)
-    (* | TASOp.Flush => Call (Fence) *)
     end.
 
   Theorem compile_op_no_atomics : forall T (op: TASOp.Op T),
@@ -363,13 +357,6 @@ Module LockOwnerAPI <: Layer TASOp LockOwnerState.
             nil
   | StepExt : forall tid ev s,
       xstep (Ext ev) tid s tt s [ev]
-  (* | StepFlush : forall tid s s' l,
-      mem_bg s s' ->
-      xstep Flush tid
-            (mkLOState s l)
-            tt
-            (mkLOState (mem_flush s' tid) l)
-            nil *)
   .
 
   Definition step := error_step xstep (fun T op tid s => bad_lock op tid s.(TASLock)).
@@ -2270,29 +2257,7 @@ Module AbsCounter :=
                CounterState CounterAPI
                AbsCounter'.
 
-
-
-(** Implement [Acquire] on top of test-and-set *)
-
 (** Linking *)
-
-(* End-to-end stack:
-
-  TASAPI ---------------+----+---------+
-    [ AbsNondet ]       |    |         |
-  TASAPI    [c0]  |         |
-    [ AbsLock ]         |    |         |
-  TASLockAPI -----------+   [c1]       |
-    [ LockImpl ]             |         |
-  RawLockAPI ----------------+----+    |
-    [ LockProtocol ]         |    |   [c]
-  LockAPI                   [c2]  |    |
-    [ LockingCounter ]       |   [c3]  |
-  LockedCounterAPI ----------+    |    |
-    [ AbsCounter ]                |    |
-  CounterAPI ---------------------+----+
- *)
-
 
 Module c1 :=
   Link
