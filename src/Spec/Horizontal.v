@@ -9,7 +9,7 @@ Require Import Helpers.Maps.
 Require Import Helpers.Instances.
 Require Import Spec.ConcurExec.
 Require Import Spec.Equiv.
-Require Import Spec.Modules.
+Require Import Spec.Patterns.
 Require Import Spec.Abstraction.
 Require Import Spec.Movers.
 Require Import Spec.Compile.

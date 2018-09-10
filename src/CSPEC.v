@@ -18,7 +18,7 @@ Require Export Helpers.RecordSet.
 Require Export Spec.ConcurExec.
 Require Export Spec.Compile.
 Require Export Spec.Abstraction.
-Require Export Spec.Modules.
+Require Export Spec.Patterns.
 Require Export Spec.Movers.
 Require Export Spec.Protocol.
 Require Export Spec.CompileLoop.
