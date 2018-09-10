@@ -89,5 +89,7 @@ Module MailboxTmpAbsAPI <: Layer MailboxOp MailboxTmpAbsState.
 
   Definition step := xstep.
 
+  Definition initP := initP.
+
 End MailboxTmpAbsAPI.
 Module MailboxTmpAbsHAPI := HLayer MailboxOp MailboxTmpAbsState MailboxTmpAbsAPI UserIdx.

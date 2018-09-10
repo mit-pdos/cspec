@@ -88,6 +88,10 @@ Module TryDeliverImpl' <:
     all: repeat atomic_exec_inv; repeat step_inv; eauto.
   Qed.
 
+  Definition initP_compat : forall s, MailFSAPI.initP s ->
+                                 TryDeliverAPI.initP s :=
+    ltac:(auto).
+
 End TryDeliverImpl'.
 
 

@@ -507,6 +507,12 @@ Module LayerImplMoversProtocol
     eapply compile_traces_match_l1 in H3; propositional; eauto.
   Qed.
 
+  Theorem initP_compat : forall s,
+      l1raw.initP s -> l2.initP s.
+  Proof.
+    auto using a.initP_compat, a.raw_initP_compat.
+  Qed.
+
 End LayerImplMoversProtocol.
 
 

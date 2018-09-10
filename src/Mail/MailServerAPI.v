@@ -125,5 +125,7 @@ Module MailServerAPI <: Layer MailServerOp MailServerState.
 
   Definition step := xstep.
 
+  Definition initP := initP.
+
 End MailServerAPI.
 Module MailServerHAPI := HLayer MailServerOp MailServerState MailServerAPI UserIdx.

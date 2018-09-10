@@ -1066,6 +1066,20 @@ Module LayerImplMoversProtocolHT
       econstructor; eauto.
   Qed.
 
+  Theorem initP_compat : forall s, hl1.initP s -> hl2.initP s.
+  Proof.
+    unfold hl1.initP, hl2.initP, horizInitP; intros.
+    specialize (H i); propositional.
+    eauto using a.initP_compat.
+  Qed.
+
+  Theorem raw_initP_compat : forall s, hl1raw.initP s -> hl1.initP s.
+  Proof.
+    unfold hl1raw.initP, hl1.initP, horizInitP; intros.
+    specialize (H i); propositional.
+    eauto using a.raw_initP_compat.
+  Qed.
+
 End LayerImplMoversProtocolHT.
 
 
@@ -1120,6 +1134,15 @@ Module LayerImplMoversHT
       econstructor; eauto.
   Qed.
 
+  Theorem initP_compat :
+    forall s, hl1.initP s -> hl2.initP s.
+  Proof.
+    unfold hl1.initP, hl2.initP.
+    unfold horizInitP; intros.
+    specialize (H i); propositional.
+    eauto using a.initP_compat.
+  Qed.
+
 End LayerImplMoversHT.
 
 
@@ -1172,6 +1195,15 @@ Module LayerImplLoopHT
       right; intuition eauto.
       econstructor; eauto.
     }
+  Qed.
+
+  Theorem initP_compat :
+    forall s, hl1.initP s -> hl2.initP s.
+  Proof.
+    unfold hl1.initP, hl2.initP.
+    unfold horizInitP; intros.
+    specialize (H i); propositional.
+    eauto using a.initP_compat.
   Qed.
 
 End LayerImplLoopHT.

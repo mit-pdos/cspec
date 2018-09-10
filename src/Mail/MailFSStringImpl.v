@@ -139,6 +139,10 @@ Module MailFSStringImpl' <:
     eauto.
   Qed.
 
+  Definition initP_compat : forall s, MailFSStringAPI.initP s ->
+                                 MailFSStringAbsAPI.initP s :=
+    ltac:(auto).
+
 End MailFSStringImpl'.
 
 Module MailFSStringImpl :=

@@ -189,6 +189,8 @@ Module MailFSMergedAPI <: Layer MailFSMergedOp MailFSMergedState.
 
   Definition step := xstep.
 
+  Definition initP := initP.
+
 End MailFSMergedAPI.
 
 
@@ -319,5 +321,7 @@ Module MailFSMergedAbsAPI <: Layer MailFSPathHOp MailFSMergedState.
   .
 
   Definition step := xstep.
+
+  Definition initP := initP.
 
 End MailFSMergedAbsAPI.

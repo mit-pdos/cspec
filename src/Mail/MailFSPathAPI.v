@@ -134,5 +134,7 @@ Module MailFSPathAPI <: Layer MailFSPathOp MailFSPathAbsState.
 
   Definition step := xstep.
 
+  Definition initP := initP.
+
 End MailFSPathAPI.
 Module MailFSPathHAPI := HLayer MailFSPathOp MailFSPathAbsState MailFSPathAPI UserIdx.

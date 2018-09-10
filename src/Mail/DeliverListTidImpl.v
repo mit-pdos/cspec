@@ -209,6 +209,14 @@ Module DeliverListTidImpl' <:
     eauto.
   Qed.
 
+  Definition initP_compat : forall s, DeliverListTidRestrictedAPI.initP s ->
+                                 DeliverAPI.initP s :=
+    ltac:(auto).
+
+  Definition raw_initP_compat : forall s, DeliverListTidRestrictedAPI.initP s ->
+                                     DeliverListTidAPI.initP s :=
+    ltac:(auto).
+
 End DeliverListTidImpl'.
 
 

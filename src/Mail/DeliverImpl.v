@@ -257,6 +257,14 @@ Module AtomicDeliver' <:
     eauto.
   Qed.
 
+  Definition initP_compat : forall s, DeliverRestrictedAPI.initP s ->
+                                 MailboxTmpAbsAPI.initP s :=
+    ltac:(auto).
+
+  Definition raw_initP_compat : forall s, DeliverAPI.initP s ->
+                                     DeliverRestrictedAPI.initP s :=
+    ltac:(auto).
+
 End AtomicDeliver'.
 
 

@@ -475,6 +475,14 @@ Module AtomicReader' <:
     eauto.
   Qed.
 
+  Definition initP_compat : forall s, MailboxRestrictedAPI.initP s ->
+                                 MailServerLockAbsAPI.initP s :=
+    ltac:(auto).
+
+  Definition raw_initP_compat : forall s, MailboxAPI.initP s ->
+                                     MailboxRestrictedAPI.initP s :=
+    ltac:(auto).
+
 End AtomicReader'.
 
 

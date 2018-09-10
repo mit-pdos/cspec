@@ -125,5 +125,7 @@ Module TryDeliverAPI <: Layer TryDeliverOp MailboxTmpAbsState.
 
   Definition step := xstep.
 
+  Definition initP := initP.
+
 End TryDeliverAPI.
 Module TryDeliverHAPI := HLayer TryDeliverOp MailboxTmpAbsState TryDeliverAPI UserIdx.

@@ -63,6 +63,11 @@ Module MailFSPathImpl' <:
     destruct op; simpl; eauto 20.
   Qed.
 
+  Definition initP_compat : forall s, MailFSPathAPI.initP s ->
+                                 MailFSPathAbsAPI.initP s :=
+    ltac:(auto).
+
+
 End MailFSPathImpl'.
 
 

@@ -464,11 +464,13 @@ Module MailFSMergedAbsImpl' <:
   Defined.
 
   Definition initP_map (s1: MailFSMergedState.State) :
-    {s2: MailFSPathAbsHState.State | MailFSMergedState.initP s1 ->
-                                 absR s1 s2 /\ MailFSPathAbsHState.initP s2}.
+    {s2: MailFSPathAbsHState.State | MailFSMergedAPI.initP s1 ->
+                                 absR s1 s2 /\ MailFSPathAbsHAPI.initP s2}.
   Proof.
-    unfold MailFSMergedState.initP, MailFSPathAbsHState.initP, absR,
-    horizInitP, MailFSPathAbsState.initP; intros.
+    unfold MailFSMergedAPI.initP, MailFSPathAbsHAPI.initP, absR,
+    MailFSMergedState.initP,
+    horizInitP, MailFSPathAbsAPI.initP, MailFSPathAbsState.initP;
+    intros.
     destruct s1; simpl.
     unshelve eexists
              {| HSMap :=
@@ -591,6 +593,10 @@ Module MailFSMergedOpImpl' <:
     destruct_validIndex.
     destruct op; simpl; repeat break_pairs; eauto 20.
   Qed.
+
+  Definition initP_compat : forall s,
+      MailFSMergedAPI.initP s -> MailFSMergedAbsAPI.initP s :=
+    ltac:(auto).
 
 End MailFSMergedOpImpl'.
 

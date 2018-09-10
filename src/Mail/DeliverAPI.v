@@ -127,6 +127,8 @@ Module DeliverAPI <: Layer DeliverOp MailboxTmpAbsState.
 
   Definition step := xstep.
 
+  Definition initP := initP.
+
 End DeliverAPI.
 Module DeliverHAPI := HLayer DeliverOp MailboxTmpAbsState DeliverAPI UserIdx.
 
@@ -168,6 +170,8 @@ Module DeliverRestrictedAPI <: Layer DeliverOp MailboxTmpAbsState.
 
   Definition step :=
     restricted_step DeliverAPI.step DeliverProtocol.step_allow.
+
+  Definition initP := DeliverAPI.initP.
 
 End DeliverRestrictedAPI.
 Module DeliverRestrictedHAPI := HLayer DeliverOp MailboxTmpAbsState DeliverRestrictedAPI UserIdx.

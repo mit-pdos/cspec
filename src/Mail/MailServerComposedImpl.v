@@ -66,6 +66,10 @@ Module MailServerComposedImpl' <:
     destruct op; simpl; eauto.
   Qed.
 
+  Definition initP_compat : forall s, MailServerHAPI.initP s ->
+                                 MailServerComposedAPI.initP s :=
+    ltac:(auto).
+
 End MailServerComposedImpl'.
 
 Module MailServerComposedImpl :=

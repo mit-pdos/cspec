@@ -94,6 +94,8 @@ Module MailboxAPI <: Layer MailboxOp MailServerLockAbsState.
 
   Definition step := xstep.
 
+  Definition initP := initP.
+
 End MailboxAPI.
 Module MailboxHAPI := HLayer MailboxOp MailServerLockAbsState MailboxAPI UserIdx.
 
@@ -133,6 +135,8 @@ Module MailboxRestrictedAPI <: Layer MailboxOp MailServerLockAbsState.
 
   Definition step :=
     restricted_step MailboxAPI.step MailboxProtocol.step_allow.
+
+  Definition initP := MailboxAPI.initP.
 
 End MailboxRestrictedAPI.
 Module MailboxRestrictedHAPI := HLayer MailboxOp MailServerLockAbsState MailboxRestrictedAPI UserIdx.

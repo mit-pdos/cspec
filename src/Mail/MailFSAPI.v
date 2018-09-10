@@ -142,5 +142,7 @@ Module MailFSAPI <: Layer MailFSOp MailboxTmpAbsState.
 
   Definition step := xstep.
 
+  Definition initP := initP.
+
 End MailFSAPI.
 Module MailFSHAPI := HLayer MailFSOp MailboxTmpAbsState MailFSAPI UserIdx.

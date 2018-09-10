@@ -134,6 +134,8 @@ Module DeliverListTidAPI <: Layer DeliverListTidOp MailboxTmpAbsState.
 
   Definition step := xstep.
 
+  Definition initP := initP.
+
 End DeliverListTidAPI.
 Module DeliverListTidHAPI := HLayer DeliverListTidOp MailboxTmpAbsState DeliverListTidAPI UserIdx.
 
@@ -169,6 +171,8 @@ Module DeliverListTidProtocol <: Protocol DeliverListTidOp MailboxTmpAbsState.
 
   Definition step_allow := xstep_allow.
 
+  Definition initP := MailboxTmpAbsState.initP.
+
 End DeliverListTidProtocol.
 Module DeliverListTidHProtocol := HProtocol DeliverListTidOp MailboxTmpAbsState DeliverListTidProtocol UserIdx.
 
@@ -176,6 +180,8 @@ Module DeliverListTidHProtocol := HProtocol DeliverListTidOp MailboxTmpAbsState 
 Module DeliverListTidRestrictedAPI <: Layer DeliverListTidOp MailboxTmpAbsState.
 
   Definition step := restricted_step DeliverListTidAPI.step DeliverListTidProtocol.step_allow.
+
+  Definition initP := MailboxTmpAbsState.initP.
 
 End DeliverListTidRestrictedAPI.
 Module DeliverListTidRestrictedHAPI := HLayer DeliverListTidOp MailboxTmpAbsState DeliverListTidRestrictedAPI UserIdx.

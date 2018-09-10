@@ -75,4 +75,6 @@ Module MailServerComposedAPI <: Layer MailServerComposedOp MailServerComposedSta
 
   Definition step := xstep.
 
+  Definition initP : MailServerComposedState.State -> Prop := horizInitP MailServerState.initP.
+
 End MailServerComposedAPI.

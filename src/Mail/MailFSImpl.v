@@ -107,6 +107,9 @@ Module MailFSImpl' <:
     destruct (v1 == v1); congruence.
   Qed.
 
+  Definition initP_compat : forall s, MailFSAPI.initP s ->
+                                 DeliverListTidAPI.initP s :=
+    ltac:(auto).
 
 End MailFSImpl'.
 

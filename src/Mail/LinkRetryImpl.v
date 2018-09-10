@@ -57,6 +57,10 @@ Module LinkRetryImpl' <:
     destruct opM; simpl; intros; pair_inv; step_inv; eauto.
   Qed.
 
+  Definition initP_compat : forall s, TryDeliverAPI.initP s ->
+                                 DeliverAPI.initP s :=
+    ltac:(auto).
+
 End LinkRetryImpl'.
 
 Module LinkRetryImpl :=

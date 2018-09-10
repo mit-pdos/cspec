@@ -59,5 +59,7 @@ Module MailServerLockAbsAPI <: Layer MailServerOp MailServerLockAbsState.
 
   Definition step := xstep.
 
+  Definition initP := initP.
+
 End MailServerLockAbsAPI.
 Module MailServerLockAbsHAPI := HLayer MailServerOp MailServerLockAbsState MailServerLockAbsAPI UserIdx.

@@ -162,5 +162,7 @@ Module MailFSStringAbsAPI <: Layer MailFSOp MailFSStringAbsState.
 
   Definition step := xstep.
 
+  Definition initP := initP.
+
 End MailFSStringAbsAPI.
 Module MailFSStringAbsHAPI := HLayer MailFSOp MailFSStringAbsState MailFSStringAbsAPI UserIdx.
