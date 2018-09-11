@@ -42,104 +42,97 @@ Section TraceAbs.
 
 End TraceAbs.
 
+Record Layer Op State : Type :=
+  { step : OpSemantics Op State;
+    initP : State -> Prop; }.
 
-Module Type Ops.
+Record Protocol (Op: Type -> Type) State :=
+  { step_allow : forall T, Op T -> nat -> State -> Prop; }.
 
-  Axiom Op : Type -> Type.
+Module LayerImpl.
+  Section S.
+    Context
+      `(l1 : Layer O1 S1)
+      `(l2 : Layer O2 S2).
 
-End Ops.
+    Record T :=
+      { absR : S1 -> S2 -> Prop;
+        compile_ts : threads_state O2 -> threads_state O1;
+        compile_ts_no_atomics :
+          forall ts,
+            no_atomics_ts ts ->
+            no_atomics_ts (compile_ts ts);
+        absInitP :
+          forall s1,
+            l1.(initP) s1 ->
+            exists s2, absR s1 s2 /\
+                  l2.(initP) s2;
+        compile_traces_match :
+          forall ts,
+            no_atomics_ts ts ->
+            traces_match_abs absR l1.(initP) l2.(initP) l1.(step) l2.(step) (compile_ts ts) ts; }.
 
-
-Module Type State.
-
-  Axiom State : Type.
-
-End State.
-
-
-Module Type Layer (o : Ops) (s : State).
-
-  Axiom step : OpSemantics o.Op s.State.
-  Axiom initP : s.State -> Prop.
-
-End Layer.
-
-
-Module Type Protocol (o : Ops) (s : State).
-
-  Axiom step_allow : forall T, o.Op T -> nat -> s.State -> Prop.
-
-End Protocol.
-
-
-Module Type LayerImpl
-  (o1 : Ops) (s1 : State) (l1 : Layer o1 s1)
-  (o2 : Ops) (s2 : State) (l2 : Layer o2 s2).
-
-  Axiom absR : s1.State -> s2.State -> Prop.
-  Axiom compile_ts : threads_state o2.Op -> threads_state o1.Op.
-  Axiom compile_ts_no_atomics :
-    forall ts,
-      no_atomics_ts ts ->
-      no_atomics_ts (compile_ts ts).
-  Axiom absInitP :
-    forall s1,
-      l1.initP s1 ->
-      exists s2, absR s1 s2 /\
-      l2.initP s2.
-  Axiom compile_traces_match :
-    forall ts,
-      no_atomics_ts ts ->
-      traces_match_abs absR l1.initP l2.initP l1.step l2.step (compile_ts ts) ts.
-
-  Hint Resolve absInitP.
-
+  End S.
 End LayerImpl.
 
+Module LayerImplAbsT.
+  Section S.
+    Context O
+            `(l1: Layer O S1)
+            `(l2: Layer O S2).
 
-Module Type LayerImplAbsT
-  (o : Ops)
-  (s1 : State) (l1 : Layer o s1)
-  (s2 : State) (l2 : Layer o s2).
-
-  Axiom absR : s1.State -> s2.State -> Prop.
-  Axiom absR_ok : op_abs absR l1.step l2.step.
-  Axiom absInitP :
-    forall s1, l1.initP s1 ->
-          exists s2, absR s1 s2 /\ l2.initP s2.
+    Record T :=
+      { absR : S1 -> S2 -> Prop;
+        absR_ok : op_abs absR l1.(step) l2.(step);
+        absInitP :
+          forall s1, l1.(initP) s1 ->
+                exists s2, absR s1 s2 /\ l2.(initP) s2; }.
+  End S.
 
 End LayerImplAbsT.
 
 
-Module LayerImplAbs
-  (o : Ops)
-  (s1 : State) (l1 : Layer o s1)
-  (s2 : State) (l2 : Layer o s2)
-  (a : LayerImplAbsT o s1 l1 s2 l2) <: LayerImpl o s1 l1 o s2 l2.
+Module LayerImplAbs.
+  Import LayerImplAbsT.
+  Section S.
+    Context O
+            `(l1 : Layer O S1)
+            `(l2 : Layer O S2)
+            (a : LayerImplAbsT.T l1 l2).
 
-  Definition absR := a.absR.
-  Definition absInitP := a.absInitP.
+    Definition absR := a.(absR).
+    Definition absInitP := a.(absInitP).
 
-  Definition compile_ts (ts : threads_state o.Op) := ts.
+    Definition compile_ts (ts : threads_state O) := ts.
 
-  Theorem compile_ts_no_atomics :
-    forall (ts : threads_state o.Op),
-      no_atomics_ts ts ->
-      no_atomics_ts (compile_ts ts).
-  Proof.
-    unfold compile_ts; eauto.
-  Qed.
+    Theorem compile_ts_no_atomics :
+      forall (ts : threads_state O),
+        no_atomics_ts ts ->
+        no_atomics_ts (compile_ts ts).
+    Proof.
+      unfold compile_ts; eauto.
+    Qed.
 
-  Hint Resolve a.absR_ok.
+    Hint Resolve absR_ok.
 
-  Theorem compile_traces_match :
-    forall ts,
-      no_atomics_ts ts ->
-      traces_match_abs absR l1.initP l2.initP l1.step l2.step (compile_ts ts) ts.
-  Proof.
-    unfold compile_ts, traces_match_abs; intros.
-    eapply absInitP in H0; propositional; eauto using trace_incl_abs.
-  Qed.
+    Theorem compile_traces_match :
+      forall ts,
+        no_atomics_ts ts ->
+        traces_match_abs absR l1.(initP) l2.(initP) l1.(step) l2.(step) (compile_ts ts) ts.
+    Proof.
+      unfold compile_ts, traces_match_abs; intros.
+      eapply absInitP in H0; propositional; eauto using trace_incl_abs.
+    Qed.
+
+    Definition t : LayerImpl.T l1 l2.
+      refine {| LayerImpl.absR := absR;
+                LayerImpl.absInitP := absInitP;
+                LayerImpl.compile_ts := compile_ts;
+                LayerImpl.compile_ts_no_atomics := compile_ts_no_atomics;
+                LayerImpl.compile_traces_match := compile_traces_match; |}.
+    Defined.
+
+  End S.
 
 End LayerImplAbs.
 
