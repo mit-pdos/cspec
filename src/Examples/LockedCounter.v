@@ -295,6 +295,7 @@ Arguments error_step {Op State} step violation.
 
 Module LockOwnerState <: State.
 
+  (* TODO: might as well track previous lock owner here *)
   Record s := mkLOState {
                   TASValue : memT TSOOp.addr nat;
                   TASLock : option nat;
@@ -442,6 +443,7 @@ Module AbsLockOwner :=
                LockOwnerState LockOwnerAPI
                AbsLockOwner'.
 
+(* TODO: get rid of this once LockOwnerState has the previous owner *)
 Module LockInvariantState <: State.
 
   Record s := mkLIState {
@@ -1829,6 +1831,19 @@ End LockAPI.
 (** LAYER: LockedCounterAPI *)
 
 Module CounterOp <: Ops.
+
+  (* TODO: generalize to arbitrary critical sections.
+
+Have only one operation, CriticalSection, which takes a program that can
+read/write addresses and produce a result. We can give this a semantics and make
+it the step rule. We can also compile it to a proc using the LockAPI
+(translating reads and writes to the corresponding lock operations), and
+surround the critical section with a lock acquire/release. As a result, the
+whole implementation will always:
+- follow the lock protocol
+- follow the YSA pattern, since Acquire is a right mover, all reads and writes
+  are right movers since we hold the lock, and Release is a left mover.
+*)
 
   Inductive xOp : Type -> Type :=
   | Inc : xOp nat
