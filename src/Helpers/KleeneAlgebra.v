@@ -743,3 +743,158 @@ Module LanguageModel (Import A:Alphabet) <: KleeneAlgebra.
     Qed.
   End StarAxioms.
 End LanguageModel.
+
+Module RelationalModel (Import A:Alphabet) <: KleeneAlgebra.
+  Definition K:Type := A -> A -> Prop.
+  Definition equiv: K -> K -> Prop :=
+    fun r1 r2 => (forall x y, r1 x y -> r2 x y) /\
+              (forall x y, r2 x y -> r1 x y).
+
+  Notation magic := ltac:(firstorder) (only parsing).
+
+  Instance equiv_Equivalence : Equivalence equiv := magic.
+
+  Definition choice : K -> K -> K :=
+    fun r1 r2 => fun x y => r1 x y \/ r2 x y.
+  Definition seq : K -> K -> K :=
+    fun r1 r2 => fun x z => exists y, r1 x y /\ r2 y z.
+
+  Inductive kstar (r:K) : K :=
+  | kstar_refl : forall x, kstar r x x
+  | kstar_one_more : forall x y z,
+      r x y ->
+      kstar r y z ->
+      kstar r x z.
+
+  Hint Constructors kstar.
+
+  Definition star : K -> K := kstar.
+
+  Instance star_PreOrder r : PreOrder (star r).
+  Proof.
+    unfold star.
+    constructor; repeat (hnf; intros); eauto.
+    induction H; eauto.
+  Qed.
+
+  Instance choice_respects_equiv : Proper (equiv ==> equiv ==> equiv) choice := magic.
+  Instance seq_respects_equiv : Proper (equiv ==> equiv ==> equiv) seq := magic.
+  Instance star_respects_equiv : Proper (equiv ==> equiv) star.
+  Proof.
+    unfold equiv, star.
+    repeat (hnf; intros); intuition eauto.
+    induction H; eauto.
+    induction H; eauto.
+  Qed.
+
+  Definition fail : K := fun x y => False.
+  Definition skip : K := eq.
+
+  Definition le (a b:K) := equiv (choice a b) b.
+
+  Definition le_implies : forall (r1 r2:K),
+      (forall x y, r1 x y -> r2 x y) ->
+      le r1 r2 := magic.
+
+  Definition le_implies' : forall (r1 r2:K),
+      le r1 r2 ->
+      (forall x y, r1 x y -> r2 x y) := magic.
+
+  Module KANotations.
+    Infix "==" := equiv (at level 90).
+    Infix "+" := choice.
+    Infix "*" := seq.
+    Notation "R ^*" := (star R) (at level 0, format "'[' R ']' ^*").
+    Notation "0" := fail.
+    Notation "1" := skip.
+    Infix "<=" := le.
+  End KANotations.
+
+  Import KANotations.
+
+  (** Idempotent semiring *)
+  Section Axioms.
+    Context (p q r:K).
+    Definition choice_assoc : p + (q + r) == (p + q) + r := magic.
+    Definition seq_assoc : p * (q * r) == (p * q) * r := magic.
+    Definition choice_comm : p + q == q + p := magic.
+    Definition distr_l : p * (q + r) == p * q + p * r := magic.
+    Definition distr_r : (p + q) * r == p * r + q * r := magic.
+    Definition choice_id_r : p + 0 == p := magic.
+    Definition choice_idem : p + p == p := magic.
+    Definition fail_cancel_r : p * 0 == 0 := magic.
+    Definition fail_cancel_l : 0 * p == 0 := magic.
+    Theorem skip_id_l : 1 * p == p.
+    Proof.
+      unfold "1", "*", "=="; intuition eauto.
+      propositional.
+    Qed.
+
+    Theorem skip_id_r : p * 1 == p.
+    Proof.
+      unfold "1", "*", "=="; intuition eauto.
+      propositional.
+    Qed.
+  End Axioms.
+
+  Ltac le := intros;
+             repeat match goal with
+                    | |- _ <= _ => apply le_implies
+                    | [ H: _ <= _ |- _ ] => pose proof (le_implies' H);
+                                         clear H
+                    end;
+             unfold "+", "*", "1", star in *;
+             intros.
+
+  (** Axioms for star *)
+  Section StarAxioms.
+    Context (p q x:K).
+    Theorem star_one_l : 1 + p * p^* <= p^*.
+    Proof.
+      le.
+      (intuition propositional); eauto.
+    Qed.
+
+    Theorem star_one_r : 1 + p^* * p <= p^*.
+    Proof.
+      le.
+      (intuition propositional); eauto.
+      induction H; eauto.
+    Qed.
+
+    Theorem star_ind_l : q + p * x <= x -> p^* * q <= x.
+    Proof.
+      le.
+      (intuition propositional); eauto.
+      induction H; eauto 10.
+    Qed.
+
+  Inductive kstar_r (r:K) : K :=
+  | kstar_r_refl : forall x, kstar_r r x x
+  | kstar_r_one_more : forall x y z,
+      kstar_r r x y ->
+      r y z ->
+      kstar_r r x z.
+
+  Hint Constructors kstar_r.
+
+  Theorem kstar_lr: forall r x y,
+      kstar r x y -> kstar_r r x y.
+  Proof.
+    intros.
+    induction H; eauto.
+    clear H0.
+    induction IHkstar; eauto.
+  Qed.
+
+  Theorem star_ind_r : q + x * p <= x -> q * p^* <= x.
+  Proof.
+    le.
+    (intuition propositional); eauto.
+    apply kstar_lr in H1.
+    generalize dependent x0.
+    induction H1; intros; eauto 10.
+  Qed.
+  End StarAxioms.
+
+End RelationalModel.
