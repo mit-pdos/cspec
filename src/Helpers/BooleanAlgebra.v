@@ -376,3 +376,73 @@ Module DecidableProp : BooleanAlgebra.
     Qed.
   End Laws.
 End DecidableProp.
+
+Module BoolAlgebra : BooleanAlgebra.
+  Definition B:Type := bool.
+  Definition equiv: B -> B -> Prop := eq.
+  Instance equiv_Equiv : Equivalence equiv.
+  typeclasses eauto.
+  Qed.
+
+  Infix "==" := equiv (at level 90).
+
+  Definition or: B -> B -> B := orb.
+  Definition and : B -> B -> B := andb.
+  Definition not: B -> B := negb.
+
+  Instance or_respects_equiv : Proper (equiv ==> equiv ==> equiv) or.
+  congruence.
+  Qed.
+  Instance and_respects_equiv : Proper (equiv ==> equiv ==> equiv) and.
+  congruence.
+  Qed.
+  Instance not_respects_equiv : Proper (equiv ==> equiv) not.
+  congruence.
+  Qed.
+
+  Definition zero : B := false.
+  Definition one : B := true.
+
+  Module BANotations.
+    Infix "+" := or.
+    Infix "*" := and.
+    Notation "! x" := (not x) (at level 10, format "! x").
+    Notation "0" := zero.
+    Notation "1" := one.
+  End BANotations.
+  Import BANotations.
+
+  Section Laws.
+    Context (a b c:B).
+
+    Ltac ba_solve :=
+      (* clear unmentioned section variables to ensure theorem does not depend
+      on them *)
+      repeat match goal with
+             | [ b: B |- _ ] =>
+               match goal with
+               | |- context[b] => idtac
+               | |- _ => clear b
+               end
+             end;
+      unfold or, and, not, equiv, zero, one;
+      repeat match goal with
+             | _ => reflexivity
+             | [ b: B |- _ ] => destruct b; clear b; simpl
+             end.
+
+    Notation magic := ltac:(ba_solve) (only parsing).
+
+    Definition or_assoc : a + (b + c) == a + b + c := magic.
+    Definition or_comm : a + b == b + a := magic.
+    Definition or_zero : a + 0 == a := magic.
+    Definition or_one : a + 1 == 1 := magic.
+    Definition or_absorption : a + a == a := magic.
+    Definition and_or_distr : a*(b + c) == a*b + a*c := magic.
+    Definition not_or_distr : !(a + b) == !a * !b := magic.
+
+    Definition zero_dual : !0 == 1 := magic.
+    Definition one_dual : !1 == 0 := magic.
+    Definition double_neg : !(!a) == a := magic.
+  End Laws.
+End BoolAlgebra.
