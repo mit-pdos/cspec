@@ -1,8 +1,7 @@
 Require Import RelationClasses.
 Require Import Setoid.
 Require Import Morphisms.
-Require PeanoNat.
-Require List.
+Require Import Varmap.
 
 Unset Intuition Negation Unfolding.
 Set Implicit Arguments.
@@ -55,37 +54,6 @@ End BooleanAlgebra.
 
 Module BAFacts (Import A:BooleanAlgebra).
   Import A.BANotations.
-
-  Class Default A := default_val: A.
-
-  Module varmap.
-    Definition I := nat.
-    Inductive t (A:Type) : Type :=
-    | empty
-    | cons (i:I) (x:A) (xs:t A).
-
-    Definition index_eq (i1 i2:I) : bool :=
-      Nat.eqb i1 i2.
-
-    Theorem index_eq_prop : forall i1 i2,
-        index_eq i1 i2 = true <-> i1 = i2.
-    Proof.
-      apply PeanoNat.Nat.eqb_eq.
-    Qed.
-
-    Fixpoint find {A} `{Default A} (i:nat) (vm: t A) : A :=
-      match vm with
-      | empty _ => default_val
-      | cons i' x vm' => if Nat.eqb i i' then x else find i vm'
-      end.
-
-    Fixpoint length A (ctx: t A) : nat :=
-      match ctx with
-      | empty _ => O
-      | cons _ _ ctx' => S (length ctx')
-      end.
-
-  End varmap.
 
   Instance B_def : Default B := 0.
 
@@ -203,17 +171,24 @@ Module BAFacts (Import A:BooleanAlgebra).
     let ctx_x := reify_helper term ctx in
     let ctx := (eval cbv [fst] in (fst ctx_x)) in
     let x := (eval cbv [snd] in (snd ctx_x)) in
-    change term with (interpret ctx x).
-  Ltac quote term := quote_with (varmap.empty B) term.
+    constr:(interpret ctx x).
+
+  Ltac quote term rx :=
+    let reified := quote_with (varmap.empty B) term in
+    rx reified.
 
   Ltac quote_eqn :=
     match goal with
-    | |- ?x == _ =>
-      quote x;
-      match goal with
-      | |- interpret ?ctx _ == ?y =>
-        quote_with ctx y
-      end
+    | |- ?x == ?y =>
+      quote x ltac:(fun x' =>
+                      match x' with
+                      | interpret ?ctx ?xt =>
+                        let y' := quote_with ctx y in
+                        match y' with
+                        | interpret ?ctx' ?yt =>
+                          change (interpret ctx' xt == interpret ctx' yt)
+                        end
+                      end)
     end.
 
   Theorem dual_interpret_eq : forall vm vm' t1 t2,
