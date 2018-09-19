@@ -249,36 +249,6 @@ Module LayerImplMovers
 End LayerImplMovers.
 
 
-Module Type LayerImplRequiresRule
-       (o1: Ops) (s1: State) (l1: Layer o1 s1)
-       (o2: Ops) (s2: State) (l2: Layer o2 s2)
-       (p: Protocol o2 s2).
-
-  Axiom absR : s1.State -> s2.State -> Prop.
-  Axiom compile_ts : threads_state o2.Op -> threads_state o1.Op.
-  Axiom compile_ts_no_atomics :
-    forall ts,
-      no_atomics_ts ts ->
-      no_atomics_ts (compile_ts ts).
-  Axiom absInitP :
-    forall s1,
-      l1.initP s1 -> exists s2, absR s1 s2 /\ l2.initP s2.
-  Axiom compile_traces_match :
-    forall ts,
-      no_atomics_ts ts ->
-      (forall s, follows_protocol_s l2.step p.step_allow ts s) ->
-      traces_match_abs absR l1.initP l2.initP l1.step l2.step (compile_ts ts) ts.
-End LayerImplRequiresRule.
-
-
-Module Type LayerImplFollowsRule
-       (o1: Ops) (s1: State) (l1: Layer o1 s1)
-       (o2: Ops) (s2: State) (l2: Layer o2 s2)
-       (p: Protocol o2 s2).
-
-End LayerImplFollowsRule.
-
-
 Module Type LayerImplMoversProtocolT
   (s : State)
   (o1 : Ops) (l1raw : Layer o1 s) (l1 : Layer o1 s)
