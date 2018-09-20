@@ -226,7 +226,7 @@ Module MailFSMergedAbsImpl' <:
     eauto.
   Qed.
 
-  Theorem absR_In :
+  Theorem absR_not_In :
     forall fs lock s2 u dir fn P,
       absR (MailFSMergedState.mk_state fs lock) s2 ->
       (~ FMap.In (u, dir, fn) fs) ->
@@ -244,6 +244,28 @@ Module MailFSMergedAbsImpl' <:
       simpl in H1.
       eauto.
     }
+    eapply FMap.mapsto_in; eauto.
+  Qed.
+
+  Theorem absR_In :
+    forall fs lock s2 u dir fn P,
+      absR (MailFSMergedState.mk_state fs lock) s2 ->
+      FMap.In (u, dir, fn) fs ->
+      FMap.In (dir, fn)
+        (MailFSPathAbsState.fs (hget s2 (exist _ u P))).
+  Proof.
+    intros.
+    specialize (H u P); simpl in *; intuition idtac.
+    apply FMap.in_mapsto_exists in H0; deex.
+    eapply H3 in H0; deex.
+
+    pose proof hget_mapsto.
+    specialize (H4 _ _ _ _ (exist _ u P) s2).
+    simpl in H4.
+
+    eapply FMap.mapsto_unique in H0; try eassumption.
+    unfold UserIdx.indexValid in *. unfold UserIdx.indexT. rewrite H0.
+
     eapply FMap.mapsto_in; eauto.
   Qed.
 
@@ -379,6 +401,7 @@ Module MailFSMergedAbsImpl' <:
   Hint Resolve absR_fs_add.
   Hint Resolve absR_fs_remove.
   Hint Resolve absR_MapsTo.
+  Hint Resolve absR_not_In.
   Hint Resolve absR_In.
   Hint Resolve absR_is_permutation_key.
   Hint Resolve absR_locked_add.
@@ -523,8 +546,10 @@ Module MailFSMergedOpImpl' <:
         Call (MailFSMergedOp.List (u, dir))
       | Read (dir, fn) =>
         Call (MailFSMergedOp.Read (u, dir, fn))
-      | CreateWrite (dir, fn) data =>
-        Call (MailFSMergedOp.CreateWrite (u, dir, fn) data)
+      | Create (dir, fn) =>
+        Call (MailFSMergedOp.Create (u, dir, fn))
+      | Write (dir, fn) data =>
+        Call (MailFSMergedOp.Write (u, dir, fn) data)
       | Unlink (dir, fn) =>
         Call (MailFSMergedOp.Unlink (u, dir, fn))
       | Ext extop =>

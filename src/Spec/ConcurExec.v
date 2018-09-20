@@ -267,6 +267,8 @@ Ltac exec_tid_simpl :=
 
 Ltac atomic_exec_inv :=
   match goal with
+  | H : atomic_exec _ (if ?expr then _ else _) _ _ _ _ _ |- _ =>
+    destruct expr
   | H : atomic_exec _ _ _ _ _ _ _ |- _ =>
     inversion H; clear H; subst; repeat maybe_proc_inv
   end;

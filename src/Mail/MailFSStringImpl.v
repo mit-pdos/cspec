@@ -13,9 +13,14 @@ Module MailFSStringImpl' <:
 
   (* START CODE *)
 
-  Definition createwritetmp_core data :=
+  Definition createtmp_core :=
     tid <- Call (MailFSStringOp.GetTID);
-    r <- Call (MailFSStringOp.CreateWriteTmp (encode_tid_fn tid 0) data);
+    r <- Call (MailFSStringOp.CreateTmp (encode_tid_fn tid 0));
+    Ret r.
+
+  Definition writetmp_core data :=
+    tid <- Call (MailFSStringOp.GetTID);
+    r <- Call (MailFSStringOp.WriteTmp (encode_tid_fn tid 0) data);
     Ret r.
 
   Definition linkmail_core mboxfn :=
@@ -38,7 +43,8 @@ Module MailFSStringImpl' <:
     | MailFSOp.List => list_core
     | MailFSOp.Read fn => Call (MailFSStringOp.Read (encode_tid_fn (fst fn) (snd fn)))
     | MailFSOp.Delete fn => Call (MailFSStringOp.Delete (encode_tid_fn (fst fn) (snd fn)))
-    | MailFSOp.CreateWriteTmp data => createwritetmp_core data
+    | MailFSOp.CreateTmp => createtmp_core
+    | MailFSOp.WriteTmp data => writetmp_core data
     | MailFSOp.UnlinkTmp => unlinktmp_core
     | MailFSOp.Ext extop => Call (MailFSStringOp.Ext extop)
     | MailFSOp.Lock => Call (MailFSStringOp.Lock)
@@ -49,7 +55,6 @@ Module MailFSStringImpl' <:
 
   (* END CODE *)
 
-  
   Theorem compile_op_no_atomics :
     forall `(op : _ T),
       no_atomics (compile_op op).
@@ -57,7 +62,6 @@ Module MailFSStringImpl' <:
     destruct op; compute; eauto.
   Qed.
 
-  
   Ltac step_inv :=
     match goal with
     | H : MailFSStringAbsAPI.step _ _ _ _ _ _ |- _ =>
@@ -77,7 +81,7 @@ Module MailFSStringImpl' <:
     unfold right_mover; intros.
     repeat step_inv; eauto.
 
-    eexists; split; econstructor.
+    eexists; split; econstructor; eauto.
   Qed.
 
   Hint Resolve gettid_right_mover.
@@ -99,13 +103,21 @@ Module MailFSStringImpl' <:
 
   Hint Resolve ysa_movers_list_core.
 
-  Theorem ysa_movers_createwritetmp_core: forall s,
-    ysa_movers MailFSStringAPI.step (createwritetmp_core s).
+  Theorem ysa_movers_createtmp_core:
+    ysa_movers MailFSStringAPI.step (createtmp_core).
   Proof.
     econstructor; eauto 20.
   Qed.
 
-  Hint Resolve ysa_movers_createwritetmp_core.
+  Hint Resolve ysa_movers_createtmp_core.
+
+  Theorem ysa_movers_writetmp_core: forall s,
+    ysa_movers MailFSStringAPI.step (writetmp_core s).
+  Proof.
+    econstructor; eauto 20.
+  Qed.
+
+  Hint Resolve ysa_movers_writetmp_core.
 
   Theorem ysa_movers_unlinktmp_core:
     ysa_movers MailFSStringAPI.step unlinktmp_core.

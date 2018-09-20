@@ -8,7 +8,8 @@ Module MailFSMergedOp <: Ops.
   Definition extopT := MailServerAPI.MailServerOp.extopT.
 
   Inductive xOp : Type -> Type :=
-  | CreateWrite : forall (fn : string * string * string) (data : string), xOp bool
+  | Create : forall (fn : string * string * string), xOp bool
+  | Write : forall (fn : string * string * string) (data : string), xOp bool
   | Link : forall (fn : string * string * string) (fn : string * string * string), xOp bool
   | Unlink : forall (fn : string * string * string), xOp unit
 
@@ -68,20 +69,34 @@ Module MailFSMergedAPI <: Layer MailFSMergedOp MailFSMergedState.
   mail-test/lib/Interpreter.hs, when run on a file system, obeys these
   semantics. *)
   Inductive xstep : forall T, Op T -> nat -> State -> T -> State -> list event -> Prop :=
-  | StepCreateWriteOK : forall fs tid tmpfn data lock,
-    xstep (CreateWrite tmpfn data) tid
+  | StepCreateOK : forall fs tid tmpfn lock,
+    xstep (Create tmpfn) tid
       (mk_state fs lock)
       true
-      (mk_state (FMap.add tmpfn data fs) lock)
+      (mk_state (FMap.add tmpfn empty_string fs) lock)
       nil
-  | StepCreateWriteErr1 : forall fs tid tmpfn data lock,
-    xstep (CreateWrite tmpfn data) tid
+  | StepCreateErr : forall fs tid tmpfn lock,
+    xstep (Create tmpfn) tid
       (mk_state fs lock)
       false
       (mk_state fs lock)
       nil
-  | StepCreateWriteErr2 : forall fs tid tmpfn data data' lock,
-    xstep (CreateWrite tmpfn data) tid
+  | StepWriteOK : forall fs tid tmpfn data lock,
+    FMap.In tmpfn fs ->
+    xstep (Write tmpfn data) tid
+      (mk_state fs lock)
+      true
+      (mk_state (FMap.add tmpfn data fs) lock)
+      nil
+  | StepWriteErr1 : forall fs tid tmpfn data lock,
+    xstep (Write tmpfn data) tid
+      (mk_state fs lock)
+      false
+      (mk_state fs lock)
+      nil
+  | StepWriteErr2 : forall fs tid tmpfn data data' lock,
+    FMap.In tmpfn fs ->
+    xstep (Write tmpfn data) tid
       (mk_state fs lock)
       false
       (mk_state (FMap.add tmpfn data' fs) lock)
@@ -201,20 +216,34 @@ Module MailFSMergedAbsAPI <: Layer MailFSPathHOp MailFSMergedState.
   Import MailFSMergedState.
 
   Inductive xstep : forall T, Op T -> nat -> State -> T -> State -> list event -> Prop :=
-  | StepCreateWriteOK : forall fs tid dir fn data lock u P,
-    xstep (Slice (exist _ u P) (CreateWrite (dir, fn) data)) tid
+  | StepCreateOK : forall fs tid dir fn lock u P,
+    xstep (Slice (exist _ u P) (Create (dir, fn))) tid
       (mk_state fs lock)
       true
-      (mk_state (FMap.add (u, dir, fn) data fs) lock)
+      (mk_state (FMap.add (u, dir, fn) empty_string fs) lock)
       nil
-  | StepCreateWriteErr1 : forall fs tid dir fn data lock u P,
-    xstep (Slice (exist _ u P) (CreateWrite (dir, fn) data)) tid
+  | StepCreateErr : forall fs tid dir fn lock u P,
+    xstep (Slice (exist _ u P) (Create (dir, fn))) tid
       (mk_state fs lock)
       false
       (mk_state fs lock)
       nil
-  | StepCreateWriteErr2 : forall fs tid dir fn data data' lock u P,
-    xstep (Slice (exist _ u P) (CreateWrite (dir, fn) data)) tid
+  | StepWriteOK : forall fs tid dir fn data lock u P,
+    FMap.In (u, dir, fn) fs ->
+    xstep (Slice (exist _ u P) (Write (dir, fn) data)) tid
+      (mk_state fs lock)
+      true
+      (mk_state (FMap.add (u, dir, fn) data fs) lock)
+      nil
+  | StepWriteErr1 : forall fs tid dir fn data lock u P,
+    xstep (Slice (exist _ u P) (Write (dir, fn) data)) tid
+      (mk_state fs lock)
+      false
+      (mk_state fs lock)
+      nil
+  | StepWriteErr2 : forall fs tid dir fn data data' lock u P,
+    FMap.In (u, dir, fn) fs ->
+    xstep (Slice (exist _ u P) (Write (dir, fn) data)) tid
       (mk_state fs lock)
       false
       (mk_state (FMap.add (u, dir, fn) data' fs) lock)

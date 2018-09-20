@@ -7,7 +7,8 @@ Module MailFSPathOp <: Ops.
   Definition extopT := MailServerAPI.MailServerOp.extopT.
 
   Inductive xOp : Type -> Type :=
-  | CreateWrite : forall (tmpfn : string * string) (data : string), xOp bool
+  | Create : forall (tmpfn : string * string), xOp bool
+  | Write : forall (tmpfn : string * string) (data : string), xOp bool
   | Link : forall (tmpfn : string * string) (mboxfn : string * string), xOp bool
   | Unlink : forall (fn : string * string), xOp unit
 
@@ -36,20 +37,34 @@ Module MailFSPathAPI <: Layer MailFSPathOp MailFSPathAbsState.
   Import MailFSPathAbsAPI.
 
   Inductive xstep : forall T, Op T -> nat -> State -> T -> State -> list event -> Prop :=
-  | StepCreateWriteOK : forall fs tid tmpfn data lock,
-    xstep (CreateWrite tmpfn data) tid
+  | StepCreateOK : forall fs tid tmpfn lock,
+    xstep (Create tmpfn) tid
       (mk_state fs lock)
       true
-      (mk_state (FMap.add tmpfn data fs) lock)
+      (mk_state (FMap.add tmpfn empty_string fs) lock)
       nil
-  | StepCreateWriteErr1 : forall fs tid tmpfn data lock,
-    xstep (CreateWrite tmpfn data) tid
+  | StepCreateErr : forall fs tid tmpfn lock,
+    xstep (Create tmpfn) tid
       (mk_state fs lock)
       false
       (mk_state fs lock)
       nil
-  | StepCreateWriteErr2 : forall fs tid tmpfn data data' lock,
-    xstep (CreateWrite tmpfn data) tid
+  | StepWriteOK : forall fs tid tmpfn data lock,
+    FMap.In tmpfn fs ->
+    xstep (Write tmpfn data) tid
+      (mk_state fs lock)
+      true
+      (mk_state (FMap.add tmpfn data fs) lock)
+      nil
+  | StepWriteErr1 : forall fs tid tmpfn data lock,
+    xstep (Write tmpfn data) tid
+      (mk_state fs lock)
+      false
+      (mk_state fs lock)
+      nil
+  | StepWriteErr2 : forall fs tid tmpfn data data' lock,
+    FMap.In tmpfn fs ->
+    xstep (Write tmpfn data) tid
       (mk_state fs lock)
       false
       (mk_state (FMap.add tmpfn data' fs) lock)

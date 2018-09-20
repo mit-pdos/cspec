@@ -89,21 +89,37 @@ Module MailFSPathAbsAPI <: Layer MailFSStringOp MailFSPathAbsState.
   Qed.
 
   Inductive xstep : forall T, Op T -> nat -> State -> T -> State -> list event -> Prop :=
-  | StepCreateWriteTmpOk : forall fs tid tmpfn data lock,
-    xstep (CreateWriteTmp tmpfn data) tid
+  | StepCreateTmpOk : forall fs tid tmpfn lock,
+    xstep (CreateTmp tmpfn) tid
+      (mk_state fs lock)
+      true
+      (mk_state (FMap.add (tmp_string, tmpfn) empty_string fs) lock)
+      nil
+
+  | StepCreateTmpErr : forall fs tid tmpfn lock,
+    xstep (CreateTmp tmpfn) tid
+      (mk_state fs lock)
+      false
+      (mk_state fs lock)
+      nil
+
+  | StepWriteTmpOk : forall fs tid tmpfn data lock,
+    FMap.In (tmp_string, tmpfn) fs ->
+    xstep (WriteTmp tmpfn data) tid
       (mk_state fs lock)
       true
       (mk_state (FMap.add (tmp_string, tmpfn) data fs) lock)
       nil
 
-  | StepCreateWriteTmpErr1 : forall fs tid tmpfn data lock,
-    xstep (CreateWriteTmp tmpfn data) tid
+  | StepWriteTmpErr1 : forall fs tid tmpfn data lock,
+    xstep (WriteTmp tmpfn data) tid
       (mk_state fs lock)
       false
       (mk_state fs lock)
       nil
-  | StepCreateWriteTmpErr2 : forall fs tid tmpfn data data' lock,
-    xstep (CreateWriteTmp tmpfn data) tid
+  | StepWriteTmpErr2 : forall fs tid tmpfn data data' lock,
+    FMap.In (tmp_string, tmpfn) fs ->
+    xstep (WriteTmp tmpfn data) tid
       (mk_state fs lock)
       false
       (mk_state (FMap.add (tmp_string, tmpfn) data' fs) lock)

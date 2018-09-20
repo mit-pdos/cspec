@@ -161,6 +161,19 @@ Module MailFSPathAbsImpl' <:
     exfalso; eauto.
   Qed.
 
+  Lemma absR_in_tmp' :
+    forall fs tmp mail fn lock lock',
+      absR (MailFSPathAbsState.mk_state fs lock)
+           (MailFSStringAbsState.mk_state tmp mail lock') ->
+      FMap.In (tmp_string, fn) fs ->
+      FMap.In fn tmp.
+  Proof.
+    unfold absR; intros.
+    eapply FMap.in_mapsto_exists in H0; destruct H0.
+    eapply FMap.mapsto_in.
+    eapply absR_mapsto_tmp; eauto.
+  Qed.
+
   Lemma absR_in_mail :
     forall fs tmp mail fn lock lock',
       absR (MailFSPathAbsState.mk_state fs lock)
@@ -250,6 +263,7 @@ Module MailFSPathAbsImpl' <:
   Hint Resolve absR_add_mail.
   Hint Resolve absR_remove_mail.
   Hint Resolve absR_in_tmp.
+  Hint Resolve absR_in_tmp'.
   Hint Resolve absR_mapsto_tmp.
   Hint Resolve absR_in_mail.
   Hint Resolve absR_in_mail'.
