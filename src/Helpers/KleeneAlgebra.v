@@ -7,71 +7,81 @@ Require Import Helpers.ProofAutomation.Propositional.
 
 Set Implicit Arguments.
 
-Module Type KleeneAlgebra.
-  Axiom K:Type.
-  Axiom equiv: K -> K -> Prop.
-  Axiom equiv_Equivalence : Equivalence equiv.
-  Existing Instance equiv_Equivalence.
+Generalizable Variables A.
 
-  Axiom choice : K -> K -> K.
-  Axiom seq : K -> K -> K.
-  Axiom star : K -> K.
+Record Setoid :=
+  { T :> Type;
+    equiv : relation T;
+    equiv_Equiv : Equivalence equiv; }.
 
-  Axiom choice_respects_equiv : Proper (equiv ==> equiv ==> equiv) choice.
-  Existing Instance choice_respects_equiv.
-  Axiom seq_respects_equiv : Proper (equiv ==> equiv ==> equiv) seq.
-  Existing Instance seq_respects_equiv.
-  Axiom star_respects_equiv : Proper (equiv ==> equiv) star.
-  Existing Instance star_respects_equiv.
+Arguments equiv {A} _ _ : rename.
+Opaque equiv.
 
-  Axiom fail : K.
-  Axiom skip : K.
+Existing Instance equiv_Equiv.
 
-  Definition le (a b:K) := equiv (choice a b) b.
+Class Monoid_Ops (A:Setoid) :=
+  { dot : A -> A -> A;
+    one : A; }.
 
-  Module KANotations.
-    Infix "==" := equiv (at level 90).
-    Infix "+" := choice.
-    Infix "*" := seq.
-    Notation "R ^*" := (star R) (at level 0, format "'[' R ']' ^*").
-    Notation "0" := fail.
-    Notation "1" := skip.
-    Infix "<=" := le.
-  End KANotations.
+Infix "==" := equiv (at level 90).
+Infix "⋅" := dot (at level 40, left associativity).
+Notation "1" := one.
 
-  Import KANotations.
+Class SemiLattice_Ops (A:Setoid) :=
+  { plus: A -> A -> A;
+    zero: A }.
 
-  (** Idempotent semiring *)
-  Section Axioms.
-    Context (p q r:K).
-    Axiom choice_assoc : p + (q + r) == (p + q) + r.
-    Axiom seq_assoc : p * (q * r) == (p * q) * r.
-    Axiom choice_comm : p + q == q + p.
-    Axiom distr_l : p * (q + r) == p * q + p * r.
-    Axiom distr_r : (p + q) * r == p * r + q * r.
-    Axiom choice_id_r : p + 0 == p.
-    Axiom choice_idem : p + p == p.
-    Axiom fail_cancel_r : p * 0 == 0.
-    Axiom fail_cancel_l : 0 * p == 0.
-    Axiom skip_id_l : 1 * p == p.
-    Axiom skip_id_r : p * 1 == p.
-  End Axioms.
+Infix "+" := plus.
+Notation "0" := zero.
 
-  (** Axioms for star *)
-  Section StarAxioms.
-    Context (p q x:K).
-    Axiom star_one_l : 1 + p * p^* <= p^*.
-    Axiom star_one_r : 1 + p^* * p <= p^*.
-    Axiom star_ind_l : q + p * x <= x -> p^* * q <= x.
-    Axiom star_ind_r : q + x * p <= x -> q * p^* <= x.
-  End StarAxioms.
+Class Star_Op (A:Setoid) :=
+  { star: A -> A; }.
 
-End KleeneAlgebra.
+Notation "x *" := (star x) (at level 0, format "'[' x ']' *").
 
-Module KAFacts (Import A:KleeneAlgebra).
-  Import A.KANotations.
+Definition le `{_: SemiLattice_Ops A} (x y:A) := x + y == y.
 
-  Existing Instance equiv_Equivalence.
+Infix "<=" := le.
+
+Section Laws.
+  Context {A} {Mo: Monoid_Ops A} {SLo: SemiLattice_Ops A} {Ko: Star_Op A}.
+
+  Class Monoid :=
+    { dot_compat :> Proper (equiv ==> equiv ==> equiv) dot;
+      dot_assoc : forall x y z, x ⋅ (y ⋅ z) == x ⋅ y ⋅ z;
+      dot_neutral_left : forall x, 1 ⋅ x == x;
+      dot_neutral_right : forall x, x ⋅ 1 == x }.
+
+  Class SemiLattice :=
+    { plus_compat :> Proper (equiv ==> equiv ==> equiv) plus;
+      plus_neutral_left : forall x, 0 + x == x;
+      plus_idem : forall x, x + x == x;
+      plus_assoc : forall x y z, x + (y + z) == x + y + z;
+      plus_comm : forall x y, x + y == y + x; }.
+
+  Class IdemSemiRing :=
+    { Monoid_ :> Monoid;
+      SemiLattice_ :> SemiLattice;
+      dot_ann_left : forall x, 0 ⋅ x == 0;
+      dot_ann_right : forall x, x ⋅ 0 == 0;
+      dot_distr_right : forall x y z, (x + y) ⋅ z == x ⋅ z + y ⋅ z;
+      dot_distr_left : forall x y z, z ⋅ (x + y) == z ⋅ x + z ⋅ y; }.
+
+  Class KleeneAlgebra :=
+    { IdemSemiRing_ :> IdemSemiRing;
+      star_one_l : forall p, 1 + p ⋅ p* <= p*;
+      star_one_r : forall p, 1 + p* ⋅ p <= p*;
+      star_ind_l : forall p q x, q + p ⋅ x <= x -> p* ⋅ q <= x;
+      star_ind_r : forall p q x, q + x ⋅ p <= x -> q ⋅ p* <= x; }.
+
+End Laws.
+
+Section Theorems.
+  Context A {Mo: Monoid_Ops A} {SLo: SemiLattice_Ops A} {Ko: Star_Op A}.
+  Context {M: Monoid}.
+  Context {SL: SemiLattice}.
+  Context {ISL: IdemSemiRing}.
+  Context {KA: KleeneAlgebra}.
 
   Theorem le_eq : forall p q, p <= q ->
                           q <= p ->
@@ -80,24 +90,24 @@ Module KAFacts (Import A:KleeneAlgebra).
     unfold le; intros.
     rewrite <- H.
     rewrite <- H0 at 1.
-    apply choice_comm.
+    apply plus_comm.
   Qed.
 
-  Hint Rewrite choice_idem : ka.
-  Hint Rewrite choice_assoc : ka.
-  Hint Rewrite seq_assoc : ka.
-  Hint Rewrite choice_id_r : ka.
+  Hint Rewrite plus_idem : ka.
+  Hint Rewrite plus_assoc : ka.
+  Hint Rewrite dot_assoc : ka.
+  Hint Rewrite plus_neutral_left : ka.
 
-  Lemma choice_id_l : forall x, 0 + x == x.
+  Lemma plus_neutral_right : forall x, x + 0 == x.
   Proof.
     intros.
-    rewrite choice_comm.
-    apply choice_id_r.
+    rewrite plus_comm.
+    apply plus_neutral_left.
   Qed.
 
-  Hint Rewrite choice_id_l : ka.
+  Hint Rewrite plus_neutral_right : ka.
 
-  Hint Rewrite fail_cancel_r fail_cancel_r skip_id_l skip_id_r : ka.
+  Hint Rewrite dot_ann_left dot_ann_right dot_neutral_left dot_neutral_right : ka.
 
   Ltac is_removed x :=
     lazymatch goal with
@@ -112,7 +122,7 @@ Module KAFacts (Import A:KleeneAlgebra).
     | _ => idtac
     end.
 
-  Hint Rewrite distr_r distr_l : ka_distr.
+  Hint Rewrite dot_distr_right dot_distr_left : ka_distr.
 
   Ltac equiv_subst :=
     match goal with
@@ -143,7 +153,7 @@ Module KAFacts (Import A:KleeneAlgebra).
     repeat (equiv_subst || autorewrite with ka ka_distr in *);
             trivial.
 
-  Hint Resolve choice_idem le_eq.
+  Hint Resolve plus_idem le_eq.
   Hint Resolve (reflexivity : forall x, x == x).
 
   Instance le_PreOrder : PreOrder le.
@@ -169,19 +179,19 @@ Module KAFacts (Import A:KleeneAlgebra).
       a + b + c == a + c + b.
   Proof.
     intros.
-    rewrite <- choice_assoc.
-    rewrite (choice_comm b c).
+    rewrite <- plus_assoc.
+    rewrite (plus_comm b c).
     cleanup.
   Qed.
 
-  Instance le_choice_respectful :
-    Proper (le ==> le ==> le) choice.
+  Instance le_plus_respectful :
+    Proper (le ==> le ==> le) plus.
   Proof.
     autounfold with m; unfold le; intros.
     cleanup.
     rewrite (abc_to_acb x x0 y).
     rewrite H.
-    rewrite <- choice_assoc.
+    rewrite <- plus_assoc.
     rewrite H0.
     auto.
   Qed.
@@ -193,51 +203,51 @@ Module KAFacts (Import A:KleeneAlgebra).
   Qed.
 
   Lemma distr_abcd : forall a b c d,
-      (a + b) * (c + d) ==
-      a * c + b * d + (a * d + b * c).
+      (a + b) ⋅ (c + d) ==
+      a ⋅ c + b ⋅ d + (a ⋅ d + b ⋅ c).
   Proof.
     intros.
-    rewrite ?distr_l, ?distr_r.
-    generalize dependent (a*c); intro w.
-    generalize dependent (b*c); intro x.
-    generalize dependent (a*d); intro y.
-    generalize dependent (b*d); intro z.
-    rewrite (choice_comm y z).
-    rewrite choice_assoc at 1.
+    rewrite ?dot_distr_left, ?dot_distr_right.
+    generalize dependent (a⋅c); intro w.
+    generalize dependent (b⋅c); intro x.
+    generalize dependent (a⋅d); intro y.
+    generalize dependent (b⋅d); intro z.
+    rewrite (plus_comm y z).
+    rewrite plus_assoc at 1.
     rewrite (abc_to_acb w x z).
-    rewrite (choice_comm y x).
+    rewrite (plus_comm y x).
     cleanup.
   Qed.
 
-  Instance le_seq_respectful :
-      Proper (le ==> le ==> le) seq.
+  Instance le_dot_respectful :
+      Proper (le ==> le ==> le) dot.
   Proof.
     autounfold with m; intros.
     unfold le in *.
 
-    assert ((x + y) * (x0 + y0) == y * y0).
+    assert ((x + y) ⋅ (x0 + y0) == y ⋅ y0).
     rewrite H, H0; auto.
     rewrite <- H1 at 2.
 
     rewrite distr_abcd.
-    rewrite <- (choice_idem (x * x0 + y * y0)) at 2.
-    rewrite <- choice_assoc.
+    rewrite <- (plus_idem (x ⋅ x0 + y ⋅ y0)) at 2.
+    rewrite <- plus_assoc.
 
-    assert (x * x0 + y * y0 + (x * y0 + y * x0) ==
-            (x + y) * (x0 + y0)).
+    assert (x ⋅ x0 + y ⋅ y0 + (x ⋅ y0 + y ⋅ x0) ==
+            (x + y) ⋅ (x0 + y0)).
     rewrite abc_to_acb.
-    rewrite ?distr_l, ?distr_r; cleanup.
-    rewrite (abc_to_acb (x*x0) (x*y0) (y*x0)).
+    rewrite ?dot_distr_left, ?dot_distr_right; cleanup.
+    rewrite (abc_to_acb (x⋅x0) (x⋅y0) (y⋅x0)).
     auto.
 
     rewrite H2.
     rewrite H1.
-    rewrite <- choice_assoc.
-    rewrite choice_idem.
+    rewrite <- plus_assoc.
+    rewrite plus_idem.
     auto.
   Qed.
 
-  Theorem choice_r_monotone : forall r p q,
+  Theorem plus_r_monotone : forall r p q,
       p <= q ->
       p + r <= q + r.
   Proof.
@@ -245,7 +255,7 @@ Module KAFacts (Import A:KleeneAlgebra).
     rewrite H; reflexivity.
   Qed.
 
-  Theorem choice_l_monotone : forall r p q,
+  Theorem plus_l_monotone : forall r p q,
       p <= q ->
       r + p <= r + q.
   Proof.
@@ -253,17 +263,17 @@ Module KAFacts (Import A:KleeneAlgebra).
     rewrite H; reflexivity.
   Qed.
 
-  Theorem seq_r_monotone : forall r p q,
+  Theorem dot_r_monotone : forall r p q,
       p <= q ->
-      p * r <= q * r.
+      p ⋅ r <= q ⋅ r.
   Proof.
     intros.
     rewrite H; reflexivity.
   Qed.
 
-  Theorem seq_l_monotone : forall r p q,
+  Theorem dot_l_monotone : forall r p q,
       p <= q ->
-      r * p <= r * q.
+      r ⋅ p <= r ⋅ q.
   Proof.
     intros.
     rewrite H; reflexivity.
@@ -276,14 +286,14 @@ Module KAFacts (Import A:KleeneAlgebra).
     cleanup.
   Qed.
 
-  Theorem star_ind1_l : forall p x, 1 + p * x <= x -> p^* <= x.
+  Theorem star_ind1_l : forall p x, 1 + p ⋅ x <= x -> p* <= x.
   Proof.
     intros.
     eapply star_ind_l in H.
     cleanup; auto.
   Qed.
 
-  Theorem star_ind1_r : forall p x, 1 + x * p <= x -> p^* <= x.
+  Theorem star_ind1_r : forall p x, 1 + x ⋅ p <= x -> p* <= x.
   Proof.
     intros.
     eapply star_ind_r in H.
@@ -291,11 +301,11 @@ Module KAFacts (Import A:KleeneAlgebra).
   Qed.
 
   Theorem star_and : forall p q,
-      q + p*p^* * q <= p^* * q.
+      q + p⋅p* ⋅ q <= p* ⋅ q.
   Proof.
     intros.
     pose proof (star_one_l p).
-    apply (seq_r_monotone q) in H.
+    apply (dot_r_monotone q) in H.
     cleanup_distr.
   Qed.
 
@@ -316,56 +326,56 @@ Module KAFacts (Import A:KleeneAlgebra).
 
   Hint Immediate le_0.
 
-  Theorem choice_le_r : forall p q,
+  Theorem plus_le_r : forall p q,
       p <= p + q.
   Proof.
     intros.
     unfold le; cleanup.
   Qed.
 
-  Theorem choice_le_l : forall p q,
+  Theorem plus_le_l : forall p q,
       p <= q + p.
   Proof.
     intros.
-    rewrite choice_comm.
-    apply choice_le_r.
+    rewrite plus_comm.
+    apply plus_le_r.
   Qed.
 
   Hint Resolve (reflexivity : forall p, p <= p).
 
   Ltac monotonicity :=
     match goal with
-    | [ |- ?x * _ <= ?x * _ ] =>
-      apply seq_l_monotone
-    | [ |- _ * ?y <= _ * ?y ] =>
-      apply seq_r_monotone
+    | [ |- ?x ⋅ _ <= ?x ⋅ _ ] =>
+      apply dot_l_monotone
+    | [ |- _ ⋅ ?y <= _ ⋅ ?y ] =>
+      apply dot_r_monotone
     | [ |- ?x + _ <= ?x + _ ] =>
-      apply choice_l_monotone
+      apply plus_l_monotone
     | [ |- _ + ?y <= _ + ?y ] =>
-      apply choice_r_monotone
+      apply plus_r_monotone
     | [ |- ?x + _ == ?x + _ ] =>
-      apply choice_respects_equiv; [ reflexivity | ]
+      apply plus_compat; [ reflexivity | ]
     | [ |- _ + ?y == _ + ?y ] =>
-      apply choice_respects_equiv; [ | reflexivity ]
+      apply plus_compat; [ | reflexivity ]
     | [ |- ?p <= ?p + _ ] =>
-      apply choice_le_r
+      apply plus_le_r
     | [ |- ?p <= _ + ?p ] =>
-      apply choice_le_l
+      apply plus_le_l
     end.
 
-  Lemma choice_split : forall p q x,
+  Lemma plus_split : forall p q x,
       p <= x ->
       q <= x ->
       p + q <= x.
   Proof.
     unfold le; intros.
-    rewrite <- choice_assoc.
+    rewrite <- plus_assoc.
     rewrite H0.
     auto.
   Qed.
 
   Theorem star_expand p :
-      p^* == 1 + p * p^*.
+      p* == 1 + p ⋅ p*.
   Proof.
     apply le_eq; [ | apply star_one_l ].
     apply star_ind1_l; cleanup.
@@ -374,7 +384,7 @@ Module KAFacts (Import A:KleeneAlgebra).
   Qed.
 
   Theorem star_expand_l p :
-      p^* == 1 + p^* * p.
+      p* == 1 + p* ⋅ p.
   Proof.
     apply le_eq; [ | apply star_one_r ].
     apply star_ind1_r; cleanup.
@@ -382,69 +392,69 @@ Module KAFacts (Import A:KleeneAlgebra).
     apply star_one_r.
   Qed.
 
-  Lemma star_one_l p :
-      p * p^* <= p^*.
+  Lemma star_one_le_l p :
+      p ⋅ p* <= p*.
   Proof.
     unfold le; intros.
     rewrite star_expand at 2 3.
     cleanup.
     rewrite abc_to_acb.
     cleanup.
-    rewrite choice_comm; auto.
+    rewrite plus_comm; auto.
   Qed.
 
   Theorem star_incl_skip p :
-    1 <= p^*.
+    1 <= p*.
   Proof.
     intros.
     rewrite star_expand.
     monotonicity.
   Qed.
 
-  Theorem star_expand1 p : p^* == 1 + p^*.
+  Theorem star_expand1 p : p* == 1 + p*.
   Proof.
     apply le_eq.
     - rewrite star_expand at 1.
       monotonicity.
-      apply star_one_l.
+      apply star_one_le_l.
     - rewrite (star_incl_skip p); cleanup.
   Qed.
 
-  Lemma star_one_r p :
-      p^* * p <= p^*.
+  Lemma star_one_le_r p :
+      p* ⋅ p <= p*.
   Proof.
     unfold le; intros.
     rewrite star_expand_l at 2 3.
     cleanup.
     rewrite abc_to_acb.
     cleanup.
-    rewrite choice_comm; auto.
+    rewrite plus_comm; auto.
   Qed.
 
-  Hint Resolve star_one_l star_one_r.
+  Hint Resolve star_one_le_l star_one_le_r.
 
-  Theorem star_one_comm p : p * p^* == p^* * p.
+  Theorem star_one_comm p : p ⋅ p* == p* ⋅ p.
   Proof.
     apply le_eq.
     - apply star_ind_r.
-      rewrite star_one_r at 1.
+      rewrite star_one_le_r at 1.
       rewrite star_expand1 at 2; cleanup_distr.
     - apply star_ind_l.
-      rewrite star_one_l at 1.
+      rewrite star_one_le_l at 1.
       rewrite star_expand1 at 2; cleanup_distr.
   Qed.
 
-  Theorem star_square p : p^* == p^* * p^*.
+  Theorem star_square p : p* == p* ⋅ p*.
   Proof.
     apply le_eq.
-    - rewrite <- skip_id_r at 1.
+    - rewrite <- dot_neutral_right at 1.
       monotonicity.
       apply star_incl_skip.
     - apply star_ind_l.
-      apply choice_split; auto.
+      apply plus_split; auto.
   Qed.
 
-  Theorem star_repeat p : p^*^* == p^*.
+  Theorem star_repeat p : (p*)* == p*.
   Proof.
     apply le_eq.
     - apply star_ind1_l.
@@ -457,28 +467,28 @@ Module KAFacts (Import A:KleeneAlgebra).
   Qed.
 
   Lemma quad_product_middle : forall w x y z,
-      w * x * y * z == w * (x * y) * z.
+      w ⋅ x ⋅ y ⋅ z == w ⋅ (x ⋅ y) ⋅ z.
   Proof.
     cleanup.
   Qed.
 
-  Theorem sliding p q : (p * q)^* * p == p * (q * p)^*.
+  Theorem sliding p q : (p ⋅ q)* ⋅ p == p ⋅ (q ⋅ p)*.
   Proof.
     apply le_eq.
     - apply star_ind_l; cleanup.
       rewrite quad_product_middle.
-      generalize dependent (q * p); intro y.
+      generalize dependent (q ⋅ p); intro y.
       rewrite (star_expand y) at 2; cleanup_distr.
     - apply star_ind_r; cleanup.
       rewrite quad_product_middle.
-      generalize dependent (p * q); intro y.
+      generalize dependent (p ⋅ q); intro y.
       rewrite (star_expand_l y) at 2; cleanup_distr.
   Qed.
 
-  Theorem seq_le_star p q r :
-    p <= r^* ->
-    q <= r^* ->
-    p * q <= r^*.
+  Theorem dot_le_star p q r :
+    p <= r* ->
+    q <= r* ->
+    p ⋅ q <= r*.
   Proof.
     intros.
     rewrite H.
@@ -487,7 +497,7 @@ Module KAFacts (Import A:KleeneAlgebra).
   Qed.
 
   Lemma star_one_iter : forall p,
-      p <= p^*.
+      p <= p*.
   Proof.
     intros.
     rewrite star_expand.
@@ -497,42 +507,42 @@ Module KAFacts (Import A:KleeneAlgebra).
 
   Theorem star_one_le : forall p q,
       p <= q ->
-      p <= q^*.
+      p <= q*.
   Proof.
     intros.
     rewrite <- star_one_iter; auto.
   Qed.
 
   Hint Resolve star_one_le.
-  Hint Resolve choice_le_l choice_le_r.
+  Hint Resolve plus_le_l plus_le_r.
 
-  Theorem denesting p q : (p + q)^* == p^* * (q * p^*)^*.
+  Theorem denesting p q : (p + q)* == p* ⋅ (q ⋅ p*)*.
   Proof.
     apply le_eq.
     - apply star_ind1_l; cleanup.
-      apply choice_split.
+      apply plus_split.
       + repeat rewrite <- star_incl_skip at 1; cleanup.
       + cleanup_distr.
-        apply choice_split.
+        apply plus_split.
         monotonicity; auto.
-        rewrite (star_square (q * _)) at 2; cleanup.
+        rewrite (star_square (q ⋅ _)) at 2; cleanup.
         monotonicity.
         rewrite <- star_incl_skip at 2; cleanup.
         auto.
     - apply star_ind_l.
-      apply choice_split.
+      apply plus_split.
       + apply star_ind1_l.
         rewrite (star_expand1 (p+q)) at 2.
         monotonicity.
-        repeat apply seq_le_star; auto.
+        repeat apply dot_le_star; auto.
         apply le_star_respectful; auto.
-      + rewrite (choice_le_r p q) at 1.
-        apply star_one_l.
+      + rewrite (plus_le_r p q) at 1.
+        apply star_one_le_l.
   Qed.
 
   Theorem bisimulation p q r :
-    p * q == q * r ->
-    p^* * q == q * r^*.
+    p ⋅ q == q ⋅ r ->
+    p* ⋅ q == q ⋅ r*.
   Proof.
     intros.
     apply le_eq.
@@ -540,34 +550,26 @@ Module KAFacts (Import A:KleeneAlgebra).
       rewrite H.
       rewrite (star_expand r) at 2; cleanup_distr.
     - apply star_ind_r; cleanup.
-      rewrite <- seq_assoc.
+      rewrite <- dot_assoc.
       rewrite <- H; cleanup.
       rewrite (star_expand_l p) at 2; cleanup_distr.
   Qed.
-End KAFacts.
 
-Module Type Alphabet.
-  Axiom A:Type.
-End Alphabet.
+  Theorem one_is_zero_star : 0* == 1.
+  Proof.
+    rewrite star_expand.
+    cleanup.
+  Qed.
 
-Module LanguageModel (Import A:Alphabet) <: KleeneAlgebra.
-  (* the elements of the language model are regular languages *)
-  Definition K := list A -> Prop.
-  Definition equiv : K -> K -> Prop := fun l1 l2 => forall x, l1 x <-> l2 x.
+End Theorems.
 
-  Import List List.ListNotations.
-  Open Scope list.
+Import List List.ListNotations.
+Open Scope list.
 
-  Notation magic := ltac:(firstorder) (only parsing).
+Section ReflTransClosure.
 
-  Instance equiv_Equivalence : Equivalence equiv := magic.
+  Context {A:Type}.
 
-  Definition choice : K -> K -> K :=
-    fun l1 l2 s => l1 s \/ l2 s.
-  Definition seq : K -> K -> K :=
-    fun l1 l2 s => exists s1 s2, s = s1 ++ s2 /\
-                         l1 s1 /\
-                         l2 s2.
   Inductive star_l (l: list A -> Prop) : list A -> Prop :=
   | star_empty : star_l l []
   | star_one_more : forall s s',
@@ -577,87 +579,7 @@ Module LanguageModel (Import A:Alphabet) <: KleeneAlgebra.
 
   Hint Constructors star_l.
 
-  Definition star : K -> K := star_l.
-
-  Instance choice_respects_equiv : Proper (equiv ==> equiv ==> equiv) choice
-    := magic.
-  Instance seq_respects_equiv : Proper (equiv ==> equiv ==> equiv) seq
-    := magic.
-
-  Instance star_respects_equiv : Proper (equiv ==> equiv) star.
-  Proof.
-    unfold equiv, star.
-    repeat (hnf; intros); intuition auto.
-    induction H0; eauto; firstorder.
-    induction H0; eauto; firstorder.
-  Qed.
-
-  Definition fail : K := fun _ => False.
-  Definition skip : K := fun s => s = nil.
-
-  Definition le (a b:K) := equiv (choice a b) b.
-
-  Module KANotations.
-    Infix "==" := equiv (at level 90).
-    Infix "+" := choice.
-    Infix "*" := seq.
-    Notation "R ^*" := (star R) (at level 0, format "'[' R ']' ^*").
-    Notation "0" := fail.
-    Notation "1" := skip.
-    Infix "<=" := le.
-  End KANotations.
-
-  Import KANotations.
-
-  (** Idempotent semiring *)
-  Section Axioms.
-    Context (p q r:K).
-    Definition choice_assoc : p + (q + r) == (p + q) + r := magic.
-    Theorem seq_assoc : p * (q * r) == (p * q) * r.
-      unfold seq, equiv; intros.
-      split; propositional.
-      eexists (_ ++ _), _; rewrite <- app_assoc; intuition eauto.
-      eexists _, (_ ++ _); rewrite <- app_assoc; intuition eauto.
-    Qed.
-
-    Definition choice_comm : p + q == q + p := magic.
-    Definition distr_l : p * (q + r) == p * q + p * r := magic.
-    Definition distr_r : (p + q) * r == p * r + q * r := magic.
-    Definition choice_id_r : p + 0 == p := magic.
-    Definition choice_idem : p + p == p := magic.
-    Definition fail_cancel_r : p * 0 == 0 := magic.
-    Definition fail_cancel_l : 0 * p == 0 := magic.
-    Theorem skip_id_l : 1 * p == p.
-      unfold seq, equiv, "1"; split; propositional.
-      do 2 eexists; intuition eauto.
-      simpl; auto.
-    Qed.
-    Theorem skip_id_r : p * 1 == p.
-      unfold seq, equiv, "1"; split; propositional.
-      rewrite app_nil_r; auto.
-      do 2 eexists; intuition eauto.
-      rewrite app_nil_r; auto.
-    Qed.
-  End Axioms.
-
-  Definition le_implies : forall (x y:K),
-      (forall s, x s -> y s) ->
-      x <= y := magic.
-
-  Definition le_implies' : forall (x y:K),
-      x <= y ->
-      (forall s, x s -> y s) := magic.
-
-  Ltac le := intros;
-             repeat match goal with
-                      | |- _ <= _ => apply le_implies
-                      | [ H: _ <= _ |- _ ] => pose proof (le_implies' H);
-                                           clear H
-                    end;
-             unfold choice, seq, "1", star in *;
-             intros.
-
-  Lemma star_l_one : forall (x:K) s,
+  Lemma star_l_one : forall (x:list A -> Prop) s,
       x s ->
       star_l x s.
   Proof.
@@ -677,7 +599,7 @@ Module LanguageModel (Import A:Alphabet) <: KleeneAlgebra.
 
   Hint Constructors star_r.
 
-  Theorem star_r_one : forall (x:K) s,
+  Theorem star_r_one : forall (x:list A -> Prop) s,
       x s ->
       star_r x s.
   Proof.
@@ -707,194 +629,207 @@ Module LanguageModel (Import A:Alphabet) <: KleeneAlgebra.
       eauto.
   Qed.
 
-  (** Axioms for star *)
-  Section StarAxioms.
-    Context (p q x:K).
-    Theorem star_one_l : 1 + p * p^* <= p^*.
-    Proof.
-      le.
-      (intuition propositional); eauto.
-    Qed.
+End ReflTransClosure.
 
-    Theorem star_one_r : 1 + p^* * p <= p^*.
-    Proof.
-      le.
-      setoid_rewrite star_lr in H.
-      setoid_rewrite star_lr.
-      (intuition propositional); eauto.
-    Qed.
+Section LanguageModel.
 
-    Theorem star_ind_l : q + p * x <= x -> p^* * q <= x.
-    Proof.
-      le.
-      (intuition propositional); eauto.
-      induction H1; eauto.
-      rewrite <- app_assoc; eauto 10.
-    Qed.
+  Definition language (A:Type) : Setoid.
+    refine {| T := list A -> Prop;
+              equiv := fun l1 l2 => forall x, l1 x <-> l2 x; |}.
+    abstract firstorder.
+  Defined.
 
-    Theorem star_ind_r : q + x * p <= x -> q * p^* <= x.
-    Proof.
-      le.
-      setoid_rewrite star_lr in H.
-      (intuition propositional); eauto.
-      induction H2; rewrite ?app_nil_r; eauto.
-      rewrite app_assoc.
-      eauto 10.
-    Qed.
-  End StarAxioms.
-End LanguageModel.
-
-Module RelationalModel (Import A:Alphabet) <: KleeneAlgebra.
-  Definition K:Type := A -> A -> Prop.
-  Definition equiv: K -> K -> Prop :=
-    fun r1 r2 => (forall x y, r1 x y -> r2 x y) /\
-              (forall x y, r2 x y -> r1 x y).
-
-  Notation magic := ltac:(firstorder) (only parsing).
-
-  Instance equiv_Equivalence : Equivalence equiv := magic.
-
-  Definition choice : K -> K -> K :=
-    fun r1 r2 => fun x y => r1 x y \/ r2 x y.
-  Definition seq : K -> K -> K :=
-    fun r1 r2 => fun x z => exists y, r1 x y /\ r2 y z.
-
-  Inductive kstar (r:K) : K :=
-  | kstar_refl : forall x, kstar r x x
-  | kstar_one_more : forall x y z,
-      r x y ->
-      kstar r y z ->
-      kstar r x z.
-
-  Hint Constructors kstar.
-
-  Definition star : K -> K := kstar.
-
-  Instance star_PreOrder r : PreOrder (star r).
+  Theorem lang_equiv : forall A (l1 l2: language A),
+      (l1 == l2) =
+      (forall x, l1 x <-> l2 x).
   Proof.
-    unfold star.
-    constructor; repeat (hnf; intros); eauto.
-    induction H; eauto.
+    reflexivity.
   Qed.
 
-  Instance choice_respects_equiv : Proper (equiv ==> equiv ==> equiv) choice := magic.
-  Instance seq_respects_equiv : Proper (equiv ==> equiv ==> equiv) seq := magic.
-  Instance star_respects_equiv : Proper (equiv ==> equiv) star.
-  Proof.
-    unfold equiv, star.
-    repeat (hnf; intros); intuition eauto.
-    induction H; eauto.
-    induction H; eauto.
-  Qed.
+  Instance lang_Mo {A} : Monoid_Ops (language A) :=
+    {| dot := fun (l1 l2: language A) =>
+                fun s => exists s1 s2, s = s1 ++ s2 /\
+                               l1 s1 /\
+                               l2 s2;
+       one := fun s => s = [] |}.
 
-  Definition fail : K := fun x y => False.
-  Definition skip : K := eq.
+  Instance lang_SLo {A} : SemiLattice_Ops (language A) :=
+    {| plus := fun (l1 l2: language A) => fun s => l1 s \/ l2 s;
+       zero := fun s => False |}.
 
-  Definition le (a b:K) := equiv (choice a b) b.
+  Instance lang_Star {A} : Star_Op (language A) :=
+    {| star := fun (l: language A) => star_l l |}.
 
-  Definition le_implies : forall (r1 r2:K),
-      (forall x y, r1 x y -> r2 x y) ->
-      le r1 r2 := magic.
-
-  Definition le_implies' : forall (r1 r2:K),
-      le r1 r2 ->
-      (forall x y, r1 x y -> r2 x y) := magic.
-
-  Module KANotations.
-    Infix "==" := equiv (at level 90).
-    Infix "+" := choice.
-    Infix "*" := seq.
-    Notation "R ^*" := (star R) (at level 0, format "'[' R ']' ^*").
-    Notation "0" := fail.
-    Notation "1" := skip.
-    Infix "<=" := le.
-  End KANotations.
-
-  Import KANotations.
-
-  (** Idempotent semiring *)
-  Section Axioms.
-    Context (p q r:K).
-    Definition choice_assoc : p + (q + r) == (p + q) + r := magic.
-    Definition seq_assoc : p * (q * r) == (p * q) * r := magic.
-    Definition choice_comm : p + q == q + p := magic.
-    Definition distr_l : p * (q + r) == p * q + p * r := magic.
-    Definition distr_r : (p + q) * r == p * r + q * r := magic.
-    Definition choice_id_r : p + 0 == p := magic.
-    Definition choice_idem : p + p == p := magic.
-    Definition fail_cancel_r : p * 0 == 0 := magic.
-    Definition fail_cancel_l : 0 * p == 0 := magic.
-    Theorem skip_id_l : 1 * p == p.
-    Proof.
-      unfold "1", "*", "=="; intuition eauto.
-      propositional.
-    Qed.
-
-    Theorem skip_id_r : p * 1 == p.
-    Proof.
-      unfold "1", "*", "=="; intuition eauto.
-      propositional.
-    Qed.
-  End Axioms.
-
-  Ltac le := intros;
-             repeat match goal with
-                    | |- _ <= _ => apply le_implies
-                    | [ H: _ <= _ |- _ ] => pose proof (le_implies' H);
-                                         clear H
-                    end;
-             unfold "+", "*", "1", star in *;
-             intros.
-
-  (** Axioms for star *)
-  Section StarAxioms.
-    Context (p q x:K).
-    Theorem star_one_l : 1 + p * p^* <= p^*.
-    Proof.
-      le.
-      (intuition propositional); eauto.
-    Qed.
-
-    Theorem star_one_r : 1 + p^* * p <= p^*.
-    Proof.
-      le.
-      (intuition propositional); eauto.
-      induction H; eauto.
-    Qed.
-
-    Theorem star_ind_l : q + p * x <= x -> p^* * q <= x.
-    Proof.
-      le.
-      (intuition propositional); eauto.
-      induction H; eauto 10.
-    Qed.
-
-  Inductive kstar_r (r:K) : K :=
-  | kstar_r_refl : forall x, kstar_r r x x
-  | kstar_r_one_more : forall x y z,
-      kstar_r r x y ->
-      r y z ->
-      kstar_r r x z.
-
-  Hint Constructors kstar_r.
-
-  Theorem kstar_lr: forall r x y,
-      kstar r x y -> kstar_r r x y.
+  Lemma lang_equiv_destruct : forall A (l1 l2: language A),
+      l1 == l2 ->
+      (forall x, l1 x -> l2 x) /\
+      (forall x, l2 x -> l1 x).
   Proof.
     intros.
-    induction H; eauto.
-    clear H0.
-    induction IHkstar; eauto.
+    rewrite lang_equiv in H; firstorder.
   Qed.
 
-  Theorem star_ind_r : q + x * p <= x -> q * p^* <= x.
+  Ltac start :=
+    repeat match goal with
+           | |- forall _, _ => intros
+           | |- _ <-> _ => split
+           | |- _ == _ => rewrite lang_equiv
+           | [ H: _ == _ |- _ ] => apply lang_equiv_destruct in H; destruct H
+           | _ => setoid_rewrite <- app_assoc
+           | _ => solve [ typeclasses eauto ]
+           | _ => progress rewrite ?app_nil_l, ?app_nil_r
+           | _ => progress unfold Proper, "==>", dot, plus
+           | _ => progress simpl in *
+           | _ => progress propositional
+           end.
+
+  Global Instance lang_Monoid : @Monoid (language A) lang_Mo.
   Proof.
-    le.
-    (intuition propositional); eauto.
-    apply kstar_lr in H1.
-    generalize dependent x0.
-    induction H1; intros; eauto 10.
+    constructor; start; try solve [ intuition eauto 10 ].
+    - eexists (_ ++ _), _;
+        rewrite app_assoc;
+        intuition eauto.
+    - eexists _, _; intuition eauto.
+      rewrite app_nil_l; auto.
+    - eexists _, _; intuition eauto.
+      rewrite app_nil_r; auto.
   Qed.
-  End StarAxioms.
+
+  Global Instance lang_SemiLattice : @SemiLattice (language A) lang_SLo.
+  Proof.
+    constructor; start; try solve [ intuition eauto 10 ].
+  Qed.
+
+  Global Instance lang_IdemSemiRing : @IdemSemiRing (language A) lang_Mo lang_SLo.
+  Proof.
+    constructor; start;
+      try solve [ firstorder ].
+  Qed.
+
+  Hint Constructors star_l star_r.
+
+  Global Instance lang_KleeneAlgebra : @KleeneAlgebra (language A) lang_Mo lang_SLo lang_Star.
+  Proof.
+    constructor; start; try solve [ intuition eauto 10 ].
+    - (intuition eauto); propositional; eauto.
+    - setoid_rewrite star_lr in H.
+      rewrite star_lr.
+      (intuition eauto); propositional; eauto.
+    - (intuition eauto); propositional; eauto.
+      induction H1; simpl.
+      * apply H; auto.
+      * rewrite <- app_assoc.
+        apply H; eauto 10.
+    - (intuition eauto); propositional; eauto.
+      setoid_rewrite star_lr in H2.
+      induction H2; rewrite ?app_nil_r.
+      * apply H; eauto.
+      * rewrite -> app_assoc.
+        apply H; eauto 10.
+  Qed.
+
+End LanguageModel.
+
+Section RelationalModel.
+  Context {A:Type}.
+  Definition relation : Setoid :=
+    {| T := A -> A -> Prop;
+       equiv r1 r2 := (forall x y, r1 x y -> r2 x y) /\ (forall x y, r2 x y -> r1 x y);
+       equiv_Equiv := ltac:(firstorder) |}.
+
+  Implicit Types r:relation.
+
+  Instance rel_Mo : Monoid_Ops relation :=
+    {| dot r1 r2 := fun x z => exists y, r1 x y /\ r2 y z;
+       one := eq |}.
+
+  Instance rel_SLo : SemiLattice_Ops relation :=
+    {| plus r1 r2 := fun x y => r1 x y \/ r2 x y;
+       zero := fun _ _ => False |}.
+
+  Section RelationStar.
+
+    Inductive kstar r : relation :=
+    | kstar_refl : forall x, kstar r x x
+    | kstar_one_more : forall x y z,
+        r x y ->
+        kstar r y z ->
+        kstar r x z.
+
+    Hint Constructors kstar.
+
+    Inductive kstar_r r : relation :=
+    | kstar_r_refl : forall x, kstar_r r x x
+    | kstar_r_one_more : forall x y z,
+        kstar_r r x y ->
+        r y z ->
+        kstar_r r x z.
+
+    Hint Constructors kstar_r.
+
+    Theorem kstar_lr: forall r x y,
+        kstar r x y <-> kstar_r r x y.
+    Proof.
+      split; intros.
+      - induction H; eauto.
+        clear H0.
+        induction IHkstar; eauto.
+      - induction H; eauto.
+        clear H.
+        induction IHkstar_r; eauto.
+    Qed.
+
+  End RelationStar.
+
+  Hint Constructors kstar kstar_r.
+
+  Instance rel_Star : Star_Op relation :=
+    {| star := kstar |}.
+
+  Lemma rel_equiv : forall r1 r2,
+      (r1 == r2) =
+      ((forall x y, r1 x y -> r2 x y) /\ (forall x y, r2 x y -> r1 x y)).
+  Proof.
+    intros.
+    reflexivity.
+  Qed.
+
+  Ltac start :=
+    repeat match goal with
+           | |- forall _, _ => intros
+           | |- _ /\ _ => split
+           | |- _ == _ => rewrite rel_equiv
+           | [ H: _ == _ |- _ ] => rewrite rel_equiv in H; destruct H
+           | _ => setoid_rewrite <- app_assoc
+           | _ => solve [ typeclasses eauto ]
+           | _ => progress rewrite ?app_nil_l, ?app_nil_r
+           | _ => progress unfold Proper, "==>", dot, plus
+           | _ => progress simpl in *
+           | _ => progress propositional
+           end.
+
+  Global Instance rel_Monoid : @Monoid relation rel_Mo.
+  Proof.
+    constructor; start; eauto.
+  Qed.
+
+  Global Instance rel_SemiLattice : @SemiLattice relation rel_SLo.
+  Proof.
+    constructor; start; intuition eauto.
+  Qed.
+
+  Global Instance rel_IdemSemiRing : @IdemSemiRing relation rel_Mo rel_SLo.
+  Proof.
+    constructor; start; intuition (propositional; eauto).
+  Qed.
+
+  Global Instance rel_KA : @KleeneAlgebra relation rel_Mo rel_SLo rel_Star.
+  Proof.
+    constructor; start; intuition (propositional; eauto).
+    - rewrite kstar_lr in *; eauto.
+    - induction H0; eauto 10.
+    - rewrite kstar_lr in *.
+      induction H2; eauto 10.
+  Qed.
 
 End RelationalModel.
