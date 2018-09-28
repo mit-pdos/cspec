@@ -1,59 +1,52 @@
 Require Import RelationClasses.
-Require Import Setoid.
+Require Import Helpers.Setoid.
 Require Import Morphisms.
 Require Import Varmap.
 
 Unset Intuition Negation Unfolding.
 Set Implicit Arguments.
 
-Module Type BooleanAlgebra.
-  Parameter B:Type.
-  Parameter equiv: B -> B -> Prop.
-  Parameter equiv_Equiv : Equivalence equiv.
-  Existing Instance equiv_Equiv.
+Class BA_Ops {B:Setoid} :=
+  { or: B -> B -> B;
+    and : B -> B -> B;
+    not: B -> B;
+    zero: B;
+    one: B;
+  }.
 
-  Infix "==" := equiv (at level 90).
+Module BANotations.
+  Infix "+" := or.
+  Infix "*" := and.
+  Notation "! x" := (not x) (at level 10, format "! x").
+  Notation "0" := zero.
+  Notation "1" := one.
+End BANotations.
+Import BANotations.
 
-  Parameter or: B -> B -> B.
-  Parameter and : B -> B -> B.
-  Parameter not: B -> B.
+Generalizable Variables B.
 
-  Axiom or_respects_equiv : Proper (equiv ==> equiv ==> equiv) or.
-  Axiom and_respects_equiv : Proper (equiv ==> equiv ==> equiv) and.
-  Axiom not_respects_equiv : Proper (equiv ==> equiv) not.
+Class BooleanAlgebra `{BAo: BA_Ops B} :=
+  {
+    or_respects_equiv :> Proper (equiv ==> equiv ==> equiv) or;
+    or_assoc : forall a b c, a + (b + c) == a + b + c;
+    or_comm : forall a b, a + b == b + a;
+    or_zero : forall a, a + 0 == a;
+    or_one : forall a, a + 1 == 1;
+    or_absorption : forall a, a + a == a;
 
-  Existing Instances or_respects_equiv and_respects_equiv not_respects_equiv.
+    and_respects_equiv :> Proper (equiv ==> equiv ==> equiv) and;
+    and_or_distr : forall a b c, a*(b + c) == a*b + a*c;
+    not_or_distr : forall a b, !(a + b) == !a * !b;
 
-  Parameter zero : B.
-  Parameter one : B.
+    not_respects_equiv :> Proper (equiv ==> equiv) not;
+    zero_dual : !0 == 1;
+    one_dual : !1 == 0;
+    double_neg : forall a, !(!a) == a;
+  }.
 
-  Module BANotations.
-    Infix "+" := or.
-    Infix "*" := and.
-    Notation "! x" := (not x) (at level 10, format "! x").
-    Notation "0" := zero.
-    Notation "1" := one.
-  End BANotations.
-  Import BANotations.
-
-  Section Laws.
-    Context (a b c:B).
-    Axiom or_assoc : a + (b + c) == a + b + c.
-    Axiom or_comm : a + b == b + a.
-    Axiom or_zero : a + 0 == a.
-    Axiom or_one : a + 1 == 1.
-    Axiom or_absorption : a + a == a.
-    Axiom and_or_distr : a*(b + c) == a*b + a*c.
-    Axiom not_or_distr : !(a + b) == !a * !b.
-
-    Axiom zero_dual : !0 == 1.
-    Axiom one_dual : !1 == 0.
-    Axiom double_neg : !(!a) == a.
-  End Laws.
-End BooleanAlgebra.
-
-Module BAFacts (Import A:BooleanAlgebra).
-  Import A.BANotations.
+Section BAFacts.
+  Context `{BAo: BA_Ops B}.
+  Context {BA: BooleanAlgebra}.
 
   Instance B_def : Default B := 0.
 
@@ -100,7 +93,7 @@ Module BAFacts (Import A:BooleanAlgebra).
   Proof.
     intros.
     apply not_respects_equiv in H.
-    rewrite ?double_neg in *; auto.
+    rewrite ?double_neg in H; auto.
   Qed.
 
   Theorem not_and_distr : forall a b, !(a * b) == !a + !b.

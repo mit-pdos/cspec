@@ -1,5 +1,5 @@
 Require Import Morphisms.
-Require Import Setoid.
+Require Import Helpers.Setoid.
 Require PeanoNat.
 Require List.
 
@@ -9,21 +9,10 @@ Set Implicit Arguments.
 
 Generalizable Variables A.
 
-Record Setoid :=
-  { T :> Type;
-    equiv : relation T;
-    equiv_Equiv : Equivalence equiv; }.
-
-Arguments equiv {A} _ _ : rename.
-Opaque equiv.
-
-Existing Instance equiv_Equiv.
-
 Class Monoid_Ops (A:Setoid) :=
   { dot : A -> A -> A;
     one : A; }.
 
-Infix "==" := equiv (at level 90).
 Infix "⋅" := dot (at level 40, left associativity).
 Notation "1" := one.
 
@@ -158,15 +147,17 @@ Section Theorems.
 
   Instance le_PreOrder : PreOrder le.
   Proof.
-    constructor; repeat (hnf; intros); auto.
-    unfold le in *.
-    rewrite <- H0.
-    rewrite <- H at 2.
-    cleanup.
+    unfold le.
+    constructor; hnf; intros.
+    - rewrite plus_idem; auto.
+    - rewrite <- H0.
+      rewrite <- H at 2.
+      cleanup.
   Qed.
 
   Instance le_PartialOrder : PartialOrder equiv le.
   Proof.
+    unfold le.
     constructor; repeat (hnf; intros); unfold Basics.flip in *.
     - unfold le.
       cleanup; eauto.
