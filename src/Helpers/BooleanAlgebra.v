@@ -247,12 +247,11 @@ Section BAFacts.
 
 End BAFacts.
 
-Module DecidableProp : BooleanAlgebra.
-  Record DecProp := { P :> Prop;
+Module DecidableProp.
+  Record decprop := { P :> Prop;
                       dec: {P} + {~P} }.
-  Definition B := DecProp.
 
-  Theorem dec_dn : forall (p:DecProp),
+  Theorem dec_dn : forall (p:decprop),
       (~p -> False) ->
       p.
   Proof.
@@ -260,157 +259,77 @@ Module DecidableProp : BooleanAlgebra.
     destruct (dec p); tauto.
   Qed.
 
-  Hint Resolve dec_dn.
-
-  Definition equiv (p1 p2: B) := p1 <-> p2.
-  Instance equiv_Equiv : Equivalence equiv.
-  firstorder.
-  Qed.
-
-  Infix "==" := equiv (at level 90).
-
-  Definition or : B -> B -> B.
-    intros p1 p2.
-    refine {| P := p1 \/ p2; |}.
-    destruct (dec p1); eauto.
-    destruct (dec p2); eauto.
-    right; tauto.
+  Definition T : Setoid.
+    refine {| Setoid.T := decprop;
+       equiv p1 p2 := p1 <-> p2; |}.
+    abstract firstorder.
   Defined.
 
-  Definition and : B -> B -> B.
-    intros p1 p2.
-    refine {| P := p1 /\ p2; |}.
-    destruct (dec p1); try tauto.
-    destruct (dec p2); try tauto.
+  Implicit Types p:T.
+
+  Theorem decprop_equiv : forall p1 p2,
+      (p1 == p2) =
+      (p1 <-> p2).
+  Proof.
+    reflexivity.
+  Qed.
+
+  Instance decprop_BAo : @BA_Ops T.
+  refine {| or p1 p2 := {| P := p1 \/ p2 |};
+            and p1 p2 := {| P := p1 /\ p2 |};
+            not p := {| P := ~p |};
+            zero := {| P := False; |};
+            one := {| P := True; |} |};
+    repeat match goal with
+           | [ p: Setoid.T T |- _ ] =>
+             lazymatch goal with
+             | [ H: P p |- _ ] => fail
+             | [ H: ~(P p) |- _ ] => fail
+             | _ => destruct (dec p)
+             end
+           | _ => tauto
+           end.
   Defined.
 
-  Definition not: B -> B.
-    intros p.
-    refine {| P := ~p |}.
-    destruct (dec p); eauto.
-  Defined.
-
-  Instance or_respects_equiv : Proper (equiv ==> equiv ==> equiv) or.
-  Proof.
-    unfold Proper, equiv, respectful; simpl; intuition auto.
+  Definition BA : BooleanAlgebra (BAo:=decprop_BAo).
+    constructor; unfold Proper, "==>"; intros;
+      rewrite decprop_equiv in *;
+      simpl;
+      try tauto.
+    destruct (dec a); tauto.
   Qed.
 
-  Instance and_respects_equiv : Proper (equiv ==> equiv ==> equiv) and.
-  Proof.
-    unfold Proper, equiv, respectful; simpl; intuition auto.
-  Qed.
-
-  Instance not_respects_equiv : Proper (equiv ==> equiv) not.
-  Proof.
-    unfold Proper, equiv, respectful; simpl; intuition auto.
-  Qed.
-
-  Definition zero : B := {| P := False;
-                            dec := right (fun x => x) |}.
-  Definition one : B := {| P := True;
-                           dec := left I |}.
-
-  Module BANotations.
-    Infix "+" := or.
-    Infix "*" := and.
-    Notation "! x" := (not x) (at level 10, format "! x").
-    Notation "0" := zero.
-    Notation "1" := one.
-  End BANotations.
-  Import BANotations.
-
-  Section Laws.
-    Context (a b c:B).
-
-    Ltac ba_solve :=
-      unfold equiv, and, or, not; simpl; tauto.
-
-    Notation magic := ltac:(ba_solve).
-
-    Definition or_assoc : a + (b + c) == a + b + c := magic.
-    Definition or_comm : a + b == b + a := magic.
-    Definition or_zero : a + 0 == a := magic.
-    Definition or_one : a + 1 == 1 := magic.
-    Definition or_absorption : a + a == a := magic.
-    Definition and_or_distr : a*(b + c) == a*b + a*c := magic.
-    Definition not_or_distr : !(a + b) == !a * !b := magic.
-
-    Definition zero_dual : !0 == 1 := magic.
-    Definition one_dual : !1 == 0 := magic.
-    Theorem double_neg : !(!a) == a.
-    Proof.
-      unfold equiv, and, or, not; simpl.
-      split; auto.
-    Qed.
-  End Laws.
 End DecidableProp.
 
-Module BoolAlgebra : BooleanAlgebra.
-  Definition B:Type := bool.
-  Definition equiv: B -> B -> Prop := eq.
-  Instance equiv_Equiv : Equivalence equiv.
-  typeclasses eauto.
+Module BoolAlgebra.
+  Definition T : Setoid :=
+    {| Setoid.T := bool;
+       equiv := eq; |}.
+
+  Implicit Types b:T.
+
+  Theorem bool_equiv : forall b1 b2,
+      (b1 == b2) =
+      (b1 = b2).
+  Proof.
+    reflexivity.
   Qed.
 
-  Infix "==" := equiv (at level 90).
+  Instance bool_BAo : @BA_Ops T :=
+    {| or b1 b2 := orb b1 b2;
+       and b1 b2 := andb b1 b2;
+       not b := negb b;
+       zero := false;
+       one := true; |}.
 
-  Definition or: B -> B -> B := orb.
-  Definition and : B -> B -> B := andb.
-  Definition not: B -> B := negb.
-
-  Instance or_respects_equiv : Proper (equiv ==> equiv ==> equiv) or.
-  congruence.
+  Instance BA : BooleanAlgebra (BAo:=bool_BAo).
+  constructor; unfold Proper, "==>"; intros;
+    simpl;
+    rewrite bool_equiv in *;
+    subst;
+    repeat match goal with
+           | _ => reflexivity
+           | [ b: Setoid.T T |- _ ] => destruct b; clear b; simpl
+           end.
   Qed.
-  Instance and_respects_equiv : Proper (equiv ==> equiv ==> equiv) and.
-  congruence.
-  Qed.
-  Instance not_respects_equiv : Proper (equiv ==> equiv) not.
-  congruence.
-  Qed.
-
-  Definition zero : B := false.
-  Definition one : B := true.
-
-  Module BANotations.
-    Infix "+" := or.
-    Infix "*" := and.
-    Notation "! x" := (not x) (at level 10, format "! x").
-    Notation "0" := zero.
-    Notation "1" := one.
-  End BANotations.
-  Import BANotations.
-
-  Section Laws.
-    Context (a b c:B).
-
-    Ltac ba_solve :=
-      (* clear unmentioned section variables to ensure theorem does not depend
-      on them *)
-      repeat match goal with
-             | [ b: B |- _ ] =>
-               match goal with
-               | |- context[b] => idtac
-               | |- _ => clear b
-               end
-             end;
-      unfold or, and, not, equiv, zero, one;
-      repeat match goal with
-             | _ => reflexivity
-             | [ b: B |- _ ] => destruct b; clear b; simpl
-             end.
-
-    Notation magic := ltac:(ba_solve) (only parsing).
-
-    Definition or_assoc : a + (b + c) == a + b + c := magic.
-    Definition or_comm : a + b == b + a := magic.
-    Definition or_zero : a + 0 == a := magic.
-    Definition or_one : a + 1 == 1 := magic.
-    Definition or_absorption : a + a == a := magic.
-    Definition and_or_distr : a*(b + c) == a*b + a*c := magic.
-    Definition not_or_distr : !(a + b) == !a * !b := magic.
-
-    Definition zero_dual : !0 == 1 := magic.
-    Definition one_dual : !1 == 0 := magic.
-    Definition double_neg : !(!a) == a := magic.
-  End Laws.
 End BoolAlgebra.
