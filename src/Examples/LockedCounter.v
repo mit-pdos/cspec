@@ -9,7 +9,7 @@ Global Generalizable All Variables.
 
 Set Printing Projections.
 
-Module TSOOp <: Ops.
+Module TSOOp.
 
   Inductive addr := addr0 | addr1.
   Global Instance addr_equal_dec : EqualDec addr := ltac:(hnf; decide equality).
@@ -33,7 +33,7 @@ Module TSOOp <: Ops.
 
 End TSOOp.
 
-Module TSOState <: State.
+Module TSOState.
 
   Definition State := memT TSOOp.addr nat.
 
@@ -48,7 +48,7 @@ Definition bg_step `(step: OpSemantics Op State) (bg: State -> State -> Prop) : 
           step _ op tid s r s1 evs /\
           bg s1 s'.
 
-Module TSOAPI <: Layer TSOOp TSOState.
+Module TSOAPI.
   Import TSOOp.
   Import TSOState.
 
@@ -71,10 +71,15 @@ Module TSOAPI <: Layer TSOOp TSOState.
   Definition step := bg_step xstep mem_bg.
 
   Definition initP := TSOState.initP.
-
+  
+  Definition l : Layer.t TSOOp.Op TSOState.State.
+     refine {| Layer.step := step;
+               Layer.initP := initP; |}.
+  Defined.
+  
 End TSOAPI.
 
-Module TSODelayNondetAPI <: Layer TSOOp TSOState.
+Module TSODelayNondetAPI.
   Import TSOOp TSOState.
 
   Inductive xstep : forall T, Op T -> nat -> State -> T -> State -> list event -> Prop :=
@@ -100,15 +105,18 @@ Module TSODelayNondetAPI <: Layer TSOOp TSOState.
 
   Definition initP := TSOState.initP.
 
+  Definition l : Layer.t TSOOp.Op TSOState.State.
+    refine {| Layer.step := step;
+              Layer.initP := initP;
+           |}.
+  Defined.
+
 End TSODelayNondetAPI.
 
 (** IMPL: TSODelayNondetAPI -> TSOAPI *)
 
-Module AbsNondet' <:
-  LayerImplAbsT TSOOp
-                TSOState TSOAPI
-                TSOState TSODelayNondetAPI.
-
+Module AbsNondet'.
+  Import Layer.
   Import TSOState.
 
   (* absR is from low (full nondeterminism) to high (careful nondeterminism) *)
@@ -119,9 +127,9 @@ Module AbsNondet' <:
   Hint Constructors TSODelayNondetAPI.xstep.
 
   Theorem absR_ok :
-    op_abs absR TSOAPI.step TSODelayNondetAPI.step.
+    op_abs absR TSOAPI.l.(step) TSODelayNondetAPI.l.(step).
   Proof.
-    unfold op_abs, TSODelayNondetAPI.step; intros.
+    unfold op_abs, TSODelayNondetAPI.l, TSODelayNondetAPI.step, step; intros.
     unfold absR in *.
     hnf in H0; repeat deex.
     destruct op; inv_clear H1; eauto.
@@ -143,17 +151,24 @@ Module AbsNondet' <:
     reflexivity.
   Qed.
 
+  Definition layerImplAbsT : LayerImplAbsT.t TSOAPI.l TSODelayNondetAPI.l.
+    refine {| LayerImplAbsT.absR := absR;
+              LayerImplAbsT.absR_ok := absR_ok;
+              LayerImplAbsT.absInitP := absInitP;
+           |}.
+  Defined.
+
 End AbsNondet'.
 
-Module AbsNondet :=
-  LayerImplAbs TSOOp
-               TSOState TSOAPI
-               TSOState TSODelayNondetAPI
-               AbsNondet'.
+Module AbsNondet.
+  Definition layerImplAbs : LayerImpl.t TSOAPI.l TSODelayNondetAPI.l.
+    refine (LayerImplAbs.t AbsNondet'.layerImplAbsT).
+  Defined.
+End AbsNondet.
 
 (** LAYER: TASAPI *)
 
-Module TASOp <: Ops.
+Module TASOp.
 
   Inductive xOp : Type -> Type :=
   | TryAcquire : xOp bool (* true if acquired *)
@@ -167,7 +182,7 @@ Module TASOp <: Ops.
 
 End TASOp.
 
-Module TAS_TSOAPI <: Layer TASOp TSOState.
+Module TAS_TSOAPI.
   Import TSOOp.
   Import TASOp.
   Import TSOState.
@@ -202,12 +217,14 @@ Module TAS_TSOAPI <: Layer TASOp TSOState.
 
   Definition initP := TSOState.initP.
 
+  Definition l : Layer.t Op State.
+    refine {| Layer.step := step;
+              Layer.initP := initP; |}.
+  Defined.
+    
 End TAS_TSOAPI.
 
-Module TAS_TSOImpl' <: LayerImplMoversT
-                        TSOState
-                        TSOOp TSODelayNondetAPI
-                        TASOp TAS_TSOAPI.
+Module TAS_TSOImpl'. 
   Import TSOOp.
   Import TSODelayNondetAPI.
 
@@ -232,7 +249,7 @@ Module TAS_TSOImpl' <: LayerImplMoversT
 
   Theorem ysa_movers :
     forall (T : Type) (op : TASOp.Op T),
-      ysa_movers step (compile_op op).
+      ysa_movers l.(Layer.step) (compile_op op).
   Proof.
     destruct op; simpl; eauto.
   Qed.
@@ -240,9 +257,9 @@ Module TAS_TSOImpl' <: LayerImplMoversT
   Hint Constructors TAS_TSOAPI.xstep.
 
   Theorem compile_correct :
-    compile_correct compile_op step TAS_TSOAPI.step.
+    compile_correct compile_op l.(Layer.step) TAS_TSOAPI.l.(Layer.step).
   Proof.
-    unfold TAS_TSOAPI.step.
+    unfold TAS_TSOAPI.l, Layer.step, TAS_TSOAPI.step.
     hnf; intros.
     destruct op; simpl in *;
       repeat match goal with
@@ -259,15 +276,23 @@ Module TAS_TSOImpl' <: LayerImplMoversT
   Qed.
 
   Definition initP_compat : forall s,
-      TAS_TSOAPI.initP s -> initP s := ltac:(auto).
+      l.(Layer.initP) s -> TAS_TSOAPI.l.(Layer.initP) s := ltac:(auto).
+
+  Definition layerImplMoversT : LayerImplMoversT.t TSODelayNondetAPI.l TAS_TSOAPI.l.
+    refine {| LayerImplMoversT.compile_op := compile_op;
+              LayerImplMoversT.compile_op_no_atomics := compile_op_no_atomics;
+              LayerImplMoversT.ysa_movers := ysa_movers;
+              LayerImplMoversT.compile_correct := compile_correct;
+              LayerImplMoversT.initP_compat := initP_compat; |}.
+  Defined.
 
 End TAS_TSOImpl'.
 
-Module TAS_TSOImpl := LayerImplMovers
-                        TSOState
-                        TSOOp TSODelayNondetAPI
-                        TASOp TAS_TSOAPI
-                        TAS_TSOImpl'.
+Module TAS_TSOImpl.
+  Definition t : LayerImpl.t TSODelayNondetAPI.l TAS_TSOAPI.l.
+    refine (LayerImplMovers.t TAS_TSOImpl'.layerImplMoversT).
+  Defined.
+End TAS_TSOImpl.
 
 Inductive OrError State :=
 | Valid (s:State)
@@ -293,7 +318,7 @@ Inductive error_step Op State
 
 Arguments error_step {Op State} step violation.
 
-Module LockOwnerState <: State.
+Module LockOwnerState.
 
   Record s := mkLOState {
                   TASValue : memT TSOOp.addr nat;
@@ -324,7 +349,7 @@ Proof.
   destruct op, (l == Some tid); subst; eauto.
 Qed.
 
-Module LockOwnerAPI <: Layer TASOp LockOwnerState.
+Module LockOwnerAPI.
 
   Import TSOOp.
   Import TASOp.
@@ -372,13 +397,15 @@ Module LockOwnerAPI <: Layer TASOp LockOwnerState.
 
   Definition initP := LockOwnerState.initP.
 
+  Definition l : Layer.t Op LockOwnerState.State.
+    refine {| Layer.step := step;
+              Layer.initP := initP; |}.
+  Defined.
+
 End LockOwnerAPI.
 
 
-Module AbsLockOwner' <: LayerImplAbsT
-                          TASOp
-                          TSOState TAS_TSOAPI
-                          LockOwnerState LockOwnerAPI.
+Module AbsLockOwner'.
   Import TSOOp.
   Import TASOp.
   Import TSOState LockOwnerState.
@@ -407,9 +434,9 @@ Module AbsLockOwner' <: LayerImplAbsT
   Hint Constructors xstep.
   Hint Resolve None.
 
-  Theorem absR_ok : op_abs absR TAS_TSOAPI.step step.
+  Theorem absR_ok : op_abs absR TAS_TSOAPI.l.(Layer.step) l.(Layer.step).
   Proof.
-    unfold step.
+    unfold l, Layer.step, step.
     hnf; intros.
     destruct s2; unfold absR in * |- ; simpl in *; propositional.
     - specialize (H _ eq_refl); subst.
@@ -427,22 +454,28 @@ Module AbsLockOwner' <: LayerImplAbsT
 
   Theorem absInitP :
     forall s1,
-      TSOState.initP s1 ->
-      exists s2 : State, absR s1 s2 /\ initP s2.
+      TAS_TSOAPI.l.(Layer.initP) s1 ->
+      exists s2 : State, absR s1 s2 /\ l.(Layer.initP) s2.
   Proof.
-    unfold TSOState.initP, initP, LockOwnerState.initP; propositional.
+    unfold TAS_TSOAPI.l, l, Layer.initP, TAS_TSOAPI.initP, TSOState.initP, initP, LockOwnerState.initP; propositional.
     exists_econstructor; eauto.
   Qed.
 
+  Definition layerImplAbsT : LayerImplAbsT.t TAS_TSOAPI.l LockOwnerAPI.l.
+    refine {| LayerImplAbsT.absR := absR;
+              LayerImplAbsT.absR_ok := absR_ok;
+              LayerImplAbsT.absInitP := absInitP;
+           |}.
+  Defined.
 End AbsLockOwner'.
 
-Module AbsLockOwner :=
-  LayerImplAbs TASOp
-               TSOState TAS_TSOAPI
-               LockOwnerState LockOwnerAPI
-               AbsLockOwner'.
+Module AbsLockOwner.
+  Definition t : LayerImpl.t TAS_TSOAPI.l LockOwnerAPI.l.
+    refine (LayerImplAbs.t AbsLockOwner'.layerImplAbsT).
+  Defined.
+End AbsLockOwner.
 
-Module LockInvariantState <: State.
+Module LockInvariantState.
 
   Record s := mkLIState {
                   InvValue : memT TSOOp.addr nat;
@@ -488,7 +521,7 @@ Definition unlock_last (sbuf: list (TSOOp.addr * nat)) :=
   exists l, sbuf = (TSOOp.Lock, TSOOp.cUnlocked) :: l /\
        only_val l.
 
-Module LockInvariantAPI <: Layer TASOp LockInvariantState.
+Module LockInvariantAPI.
 
   Import TSOOp.
   Import TASOp.
@@ -565,6 +598,11 @@ Module LockInvariantAPI <: Layer TASOp LockInvariantState.
                        (fun T op tid s => bad_lock op tid s.(InvLock)).
 
   Definition initP := initP.
+
+  Definition l : Layer.t Op State.
+     refine {| Layer.step := step;
+               Layer.initP := initP; |}.
+  Defined.
 End LockInvariantAPI.
 
 Inductive error_absR {State1 State2} {absR: State1 -> State2 -> Prop} :
@@ -578,10 +616,7 @@ Arguments error_absR {State1 State2} absR.
 
 Hint Constructors error_absR.
 
-Module AbsLockInvariant' <: LayerImplAbsT
-                              TASOp
-                              LockOwnerState LockOwnerAPI
-                              LockInvariantState LockInvariantAPI.
+Module AbsLockInvariant'.
   Import TSOOp.
   Import TASOp.
   Import LockOwnerState LockInvariantState.
@@ -663,11 +698,11 @@ Module AbsLockInvariant' <: LayerImplAbsT
   Theorem last_error_app : forall A (l l': list A) a,
       last_error (l ++ a::l') = last_error (a::l').
   Proof.
-    induction l; simpl; intros; eauto.
-    rewrite IHl.
+    induction l0; simpl; intros; eauto.
+    rewrite IHl0.
     simpl.
-    destruct_with_eqn (l ++ a0 :: l'); auto.
-    apply app_eq_nil in Heql0; intuition congruence.
+    destruct_with_eqn (l0 ++ a0 :: l'); auto.
+    apply app_eq_nil in Heql1; intuition congruence.
   Qed.
 
   Theorem last_error_app1 : forall A (l: list A) x,
@@ -752,7 +787,7 @@ Module AbsLockInvariant' <: LayerImplAbsT
       Forall P l ->
       Forall P (removelast l).
   Proof.
-    induction l using rev_ind; intros; eauto.
+    induction l0 using rev_ind; intros; eauto.
     apply Forall_app in H; propositional.
     rewrite removelast_app_one; auto.
   Qed.
@@ -816,7 +851,7 @@ Module AbsLockInvariant' <: LayerImplAbsT
   Proof.
     unfold only_val, mem_bgflush; intros.
     generalize dependent (m.(SBuf) tid); intros.
-    destruct (list_last_dec l); propositional; simpl; auto.
+    destruct (list_last_dec l0); propositional; simpl; auto.
     destruct a.
     apply Forall_app in H; propositional.
     invert H0; clear H0.
@@ -837,8 +872,8 @@ Module AbsLockInvariant' <: LayerImplAbsT
   Lemma last_error_cons : forall A (a:A) l,
       last_error (a :: l) <> None.
   Proof.
-    induction l; simpl in *; try congruence.
-    destruct l; try congruence.
+    induction l0; simpl in *; try congruence.
+    destruct l0; try congruence.
   Qed.
 
   Lemma last_error_cons2 : forall A (l: list A) x y,
@@ -854,13 +889,13 @@ Module AbsLockInvariant' <: LayerImplAbsT
   Proof.
     intros.
     simpl.
-    induction l using rev_ind.
+    induction l0 using rev_ind.
     - invert H; eauto.
     - rewrite app_comm_cons in H.
       apply Forall_app in H; propositional.
       invert H0; clear H0.
       rewrite last_error_append.
-      destruct l; simpl; eauto.
+      destruct l0; simpl; eauto.
   Qed.
 
   Definition unlock_last_bgflush : forall m tid,
@@ -872,10 +907,10 @@ Module AbsLockInvariant' <: LayerImplAbsT
   Proof.
     unfold mem_bgflush; simpl; propositional.
     generalize dependent (m.(SBuf) tid); intros.
-    destruct l.
+    destruct l0.
     - exfalso.
       unfold unlock_last in H; propositional; congruence.
-    - destruct l;
+    - destruct l0;
         [ left | right ];
         unfold unlock_last in *; propositional.
       + invert H; clear H; simpl; autorewrite with fupd; auto.
@@ -887,7 +922,7 @@ Module AbsLockInvariant' <: LayerImplAbsT
           pose proof (last_error_Forall H0); propositional.
           rewrite H.
           destruct y; subst; simpl; autorewrite with fupd; auto.
-        * exists (removelast ((Val,n) :: l)); (intuition auto).
+        * exists (removelast ((Val,n) :: l0)); (intuition auto).
           destruct matches; simpl; autorewrite with fupd; auto.
           apply last_error_cons in Heqo; propositional.
   Qed.
@@ -900,7 +935,7 @@ Module AbsLockInvariant' <: LayerImplAbsT
       invariant (mkLIState s' l pl).
   Proof.
     unfold invariant; simpl; propositional; intuition eauto.
-    destruct l; (intuition eauto); propositional;
+    destruct l0; (intuition eauto); propositional;
       autorewrite with tso;
       eauto.
     destruct (n == tid); subst; autorewrite with tso; auto.
@@ -923,7 +958,7 @@ Module AbsLockInvariant' <: LayerImplAbsT
   Proof.
     intros.
     eapply mem_bgflush_mem_bg_invariant with
-        (I:=fun s => invariant (mkLIState s l pl)); eauto.
+        (I:=fun s => invariant (mkLIState s l0 pl)); eauto.
     intros.
     eapply invariant_mem_bgflush; eauto.
   Qed.
@@ -935,7 +970,7 @@ Module AbsLockInvariant' <: LayerImplAbsT
   Proof.
     intros; subst.
     eapply mem_bgflush_mem_flush_invariant with
-        (I:=fun s => invariant (mkLIState s l pl)); eauto.
+        (I:=fun s => invariant (mkLIState s l0 pl)); eauto.
     intros.
     eapply invariant_mem_bgflush; eauto.
   Qed.
@@ -964,7 +999,7 @@ Module AbsLockInvariant' <: LayerImplAbsT
     unfold mem_read; simpl.
     unfold only_val in *.
     generalize dependent (m.(SBuf) tid'); intros.
-    induction l; simpl; auto.
+    induction l0; simpl; auto.
     invert H0; clear H0.
     destruct a; subst.
     destruct (Lock == Val); subst; eauto.
@@ -980,7 +1015,7 @@ Module AbsLockInvariant' <: LayerImplAbsT
                    tid).
   Proof.
     unfold invariant; simpl; propositional.
-    destruct l; propositional; autorewrite with fupd; intuition eauto.
+    destruct l0; propositional; autorewrite with fupd; intuition eauto.
     - erewrite mem_read_only_val in H0 by eauto; contradiction.
     - destruct (tid == pl); subst; eauto.
       autorewrite with tso in *; contradiction.
@@ -1124,7 +1159,7 @@ Module AbsLockInvariant' <: LayerImplAbsT
     intros.
     eapply invariant_mem_bg in H; eauto.
     unfold invariant in *; simpl in *; propositional.
-    destruct l; propositional; auto.
+    destruct l0; propositional; auto.
     exfalso.
     destruct (n == tid); subst; autorewrite with tso in *; eauto.
     erewrite mem_read_only_val in H1 by eauto; congruence.
@@ -1137,9 +1172,9 @@ Module AbsLockInvariant' <: LayerImplAbsT
              learn that (invariant_mem_bg l pl H H')
            end.
 
-  Theorem absR_ok : op_abs absR LockOwnerAPI.step step.
+  Theorem absR_ok : op_abs absR LockOwnerAPI.l.(Layer.step) l.(Layer.step).
   Proof.
-    unfold LockOwnerAPI.step, step, absR.
+    unfold LockOwnerAPI.l, l, Layer.step, LockOwnerAPI.step, step, absR.
     hnf; intros.
     invert H0; clear H0.
     - invert H; clear H; eauto.
@@ -1154,7 +1189,7 @@ Module AbsLockInvariant' <: LayerImplAbsT
           eapply invariant_write_lock; eauto.
           constructor.
           apply bg_invariant; eauto.
-          assert (l = None); subst.
+          assert (l0 = None); subst.
           eauto using observe_unlock_mem_read.
           constructor; eauto.
           eapply invariant_write_lock; eauto.
@@ -1205,16 +1240,21 @@ Module AbsLockInvariant' <: LayerImplAbsT
     unfold empty_sb; intros; eauto.
   Qed.
 
+  Definition layerImplAbsT : LayerImplAbsT.t LockOwnerAPI.l LockInvariantAPI.l.
+    refine {| LayerImplAbsT.absR := absR;
+              LayerImplAbsT.absR_ok := absR_ok;
+              LayerImplAbsT.absInitP := absInitP;
+           |}.
+  Defined.
 End AbsLockInvariant'.
 
-Module AbsLockInvariant := LayerImplAbs
-                              TASOp
-                              LockOwnerState LockOwnerAPI
-                              LockInvariantState LockInvariantAPI
-                              AbsLockInvariant'.
+Module AbsLockInvariant.
+  Definition t : LayerImpl.t LockOwnerAPI.l LockInvariantAPI.l.
+    refine (LayerImplAbs.t AbsLockInvariant'.layerImplAbsT).
+  Defined.
+End AbsLockInvariant.
 
-
-Module SeqMemState <: State.
+Module SeqMemState.
 
   Record s := mkSMState {
                   Value : nat;
@@ -1228,7 +1268,7 @@ Module SeqMemState <: State.
 End SeqMemState.
 
 
-Module SeqMemAPI <: Layer TASOp SeqMemState.
+Module SeqMemAPI.
 
   Import TASOp.
   Import SeqMemState.
@@ -1251,13 +1291,14 @@ Module SeqMemAPI <: Layer TASOp SeqMemState.
   Definition step := error_step xstep (fun T op tid s => bad_lock op tid s.(LockOwner)).
 
   Definition initP := initP.
+  Definition l : Layer.t Op State.
+     refine {| Layer.step := step;
+               Layer.initP := initP; |}.
+  Defined.
 End SeqMemAPI.
 
 
-Module AbsSeqMem' <: LayerImplAbsT
-                       TASOp
-                       LockInvariantState LockInvariantAPI
-                       SeqMemState SeqMemAPI.
+Module AbsSeqMem'.
 
   Import TSOOp.
   Import TASOp.
@@ -1295,7 +1336,7 @@ Module AbsSeqMem' <: LayerImplAbsT
   Proof.
     intros.
     eapply mem_bgflush_mem_bg_invariant with
-        (I := fun s => invariant (mkLIState s l pl) /\ abstr (mkLIState s l pl) (mkSMState v l')); eauto.
+        (I := fun s => invariant (mkLIState s l0 pl) /\ abstr (mkLIState s l0 pl) (mkSMState v l')); eauto.
 
     clear.
     unfold abstr; simpl; propositional; autorewrite with tso; intuition eauto.
@@ -1411,9 +1452,9 @@ Module AbsSeqMem' <: LayerImplAbsT
     unfold invariant, abstr; simpl; propositional; autorewrite with tso; eauto.
   Qed.
 
-  Theorem absR_ok : op_abs absR LockInvariantAPI.step step.
+  Theorem absR_ok : op_abs absR LockInvariantAPI.l.(Layer.step) l.(Layer.step).
   Proof.
-    unfold LockInvariantAPI.step, step, absR.
+    unfold LockInvariantAPI.l, l, Layer.step, LockInvariantAPI.step, step, absR.
     hnf; intros.
     invert H0; clear H0;
       repeat match goal with
@@ -1436,7 +1477,7 @@ Module AbsSeqMem' <: LayerImplAbsT
           unfold abstr in H4; simpl in *; propositional.
           constructor.
         * (* TryAcquire, failure *)
-          exists (Valid (mkSMState s3.(Value) l));
+          exists (Valid (mkSMState s3.(Value) l0));
             intuition eauto.
           constructor.
           eapply mem_bg_preserves_abstr in H4; eauto.
@@ -1515,18 +1556,25 @@ Module AbsSeqMem' <: LayerImplAbsT
     simpl; eauto.
   Qed.
 
+  Definition layerImplAbsT : LayerImplAbsT.t LockInvariantAPI.l SeqMemAPI.l.
+    refine {| LayerImplAbsT.absR := absR;
+              LayerImplAbsT.absR_ok := absR_ok;
+              LayerImplAbsT.absInitP := absInitP;
+           |}.
+  Defined.
+
 End AbsSeqMem'.
 
 
-Module AbsSeqMem := LayerImplAbs
-                      TASOp
-                      LockInvariantState LockInvariantAPI
-                      SeqMemState SeqMemAPI
-                      AbsSeqMem'.
+Module AbsSeqMem.
+  Definition t : LayerImpl.t LockInvariantAPI.l SeqMemAPI.l.
+    refine (LayerImplAbs.t AbsSeqMem'.layerImplAbsT).
+  Defined.
+End AbsSeqMem.
 
 (** LAYER: TASLockAPI *)
 
-Module LockOp <: Ops.
+Module LockOp.
 
   Inductive xOp : Type -> Type :=
   | Acquire : xOp bool
@@ -1542,7 +1590,7 @@ End LockOp.
 
 (** LAYER: RawLockAPI *)
 
-Module RawLockAPI <: Layer LockOp SeqMemState.
+Module RawLockAPI.
 
   Import LockOp.
   Import SeqMemState.
@@ -1567,14 +1615,15 @@ Module RawLockAPI <: Layer LockOp SeqMemState.
                                                       end).
 
   Definition initP := initP.
+  
+  Definition l : Layer.t Op State.
+    refine {| Layer.step := step;
+              Layer.initP := initP; |}.
+  Defined.
 
 End RawLockAPI.
 
-Module LockImpl' <:
-  LayerImplLoopT
-    SeqMemState
-    TASOp  SeqMemAPI
-    LockOp RawLockAPI.
+Module LockImpl'.
 
   Definition acquire_cond (r : bool) := r.
 
@@ -1611,9 +1660,9 @@ Module LockImpl' <:
   Hint Resolve true.
 
   Theorem noop_or_success :
-    noop_or_success compile_op SeqMemAPI.step RawLockAPI.step.
+    noop_or_success compile_op SeqMemAPI.l.(Layer.step) RawLockAPI.l.(Layer.step).
   Proof.
-    unfold noop_or_success.
+    unfold RawLockAPI.l, Layer.step, noop_or_success.
     unfold RawLockAPI.step.
     intros.
     cut (match cond r with
@@ -1644,17 +1693,21 @@ Module LockImpl' <:
   Qed.
 
   Definition initP_compat : forall s, SeqMemAPI.initP s -> RawLockAPI.initP s := ltac:(auto).
-
+  
+  Definition layerImplLoopT : LayerImplLoopT.t SeqMemAPI.l RawLockAPI.l.
+    refine {| LayerImplLoopT.compile_op := compile_op;
+              LayerImplLoopT.noop_or_success := noop_or_success;
+              LayerImplLoopT.initP_compat := initP_compat; |}.
+  Defined.
 End LockImpl'.
 
-Module LockImpl :=
-  LayerImplLoop
-    SeqMemState
-    TASOp  SeqMemAPI
-    LockOp RawLockAPI
-    LockImpl'.
+Module LockImpl.
+  Definition t : LayerImpl.t SeqMemAPI.l RawLockAPI.l.
+    refine (LayerImplLoop.t LockImpl'.layerImplLoopT).
+  Defined.
+End LockImpl.
 
-Module LockProtocol <: Protocol LockOp SeqMemState.
+Module LockProtocol.
 
   Import LockOp.
   Import SeqMemState.
@@ -1676,10 +1729,13 @@ Module LockProtocol <: Protocol LockOp SeqMemState.
     forall s', s = Valid s' ->
           xstep_allow op tid s'.
 
+  Definition p : Protocol.t LockOp.Op SeqMemState.State.
+    refine {| Protocol.step_allow := step_allow; |}.
+  Defined.
 End LockProtocol.
 
 
-Module LockAPI <: Layer LockOp SeqMemState.
+Module LockAPI.
 
   Definition step_allow := LockProtocol.step_allow.
   Definition step :=
@@ -1824,11 +1880,16 @@ Module LockAPI <: Layer LockOp SeqMemState.
 
   Definition initP := initP.
 
+  Definition l : Layer.t Op State.
+     refine {| Layer.step := step;
+               Layer.initP := initP; |}.
+  Defined.
+
 End LockAPI.
 
 (** LAYER: LockedCounterAPI *)
 
-Module CounterOp <: Ops.
+Module CounterOp.
 
   Inductive xOp : Type -> Type :=
   | Inc : xOp nat
@@ -1841,7 +1902,7 @@ Module CounterOp <: Ops.
 End CounterOp.
 
 
-Module LockedCounterAPI <: Layer CounterOp SeqMemState.
+Module LockedCounterAPI.
 
   Import CounterOp.
   Import SeqMemState.
@@ -1859,16 +1920,15 @@ Module LockedCounterAPI <: Layer CounterOp SeqMemState.
 
   Definition initP := initP.
 
+  Definition l : Layer.t Op State.
+     refine {| Layer.step := step;
+               Layer.initP := initP; |}.
+  Defined.
 End LockedCounterAPI.
 
 (** Using locks to get atomicity. *)
 
-Module LockingCounter' <:
-  LayerImplMoversProtocolT
-    SeqMemState
-    LockOp    RawLockAPI LockAPI
-    CounterOp LockedCounterAPI
-    LockProtocol.
+Module LockingCounter'.
 
   Import LockOp.
   Import CounterOp.
@@ -1992,7 +2052,7 @@ Module LockingCounter' <:
   Hint Resolve write_right_mover.
 
   Theorem ysa_movers : forall T (op : CounterOp.Op T),
-      ysa_movers LockAPI.step (compile_op op).
+      ysa_movers LockAPI.l.(Layer.step) (compile_op op).
   Proof.
     destruct op; unfold ysa_movers; simpl.
     - unfold inc_core; eauto 20.
@@ -2009,8 +2069,9 @@ Module LockingCounter' <:
   Hint Constructors LockedCounterAPI.xstep.
 
   Theorem compile_correct :
-    compile_correct compile_op LockAPI.step LockedCounterAPI.step.
+    compile_correct compile_op LockAPI.l.(Layer.step) LockedCounterAPI.l.(Layer.step).
   Proof.
+    unfold Layer.step, LockAPI.l, LockedCounterAPI.l.
     unfold compile_correct; intros.
     destruct op.
 
@@ -2137,18 +2198,20 @@ Module LockingCounter' <:
   Hint Resolve ext_follows_protocol.
 
   Theorem op_follows_protocol : forall tid s `(op : CounterOp.Op T),
-      follows_protocol_proc RawLockAPI.step LockProtocol.step_allow tid s (compile_op op).
+      follows_protocol_proc RawLockAPI.l.(Layer.step) LockProtocol.p.(Protocol.step_allow) tid s (compile_op op).
   Proof.
     destruct op; simpl; eauto.
   Qed.
 
   Theorem allowed_stable :
-    forall `(op : LockOp.Op T) `(op' : LockOp.Op T') tid tid' s s' r evs,
+    forall T (op : LockOp.Op T) `(op' : LockOp.Op T') tid tid' s s' r evs,
       tid <> tid' ->
-      LockAPI.step_allow op tid s ->
-      LockAPI.step op' tid' s r s' evs ->
-      LockAPI.step_allow op tid s'.
+      LockProtocol.p.(Protocol.step_allow) T op tid s ->
+      LockAPI.l.(Layer.step) op' tid' s r s' evs ->
+      LockProtocol.p.(Protocol.step_allow) T op tid s'.
   Proof.
+    unfold LockAPI.l, Layer.step.
+    unfold LockProtocol.p, Protocol.step_allow, LockProtocol.step_allow.
     intros.
     destruct op, op';
       repeat match goal with
@@ -2159,31 +2222,49 @@ Module LockingCounter' <:
              | [ H: RawLockAPI.step _ _ _ _ _ _ |- _ ] => invertc H
              | [ H: RawLockAPI.xstep _ _ _ _ _ _ |- _ ] => invertc H
              end; eauto.
-  Qed.
+   Qed.
 
   Theorem raw_step_ok :
-    forall `(op : _ T) tid s r s' evs,
-      restricted_step RawLockAPI.step LockProtocol.step_allow op tid s r s' evs ->
-      LockAPI.step op tid s r s' evs.
+    forall T (op : _ T) tid s r s' evs,
+      restricted_step RawLockAPI.l.(Layer.step) LockProtocol.step_allow op tid s r s' evs ->
+      LockAPI.l.(Layer.step) op tid s r s' evs.
   Proof.
+    unfold RawLockAPI.l, LockAPI.l, Layer.step.
     eauto.
   Qed.
 
   Definition initP_compat : forall s, LockAPI.initP s -> LockedCounterAPI.initP s := ltac:(auto).
   Definition raw_initP_compat : forall s, RawLockAPI.initP s -> LockAPI.initP s := ltac:(auto).
 
+  Definition layerImplMoversT : LayerImplMoversT.t LockAPI.l LockedCounterAPI.l.
+    refine {| LayerImplMoversT.compile_op := compile_op;
+              LayerImplMoversT.compile_op_no_atomics := compile_op_no_atomics;
+              LayerImplMoversT.ysa_movers := ysa_movers;
+              LayerImplMoversT.compile_correct := compile_correct;
+              LayerImplMoversT.initP_compat := initP_compat; |}.
+  Defined.
+
+  Definition layerImplMoversProtocolT : LayerImplMoversProtocolT.t RawLockAPI.l LockAPI.l LockedCounterAPI.l LockProtocol.p.
+    refine {| LayerImplMoversProtocolT.movers_impl := layerImplMoversT;
+              LayerImplMoversProtocolT.op_follows_protocol := op_follows_protocol;
+              LayerImplMoversProtocolT.allowed_stable := allowed_stable;
+              LayerImplMoversProtocolT.raw_step_ok := raw_step_ok;
+              LayerImplMoversProtocolT.raw_initP_compat := raw_initP_compat;
+           |}.
+  Defined.
+
 End LockingCounter'.
 
 (** LAYER: CounterAPI *)
 
-Module CounterState <: State.
+Module CounterState.
 
   Definition State := nat.
   Definition initP (s : State) := s = 0.
 
 End CounterState.
 
-Module CounterAPI <: Layer CounterOp CounterState.
+Module CounterAPI.
 
   Import CounterOp.
   Import CounterState.
@@ -2201,15 +2282,16 @@ Module CounterAPI <: Layer CounterOp CounterState.
 
   Definition initP := initP.
 
+  Definition l : Layer.t Op State.
+     refine {| Layer.step := step;
+               Layer.initP := initP; |}.
+  Defined.
 End CounterAPI.
 
 
 (** Abstracting away the lock details. *)
 
-Module AbsCounter' <:
-  LayerImplAbsT CounterOp
-                SeqMemState   LockedCounterAPI
-                CounterState CounterAPI.
+Module AbsCounter'.
 
   Import SeqMemState.
 
@@ -2260,7 +2342,7 @@ Module AbsCounter' <:
   Hint Resolve absR_from_valid.
 
   Theorem absR_ok :
-    op_abs absR LockedCounterAPI.step CounterAPI.step.
+    op_abs absR LockedCounterAPI.l.(Layer.step) CounterAPI.l.(Layer.step).
   Proof.
     unfold op_abs; intros.
     unfold absR in * |-; propositional.
@@ -2278,22 +2360,28 @@ Module AbsCounter' <:
     exists 0; eauto.
   Qed.
 
+  Definition layerImplAbsT : LayerImplAbsT.t LockedCounterAPI.l CounterAPI.l.
+    refine {| LayerImplAbsT.absR := absR;
+              LayerImplAbsT.absR_ok := absR_ok;
+              LayerImplAbsT.absInitP := absInitP;
+           |}.
+  Defined.
+  
 End AbsCounter'.
 
-Module AbsCounter :=
-  LayerImplAbs CounterOp
-               SeqMemState    LockedCounterAPI
-               CounterState CounterAPI
-               AbsCounter'.
+Module AbsCounter.
+  Definition layerImplAbs : LayerImpl.t LockedCounterAPI.l CounterAPI.l.
+    refine (LayerImplAbs.t AbsCounter'.layerImplAbsT).
+  Defined.
+End AbsCounter.
 
 (** Linking *)
 
-Module c1 :=
-  Link
-    TSOOp TSOState TSOAPI
-    TSOOp TSOState TSODelayNondetAPI
-    TASOp TSOState TAS_TSOAPI
-    AbsNondet TAS_TSOImpl.
+Module c1.
+  Definition t: LayerImpl.t TSOAPI.l TAS_TSOAPI.l. 
+    refine (Link.t AbsNondet.layerImplAbs TAS_TSOImpl.t).
+  Defined.
+End c1.
 
 Module c2 :=
   Link

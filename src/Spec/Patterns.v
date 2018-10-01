@@ -42,18 +42,27 @@ Section TraceAbs.
 
 End TraceAbs.
 
-Record Layer Op State : Type :=
-  { step : OpSemantics Op State;
-    initP : State -> Prop; }.
+Module Layer.
+  Section S.
+    Record t Op State : Type :=
+      { step : OpSemantics Op State;
+        initP : State -> Prop; }.
+  End S.
+End Layer.
 
-Record Protocol (Op: Type -> Type) State :=
-  { step_allow : forall T, Op T -> nat -> State -> Prop; }.
+Module Protocol.
+  Section S.
+    Record t (Op: Type -> Type) State :=
+      { step_allow : forall T, Op T -> nat -> State -> Prop; }.
+  End S.
+End Protocol.
 
 Module LayerImpl.
+  Import Layer.
   Section S.
     Context
-      `(l1 : Layer O1 S1)
-      `(l2 : Layer O2 S2).
+      `(l1 : Layer.t O1 S1)
+      `(l2 : Layer.t O2 S2).
 
     Record t :=
       { absR : S1 -> S2 -> Prop;
@@ -76,10 +85,11 @@ Module LayerImpl.
 End LayerImpl.
 
 Module LayerImplAbsT.
+  Import Layer.
   Section S.
     Context O
-            `(l1: Layer O S1)
-            `(l2: Layer O S2).
+            `(l1: Layer.t O S1)
+            `(l2: Layer.t O S2).
 
     Record t :=
       { absR : S1 -> S2 -> Prop;
@@ -93,11 +103,12 @@ End LayerImplAbsT.
 
 
 Module LayerImplAbs.
+  Import Layer.
   Import LayerImplAbsT.
   Section S.
     Context O
-            `(l1 : Layer O S1)
-            `(l2 : Layer O S2)
+            `(l1 : Layer.t O S1)
+            `(l2 : Layer.t O S2)
             (a : LayerImplAbsT.t l1 l2).
 
     Definition absR := a.(absR).
@@ -137,10 +148,11 @@ Module LayerImplAbs.
 End LayerImplAbs.
 
 Module LayerImplMoversT.
+  Import Layer.
   Section S.
     Context S
-            `(l1: Layer O1 S)
-            `(l2: Layer O2 S).
+            `(l1: Layer.t O1 S)
+            `(l2: Layer.t O2 S).
     Record t :=
       { compile_op : forall T, O2 T -> proc O1 T;
         compile_op_no_atomics : forall T (op : O2 T),
@@ -165,11 +177,12 @@ Local Ltac init_abs :=
 
 
 Module LayerImplMovers.
+  Import Layer.
   Import LayerImplMoversT.
   Section S.
     Context S
-            `(l1 : Layer O1 S)
-            `(l2 : Layer O2 S)
+            `(l1 : Layer.t O1 S)
+            `(l2 : Layer.t O2 S)
             (a : LayerImplMoversT.t l1 l2).
 
     Definition absR (s1 : S) (s2: S) := s1 = s2.
@@ -238,16 +251,27 @@ Module LayerImplMovers.
       eapply all_traces_match; eauto.
       eapply Compile.compile_ts_ok; eauto.
     Qed.
+
+    Definition t : LayerImpl.t l1 l2.
+      refine {| LayerImpl.absR := absR;
+                LayerImpl.compile_ts := compile_ts;
+                LayerImpl.compile_ts_no_atomics := compile_ts_no_atomics;
+                LayerImpl.absInitP := absInitP;
+                LayerImpl.compile_traces_match := compile_traces_match;
+             |}.
+    Defined.
   End S.
 End LayerImplMovers.
 
 Module LayerImplMoversProtocolT.
+  Import Layer.
   Import LayerImplMoversT.
+  Import Protocol.
   Section S.
     Context S
-            `(l1raw: Layer O1 S) (l1: Layer O1 S)
-            `(l2: Layer O2 S)
-            (p: Protocol O1 S).
+            `(l1raw: Layer.t O1 S) (l1: Layer.t O1 S)
+            `(l2: Layer.t O2 S)
+            (p: Protocol.t O1 S).
 
     Record t : Type :=
       { movers_impl :> LayerImplMoversT.t l1 l2;
@@ -270,14 +294,16 @@ Module LayerImplMoversProtocolT.
 End LayerImplMoversProtocolT.
 
 Module LayerImplMoversProtocol.
+  Import Layer.
   Export LayerImplMoversT.
   Export LayerImplMoversProtocolT.
+  Import Protocol.
   
   Section S.
     Context S
-            `(l1raw : Layer O1 S) (l1: Layer O1 S)
-            `(l2 : Layer O2 S)
-            (p : Protocol O1 S)
+            `(l1raw : Layer.t O1 S) (l1: Layer.t O1 S)
+            `(l2 : Layer.t O2 S)
+            (p : Protocol.t O1 S)
             (a : LayerImplMoversProtocolT.t l1raw l1 l2 p).
 
     Definition absR (s1 : S) (s2 : S) := s1 = s2.
@@ -479,10 +505,11 @@ Module LayerImplMoversProtocol.
 End LayerImplMoversProtocol.
 
 Module LayerImplLoopT.
+  Import Layer.
   Section S.
     Context S
-            `(l1: Layer O1 S)
-            `(l2: Layer O2 S).
+            `(l1: Layer.t O1 S)
+            `(l2: Layer.t O2 S).
 
     Record t :=
       { compile_op : forall T, O2 T -> (option T -> O1 T) * (T -> bool) * option T;
@@ -492,11 +519,12 @@ Module LayerImplLoopT.
 End LayerImplLoopT.
 
 Module LayerImplLoop.
+  Import Layer.
   Export LayerImplLoopT.
   Section S.
     Context S
-            `(l1 : Layer O1 S)
-            `(l2 : Layer O2 S)
+            `(l1 : Layer.t O1 S)
+            `(l2 : Layer.t O2 S)
             (a : LayerImplLoopT.t l1 l2).
 
     Definition absR (s1 : S) (s2 : S) := s1 = s2.
@@ -534,18 +562,26 @@ Module LayerImplLoop.
       eapply CompileLoop.compile_ts_ok; eauto.
     Qed.
 
+    Definition t : LayerImpl.t l1 l2.
+      refine {| LayerImpl.absR := absR;
+                LayerImpl.absInitP := absInitP;
+                LayerImpl.compile_ts := compile_ts;
+                LayerImpl.compile_ts_no_atomics := compile_ts_no_atomics;
+                LayerImpl.compile_traces_match := compile_traces_match; |}.
+    Defined.
   End S.
 End LayerImplLoop.
 
 (** General layer transformers. *)
 
 Module Link.
+  Import Layer.
   Import LayerImpl.
   Section S.
     Context
-      `(a: Layer OA SA)
-      `(b: Layer OB SB)
-      `(c: Layer OC SC)
+      `(a: Layer.t OA SA)
+      `(b: Layer.t OB SB)
+      `(c: Layer.t OC SC)
       (x: LayerImpl.t a b)
       (y: LayerImpl.t b c).
     
@@ -598,6 +634,14 @@ Module Link.
       eapply y.(compile_traces_match) in H3; propositional; eauto.
       eapply y.(compile_ts_no_atomics); eauto.
     Qed.
+
+    Definition t : LayerImpl.t a c.
+      refine {| LayerImpl.absR := link_absR;
+                LayerImpl.absInitP := absInitP;
+                LayerImpl.compile_ts := compile_ts;
+                LayerImpl.compile_ts_no_atomics := link_compile_ts_no_atomics;
+                LayerImpl.compile_traces_match := compile_traces_match; |}.
+    Defined.
 
   End S.
 End Link.
