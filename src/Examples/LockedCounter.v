@@ -2377,39 +2377,16 @@ End AbsCounter.
 
 (** Linking *)
 
-Module c1.
-  Definition t: LayerImpl.t TSOAPI.l TAS_TSOAPI.l. 
-    refine (Link.t AbsNondet.layerImplAbs TAS_TSOImpl.t).
-  Defined.
-End c1.
+Local Infix "<==>" := (Link.t) (at level 30, right associativity).
 
-Module c2 :=
-  Link
-    TSOOp TSOState TSOAPI
-    TASOp TSOState TAS_TSOAPI
-    TASOp LockOwnerState LockOwnerAPI
-    c1 AbsLockOwner.
-
-Module c3 :=
-  Link
-    TSOOp TSOState TSOAPI
-    TASOp LockOwnerState LockOwnerAPI
-    TASOp LockInvariantState LockInvariantAPI
-    c2 AbsLockInvariant.
-
-Module c4 :=
-  Link
-    TSOOp TSOState TSOAPI
-    TASOp LockInvariantState LockInvariantAPI
-    TASOp SeqMemState SeqMemAPI
-    c3 AbsSeqMem.
-
-Module c5 :=
-  Link
-    TSOOp TSOState TSOAPI
-    TASOp SeqMemState SeqMemAPI
-    LockOp SeqMemState RawLockAPI
-    c4 LockImpl.
+Module c5.
+  Definition t := AbsNondet.layerImplAbs
+                    <==> TAS_TSOImpl.t
+                    <==> AbsLockOwner.t
+                    <==> AbsLockInvariant.t
+                    <==> AbsSeqMem.t
+                    <==> LockImpl.t.
+End c5.
 
 Module LockingCounter <: LayerImpl
                            LockOp SeqMemState RawLockAPI
