@@ -2383,35 +2383,37 @@ Module c1.
   Defined.
 End c1.
 
-Module c2 :=
-  Link
-    TSOOp TSOState TSOAPI
-    TASOp TSOState TAS_TSOAPI
-    TASOp LockOwnerState LockOwnerAPI
-    c1 AbsLockOwner.
+Module c2.
+  Definition t: LayerImpl.t TSOAPI.l LockOwnerAPI.l.
+    refine (Link.t c1.t AbsLockOwner.t).
+  Defined.
+End c2.
 
-Module c3 :=
-  Link
-    TSOOp TSOState TSOAPI
-    TASOp LockOwnerState LockOwnerAPI
-    TASOp LockInvariantState LockInvariantAPI
-    c2 AbsLockInvariant.
+Module c3.
+  Definition t: LayerImpl.t TSOAPI.l LockInvariantAPI.l.
+    refine (Link.t c2.t AbsLockInvariant.t).
+  Defined.
+End c3.
 
-Module c4 :=
-  Link
-    TSOOp TSOState TSOAPI
-    TASOp LockInvariantState LockInvariantAPI
-    TASOp SeqMemState SeqMemAPI
-    c3 AbsSeqMem.
+Module c4.
+  Definition t: LayerImpl.t TSOAPI.l SeqMemAPI.l.
+    refine (Link.t c3.t AbsSeqMem.t).
+  Defined.
+End c4.
 
-Module c5 :=
-  Link
-    TSOOp TSOState TSOAPI
-    TASOp SeqMemState SeqMemAPI
-    LockOp SeqMemState RawLockAPI
-    c4 LockImpl.
+Module c5.
+  Definition t: LayerImpl.t TSOAPI.l RawLockAPI.l.
+    refine (Link.t c4.t LockImpl.t).
+  Defined.
+End c5.
 
-Module LockingCounter <: LayerImpl
+Module LockingCounter.
+  Definition t: LayerImpl.t RawLockAPI.l LockedCounterAPI.l.
+    refine (LayerImplMoversProtocol.t RawLockAPI.l LockAPI.l LockedCounterAPI.l LockProtocol.p).
+
+
+
+<: LayerImpl
                            LockOp SeqMemState RawLockAPI
                            CounterOp SeqMemState LockedCounterAPI :=
   LayerImplMoversProtocol

@@ -501,6 +501,14 @@ Module LayerImplMoversProtocol.
       auto using a.(initP_compat), a.(raw_initP_compat).
     Qed.
 
+    Definition t : LayerImpl.t l1raw l2.
+      refine {| LayerImpl.absR := absR;
+                LayerImpl.absInitP := absInitP;
+                LayerImpl.compile_ts := compile_ts;
+                LayerImpl.compile_ts_no_atomics := compile_ts_no_atomics;
+                LayerImpl.compile_traces_match := compile_traces_match; |}.
+    Defined.
+
   End S.
 End LayerImplMoversProtocol.
 
