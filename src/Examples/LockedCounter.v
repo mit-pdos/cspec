@@ -2377,48 +2377,26 @@ End AbsCounter.
 
 (** Linking *)
 
+Module LockingCounter.
+  Definition t: LayerImpl.t RawLockAPI.l LockedCounterAPI.l.
+    refine (LayerImplMoversProtocol.t LockingCounter'.layerImplMoversProtocolT).
+  Defined.
+End LockingCounter.
+
 Local Infix "<==>" := (Link.t) (at level 30, right associativity).
 
-Module c5.
+Module c.
   Definition t := AbsNondet.layerImplAbs
                     <==> TAS_TSOImpl.t
                     <==> AbsLockOwner.t
                     <==> AbsLockInvariant.t
                     <==> AbsSeqMem.t
-                    <==> LockImpl.t.
-End c5.
+                    <==> LockImpl.t
+                    <==> LockingCounter.t
+                    <==> AbsCounter.layerImplAbs.
+End c.
 
-Module LockingCounter.
-  Definition t: LayerImpl.t RawLockAPI.l LockedCounterAPI.l.
-    refine (LayerImplMoversProtocol.t RawLockAPI.l LockAPI.l LockedCounterAPI.l LockProtocol.p).
-
-<: LayerImpl
-                           LockOp SeqMemState RawLockAPI
-                           CounterOp SeqMemState LockedCounterAPI :=
-  LayerImplMoversProtocol
-    SeqMemState
-    LockOp    RawLockAPI LockAPI
-    CounterOp LockedCounterAPI
-    LockProtocol
-    LockingCounter'.
-
-Module c6 :=
-  Link
-    TSOOp TSOState TSOAPI
-    LockOp SeqMemState RawLockAPI
-    CounterOp SeqMemState LockedCounterAPI
-    c5 LockingCounter.
-
-Module c <: LayerImpl
-               TSOOp TSOState TSOAPI
-               CounterOp CounterState CounterAPI :=
-  Link
-    TSOOp TSOState TSOAPI
-    CounterOp SeqMemState LockedCounterAPI
-    CounterOp CounterState CounterAPI
-    c6 AbsCounter.
-
-Print Assumptions c.compile_traces_match.
+Print Assumptions c.t.
 
 Import CounterOp.
 
@@ -2432,4 +2410,4 @@ Definition test_threads : threads_state _ :=
   thread_from_list (repeat (existT _ _ test_thread) 16).
 
 Definition compiled_threads : list (maybe_proc _) :=
-  thread_to_list (c.compile_ts test_threads).
+  thread_to_list (c.t.(LayerImpl.compile_ts) test_threads).
