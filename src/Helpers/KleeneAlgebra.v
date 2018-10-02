@@ -1,13 +1,220 @@
 Require Import Morphisms.
+Require Import Permutation.
+Require Import Varmap.
 Require Import Helpers.Setoid.
+Require Import Helpers.Sorting.
 Require PeanoNat.
 Require List.
+
+Import List.ListNotations.
+Open Scope list.
 
 Require Import Helpers.ProofAutomation.Propositional.
 
 Set Implicit Arguments.
 
 Generalizable Variables A.
+
+Section Monoidal.
+
+  Context (A:Setoid) (op: A -> A -> A) (zero:A).
+
+  Infix "+" := op.
+  Notation "0" := zero.
+
+  Hint Resolve (reflexivity: forall (x:A), x == x).
+
+  Global Class Monoidal :=
+    { op_proper :> Proper (equiv ==> equiv ==> equiv) op;
+      op_assoc : forall (x y z:A), x + y + z == x + (y + z);
+      op_neutral_right : forall (x:A), x + 0 == x;
+      op_neutral_left : forall (x:A), 0 + x == x; }.
+
+  Global Class Commutative := op_comm : forall x y, x + y == y + x.
+
+  Global Class Idempotent := op_idem : forall x, x + x == x.
+
+  (* non-recursive op syntax *)
+  Inductive op_element :=
+  | Leaf (x:A)
+  | Atom (i:varmap.I)
+  | Const0.
+
+  Inductive op_tree :=
+  | Element (e:op_element)
+  | Bin (l r:op_tree).
+
+  Instance def_A : Default A := 0.
+
+  Definition interpret_e (vm:varmap.t A) (e:op_element) : A :=
+    match e with
+    | Leaf x => x
+    | Atom i => varmap.find i vm
+    | Const0 => 0
+    end.
+
+  Fixpoint interpret (vm:varmap.t A) (t:op_tree) : A :=
+    match t with
+      | Element e => interpret_e vm e
+      | Bin l r => interpret vm l + interpret vm r
+    end.
+
+  Fixpoint flatten (t:op_tree) : list op_element :=
+    match t with
+    | Element e => [e]
+    | Bin l r => flatten l ++ flatten r
+    end.
+
+  Fixpoint int_l (vm:varmap.t A) (acc: A) (es: list op_element) : A :=
+    match es with
+    | [] => acc
+    | e::es' => int_l vm (acc + interpret_e vm e) es'
+    end.
+
+  Fixpoint int_l' (vm:varmap.t A) (es: list op_element) : A :=
+    match es with
+    | nil => 0
+    | e::es' => interpret_e vm e + int_l' vm es'
+    end.
+
+  Definition interpret_l (vm:varmap.t A) (es: list op_element) : A :=
+    match es with
+    | nil => 0
+    | e::es' => int_l vm (interpret_e vm e) es'
+    end.
+
+  Theorem int_l_to_int_l' {Mno: Monoidal} : forall vm es acc,
+      int_l vm acc es == acc + int_l' vm es.
+  Proof.
+    induction es; intros; simpl.
+    rewrite op_neutral_right; auto.
+    rewrite IHes.
+    rewrite op_assoc; auto.
+  Qed.
+
+  Theorem interpret_l_to_int_l' {Mno: Monoidal} : forall vm es,
+      interpret_l vm es == int_l' vm es.
+  Proof.
+    unfold interpret_l; intros.
+    destruct es; simpl; auto.
+    rewrite int_l_to_int_l'; auto.
+  Qed.
+
+  Lemma interpret_l_app {Mno: Monoidal} :
+    forall  vm l1 l2,
+      interpret_l vm l1 + interpret_l vm l2 ==
+      interpret_l vm (l1 ++ l2).
+  Proof.
+    repeat setoid_rewrite interpret_l_to_int_l'.
+    induction l1; intros; simpl.
+    now rewrite op_neutral_left.
+    rewrite op_assoc.
+    now rewrite IHl1.
+  Qed.
+
+  Theorem interpret_flatten {Mno: Monoidal} : forall vm t,
+      interpret vm t == interpret_l vm (flatten t).
+  Proof.
+    induction t; simpl; auto.
+    - rewrite IHt1, IHt2.
+      rewrite interpret_l_app; auto.
+  Qed.
+
+  Theorem interpret_l_perm {Mno: Monoidal} {Cm: Commutative} :
+    forall vm l1 l2,
+      Permutation l1 l2 ->
+      interpret_l vm l1 == interpret_l vm l2.
+  Proof.
+    repeat setoid_rewrite interpret_l_to_int_l'.
+    intros.
+    induction H; simpl; auto.
+    - rewrite IHPermutation; auto.
+    - rewrite <- ?op_assoc.
+      rewrite (op_comm (interpret_e vm y) (interpret_e vm x)); auto.
+    - etransitivity; eauto.
+  Qed.
+
+  Definition get_key (e:op_element) : option nat :=
+    match e with
+      | Atom i => Some i
+      | _ => None
+    end.
+
+  Theorem interpret_l_sort {Mno: Monoidal} {Cm: Commutative} :
+    forall vm l,
+      interpret_l vm l == interpret_l vm (sortBy get_key l).
+  Proof.
+    intros.
+    apply interpret_l_perm.
+    apply sortBy_permutation.
+  Qed.
+
+  Theorem interpret_l_sort_eqn {Mno: Monoidal} {Cm: Commutative} :
+    forall vm l1 l2,
+      interpret_l vm (sortBy get_key l1) == interpret_l vm (sortBy get_key l2) ->
+      interpret_l vm l1 == interpret_l vm l2.
+  Proof.
+    intros.
+    rewrite <- ?interpret_l_sort in H; auto.
+  Qed.
+
+End Monoidal.
+
+(* TODO: need to pass section parameters to these tactics appropriately *)
+Ltac reify_helper A op term ctx :=
+  let reify_rec term ctx := reify_helper A op term ctx in
+  lazymatch ctx with
+  | context[varmap.cons ?i term _] =>
+    constr:( (ctx, Element (Atom A i)) )
+  | _ =>
+    lazymatch term with
+    | 0 => constr:( (ctx, Element (Const0 A)) )
+    | op ?x ?y =>
+      let ctx_x := reify_rec x ctx in
+      let ctx_y := reify_rec y (fst ctx_x) in
+      let r := (eval cbv [fst snd] in
+                   (fst ctx_y, Bin (snd ctx_x) (snd ctx_y))) in
+      constr:(r)
+    | _ =>
+      let v' := (eval cbv [varmap.length] in (varmap.length ctx)) in
+      let ctx' := constr:( varmap.cons v' term ctx ) in
+      constr:( (ctx', Element (Atom A v')) )
+    end
+  end.
+
+  Ltac quote_with A op zero ctx term :=
+    let ctx_x := reify_helper A op term ctx in
+    let ctx := (eval cbv [fst] in (fst ctx_x)) in
+    let x := (eval cbv [snd] in (snd ctx_x)) in
+    constr:(interpret op zero ctx x).
+
+  Ltac quote A op zero term rx :=
+    let reified := quote_with A op zero (varmap.empty A) term in
+    rx reified.
+
+  Ltac quote_eqn op :=
+    let tc := constr:(_ : Monoidal _ op _) in
+    let A := match type of tc with
+             | Monoidal ?A _ _ => A
+             end in
+    let zero := match type of tc with
+                | Monoidal _ _ ?zero => zero
+                end in
+    match goal with
+    | |- ?x == ?y =>
+      quote A op zero x
+            ltac:(fun x' =>
+                    match x' with
+                    | interpret _ _ ?ctx ?xt =>
+                      let y' := quote_with A op zero ctx y in
+                      match y' with
+                      | interpret _ _ ?ctx' ?yt =>
+                        change
+                          (interpret op zero ctx' xt ==
+                           interpret op zero ctx' yt)
+                      end
+                    end)
+    end.
 
 Class Monoid_Ops (A:Setoid) :=
   { dot : A -> A -> A;
@@ -72,9 +279,31 @@ Section Theorems.
   Context {ISL: IdemSemiRing}.
   Context {KA: KleeneAlgebra}.
 
+  Instance dot_Monoidal : Monoidal A dot 1.
+  Proof.
+    destruct M.
+    constructor; eauto.
+    symmetry; auto.
+  Qed.
+
+  Instance plus_Monoidal : Monoidal A plus 0.
+  Proof.
+    destruct SL.
+    constructor; eauto.
+    symmetry; auto.
+    intros.
+    rewrite plus_comm0; auto.
+  Qed.
+
+  Instance plus_Commutative : Commutative A plus.
+  Proof.
+    unfold Commutative.
+    destruct SL; auto.
+  Qed.
+
   Theorem le_eq : forall p q, p <= q ->
-                          q <= p ->
-                          p == q.
+                         q <= p ->
+                         p == q.
   Proof.
     unfold le; intros.
     rewrite <- H.
@@ -166,13 +395,21 @@ Section Theorems.
 
   Hint Unfold Proper respectful Basics.flip Basics.impl : m.
 
+  Ltac norm :=
+    intros;
+    quote_eqn (@plus A SLo);
+    rewrite ?interpret_flatten by typeclasses eauto;
+    apply interpret_l_sort_eqn;
+    try match goal with
+        | [ |- Monoidal _ _ _ ] => typeclasses eauto
+        | [ |- Commutative _ _ ] => typeclasses eauto
+        end;
+    simpl.
+
   Lemma abc_to_acb : forall a b c,
       a + b + c == a + c + b.
   Proof.
-    intros.
-    rewrite <- plus_assoc.
-    rewrite (plus_comm b c).
-    cleanup.
+    now norm.
   Qed.
 
   Instance le_plus_respectful :
@@ -199,15 +436,7 @@ Section Theorems.
   Proof.
     intros.
     rewrite ?dot_distr_left, ?dot_distr_right.
-    generalize dependent (a⋅c); intro w.
-    generalize dependent (b⋅c); intro x.
-    generalize dependent (a⋅d); intro y.
-    generalize dependent (b⋅d); intro z.
-    rewrite (plus_comm y z).
-    rewrite plus_assoc at 1.
-    rewrite (abc_to_acb w x z).
-    rewrite (plus_comm y x).
-    cleanup.
+    now norm.
   Qed.
 
   Instance le_dot_respectful :
@@ -226,10 +455,8 @@ Section Theorems.
 
     assert (x ⋅ x0 + y ⋅ y0 + (x ⋅ y0 + y ⋅ x0) ==
             (x + y) ⋅ (x0 + y0)).
-    rewrite abc_to_acb.
-    rewrite ?dot_distr_left, ?dot_distr_right; cleanup.
-    rewrite (abc_to_acb (x⋅x0) (x⋅y0) (y⋅x0)).
-    auto.
+    rewrite ?dot_distr_left, ?dot_distr_right.
+    now norm.
 
     rewrite H2.
     rewrite H1.

@@ -1,4 +1,5 @@
-Require PeanoNat.
+Require Import PeanoNat.
+Require Import Permutation.
 
 Set Implicit Arguments.
 
