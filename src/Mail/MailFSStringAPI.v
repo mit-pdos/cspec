@@ -50,7 +50,7 @@ Module MailFSStringAPI <: Layer MailFSStringOp MailFSStringAbsState.
       (mk_state tmp mbox lock)
       nil
   | StepWriteTmpOK : forall tmp mbox tid tmpfn data lock,
-    FMap.In tmpfn tmp ->
+    FMap.MapsTo tmpfn empty_string tmp ->
     xstep (WriteTmp tmpfn data) tid
       (mk_state tmp mbox lock)
       true
@@ -63,7 +63,7 @@ Module MailFSStringAPI <: Layer MailFSStringOp MailFSStringAbsState.
       (mk_state tmp mbox lock)
       nil
   | StepWriteTmpErr2 : forall tmp mbox tid tmpfn data data' lock,
-    FMap.In tmpfn tmp ->
+    FMap.MapsTo tmpfn empty_string tmp ->
     xstep (WriteTmp tmpfn data) tid
       (mk_state tmp mbox lock)
       false

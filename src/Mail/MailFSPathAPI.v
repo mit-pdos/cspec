@@ -50,7 +50,7 @@ Module MailFSPathAPI <: Layer MailFSPathOp MailFSPathAbsState.
       (mk_state fs lock)
       nil
   | StepWriteOK : forall fs tid tmpfn data lock,
-    FMap.In tmpfn fs ->
+    FMap.MapsTo tmpfn empty_string fs ->
     xstep (Write tmpfn data) tid
       (mk_state fs lock)
       true
@@ -63,7 +63,7 @@ Module MailFSPathAPI <: Layer MailFSPathOp MailFSPathAbsState.
       (mk_state fs lock)
       nil
   | StepWriteErr2 : forall fs tid tmpfn data data' lock,
-    FMap.In tmpfn fs ->
+    FMap.MapsTo tmpfn empty_string fs ->
     xstep (Write tmpfn data) tid
       (mk_state fs lock)
       false

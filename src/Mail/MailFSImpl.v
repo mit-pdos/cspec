@@ -81,18 +81,18 @@ Module MailFSImpl' <:
 
   Hint Resolve gettid_right_mover.
 
-  Lemma fmap_in_tid_ne :
-    forall (tid0 tid1 : nat) (x y : nat) TV (v : TV) m,
+  Lemma fmap_mapsto_tid_ne :
+    forall (tid0 tid1 : nat) (x y : nat) TV (v v0 : TV) m,
       tid0 <> tid1 ->
-      FMap.In (tid0, x) (FMap.add (tid1, y) v m) ->
-      FMap.In (tid0, x) m.
+      FMap.MapsTo (tid0, x) v0 (FMap.add (tid1, y) v m) ->
+      FMap.MapsTo (tid0, x) v0 m.
   Proof.
     intros.
-    eapply FMap.in_add_ne; eauto.
+    eapply FMap.mapsto_add_ne; eauto.
     congruence.
   Qed.
 
-  Hint Resolve fmap_in_tid_ne.
+  Hint Resolve fmap_mapsto_tid_ne.
 
   Lemma createtmp_right_mover :
     right_mover
@@ -109,9 +109,6 @@ Module MailFSImpl' <:
       eexists. split. 2: eauto. eauto.
 
     rewrite <- FMap.add_remove_ne by congruence.
-      eexists. split. 2: eauto. eauto.
-
-    eapply FMap.mapsto_add_ne in H12; try congruence.
       eexists. split. 2: eauto. eauto.
 
     eexists. split. 2: eauto. eauto.

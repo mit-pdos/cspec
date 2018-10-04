@@ -82,7 +82,7 @@ Module MailFSMergedAPI <: Layer MailFSMergedOp MailFSMergedState.
       (mk_state fs lock)
       nil
   | StepWriteOK : forall fs tid tmpfn data lock,
-    FMap.In tmpfn fs ->
+    FMap.MapsTo tmpfn empty_string fs ->
     xstep (Write tmpfn data) tid
       (mk_state fs lock)
       true
@@ -95,7 +95,7 @@ Module MailFSMergedAPI <: Layer MailFSMergedOp MailFSMergedState.
       (mk_state fs lock)
       nil
   | StepWriteErr2 : forall fs tid tmpfn data data' lock,
-    FMap.In tmpfn fs ->
+    FMap.MapsTo tmpfn empty_string fs ->
     xstep (Write tmpfn data) tid
       (mk_state fs lock)
       false
@@ -229,7 +229,7 @@ Module MailFSMergedAbsAPI <: Layer MailFSPathHOp MailFSMergedState.
       (mk_state fs lock)
       nil
   | StepWriteOK : forall fs tid dir fn data lock u P,
-    FMap.In (u, dir, fn) fs ->
+    FMap.MapsTo (u, dir, fn) empty_string fs ->
     xstep (Slice (exist _ u P) (Write (dir, fn) data)) tid
       (mk_state fs lock)
       true
@@ -242,7 +242,7 @@ Module MailFSMergedAbsAPI <: Layer MailFSPathHOp MailFSMergedState.
       (mk_state fs lock)
       nil
   | StepWriteErr2 : forall fs tid dir fn data data' lock u P,
-    FMap.In (u, dir, fn) fs ->
+    FMap.MapsTo (u, dir, fn) empty_string fs ->
     xstep (Slice (exist _ u P) (Write (dir, fn) data)) tid
       (mk_state fs lock)
       false
