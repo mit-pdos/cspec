@@ -776,19 +776,15 @@ End HorizontalCompositionMovers.
 
 (** Module structures for horizontal composition *)
 
-Module Type HIndex.
-  Axiom indexT : Type.
-  Axiom indexValid : indexT -> Prop.
-  Axiom indexCmp : Ordering indexT.
-End HIndex.
+Record HIndex :=
+  { indexT :> Type;
+    indexValid : indexT -> Prop;
+    indexCmp : Ordering indexT; }.
 
-Module HOps (o : Ops) (i : HIndex) <: Ops.
-  Definition Op := horizOpT i.indexValid o.Op.
-End HOps.
+Instance hindex_Ordering (x:HIndex) : Ordering x := indexCmp x.
 
-Module HState (s : State) (i : HIndex) <: State.
-  Definition State := @horizState i.indexT i.indexCmp i.indexValid s.State.
-End HState.
+Definition HOps (o:Type -> Type) (i: HIndex) :=
+  horizOpT i.(indexValid) o.
 
 Module HLayer (o : Ops) (s : State) (l : Layer o s) (i : HIndex).
   Definition step := @horizStep i.indexT i.indexCmp i.indexValid _ _ l.step.
