@@ -776,25 +776,46 @@ End HorizontalCompositionMovers.
 
 (** Module structures for horizontal composition *)
 
-Module Type HIndex.
-  Axiom indexT : Type.
-  Axiom indexValid : indexT -> Prop.
-  Axiom indexCmp : Ordering indexT.
-End HIndex.
+Record HIndex :=
+  { indexT: Type;
+    indexValid: indexT -> Prop;
+    indexCmp: Ordering indexT;
+  }.
 
-Module HOps (o : Ops) (i : HIndex) <: Ops.
-  Definition Op := horizOpT i.indexValid o.Op.
+Module HOps.
+  Section S.
+    Context (O: Type -> Type)
+            (i: HIndex).
+    Definition Op := horizOpT i.(indexValid) O.
+  End S.
 End HOps.
 
-Module HState (s : State) (i : HIndex) <: State.
-  Definition State := @horizState i.indexT i.indexCmp i.indexValid s.State.
+Module HState.
+  Section S.
+    Context (S: Type)
+            `(i: HIndex).
+    Definition State := @horizState i.(indexT) i.(indexCmp) i.(indexValid) S.
+  End S.
 End HState.
 
-Module HLayer (o : Ops) (s : State) (l : Layer o s) (i : HIndex).
-  Definition step := @horizStep i.indexT i.indexCmp i.indexValid _ _ l.step.
-  Definition initP : @horizState i.indexT i.indexCmp i.indexValid s.State -> Prop :=
-    horizInitP l.initP.
+Module HLayer.
+  Import Layer.
+  Section S.
+    Context O
+            S
+            (l: Layer.t O S)
+            (i: HIndex).
+
+    Definition step := @horizStep i.(indexT) i.(indexCmp) i.(indexValid) _ _ l.(step).
+    Definition initP : @horizState i.(indexT) i.(indexCmp) i.(indexValid) S -> Prop :=
+      horizInitP l.(initP).
+  End S.
 End HLayer.
+
+Record HLayer Op State Layer HIndex : Type :=
+  { step: @horizStep HIndex _ _ Layer.t.(Layer.step);
+    initP: @horizState HIndex State -> Prop := horizInitP Layer.t.(initP);
+  }.
 
 Module HProtocol (o : Ops) (s : State) (p : Protocol o s) (i : HIndex).
   Module ho := HOps o i.
