@@ -777,10 +777,14 @@ End HorizontalCompositionMovers.
 (** Module structures for horizontal composition *)
 
 Record HIndex :=
-  { indexT: Type;
-    indexValid: indexT -> Prop;
-    indexCmp: Ordering indexT;
-  }.
+  { indexT :> Type;
+    indexValid : indexT -> Prop;
+    indexCmp : Ordering indexT; }.
+
+Instance hindex_Ordering (x:HIndex) : Ordering x := indexCmp x.
+
+Definition HOps (o:Type -> Type) (i: HIndex) :=
+  horizOpT i.(indexValid) o.
 
 Module HOps.
   Section S.
