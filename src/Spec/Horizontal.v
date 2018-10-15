@@ -964,7 +964,7 @@ Module LayerImplMoversProtocolHT.
     destruct op; simpl; eauto.
     pose proof (a.(compile_op_no_atomics) T op).
     generalize dependent H.
-    generalize (a.(compile_op) op).
+    generalize (a.(LayerImplMoversT.compile_op) op).
     clear.
     induction 1; simpl; eauto.
   Qed.
