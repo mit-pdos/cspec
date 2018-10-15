@@ -929,6 +929,12 @@ Module LayerImplAbsHT.
     apply a.(absR_ok).
   Qed.
 
+  Definition t : LayerImplAbsT.t hl1 hl2.
+    refine {| LayerImplAbsT.absR := absR;
+              LayerImplAbsT.absInitP := absInitP;
+              LayerImplAbsT.absR_ok := absR_ok; |}.
+  Qed.
+
   End S.
 End LayerImplAbsHT.
 
