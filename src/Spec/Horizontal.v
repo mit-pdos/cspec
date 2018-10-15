@@ -972,11 +972,11 @@ Module LayerImplMoversHT.
   Qed.
 
   Theorem ysa_movers : forall T (op : ho2 T),
-    @ysa_movers hs ho1 hl1 ho2 hl2 a T hl1.(Layer.step) (compile_op op).
+      Movers.ysa_movers hl1.(Layer.step) (compile_op op).
   Proof.
     destruct op; simpl; eauto.
     eapply horiz_ysa_movers.
-    eapply a.ysa_movers.
+    eapply a.(ysa_movers).
   Qed.
 
   Theorem compile_correct :
