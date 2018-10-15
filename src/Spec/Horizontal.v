@@ -938,25 +938,21 @@ Module LayerImplAbsHT.
   End S.
 End LayerImplAbsHT.
 
-Module LayerImplMoversProtocolHT.
-  Export LayerImplMoversProtocolT.
+Module LayerImplMoversHT.
   Import LayerImplMoversT.
   Section S.
-    Context S O1 O2
-            (l1raw: Layer.t O1 S)
-            (l1: Layer.t O1 S)
-            (l2: Layer.t O2 S)
-            (p : Protocol.t O1 S)
-            (a : LayerImplMoversProtocolT.t l1raw l1 l2 p)
-            (i : HIndex).
+    Context
+      S
+      `(l1 : Layer.t O1 S)
+      `(l2 : Layer.t O2 S)
+      (a : LayerImplMoversT.t l1 l2)
+      (i : HIndex).
 
   Definition hs := HState S i.
   Definition ho1 := HOps O1 i.
   Definition ho2 := HOps O2 i.
-  Definition hl1raw := HLayer.t l1raw i.
   Definition hl1 := HLayer.t l1 i.
   Definition hl2 := HLayer.t l2 i.
-  Definition hp := HProtocol.t i p.
 
   Definition compile_op T (op : ho2 T) : proc ho1 T :=
     match op with
@@ -975,8 +971,8 @@ Module LayerImplMoversProtocolHT.
     induction 1; simpl; eauto.
   Qed.
 
-  Theorem ysa_movers : forall T (op : ho2.Op T),
-    ysa_movers hl1.step (compile_op op).
+  Theorem ysa_movers : forall T (op : ho2 T),
+    @ysa_movers hs ho1 hl1 ho2 hl2 a T hl1.(Layer.step) (compile_op op).
   Proof.
     destruct op; simpl; eauto.
     eapply horiz_ysa_movers.
@@ -985,6 +981,82 @@ Module LayerImplMoversProtocolHT.
 
   Theorem compile_correct :
     compile_correct compile_op hl1.step hl2.step.
+  Proof.
+    intro; intros.
+    destruct op; simpl in *.
+    - eapply atomic_exec_horizStep in H; eauto; deex.
+      eapply a.compile_correct in H.
+      econstructor; eauto.
+    - repeat atomic_exec_inv.
+      inversion H5; clear H5; subst; repeat sigT_eq.
+      econstructor; eauto.
+  Qed.
+
+  Theorem initP_compat :
+    forall s, hl1.initP s -> hl2.initP s.
+  Proof.
+    unfold hl1.initP, hl2.initP.
+    unfold horizInitP; intros.
+    specialize (H i); propositional.
+    eauto using a.initP_compat.
+  Qed.
+
+End LayerImplMoversHT.
+
+Module LayerImplMoversProtocolHT.
+  Import LayerImplMoversProtocolT.
+  Import LayerImplMoversT.
+  Import HLayerImpl.
+  Import HLayer.
+  Import Layer.
+  
+  Section S.
+    Context S O1 O2
+            `(l1raw: Layer.t O1 S)
+            `(l1: Layer.t O1 S)
+            `(l2: Layer.t O2 S)
+            (p : Protocol.t O1 S)
+            (a : LayerImplMoversProtocolT.t l1raw l1 l2 p)
+            (i : HIndex).
+
+  Definition hs := HState S i.
+  Definition ho1 := HOps O1 i.
+  Definition ho2 := HOps O2 i.
+  Definition hl1raw := HLayer.t l1raw i.
+  Definition hl1 := HLayer.t l1 i.
+  Definition hl2 := HLayer.t l2 i.
+  Definition hp := HProtocol.t i p.
+  Definition layerImplMoversT := a.(movers_impl).
+
+  Definition compile_op T (op : ho2 T) : proc ho1 T :=
+    match op with
+    | Slice i op => SliceProc i (a.(compile_op) op)
+    | CheckSlice i => Call (CheckSlice i)
+    end.
+
+  Theorem compile_op_no_atomics : forall T (op : ho2 T),
+    no_atomics (compile_op op).
+  Proof.
+    destruct op; simpl; eauto.
+    pose proof (a.(compile_op_no_atomics) T op).
+    generalize dependent H.
+    generalize (a.(LayerImplMoversT.compile_op) op).
+    clear.
+    induction 1; simpl; eauto.
+  Qed.
+
+  Check ysa_movers.
+  Check (compile_op).
+  Theorem ysa_movers : forall T (op : ho2 T),
+    @ysa_movers hs ho1 hl1 ho2 hl2 ho1 T op.
+  Proof.
+    destruct op; simpl; eauto.
+    eapply horiz_ysa_movers.
+    eapply a.ysa_movers.
+  Qed.
+
+  Theorem compile_correct :
+    compile_correct compile_op hl1.(step) hl2.(step).
   Proof.
     intro; intros.
     destruct op; simpl in *.
@@ -1138,68 +1210,6 @@ Module LayerImplMoversProtocolHT.
 
 End LayerImplMoversProtocolHT.
 
-
-Module LayerImplMoversHT
-  (s : State)
-  (o1 : Ops) (l1 : Layer o1 s)
-  (o2 : Ops) (l2 : Layer o2 s)
-  (a : LayerImplMoversT s o1 l1 o2 l2)
-  (i : HIndex).
-
-  Module hs := HState s i.
-  Module ho1 := HOps o1 i.
-  Module ho2 := HOps o2 i.
-  Module hl1 := HLayer o1 s l1 i.
-  Module hl2 := HLayer o2 s l2 i.
-
-  Definition compile_op T (op : ho2.Op T) : proc ho1.Op T :=
-    match op with
-    | Slice i op => SliceProc i (a.compile_op op)
-    | CheckSlice i => Call (CheckSlice i)
-    end.
-
-  Theorem compile_op_no_atomics : forall T (op : ho2.Op T),
-    no_atomics (compile_op op).
-  Proof.
-    destruct op; simpl; eauto.
-    pose proof (a.compile_op_no_atomics op).
-    generalize dependent H.
-    generalize (a.compile_op op).
-    clear.
-    induction 1; simpl; eauto.
-  Qed.
-
-  Theorem ysa_movers : forall T (op : ho2.Op T),
-    ysa_movers hl1.step (compile_op op).
-  Proof.
-    destruct op; simpl; eauto.
-    eapply horiz_ysa_movers.
-    eapply a.ysa_movers.
-  Qed.
-
-  Theorem compile_correct :
-    compile_correct compile_op hl1.step hl2.step.
-  Proof.
-    intro; intros.
-    destruct op; simpl in *.
-    - eapply atomic_exec_horizStep in H; eauto; deex.
-      eapply a.compile_correct in H.
-      econstructor; eauto.
-    - repeat atomic_exec_inv.
-      inversion H5; clear H5; subst; repeat sigT_eq.
-      econstructor; eauto.
-  Qed.
-
-  Theorem initP_compat :
-    forall s, hl1.initP s -> hl2.initP s.
-  Proof.
-    unfold hl1.initP, hl2.initP.
-    unfold horizInitP; intros.
-    specialize (H i); propositional.
-    eauto using a.initP_compat.
-  Qed.
-
-End LayerImplMoversHT.
 
 
 Module LayerImplLoopHT
