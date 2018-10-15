@@ -24,19 +24,23 @@ Import ListNotations.
 Global Set Implicit Arguments.
 Global Generalizable All Variables.
 
+Record HIndex :=
+  { indexT :> Type;
+    indexValid : indexT -> Prop;
+    indexCmp : Ordering indexT; }.
+
+Instance hindex_Ordering (x:HIndex) : Ordering x := indexCmp x.
 
 Section HorizontalComposition.
 
-  Variable indexT : Type.
-  Context {cmp : Ordering indexT}.
-  Variable indexValid : indexT -> Prop.
+  Variable ind : HIndex.
 
   Variable sliceOpT : Type -> Type.
   Variable sliceState : Type.
   Variable sliceStep : OpSemantics sliceOpT sliceState.
   Variable initP : sliceState -> Prop.
 
-  Definition validIndexT := { i : indexT | indexValid i }.
+  Definition validIndexT := { i : ind.(indexT) | ind.(indexValid) i }.
 
   Inductive CheckResult :=
   | Missing
@@ -45,12 +49,12 @@ Section HorizontalComposition.
 
   Inductive horizOpT : Type -> Type :=
   | Slice : forall (i : validIndexT) T (op : sliceOpT T), horizOpT T
-  | CheckSlice : forall (i : indexT), horizOpT CheckResult
+  | CheckSlice : forall (i : ind.(indexT)), horizOpT CheckResult
   .
 
   Record horizState := mk_horizState {
-    HSMap : FMap.t indexT sliceState;
-    HSValid : forall i, indexValid i -> FMap.In i HSMap;
+    HSMap : FMap.t ind.(indexT) sliceState;
+    HSValid : forall i, ind.(indexValid) i -> FMap.In i HSMap;
   }.
 
   Definition hget (S : horizState) (i : validIndexT) : sliceState.
@@ -181,7 +185,7 @@ Section HorizontalComposition.
     apply proof_irrelevance.
   Qed.
 
-  Inductive sameSlice : CheckResult -> indexT -> Prop :=
+  Inductive sameSlice : CheckResult -> ind.(indexT) -> Prop :=
   | SameSliceMissing : forall i,
     sameSlice Missing i
   | SameSlicePresent : forall i P,
@@ -202,7 +206,7 @@ Section HorizontalComposition.
 
   Definition horizInitP (S : horizState) :=
     forall i,
-      indexValid i ->
+      ind.(indexValid) i ->
       exists s,
         FMap.MapsTo i s (HSMap S) /\
         initP s.
@@ -240,16 +244,15 @@ Section HorizontalComposition.
 
 End HorizontalComposition.
 
-Arguments horizState indexT {cmp} indexValid sliceState.
-Arguments horizStep indexT {cmp} indexValid {sliceOpT sliceState} sliceStep.
-Arguments Slice {indexT indexValid sliceOpT} i {T}.
-Arguments CheckSlice {indexT indexValid sliceOpT} i.
-Arguments Missing {indexT indexValid}.
-
+Arguments horizState ind sliceState.
+Arguments horizStep ind {sliceOpT sliceState} sliceStep.
+Arguments Slice {ind sliceOpT} i {T}.
+Arguments CheckSlice {ind sliceOpT} i.
+Arguments Missing {ind}.
 
 Ltac destruct_horizState :=
   match goal with
-  | x : horizState _ _ _ |- _ => destruct x; simpl in *
+  | x : horizState _ _ |- _ => destruct x; simpl in *
   end.
 
 Ltac destruct_validIndex :=
@@ -257,12 +260,15 @@ Ltac destruct_validIndex :=
   | x : validIndexT _ |- _ => destruct x; simpl in *
   end.
 
+Ltac destruct_ind :=
+  match goal with
+  | x : indexT _ _ |- _ => unfold indexT in x; simpl in *
+  | x : indexValid _ _ |- _ => unfold indexValid in x; simpl in *
+  end.
 
 Section HorizontalCompositionAbs.
 
-  Variable indexT : Type.
-  Context {cmp : Ordering indexT}.
-  Variable indexValid : indexT -> Prop.
+  Variable ind : HIndex.
 
   Variable sliceOpT : Type -> Type.
 
@@ -272,13 +278,12 @@ Section HorizontalCompositionAbs.
   Variable sliceState2 : Type.
   Variable sliceStep2 : OpSemantics sliceOpT sliceState2.
 
-
   Variable absR : sliceState1 -> sliceState2 -> Prop.
 
-  Definition horizAbsR (S1 : horizState indexT indexValid sliceState1)
-                       (S2 : horizState indexT indexValid sliceState2) : Prop :=
-    forall (i : indexT),
-      indexValid i ->
+  Definition horizAbsR (S1 : horizState ind sliceState1)
+                       (S2 : horizState ind sliceState2) : Prop :=
+    forall (i : ind.(indexT)),
+      ind.(indexValid) i ->
       ( forall s1,
           FMap.MapsTo i s1 (HSMap S1) ->
             exists s2, FMap.MapsTo i s2 (HSMap S2) /\ absR s1 s2 ) /\
@@ -292,7 +297,7 @@ Section HorizontalCompositionAbs.
 
   Theorem horizAbsR_ok :
     op_abs absR sliceStep1 sliceStep2 ->
-    op_abs horizAbsR (horizStep indexT indexValid sliceStep1) (horizStep indexT indexValid sliceStep2).
+    op_abs horizAbsR (horizStep ind sliceStep1) (horizStep ind sliceStep2).
   Proof.
     unfold op_abs, horizAbsR; intros.
     inversion H1; clear H1; subst; repeat sigT_eq.
@@ -314,8 +319,8 @@ Section HorizontalCompositionAbs.
             specialize (H5 _ H4); propositional; eauto.
       }
       {
-        pose proof (@hget_mapsto _ _ _ _ idx s1).
-        pose proof (@hget_mapsto _ _ _ _ idx s2).
+        pose proof (@hget_mapsto _ _ idx s1).
+        pose proof (@hget_mapsto _ _ idx s2).
         specialize (H0 (proj1_sig idx) (proj2_sig idx)).
         eapply H0 in H1; deex.
         FMap.mapsto_unique; eauto.
@@ -329,7 +334,6 @@ Section HorizontalCompositionAbs.
       intuition idtac.
     }
   Qed.
-
 
   Variable initP1 : sliceState1 -> Prop.
   Variable initP2 : sliceState2 -> Prop.
@@ -375,14 +379,12 @@ Section HorizontalCompositionAbs.
 
 End HorizontalCompositionAbs.
 
-Arguments horizAbsR indexT {cmp indexValid sliceState1 sliceState2} absR.
-
+Print horizAbsR.
+Arguments horizAbsR ind {sliceState1 sliceState2} absR.
 
 Section HorizontalCompositionMovers.
 
-  Variable indexT : Type.
-  Context {cmp : Ordering indexT}.
-  Variable indexValid : indexT -> Prop.
+  Variable ind : HIndex.
 
   Variable sliceOpT : Type -> Type.
   Variable sliceState : Type.
@@ -403,7 +405,7 @@ Section HorizontalCompositionMovers.
     forall `(op : sliceOpT T),
       right_mover sliceStep op ->
       forall i,
-        right_mover (horizStep indexT indexValid sliceStep) (Slice i op).
+        right_mover (horizStep ind sliceStep) (Slice i op).
   Proof.
     intros.
     unfold right_mover; intros.
@@ -441,7 +443,7 @@ Section HorizontalCompositionMovers.
     forall `(op : sliceOpT T),
       enabled_stable sliceStep T op ->
       forall i,
-        enabled_stable (horizStep indexT indexValid sliceStep) T (Slice i op).
+        enabled_stable (horizStep ind sliceStep) T (Slice i op).
   Proof.
     intros.
     unfold enabled_stable; intros.
@@ -465,7 +467,7 @@ Section HorizontalCompositionMovers.
     forall `(op : sliceOpT T),
       left_mover sliceStep op ->
       forall i,
-        left_mover (horizStep indexT indexValid sliceStep) (Slice i op).
+        left_mover (horizStep ind sliceStep) (Slice i op).
   Proof.
     intros.
     split; intros.
@@ -503,7 +505,7 @@ Section HorizontalCompositionMovers.
     forall `(op : sliceOpT T) P,
       left_mover_pred sliceStep op P ->
       forall i,
-        left_mover_pred (horizStep indexT indexValid sliceStep) (Slice i op)
+        left_mover_pred (horizStep ind sliceStep) (Slice i op)
           (fun tid S => P tid (hget S i)).
   Proof.
     intros.
@@ -544,7 +546,7 @@ Section HorizontalCompositionMovers.
 
 
   Lemma atomic_exec_horizStep : forall `(p0 : proc _ T) i tid S v S' evs,
-    atomic_exec (horizStep indexT indexValid sliceStep) p0 tid S v S' evs ->
+    atomic_exec (horizStep ind sliceStep) p0 tid S v S' evs ->
       forall p,
         p0 = SliceProc i p ->
         exists s',
@@ -582,7 +584,7 @@ Section HorizontalCompositionMovers.
         eexists; split; eauto.
   Qed.
 
-  Local Lemma hadd_hget_eq' : forall (i: validIndexT indexValid) (s: horizState _ _ sliceState),
+  Local Lemma hadd_hget_eq' : forall (i: validIndexT ind) (s: horizState _ sliceState),
       s = hadd i (hget s i) s.
   Proof.
     intros.
@@ -594,7 +596,7 @@ Section HorizontalCompositionMovers.
 
   Local Lemma exec_tid_slice :
     forall S1 S2 tid `(p : proc _ T) r spawned evs,
-      exec_tid (horizStep indexT indexValid sliceStep) tid S1 p S2 r spawned evs ->
+      exec_tid (horizStep ind sliceStep) tid S1 p S2 r spawned evs ->
       forall `(p' : proc _ T) i,
         p = SliceProc i p' ->
         exists spawned' s' r',
@@ -647,7 +649,7 @@ Section HorizontalCompositionMovers.
 
   Local Lemma exec_any_slice :
     forall S1 S2 tid `(p : proc _ T) r,
-      exec_any (horizStep indexT indexValid sliceStep) tid S1 p r S2 ->
+      exec_any (horizStep ind sliceStep) tid S1 p r S2 ->
       forall `(p' : proc _ T) i,
         p = SliceProc i p' ->
         exec_any sliceStep tid (hget S1 i) p' r (hget S2 i).
@@ -678,7 +680,7 @@ Section HorizontalCompositionMovers.
 
   Local Lemma exec_others_slice :
     forall S1 S2 tid,
-      exec_others (horizStep indexT indexValid sliceStep) tid S1 S2 ->
+      exec_others (horizStep ind sliceStep) tid S1 S2 ->
       forall i,
         exec_others sliceStep tid (hget S1 i) (hget S2 i).
   Proof.
@@ -705,7 +707,7 @@ Section HorizontalCompositionMovers.
     forall `(p : proc _ T) P,
       left_movers sliceStep P p ->
       forall i,
-        left_movers (horizStep indexT indexValid sliceStep)
+        left_movers (horizStep ind sliceStep)
           (fun tid S => P tid (hget S i))
           (SliceProc i p).
   Proof.
@@ -729,7 +731,7 @@ Section HorizontalCompositionMovers.
     forall `(p : proc _ T),
       ysa_movers sliceStep p ->
       forall i,
-        ysa_movers (horizStep indexT indexValid sliceStep) (SliceProc i p).
+        ysa_movers (horizStep ind sliceStep) (SliceProc i p).
   Proof.
     unfold ysa_movers; intros.
     eapply right_movers_impl with
@@ -776,31 +778,11 @@ End HorizontalCompositionMovers.
 
 (** Module structures for horizontal composition *)
 
-Record HIndex :=
-  { indexT :> Type;
-    indexValid : indexT -> Prop;
-    indexCmp : Ordering indexT; }.
+Definition HOps (o: Type -> Type) (i: HIndex) :=
+  horizOpT i o.
 
-Instance hindex_Ordering (x:HIndex) : Ordering x := indexCmp x.
-
-Definition HOps (o:Type -> Type) (i: HIndex) :=
-  horizOpT i.(indexValid) o.
-
-Module HOps.
-  Section S.
-    Context (O: Type -> Type)
-            (i: HIndex).
-    Definition Op := horizOpT i.(indexValid) O.
-  End S.
-End HOps.
-
-Module HState.
-  Section S.
-    Context (S: Type)
-            `(i: HIndex).
-    Definition State := @horizState i.(indexT) i.(indexCmp) i.(indexValid) S.
-  End S.
-End HState.
+Definition HState (s: Type) (i: HIndex) :=
+  @horizState i s.
 
 Module HLayer.
   Import Layer.
@@ -810,136 +792,179 @@ Module HLayer.
             (l: Layer.t O S)
             (i: HIndex).
 
-    Definition step := @horizStep i.(indexT) i.(indexCmp) i.(indexValid) _ _ l.(step).
-    Definition initP : @horizState i.(indexT) i.(indexCmp) i.(indexValid) S -> Prop :=
+    Definition hstep := @horizStep i _ _ l.(step).
+    Definition hinitP : @horizState i S -> Prop :=
       horizInitP l.(initP).
+    Definition t : Layer.t (horizOpT i O) (horizState i S) :=
+      {| step := hstep;
+         initP := hinitP; |}.
   End S.
 End HLayer.
 
-Record HLayer Op State Layer HIndex : Type :=
-  { step: @horizStep HIndex _ _ Layer.t.(Layer.step);
-    initP: @horizState HIndex State -> Prop := horizInitP Layer.t.(initP);
-  }.
-
-Module HProtocol (o : Ops) (s : State) (p : Protocol o s) (i : HIndex).
-  Module ho := HOps o i.
-  Module hs := HState s i.
-  Definition step_allow T (hop : ho.Op T) (tid : nat) (S : hs.State) : Prop :=
+Module HProtocol.
+  Section S.
+    Context O
+            S
+            (i : HIndex)
+            (p : Protocol.t O S).
+  Definition ho := horizOpT i O.
+  Definition hs := horizState i S.
+  Definition step_allow T (hop : ho T) (tid : nat) (S : hs) : Prop :=
     match hop with
     | Slice i op =>
-      p.step_allow op tid (hget S i)
+      p.(Protocol.step_allow) _ op tid (hget S i)
     | CheckSlice i =>
       True
     end.
+  Definition t : Protocol.t (horizOpT i O) (horizState i S) :=
+    {| Protocol.step_allow := step_allow; |}.
+  End S.
 End HProtocol.
 
-Module Type HLayerImplAbsT
-       (o:Ops)
-       (s1: State) (l1: Layer o s1)
-       (s2: State) (l2: Layer o s2).
-  Parameter absR : s1.State -> s2.State -> Prop.
-  Parameter absR_ok : op_abs absR l1.step l2.step.
+Check HProtocol.t.
 
-  Parameter initP_map: forall (s1:s1.State), {s2:s2.State | l1.initP s1 -> absR s1 s2 /\ l2.initP s2}.
+Module HLayerImpl.
+  Import Layer.
+  Section S.
+  Context O 
+          S1
+          S2
+          `(l1: Layer.t O S1)
+          `(l2: Layer.t O S2).
+  Record t :=
+  { absR : S1 -> S2 -> Prop;
+    absR_ok : op_abs absR l1.(step) l2.(step);
+    initP_map: forall (s1: S1), {s2: S2 | l1.(initP) s1 -> absR s1 s2 /\ l2.(initP) s2}; }.
+  End S.
+End HLayerImpl.
 
-End HLayerImplAbsT.
-
-Module LayerImplAbsT_from_H
-       (o:Ops)
-       (s1:State) (l1:Layer o s1)
-       (s2:State) (l2:Layer o s2)
-       (a: HLayerImplAbsT o s1 l1 s2 l2) <: LayerImplAbsT o s1 l1 s2 l2.
-  Include a.
+Module HLayerImplAbsT.
+  Import Layer.
+  Import HLayerImpl.
+  Section S.
+    Context O
+            S1
+            S2
+            `(l1: Layer.t O S1)
+            `(l2: Layer.t O S2)
+            (a : HLayerImpl.t l1 l2).
 
   Theorem absInitP : forall s1,
-      l1.initP s1 ->
-      exists s2, absR s1 s2 /\
-            l2.initP s2.
+      l1.(initP) s1 ->
+      exists s2, a.(absR) s1 s2 /\
+            l2.(initP) s2.
   Proof.
     intros.
-    destruct (initP_map s1); eauto.
+    destruct (a.(initP_map) s1); eauto.
   Qed.
 
-End LayerImplAbsT_from_H.
+  Definition t : LayerImplAbsT.t l1 l2 :=
+    {| LayerImplAbsT.absR := a.(absR);
+       LayerImplAbsT.absR_ok := a.(absR_ok);
+       LayerImplAbsT.absInitP := absInitP; |}.
+  End S.
+End HLayerImplAbsT.
 
-Module HLayerImplAbs
-       (o:Ops)
-       (s1:State) (l1:Layer o s1)
-       (s2:State) (l2:Layer o s2)
-       (a: HLayerImplAbsT o s1 l1 s2 l2).
-  Module a' := LayerImplAbsT_from_H o s1 l1 s2 l2 a.
-  Include (LayerImplAbs o s1 l1 s2 l2 a').
+Module HLayerImplAbs.
+  Section S.
+    Context O S1 S2
+            (l1: Layer.t O S1)
+            (l2: Layer.t O S2)
+            (a : HLayerImpl.t l1 l2).
+
+    Definition t : LayerImpl.t l1 l2 :=
+      LayerImplAbs.t (HLayerImplAbsT.t a).
+    End S.
 End HLayerImplAbs.
 
-Module LayerImplAbsHT
-  (o : Ops)
-  (s1 : State) (l1 : Layer o s1)
-  (s2 : State) (l2 : Layer o s2)
-  (a : HLayerImplAbsT o s1 l1 s2 l2)
-  (i : HIndex).
+Module LayerImplAbsHT.
+  Import Layer.
+  Import HLayerImpl.
+  Import HLayerImplAbsT.
+  Section S.
+    Context O S1 S2
+            `(l1: Layer.t O S1)
+            `(l2: Layer.t O S2)
+            (a : HLayerImpl.t l1 l2)
+            (i : HIndex).
 
-  Module ho := HOps o i.
-  Module hs1 := HState s1 i.
-  Module hs2 := HState s2 i.
-  Module hl1 := HLayer o s1 l1 i.
-  Module hl2 := HLayer o s2 l2 i.
+  Definition ho := HOps O i.
+  Definition hs1 := HState S1 i.
+  Definition hs2 := HState S2 i.
+  Definition hl1 := HLayer.t l1 i.
+  Definition hl2 := HLayer.t l2 i.
+
+  Definition hliat := HLayerImplAbsT.t a.
+  Definition hlia := HLayerImplAbs.t a.
 
   Definition absR :=
-    @horizAbsR i.indexT i.indexCmp i.indexValid _ _ a.absR.
+    @horizAbsR i _ _ a.(absR).
 
   Theorem absInitP :
     forall s1,
-      hl1.initP s1 ->
+      hl1.(initP) s1 ->
       exists s2, absR s1 s2 /\
-      hl2.initP s2.
+      hl2.(initP) s2.
   Proof.
     intros.
     eapply horizAbsR_initP_ok
-      with (initP_map := fun s1 => proj1_sig (a.initP_map s1)) in H;
+      with (initP_map := fun s1 => proj1_sig (a.(initP_map) s1)) in H;
       propositional; eauto.
-    pose proof (proj2_sig (a.initP_map s0));
+    pose proof hlia.
+    exists s2.
+    destruct X.
+    split.
+    unfold absR.
+    destruct a.
+    apply H.
+    apply H0.
+    pose proof (proj2_sig (a.(initP_map) s0));
       simpl in *; propositional; eauto.
-  Qed.
+    Qed.
 
   Theorem absR_ok :
-    op_abs absR hl1.step hl2.step.
+    op_abs absR hl1.(step) hl2.(step).
   Proof.
     eapply horizAbsR_ok.
-    apply a.absR_ok.
+    apply a.(absR_ok).
   Qed.
 
+  End S.
 End LayerImplAbsHT.
 
+Module LayerImplMoversProtocolHT.
+  Export LayerImplMoversProtocolT.
+  Import LayerImplMoversT.
+  Section S.
+    Context S O1 O2
+            (l1raw: Layer.t O1 S)
+            (l1: Layer.t O1 S)
+            (l2: Layer.t O2 S)
+            (p : Protocol.t O1 S)
+            (a : LayerImplMoversProtocolT.t l1raw l1 l2 p)
+            (i : HIndex).
 
-Module LayerImplMoversProtocolHT
-  (s : State)
-  (o1 : Ops) (l1raw : Layer o1 s) (l1 : Layer o1 s)
-  (o2 : Ops) (l2 : Layer o2 s)
-  (p : Protocol o1 s)
-  (a : LayerImplMoversProtocolT s o1 l1raw l1 o2 l2 p)
-  (i : HIndex).
+  Definition hs := HState S i.
+  Definition ho1 := HOps O1 i.
+  Definition ho2 := HOps O2 i.
+  Definition hl1raw := HLayer.t l1raw i.
+  Definition hl1 := HLayer.t l1 i.
+  Definition hl2 := HLayer.t l2 i.
+  Definition hp := HProtocol.t i p.
 
-  Module hs := HState s i.
-  Module ho1 := HOps o1 i.
-  Module ho2 := HOps o2 i.
-  Module hl1raw := HLayer o1 s l1raw i.
-  Module hl1 := HLayer o1 s l1 i.
-  Module hl2 := HLayer o2 s l2 i.
-  Module hp := HProtocol o1 s p i.
-
-  Definition compile_op T (op : ho2.Op T) : proc ho1.Op T :=
+  Definition compile_op T (op : ho2 T) : proc ho1 T :=
     match op with
-    | Slice i op => SliceProc i (a.compile_op op)
+    | Slice i op => SliceProc i (a.(compile_op) op)
     | CheckSlice i => Call (CheckSlice i)
     end.
 
-  Theorem compile_op_no_atomics : forall T (op : ho2.Op T),
+  Theorem compile_op_no_atomics : forall T (op : ho2 T),
     no_atomics (compile_op op).
   Proof.
     destruct op; simpl; eauto.
-    pose proof (a.compile_op_no_atomics op).
+    pose proof (a.(compile_op_no_atomics) T op).
     generalize dependent H.
-    generalize (a.compile_op op).
+    generalize (a.(compile_op) op).
     clear.
     induction 1; simpl; eauto.
   Qed.
