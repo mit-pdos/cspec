@@ -2198,6 +2198,24 @@ Module CriticalSection' <:
     induction p; intros; simpl; atomic_exec_and_step_inv.
   Qed.
 
+  Theorem exec_prog_after_acquire : forall T (p: prog T) (tid v0: nat) (ret: T)
+                             s evs,
+      atomic_exec LockAPI.step (flat_prog_core (flatten_prog p)) tid
+                  (Valid {| SeqMemState.Value := v0;
+                            SeqMemState.LockOwner := Some tid |}) ret s evs ->
+      exists v1,
+        progStep (flatten_prog p) v0 = (v1, ret) /\
+        s = Valid {| SeqMemState.Value := v1;
+                     SeqMemState.LockOwner := None |} /\
+        evs = [].
+  Proof.
+    intros.
+    pose proof (exec_prog_after_acquire_is_valid _ H); propositional;
+      pose proof (exec_prog_after_acquire_is_step _ H);
+      propositional.
+    rewrite H0; eauto.
+  Qed.
+
   Lemma exec_after_error_is_error:
       forall T p (tid: nat) (v: T) s evs,
         atomic_exec LockAPI.step (flat_prog_core p) tid Error v s evs ->
@@ -2208,23 +2226,44 @@ Module CriticalSection' <:
 
   Hint Constructors error_step.
 
+  Lemma critical_section_error_step : forall tid T (p: prog T) r,
+        CriticalSectionAPI.step (CriticalSection p) tid Error r Error [].
+  Proof.
+    intros.
+    assert (exists r s',
+               CriticalSectionAPI.xstep (CriticalSection p) tid
+                                        (SeqMemState.mkSMState 0 None)
+                                        r s' []).
+    destruct_with_eqn (CriticalSectionOp.progStep (flatten_prog p) 0).
+    induction p; simpl in *;
+      try match goal with
+          | [ H: (_, _) = (_, _) |- _ ] => invertc H
+          end;
+      try solve [ descend; econstructor; simpl; eauto ].
+    propositional; eauto.
+  Qed.
+
+  Hint Resolve critical_section_error_step.
+
   Theorem compile_correct :
     compile_correct compile_op LockAPI.step CriticalSectionAPI.step.
   Proof.
     unfold compile_correct. intros.
     destruct op; simpl.
+
     - repeat atomic_exec_inv_safe. cleanup.
-      remember (flatten_prog p) as flatProg.
-      destruct_with_eqn (CriticalSectionOp.progStep (flatten_prog p) 0).
-      induction flatProg; atomic_exec_and_step_inv.
-      all: try match goal with
-           | [ H : atomic_exec _ (flat_prog_core ?p) _ (Valid _) _ ?s _ |- _ ] =>
-             pose proof (exec_prog_after_acquire_is_valid p H); propositional;
-             pose proof (exec_prog_after_acquire_is_step p H)
-           | [ H : atomic_exec _ (flat_prog_core ?p) _ Error _ ?s _ |- _ ] =>
-             pose proof (exec_after_error_is_error p H)
-           end; propositional.
-      all: econstructor; econstructor; rewrite <- HeqflatProg in *; eauto.
+      match goal with
+      | [ H: LockAPI.step' Acquire _ _ _ _ _ |- _ ] =>
+        invertc H
+      end.
+      + match goal with
+          | [ H: atomic_exec _ _ _ (Valid _) _ _ _ |- _ ] =>
+            apply exec_prog_after_acquire in H
+        end.
+        propositional; eauto.
+      + apply exec_after_error_is_error in H10; propositional.
+        eauto.
+
     - atomic_exec_and_step_inv.
       Grab Existential Variables.
       apply (SeqMemState.mkSMState 0 None).
