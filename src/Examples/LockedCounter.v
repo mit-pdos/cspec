@@ -1863,7 +1863,7 @@ Module CriticalSectionOp <: Ops.
 
   Fixpoint deflatten_prog T (p : flatProg T) : prog T :=
     match p with
-    | DoRet v => ProgRet v
+    | DoRet v     => ProgRet v
     | DoRead p    => ProgBind ProgRead (fun v => deflatten_prog (p v))
     | DoWrite n p => ProgBind (ProgWrite n) (fun v => deflatten_prog (p v))
     end.
@@ -2059,13 +2059,26 @@ Module CriticalSection' <:
   Hint Resolve read_right_mover.
   Hint Resolve write_right_mover.
 
-  (* Predicate on states after calling acquire .*)
+  (* Predicate on states after calling acquire. *)
   Definition p_acquire :=
-    fun (r: bool) (tid: nat) (s' : OrError SeqMemState.s) =>
-     exists s s0 : OrError SeqMemState.s,
-       any tid s /\
-       exec_any LockAPI.step tid s (Call Acquire) r s0 /\
-       exec_others LockAPI.step tid s0 s'.
+      fun (r: bool) (tid: nat) (s' : OrError SeqMemState.s) =>
+      exists s s0 : OrError SeqMemState.s,
+      any tid s /\
+      exec_any LockAPI.step tid s (Call Acquire) r s0 /\
+      exec_others LockAPI.step tid s0 s'.
+
+  Lemma p_acquire_after_exec_others:
+    forall (tid n: nat) (s0 s:OrError SeqMemState.s),
+      s0 = Valid (SeqMemState.mkSMState n (Some tid)) /\
+      exec_others LockAPI.step tid s0 s ->
+      p_acquire true tid s.
+  Proof.
+    intros; hnf. destruct H; rewrite H in *; clear H.
+    exists (Valid (SeqMemState.mkSMState n None)).
+    exists (Valid (SeqMemState.mkSMState n (Some tid))).
+    intuition; [cbv; eauto | eauto].
+    econstructor 2; eauto.
+  Qed.
 
   Ltac exec_any_invert H := pose proof (exec_any_op H); cleanup.
 
@@ -2081,7 +2094,7 @@ Module CriticalSection' <:
   Hint Resolve exec_error_is_error.
 
   Ltac movers_helper :=
-    match goal with
+    repeat match goal with
     | [ H1: exec_others LockAPI.step ?tid ?s1 ?s2,
         H2: exec_others LockAPI.step ?tid ?s2 ?s3 |- _ ] =>
         let H' := fresh in
@@ -2094,18 +2107,6 @@ Module CriticalSection' <:
     | [ H: Valid _ = Error |- _ ] => solve [ invert H ]
     | [ H: Error = Valid _ |- _ ] => solve [ invert H ]
     | [ H: unit |- _ ] => destruct H
-    | [ H: exec_others LockAPI.step ?tid ?s0 ?s
-        |- exists s1 s2,
-           any ?tid s1 /\
-           exec_any LockAPI.step ?tid s1 (Call Acquire) true s2 /\
-           exec_others LockAPI.step ?tid s2 ?s] =>
-      let cand_s1 :=
-        match s0 with
-         | Valid {| SeqMemState.Value := ?n;
-                    SeqMemState.LockOwner := Some tid |} =>
-           constr:(Valid (SeqMemState.mkSMState n None))
-         | Error => constr:(@Error SeqMemState.s)
-        end in solve [exists cand_s1, s0; intuition; econstructor 2; eauto]
     end; eauto.
 
   Lemma right_movers_read_after_acquire :
@@ -2117,11 +2118,11 @@ Module CriticalSection' <:
     intro n; specialize (H n).
     unfold p_acquire in *. cleanup.
     eapply right_movers_impl; eauto. propositional.
-    exec_any_invert H1. all: repeat movers_helper.
+    exec_any_invert H1. movers_helper.
   Qed.
 
   Lemma right_movers_write_after_acquire:
-    forall T (p: unit -> proc LockOp.Op T),
+      forall T (p: unit -> proc LockOp.Op T),
       (forall (r: bool), right_movers LockAPI.step (p_acquire r) (p tt)) ->
       (forall (r: bool) (n: nat),
           right_movers LockAPI.step (p_acquire r) (x <- Call (Write n); p x)).
@@ -2130,7 +2131,7 @@ Module CriticalSection' <:
     specialize (H r). unfold p_acquire in *.
     eapply right_movers_impl; eauto. propositional.
     exec_any_invert H3. exec_any_invert H1.
-    all: repeat movers_helper.
+    movers_helper. eapply p_acquire_after_exec_others; eauto.
   Qed.
 
   Lemma prog_movers : forall T (p: flatProg T),
@@ -2175,25 +2176,26 @@ Module CriticalSection' <:
     end;
     autorewrite with t in *.
 
+  Ltac atomic_exec_and_step_inv :=
+    repeat atomic_exec_inv_safe; cleanup; repeat step_inv; eauto.
+
   Lemma exec_prog_after_acquire_is_valid:
-    forall T (p: flatProg T) tid v0 (ret: T) s evs,
-    atomic_exec LockAPI.step (flat_prog_core p) tid
-                (Valid (SeqMemState.mkSMState v0 (Some tid))) ret s evs ->
-    exists v1, s = Valid (SeqMemState.mkSMState v1 None) /\ evs = [].
+      forall T (p: flatProg T) tid v0 (ret: T) s evs,
+      atomic_exec LockAPI.step (flat_prog_core p) tid
+                  (Valid (SeqMemState.mkSMState v0 (Some tid))) ret s evs ->
+      exists v1, s = Valid (SeqMemState.mkSMState v1 None) /\ evs = [].
   Proof.
-    do 3 intro. induction p; intros; simpl; eauto.
-    all: repeat atomic_exec_inv_safe; cleanup; repeat step_inv; eauto.
+    induction p; intros; atomic_exec_and_step_inv.
   Qed.
 
   Lemma exec_prog_after_acquire_is_step :
-    forall T (p: flatProg T) (tid: nat) (v0 v1: nat) (ret: T) evs,
-    atomic_exec LockAPI.step (flat_prog_core p) tid
-                (Valid (SeqMemState.mkSMState v0 (Some tid))) ret
-                (Valid (SeqMemState.mkSMState v1 None)) evs ->
-    CriticalSectionOp.progStep p v0 = (v1, ret) /\ evs = [].
+      forall T (p: flatProg T) (tid: nat) (v0 v1: nat) (ret: T) evs,
+      atomic_exec LockAPI.step (flat_prog_core p) tid
+                  (Valid (SeqMemState.mkSMState v0 (Some tid))) ret
+                  (Valid (SeqMemState.mkSMState v1 None)) evs ->
+      CriticalSectionOp.progStep p v0 = (v1, ret) /\ evs = [].
   Proof.
-    intro; intro. induction p; intros; simpl; eauto.
-    all: repeat atomic_exec_inv_safe; cleanup; repeat step_inv; eauto.
+    induction p; intros; simpl; atomic_exec_and_step_inv.
   Qed.
 
   Lemma exec_after_error_is_error:
@@ -2201,14 +2203,7 @@ Module CriticalSection' <:
         atomic_exec LockAPI.step (flat_prog_core p) tid Error v s evs ->
         s = Error /\ evs = [].
   Proof.
-    intro; intro. induction p; intros; simpl; eauto.
-    all: repeat atomic_exec_inv_safe; cleanup; repeat step_inv; eauto.
-  Qed.
-
-  Lemma step_is_function: forall T (p : flatProg T) (s0: nat),
-      exists (s1: nat) (v: T), CriticalSectionOp.progStep p s0 = (s1,v).
-  Proof.
-    induction p; simpl; eauto.
+    induction p; intros; simpl; atomic_exec_and_step_inv.
   Qed.
 
   Hint Constructors error_step.
@@ -2220,19 +2215,17 @@ Module CriticalSection' <:
     destruct op; simpl.
     - repeat atomic_exec_inv_safe. cleanup.
       remember (flatten_prog p) as flatProg.
-      induction flatProg; simpl.
-      all: repeat atomic_exec_inv_safe; cleanup; repeat step_inv.
-      all: pose proof (step_is_function (flatten_prog p) 0); repeat deex.
+      destruct_with_eqn (CriticalSectionOp.progStep (flatten_prog p) 0).
+      induction flatProg; atomic_exec_and_step_inv.
       all: try match goal with
            | [ H : atomic_exec _ (flat_prog_core ?p) _ (Valid _) _ ?s _ |- _ ] =>
-             pose proof (exec_prog_after_acquire_is_valid p H);
-               repeat deex; destruct_ands; subst;
+             pose proof (exec_prog_after_acquire_is_valid p H); propositional;
              pose proof (exec_prog_after_acquire_is_step p H)
            | [ H : atomic_exec _ (flat_prog_core ?p) _ Error _ ?s _ |- _ ] =>
              pose proof (exec_after_error_is_error p H)
-               end; repeat deex; destruct_ands; subst.
+           end; propositional.
       all: econstructor; econstructor; rewrite <- HeqflatProg in *; eauto.
-    - repeat atomic_exec_inv. cleanup. repeat step_inv; simpl; eauto.
+    - atomic_exec_and_step_inv.
       Grab Existential Variables.
       apply (SeqMemState.mkSMState 0 None).
   Qed.
@@ -2313,11 +2306,13 @@ Module CriticalSection' <:
            | |- LockAPI.step_allow _ _ (Valid _) => apply step_allow_valid
            end.
 
+  Hint Resolve flatProg_invert.
+
   Ltac critical_section_helper :=
     match goal with
     | [H: forall n p, ?p0 n = flatten_prog p -> _
        |- follows_protocol_proc _ _ _ _ (flat_prog_core (?p0 ?x))] =>
-        specialize (H x (deflatten_prog (p0 x)) (flatProg_invert (p0 x)))
+        specialize (H x (deflatten_prog (p0 x)) (ltac:(auto)))
     | [H: forall s r s', _ -> follows_protocol_proc _ _ ?tid s' ?p
        |- follows_protocol_proc _ _ ?tid Error ?p ] =>
         apply (H Error false Error)
@@ -2413,7 +2408,7 @@ Module LockFreeAPI <: Layer CriticalSectionOp LockFreeState.
   Inductive xstep : forall T, Op T -> nat -> State -> T -> State -> list event -> Prop :=
   | StepCriticalSection :
       forall T tid (p: prog T) v1 v2 r (_ : progStep (flatten_prog p) v1 = (v2, r)),
-        xstep (CriticalSection p) tid v1 r v2 nil
+      xstep (CriticalSection p) tid v1 r v2 nil
   | StepExt : forall tid ev s,
       xstep (Ext ev) tid s tt s [ev]
   .
