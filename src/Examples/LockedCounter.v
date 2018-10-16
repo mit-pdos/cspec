@@ -2,6 +2,9 @@ Require Import CSPEC.
 Require Import Helpers.Learn.
 Require Import TSO.
 
+Require Import Coq.Program.Tactics.
+Require Import Coq.Logic.FunctionalExtensionality.
+
 Import ListNotations.
 
 Global Set Implicit Arguments.
@@ -1828,44 +1831,94 @@ Module LockAPI <: Layer LockOp SeqMemState.
 
 End LockAPI.
 
-(** LAYER: LockedCounterAPI *)
+(** LAYER: CriticalSectionAPI *)
 
-Module CounterOp <: Ops.
+Module CriticalSectionOp <: Ops.
 
-  (* TODO: generalize to arbitrary critical sections.
+  Inductive prog : Type -> Type :=
+  | ProgRead  : prog nat
+  | ProgWrite : nat -> prog unit
+  | ProgRet   : forall T (v: T), prog T
+  | ProgBind  : forall T (T1: Type) (p1: prog T1) (p2 : T1 -> prog T), prog T
+  .
 
-Have only one operation, CriticalSection, which takes a program that can
-read/write addresses and produce a result. We can give this a semantics and make
-it the step rule. We can also compile it to a proc using the LockAPI
-(translating reads and writes to the corresponding lock operations), and
-surround the critical section with a lock acquire/release. As a result, the
-whole implementation will always:
-- follow the lock protocol
-- follow the YSA pattern, since Acquire is a right mover, all reads and writes
-  are right movers since we hold the lock, and Release is a left mover.
-*)
+  (* Flat program consisting of reads and writes, followed by a return. *)
+  Inductive flatProg : Type -> Type :=
+  | DoRet   : forall T (v: T), flatProg T
+  | DoRead  : forall T (p: nat -> flatProg T), flatProg T
+  | DoWrite : forall T (n: nat) (p: unit -> flatProg T), flatProg T
+  .
+
+  Fixpoint flat_bind_prog T T1 (p: prog T1) : (T1 -> flatProg T) -> flatProg T :=
+    match p with
+    | ProgRead    => fun p2 => DoRead p2
+    | ProgWrite n => fun p2 => DoWrite n (p2)
+    | ProgRet v   => fun p2 => p2 v
+    | ProgBind p0 p1 =>
+        fun p2 => flat_bind_prog p0 (fun x => flat_bind_prog (p1 x) p2)
+    end.
+
+  Definition flatten_prog T (p: prog T) : flatProg T :=
+    flat_bind_prog p (fun v => (DoRet v)).
+
+  Fixpoint deflatten_prog T (p : flatProg T) : prog T :=
+    match p with
+    | DoRet v     => ProgRet v
+    | DoRead p    => ProgBind ProgRead (fun v => deflatten_prog (p v))
+    | DoWrite n p => ProgBind (ProgWrite n) (fun v => deflatten_prog (p v))
+    end.
+
+  Lemma bind_to_ret_is_noop : forall T (p: flatProg T),
+      p = flat_bind_prog (deflatten_prog p) (fun v => DoRet v).
+  Proof.
+    intros. induction p; simpl; eauto.
+    all: f_equal; extensionality in H; eauto.
+  Qed.
+
+  Lemma flatProg_invert : forall T (p: flatProg T),
+      p = flatten_prog (deflatten_prog p).
+  Proof.
+    intros. induction p; simpl; eauto.
+    all: cbv; f_equal; apply functional_extensionality_dep; intro.
+    all: apply bind_to_ret_is_noop.
+  Qed.
+
+  (* Given a program and the current value in memory, return a pair containing
+     the new value in memory after executing the program along with the value
+     returned by the program.
+
+     This is a function as a program is currently defined to consist only of
+     deterministic operations. If a random operations were provided, then this
+     would have to be a relation.
+   *)
+  Fixpoint progStep T (p: flatProg T) (s: nat) : nat * T :=
+    match p with
+    | DoRet v      => (s, v)
+    | DoRead p1    => progStep (p1 s) s
+    | DoWrite v p1 => progStep (p1 tt) v
+    end
+  .
 
   Inductive xOp : Type -> Type :=
-  | Inc : xOp nat
-  | Dec : xOp nat
+  | CriticalSection : forall T (p: prog T), xOp T
   | Ext : event -> xOp unit
   .
 
   Definition Op := xOp.
 
-End CounterOp.
+End CriticalSectionOp.
 
 
-Module LockedCounterAPI <: Layer CounterOp SeqMemState.
+Module CriticalSectionAPI <: Layer CriticalSectionOp SeqMemState.
 
-  Import CounterOp.
+  Import CriticalSectionOp.
   Import SeqMemState.
 
   Inductive xstep : forall T, Op T -> nat -> s -> T -> s -> list event -> Prop :=
-  | StepInc : forall (tid: nat) v,
-      xstep Inc tid (mkSMState v None) v (mkSMState (v+1) None) nil
-  | StepDec : forall (tid: nat) v,
-      xstep Dec tid (mkSMState v None) v (mkSMState (v-1) None) nil
+  | StepCriticalSection : forall T tid (p: prog T) (v1 v2: nat) (ret: T)
+                                 (_ : progStep (flatten_prog p) v1 = (v2, ret)),
+      xstep (CriticalSection p) tid (mkSMState v1 None)
+            ret (mkSMState v2 None) nil
   | StepExt : forall tid ev s,
       xstep (Ext ev) tid s tt s [ev]
   .
@@ -1874,54 +1927,54 @@ Module LockedCounterAPI <: Layer CounterOp SeqMemState.
 
   Definition initP := initP.
 
-End LockedCounterAPI.
+End CriticalSectionAPI.
 
 (** Using locks to get atomicity. *)
 
-Module LockingCounter' <:
+Module CriticalSection' <:
   LayerImplMoversProtocolT
     SeqMemState
     LockOp    RawLockAPI LockAPI
-    CounterOp LockedCounterAPI
+    CriticalSectionOp CriticalSectionAPI
     LockProtocol.
 
   Import LockOp.
-  Import CounterOp.
+  Import CriticalSectionOp.
 
-  Definition inc_core : proc LockOp.Op _ :=
-    _ <- Call Acquire;
-      v <- Call Read;
-      _ <- Call (Write (v + 1));
-      _ <- Call Release;
-      Ret v.
+  Fixpoint flat_prog_core T (p: flatProg T) : proc LockOp.Op T :=
+    match p with
+    | DoRet v      => (_ <- Call Release; Ret v)
+    | DoRead p2    => (x <- Call Read; (flat_prog_core (p2 x)))
+    | DoWrite n p2 => (x <- Call (Write n); (flat_prog_core (p2 x)))
+    end.
 
-  Definition dec_core : proc LockOp.Op _ :=
-    _ <- Call Acquire;
-      v <- Call Read;
-      _ <- Call (Write (v - 1));
-      _ <- Call Release;
-      Ret v.
+  Definition prog_core T (p: prog T) : proc LockOp.Op T :=
+    (_ <- Call Acquire; flat_prog_core (flatten_prog p)).
 
-  Definition compile_op T (op : CounterOp.Op T)
-    : proc LockOp.Op T :=
+  Definition compile_op T (op : CriticalSectionOp.Op T) : proc LockOp.Op T :=
     match op with
-    | Inc => inc_core
-    | Dec => dec_core
+    | CriticalSection p => prog_core p
     | Ext ev => Call (LockOp.Ext ev)
     end.
 
-  Theorem compile_op_no_atomics : forall T (op : CounterOp.Op T),
-      no_atomics (compile_op op).
+  Lemma prog_no_atomics : forall T (p : flatProg T),
+    no_atomics (flat_prog_core p).
   Proof.
-    destruct op; econstructor; eauto.
+    induction p; simpl; auto.
   Qed.
 
+  Theorem compile_op_no_atomics : forall T (op : CriticalSectionOp.Op T),
+      no_atomics (compile_op op).
+  Proof.
+    intros. destruct op; constructor; auto.
+    intros. apply prog_no_atomics.
+  Qed.
 
   Hint Extern 1 (RawLockAPI.step _ _ _ _ _ _) => econstructor.
   Hint Extern 1 (LockAPI.step _ _ _ _ _ _) => left.
   Hint Extern 1 (LockAPI.step _ _ _ _ _ _) => right.
   Hint Extern 1 (LockAPI.step_allow _ _ _) => econstructor.
-  Hint Extern 1 (LockedCounterAPI.step _ _ _ _ _ _) => econstructor.
+  Hint Extern 1 (CriticalSectionAPI.step _ _ _ _ _ _) => econstructor.
   Hint Extern 1 (~ LockAPI.step_allow _ _ _) => intro H'; inversion H'.
   Hint Extern 1 (LockAPI.step_allow _ _ _ -> False) => intro H'; inversion H'.
 
@@ -2006,42 +2059,214 @@ Module LockingCounter' <:
   Hint Resolve read_right_mover.
   Hint Resolve write_right_mover.
 
-  Theorem ysa_movers : forall T (op : CounterOp.Op T),
+  (* Predicate on states after calling acquire. *)
+  Definition p_acquire :=
+      fun (r: bool) (tid: nat) (s' : OrError SeqMemState.s) =>
+      exists s s0 : OrError SeqMemState.s,
+      any tid s /\
+      exec_any LockAPI.step tid s (Call Acquire) r s0 /\
+      exec_others LockAPI.step tid s0 s'.
+
+  Lemma p_acquire_after_exec_others:
+    forall (tid n: nat) (s0 s:OrError SeqMemState.s),
+      s0 = Valid (SeqMemState.mkSMState n (Some tid)) /\
+      exec_others LockAPI.step tid s0 s ->
+      p_acquire true tid s.
+  Proof.
+    intros; hnf. destruct H; rewrite H in *; clear H.
+    exists (Valid (SeqMemState.mkSMState n None)).
+    exists (Valid (SeqMemState.mkSMState n (Some tid))).
+    intuition; [cbv; eauto | eauto].
+    econstructor 2; eauto.
+  Qed.
+
+  Ltac exec_any_invert H := pose proof (exec_any_op H); cleanup.
+
+  Lemma exec_error_is_error : forall (tid: nat) (s: OrError SeqMemState.s),
+      exec_others LockAPI.step tid Error s -> s = Error.
+  Proof.
+    intros. remember Error as t1 in H. induction H.
+    - assumption.
+    - repeat deex. destruct IHclos_refl_trans_1n; auto.
+      invert H1. invert H3. eauto.
+  Qed.
+
+  Hint Resolve exec_error_is_error.
+
+  Ltac movers_helper :=
+    repeat match goal with
+    | [ H1: exec_others LockAPI.step ?tid ?s1 ?s2,
+        H2: exec_others LockAPI.step ?tid ?s2 ?s3 |- _ ] =>
+        let H' := fresh in
+        add_hypothesis H' (exec_others_trans H1 H2)
+    | [ H: LockAPI.step' _ _ _ _ _ _ |- _ ] =>
+        invert H; clear H
+    | [ H: exec_others LockAPI.step _ Error ?s |- _ ]  =>
+        let H' := fresh in
+        add_hypothesis H' (exec_error_is_error H); subst
+    | [ H: Valid _ = Error |- _ ] => solve [ invert H ]
+    | [ H: Error = Valid _ |- _ ] => solve [ invert H ]
+    | [ H: unit |- _ ] => destruct H
+    end; eauto.
+
+  Lemma right_movers_read_after_acquire :
+      forall T (p: nat -> proc LockOp.Op T) (r: bool),
+      (forall (n: nat), right_movers LockAPI.step (p_acquire r) (p n)) ->
+      right_movers LockAPI.step (p_acquire r) (x <- Call Read; p x).
+  Proof.
+    constructor; auto.
+    intro n; specialize (H n).
+    unfold p_acquire in *. cleanup.
+    eapply right_movers_impl; eauto. propositional.
+    exec_any_invert H1. movers_helper.
+  Qed.
+
+  Lemma right_movers_write_after_acquire:
+      forall T (p: unit -> proc LockOp.Op T),
+      (forall (r: bool), right_movers LockAPI.step (p_acquire r) (p tt)) ->
+      (forall (r: bool) (n: nat),
+          right_movers LockAPI.step (p_acquire r) (x <- Call (Write n); p x)).
+  Proof.
+    constructor; intuition. destruct r0.
+    specialize (H r). unfold p_acquire in *.
+    eapply right_movers_impl; eauto. propositional.
+    exec_any_invert H3. exec_any_invert H1.
+    movers_helper. eapply p_acquire_after_exec_others; eauto.
+  Qed.
+
+  Lemma prog_movers : forall T (p: flatProg T),
+      ysa_movers LockAPI.step (_ <- Call Acquire; flat_prog_core p).
+  Proof.
+    unfold ysa_movers.
+    constructor; auto.
+    induction p; simpl; propositional; eauto.
+    - apply right_movers_read_after_acquire; eauto.
+    - apply right_movers_write_after_acquire; eauto.
+  Qed.
+
+  Theorem ysa_movers : forall T (op : CriticalSectionOp.Op T),
       ysa_movers LockAPI.step (compile_op op).
   Proof.
     destruct op; unfold ysa_movers; simpl.
-    - unfold inc_core; eauto 20.
-    - unfold dec_core; eauto 20.
-    - eauto.
+    unfold prog_core.
+    - apply prog_movers.
+    - auto.
   Qed.
 
   Ltac step_inv :=
     match goal with
     | [ H: LockAPI.step' _ _ _ _ _ _ |- _ ] => invertc H
-    | |- LockedCounterAPI.step _ _ _ _ _ _ => hnf
+    | |- CriticalSectionAPI.step _ _ _ _ _ _ => hnf
     end.
 
-  Hint Constructors LockedCounterAPI.xstep.
+  Hint Constructors CriticalSectionAPI.xstep.
+
+  Ltac atomic_exec_inv_safe :=
+    match goal with
+    | [H : atomic_exec _ ?p _ _ _ _ _ |- _ ] =>
+        match p with
+        | Call _          => idtac
+        | Ret _           => idtac
+        | _ (DoRet _)     => idtac
+        | _ (DoRead _)    => idtac
+        | _ (DoWrite _ _) => idtac
+        | compile_op _ => idtac
+        | _ => fail
+        end; invert H; clear H; subst; repeat maybe_proc_inv
+    end;
+    autorewrite with t in *.
+
+  Ltac atomic_exec_and_step_inv :=
+    repeat atomic_exec_inv_safe; cleanup; repeat step_inv; eauto.
+
+  Lemma exec_prog_after_acquire_is_valid:
+      forall T (p: flatProg T) tid v0 (ret: T) s evs,
+      atomic_exec LockAPI.step (flat_prog_core p) tid
+                  (Valid (SeqMemState.mkSMState v0 (Some tid))) ret s evs ->
+      exists v1, s = Valid (SeqMemState.mkSMState v1 None) /\ evs = [].
+  Proof.
+    induction p; intros; atomic_exec_and_step_inv.
+  Qed.
+
+  Lemma exec_prog_after_acquire_is_step :
+      forall T (p: flatProg T) (tid: nat) (v0 v1: nat) (ret: T) evs,
+      atomic_exec LockAPI.step (flat_prog_core p) tid
+                  (Valid (SeqMemState.mkSMState v0 (Some tid))) ret
+                  (Valid (SeqMemState.mkSMState v1 None)) evs ->
+      CriticalSectionOp.progStep p v0 = (v1, ret) /\ evs = [].
+  Proof.
+    induction p; intros; simpl; atomic_exec_and_step_inv.
+  Qed.
+
+  Theorem exec_prog_after_acquire : forall T (p: prog T) (tid v0: nat) (ret: T)
+                             s evs,
+      atomic_exec LockAPI.step (flat_prog_core (flatten_prog p)) tid
+                  (Valid {| SeqMemState.Value := v0;
+                            SeqMemState.LockOwner := Some tid |}) ret s evs ->
+      exists v1,
+        progStep (flatten_prog p) v0 = (v1, ret) /\
+        s = Valid {| SeqMemState.Value := v1;
+                     SeqMemState.LockOwner := None |} /\
+        evs = [].
+  Proof.
+    intros.
+    pose proof (exec_prog_after_acquire_is_valid _ H); propositional;
+      pose proof (exec_prog_after_acquire_is_step _ H);
+      propositional.
+    rewrite H0; eauto.
+  Qed.
+
+  Lemma exec_after_error_is_error:
+      forall T p (tid: nat) (v: T) s evs,
+        atomic_exec LockAPI.step (flat_prog_core p) tid Error v s evs ->
+        s = Error /\ evs = [].
+  Proof.
+    induction p; intros; simpl; atomic_exec_and_step_inv.
+  Qed.
+
+  Hint Constructors error_step.
+
+  Lemma critical_section_error_step : forall tid T (p: prog T) r,
+        CriticalSectionAPI.step (CriticalSection p) tid Error r Error [].
+  Proof.
+    intros.
+    assert (exists r s',
+               CriticalSectionAPI.xstep (CriticalSection p) tid
+                                        (SeqMemState.mkSMState 0 None)
+                                        r s' []).
+    destruct_with_eqn (CriticalSectionOp.progStep (flatten_prog p) 0).
+    induction p; simpl in *;
+      try match goal with
+          | [ H: (_, _) = (_, _) |- _ ] => invertc H
+          end;
+      try solve [ descend; econstructor; simpl; eauto ].
+    propositional; eauto.
+  Qed.
+
+  Hint Resolve critical_section_error_step.
 
   Theorem compile_correct :
-    compile_correct compile_op LockAPI.step LockedCounterAPI.step.
+    compile_correct compile_op LockAPI.step CriticalSectionAPI.step.
   Proof.
-    unfold compile_correct; intros.
-    destruct op.
+    unfold compile_correct. intros.
+    destruct op; simpl.
 
-    + repeat atomic_exec_inv.
-      cleanup.
-      repeat step_inv; simpl; eauto.
-    + repeat atomic_exec_inv.
-      cleanup.
-      repeat step_inv; simpl; eauto.
-    + repeat atomic_exec_inv.
-      cleanup.
-      repeat step_inv; simpl; eauto.
+    - repeat atomic_exec_inv_safe. cleanup.
+      match goal with
+      | [ H: LockAPI.step' Acquire _ _ _ _ _ |- _ ] =>
+        invertc H
+      end.
+      + match goal with
+          | [ H: atomic_exec _ _ _ (Valid _) _ _ _ |- _ ] =>
+            apply exec_prog_after_acquire in H
+        end.
+        propositional; eauto.
+      + apply exec_after_error_is_error in H10; propositional.
+        eauto.
 
+    - atomic_exec_and_step_inv.
       Grab Existential Variables.
-      all: auto.
-      constructor; auto.
+      apply (SeqMemState.mkSMState 0 None).
   Qed.
 
   Import SeqMemState.
@@ -2120,24 +2345,42 @@ Module LockingCounter' <:
            | |- LockAPI.step_allow _ _ (Valid _) => apply step_allow_valid
            end.
 
-  Lemma inc_follows_protocol : forall tid s,
-      follows_protocol_proc RawLockAPI.step LockAPI.step_allow tid s inc_core.
-  Proof.
-    intros.
-    repeat constructor.
-    - repeat exec_propagate; eauto.
-    - repeat exec_propagate; eauto.
-    - repeat exec_propagate; eauto.
-  Qed.
+  Hint Resolve flatProg_invert.
 
-  Lemma dec_follows_protocol : forall tid s,
-      follows_protocol_proc RawLockAPI.step LockAPI.step_allow tid s dec_core.
+  Ltac critical_section_helper :=
+    match goal with
+    | [H: forall n p, ?p0 n = flatten_prog p -> _
+       |- follows_protocol_proc _ _ _ _ (flat_prog_core (?p0 ?x))] =>
+        specialize (H x (deflatten_prog (p0 x)) (ltac:(auto)))
+    | [H: forall s r s', _ -> follows_protocol_proc _ _ ?tid s' ?p
+       |- follows_protocol_proc _ _ ?tid Error ?p ] =>
+        apply (H Error false Error)
+    | [H: forall s r s', _ -> follows_protocol_proc _ _ ?tid s' ?p
+       |- follows_protocol_proc _ _ _
+                            (Valid {|Value := ?n; LockOwner := _ |}) _ ] =>
+        apply (H (Valid (mkSMState n None)) true)
+    end.
+
+  Lemma critical_section_follows_protocol : forall T tid s (p: prog T),
+      follows_protocol_proc RawLockAPI.step LockAPI.step_allow tid s
+                            (prog_core p).
   Proof.
-    intros.
-    repeat constructor.
-    - repeat exec_propagate; eauto.
-    - repeat exec_propagate; eauto.
-    - repeat exec_propagate; eauto.
+    intros. unfold prog_core.
+    remember (flatten_prog p) as flatProg.
+    econstructor; simpl; eauto.
+    generalize s0.
+    induction flatProg; intros; simpl; eauto.
+    - repeat constructor. repeat exec_propagate; auto.
+    - constructor; repeat exec_propagate; eauto.
+      all: repeat critical_section_helper.
+      all: econstructor 2 with (spawned := NoProc) (evs := nil);
+           econstructor 2; hnf; split; eauto.
+    - constructor; repeat exec_propagate; eauto.
+      all: repeat critical_section_helper.
+      all: econstructor 2 with (spawned := NoProc) (evs := nil);
+           econstructor 2; hnf; split; eauto.
+    Grab Existential Variables.
+    all: eauto.
   Qed.
 
   Lemma ext_follows_protocol : forall tid ev s,
@@ -2146,12 +2389,10 @@ Module LockingCounter' <:
     intros.
     repeat constructor.
   Qed.
-
-  Hint Resolve inc_follows_protocol.
-  Hint Resolve dec_follows_protocol.
+  Hint Resolve critical_section_follows_protocol.
   Hint Resolve ext_follows_protocol.
 
-  Theorem op_follows_protocol : forall tid s `(op : CounterOp.Op T),
+  Theorem op_follows_protocol : forall tid s `(op : CriticalSectionOp.Op T),
       follows_protocol_proc RawLockAPI.step LockProtocol.step_allow tid s (compile_op op).
   Proof.
     destruct op; simpl; eauto.
@@ -2184,30 +2425,29 @@ Module LockingCounter' <:
     eauto.
   Qed.
 
-  Definition initP_compat : forall s, LockAPI.initP s -> LockedCounterAPI.initP s := ltac:(auto).
+  Definition initP_compat : forall s, LockAPI.initP s -> CriticalSectionAPI.initP s := ltac:(auto).
   Definition raw_initP_compat : forall s, RawLockAPI.initP s -> LockAPI.initP s := ltac:(auto).
 
-End LockingCounter'.
+End CriticalSection'.
 
 (** LAYER: CounterAPI *)
 
-Module CounterState <: State.
+Module LockFreeState <: State.
 
   Definition State := nat.
   Definition initP (s : State) := s = 0.
 
-End CounterState.
+End LockFreeState.
 
-Module CounterAPI <: Layer CounterOp CounterState.
+Module LockFreeAPI <: Layer CriticalSectionOp LockFreeState.
 
-  Import CounterOp.
-  Import CounterState.
+  Import CriticalSectionOp.
+  Import LockFreeState.
 
   Inductive xstep : forall T, Op T -> nat -> State -> T -> State -> list event -> Prop :=
-  | StepInc : forall tid v,
-      xstep Inc tid v v (v + 1) nil
-  | StepDec : forall tid v,
-      xstep Dec tid v v (v - 1) nil
+  | StepCriticalSection :
+      forall T tid (p: prog T) v1 v2 r (_ : progStep (flatten_prog p) v1 = (v2, r)),
+      xstep (CriticalSection p) tid v1 r v2 nil
   | StepExt : forall tid ev s,
       xstep (Ext ev) tid s tt s [ev]
   .
@@ -2216,44 +2456,55 @@ Module CounterAPI <: Layer CounterOp CounterState.
 
   Definition initP := initP.
 
-End CounterAPI.
+End LockFreeAPI.
 
 
 (** Abstracting away the lock details. *)
 
 Module AbsCounter' <:
-  LayerImplAbsT CounterOp
-                SeqMemState   LockedCounterAPI
-                CounterState CounterAPI.
+  LayerImplAbsT CriticalSectionOp
+                SeqMemState   CriticalSectionAPI
+                LockFreeState LockFreeAPI.
 
   Import SeqMemState.
+  Import CriticalSectionOp.
 
-  Definition absR (s1 : State) (s2 : CounterState.State) :=
+  Definition absR (s1 : State) (s2 : LockFreeState.State) :=
     exists s, s1 = Valid s /\
          s.(LockOwner) = None /\
          s.(Value) = s2.
 
+  Definition inc :=
+    CriticalSection (
+        ProgBind ProgRead (fun v => ProgBind (ProgWrite (v + 1))
+                                             (fun _ => ProgRet v))).
+
   Lemma step_inc : forall tid v r v',
       r = v ->
       v' = v + 1 ->
-      CounterAPI.step CounterOp.Inc tid v r v' [].
+      LockFreeAPI.step inc tid v r v' [].
   Proof.
     intros; subst.
-    constructor.
+    constructor. eauto.
   Qed.
+
+  Definition dec :=
+    CriticalSection (
+        ProgBind ProgRead (fun v => ProgBind (ProgWrite (v - 1))
+                                              (fun _ => ProgRet v))).
 
   Lemma step_dec : forall tid v r v',
       r = v ->
       v' = v - 1 ->
-      CounterAPI.step CounterOp.Dec tid v r v' [].
+      LockFreeAPI.step dec tid v r v' [].
   Proof.
     intros; subst.
-    constructor.
+    constructor. eauto.
   Qed.
 
   Lemma step_ext : forall tid ev s r s',
       s = s' ->
-      CounterAPI.step (CounterOp.Ext ev) tid s r s' [ev].
+      LockFreeAPI.step (CriticalSectionOp.Ext ev) tid s r s' [ev].
   Proof.
     propositional.
     destruct r.
@@ -2275,30 +2526,32 @@ Module AbsCounter' <:
   Hint Resolve absR_from_valid.
 
   Theorem absR_ok :
-    op_abs absR LockedCounterAPI.step CounterAPI.step.
+    op_abs absR CriticalSectionAPI.step LockFreeAPI.step.
   Proof.
     unfold op_abs; intros.
     unfold absR in * |-; propositional.
     invertc H0.
     invertc H6; simpl in *; eauto.
+    exists v2. split; eauto.
+    constructor. assumption.
   Qed.
 
   Theorem absInitP :
     forall s1,
       SeqMemState.initP s1 ->
       exists s2, absR s1 s2 /\
-      CounterState.initP s2.
+      LockFreeState.initP s2.
   Proof.
-    unfold absR, SeqMemState.initP, CounterState.initP; propositional.
+    unfold absR, SeqMemState.initP, LockFreeState.initP; propositional.
     exists 0; eauto.
   Qed.
 
 End AbsCounter'.
 
 Module AbsCounter :=
-  LayerImplAbs CounterOp
-               SeqMemState    LockedCounterAPI
-               CounterState CounterAPI
+  LayerImplAbs CriticalSectionOp
+               SeqMemState    CriticalSectionAPI
+               LockFreeState LockFreeAPI
                AbsCounter'.
 
 (** Linking *)
@@ -2340,38 +2593,37 @@ Module c5 :=
 
 Module LockingCounter <: LayerImpl
                            LockOp SeqMemState RawLockAPI
-                           CounterOp SeqMemState LockedCounterAPI :=
+                           CriticalSectionOp SeqMemState CriticalSectionAPI :=
   LayerImplMoversProtocol
     SeqMemState
     LockOp    RawLockAPI LockAPI
-    CounterOp LockedCounterAPI
+    CriticalSectionOp CriticalSectionAPI
     LockProtocol
-    LockingCounter'.
+    CriticalSection'.
 
 Module c6 :=
   Link
     TSOOp TSOState TSOAPI
     LockOp SeqMemState RawLockAPI
-    CounterOp SeqMemState LockedCounterAPI
+    CriticalSectionOp SeqMemState CriticalSectionAPI
     c5 LockingCounter.
 
 Module c <: LayerImpl
                TSOOp TSOState TSOAPI
-               CounterOp CounterState CounterAPI :=
+               CriticalSectionOp LockFreeState LockFreeAPI :=
   Link
     TSOOp TSOState TSOAPI
-    CounterOp SeqMemState LockedCounterAPI
-    CounterOp CounterState CounterAPI
+    CriticalSectionOp SeqMemState CriticalSectionAPI
+    CriticalSectionOp LockFreeState LockFreeAPI
     c6 AbsCounter.
 
 Print Assumptions c.compile_traces_match.
 
-Import CounterOp.
-
 Definition test_thread :=
   Until
     (fun _ => false)
-    (fun _ => _ <- Call Inc; _ <- Call Dec; Ret tt)
+    (fun _ => _ <- Call AbsCounter'.inc;
+              _ <- Call AbsCounter'.dec; Ret tt)
     None.
 
 Definition test_threads : threads_state _ :=
