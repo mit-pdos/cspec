@@ -1242,31 +1242,16 @@ Module LayerImplLoopHT.
   Definition hl2 := HLayer.t l2 i.
 
   Definition compile_op T (op : ho2 T) :
-    (option T -> ho1 T) * (T -> bool) * option T.
-    destruct op.
-    + 
-      exact
-      (let '(p, cond, i) := a.(compile_op) T op in
-        ((fun x => Slice i0 (p x)), cond, i)).
-    +
-      exact
-      ((fun x => CheckSlice i0),
-        fun _ => true,
-        None).
-  Defined.
-
-  (*
-  Definition compile_op T (op : ho2 T) :
     (option T -> ho1 T) * (T -> bool) * option T :=
     match op with
-    | (Slice idx op') =>
-      let '(p, cond, i0) := a.(LayerImplLoopT.compile_op) T op' in
-        ((fun x => Slice idx (p x)), cond, i0)
+    | @Slice _ _ idx T' op' =>
+      let '(p, cond, i0) := LayerImplLoopT.compile_op a T' op' in
+      (fun x => Slice idx (p x), cond, i0)
     | CheckSlice idx =>
-      ((fun x => CheckSlice idx),
-        fun _ => true,
-        None)
-    end. *)
+      ((fun _ => CheckSlice idx),
+       fun _ => true,
+             None)
+    end.
 
   Theorem noop_or_success :
     CompileLoop.noop_or_success compile_op hl1.(step) hl2.(step).
