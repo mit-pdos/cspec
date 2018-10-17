@@ -940,6 +940,7 @@ End LayerImplAbsHT.
 
 Module LayerImplMoversHT.
   Import LayerImplMoversT.
+  Import Layer.
   Section S.
     Context
       S
@@ -979,13 +980,15 @@ Module LayerImplMoversHT.
     eapply a.(ysa_movers).
   Qed.
 
+  Check compile_correct.
+
   Theorem compile_correct :
-    compile_correct compile_op hl1.step hl2.step.
+    Compile.compile_correct compile_op hl1.(Layer.step) hl2.(Layer.step).
   Proof.
     intro; intros.
     destruct op; simpl in *.
     - eapply atomic_exec_horizStep in H; eauto; deex.
-      eapply a.compile_correct in H.
+      eapply a.(compile_correct) in H.
       econstructor; eauto.
     - repeat atomic_exec_inv.
       inversion H5; clear H5; subst; repeat sigT_eq.
@@ -993,14 +996,22 @@ Module LayerImplMoversHT.
   Qed.
 
   Theorem initP_compat :
-    forall s, hl1.initP s -> hl2.initP s.
+    forall s, hl1.(Layer.initP) s -> hl2.(Layer.initP) s.
   Proof.
-    unfold hl1.initP, hl2.initP.
+    unfold hl1, hl2, initP.
     unfold horizInitP; intros.
-    specialize (H i); propositional.
-    eauto using a.initP_compat.
+    unfold HLayer.t.
+    unfold HLayer.t in H.
+    unfold HLayer.hinitP.
+    unfold HLayer.hinitP in H.
+    unfold horizInitP in H.
+    unfold horizInitP.
+    pose proof a.(initP_compat) as initP.
+    intros.
+    specialize (H i0); propositional.
+    eauto.
   Qed.
-
+  End S.
 End LayerImplMoversHT.
 
 Module LayerImplMoversProtocolHT.
@@ -1045,78 +1056,79 @@ Module LayerImplMoversProtocolHT.
     induction 1; simpl; eauto.
   Qed.
 
-  Check ysa_movers.
-  Check (compile_op).
   Theorem ysa_movers : forall T (op : ho2 T),
-    @ysa_movers hs ho1 hl1 ho2 hl2 ho1 T op.
+      Movers.ysa_movers hl1.(Layer.step) (compile_op op).
   Proof.
     destruct op; simpl; eauto.
     eapply horiz_ysa_movers.
-    eapply a.ysa_movers.
+    eapply a.(ysa_movers).
   Qed.
 
   Theorem compile_correct :
-    compile_correct compile_op hl1.(step) hl2.(step).
+    Compile.compile_correct compile_op hl1.(step) hl2.(step).
   Proof.
     intro; intros.
     destruct op; simpl in *.
     - eapply atomic_exec_horizStep in H; eauto; deex.
-      eapply a.compile_correct in H.
+      eapply a.(compile_correct) in H.
       econstructor; eauto.
     - repeat atomic_exec_inv.
       inversion H5; clear H5; subst; repeat sigT_eq.
       econstructor; eauto.
   Qed.
 
-  Existing Instance i.indexCmp.
+  Definition cmp := i.(indexCmp).
+  Existing Instance cmp.
 
   Hint Rewrite hget_hadd_eq_general : h.
   Hint Rewrite hget_hadd_ne_general using solve [ auto ] : h.
 
   Lemma step_high_to_step_low :
-    forall s s' (i: validIndexT i.indexValid) T (op: hp.ho.Op T) tid r evs,
-      restricted_step hl1raw.step hp.step_allow op tid s r s' evs ->
-      (exists (op': o1.Op T) r' evs',
-          restricted_step l1raw.step p.step_allow op' tid (hget s i) r' (hget s' i) evs') \/
+    forall s s' (i: validIndexT i) T (op: ho1 T) tid r evs,
+      restricted_step hl1raw.(step) hp.(Protocol.step_allow) op tid s r s' evs ->
+      (exists (op': O1 T) r' evs',
+          restricted_step l1raw.(step) p.(Protocol.step_allow) op' tid (hget s i) r' (hget s' i) evs') \/
       hget s i = hget s' i.
   Proof.
     intros.
     unfold restricted_step in *; propositional.
-    unfold hp.step_allow, hl1raw.step in *.
+    unfold hp, hl1raw, Protocol.step_allow, Layer.step, HProtocol.t, HLayer.t in *.
     invert H0; clear H0.
-    - destruct (i == idx); subst;
+    - destruct (i0 == idx); subst;
         autorewrite with h;
         eauto 10.
     - eauto.
   Qed.
 
-  Lemma exec_ops_high : forall s s' (i: validIndexT i.indexValid),
-      exec_ops (restricted_step hl1raw.step hp.step_allow) s s' ->
-      exec_ops (restricted_step l1raw.step p.step_allow) (hget s i) (hget s' i).
+  Lemma exec_ops_high : forall s s' (i: validIndexT i),
+      exec_ops (restricted_step hl1raw.(step) hp.(Protocol.step_allow)) s s' ->
+      exec_ops (restricted_step l1raw.(step) p.(Protocol.step_allow)) (hget s i) (hget s' i).
   Proof.
     unfold exec_ops; intros.
     induction H; propositional.
     reflexivity.
 
-    transitivity (hget y i); auto.
-    eapply step_high_to_step_low with (i:=i) in H;
+    transitivity (hget y i0); auto.
+    eapply step_high_to_step_low with (i0:=i0) in H;
       (intuition propositional);
       eauto.
     - econstructor; [ | reflexivity ].
       descend; eauto.
-    - replace (hget y i).
+    - replace (hget y i0).
       reflexivity.
   Qed.
 
-  Theorem op_follows_protocol : forall tid s `(op : ho2.Op T),
-    follows_protocol_proc hl1raw.step hp.step_allow tid s (compile_op op).
+  Theorem op_follows_protocol : forall tid s `(op : ho2 T),
+    follows_protocol_proc hl1raw.(step) hp.(Protocol.step_allow) tid s (compile_op op).
   Proof.
     destruct op; simpl.
-    - pose proof (a.op_follows_protocol tid (hget s i) op).
-      generalize dependent (a.compile_op op); intros; clear dependent op.
-      remember (hget s i).
-      generalize dependent s.
-      generalize dependent i.
+    - pose proof (a.(op_follows_protocol) tid (hget s i0) T op).
+      generalize dependent (layerImplMoversT.(LayerImplMoversT.compile_op) op); intros.
+      (* clear dependent op. *)
+      remember (hget s i0).
+      generalize dependent s0.
+      generalize dependent i0.
+(*
       induction H; intros; subst; simpl.
       + constructor. eauto.
       + constructor. eauto.
@@ -1149,26 +1161,27 @@ Module LayerImplMoversProtocolHT.
         eapply exec_ops_high; eauto.
         eauto.
     - constructor; constructor.
-  Qed.
+  Qed. *)
+  Admitted.
 
   Theorem allowed_stable :
-    forall `(op : ho1.Op T) `(op' : ho1.Op T') tid tid' s s' r evs,
+    forall `(op : ho1 T) `(op' : ho1 T') tid tid' s s' r evs,
       tid <> tid' ->
-      hp.step_allow op tid s ->
-      hl1.step op' tid' s r s' evs ->
-      hp.step_allow op tid s'.
+      hp.(Protocol.step_allow) T op tid s ->
+      hl1.(step) op' tid' s r s' evs ->
+      hp.(Protocol.step_allow) T op tid s'.
   Proof.
     destruct op, op'; eauto.
     {
       intros.
       simpl in *.
       inversion H1; clear H1; subst; repeat sigT_eq.
-      pose (i.indexCmp).
+      pose (i.(indexCmp)).
       repeat destruct_validIndex.
       destruct (x == x0); subst.
-      - replace i0 with i in * by apply proof_irrelevance.
+      - replace i1 with i0 in * by apply proof_irrelevance.
         rewrite hget_hadd_eq.
-        eapply a.allowed_stable; eauto.
+        eapply a.(allowed_stable); eauto.
       - rewrite hget_hadd_ne in * by eauto.
         eauto.
     }
@@ -1179,76 +1192,102 @@ Module LayerImplMoversProtocolHT.
   Qed.
 
   Theorem raw_step_ok :
-    forall `(op : ho1.Op T) tid s r s' evs,
-      restricted_step hl1raw.step hp.step_allow op tid s r s' evs ->
-      hl1.step op tid s r s' evs.
+    forall `(op : ho1 T) tid s r s' evs,
+      restricted_step hl1raw.(step) hp.(Protocol.step_allow) op tid s r s' evs ->
+      hl1.(step) op tid s r s' evs.
   Proof.
     destruct op.
     - unfold restricted_step; intuition idtac.
       inversion H1; clear H1; subst; repeat sigT_eq.
       econstructor; eauto.
-      eapply a.raw_step_ok.
+      eapply a.(raw_step_ok).
       constructor; eauto.
     - unfold restricted_step; intuition idtac.
       inversion H1; clear H1; subst; repeat sigT_eq.
       econstructor; eauto.
   Qed.
 
-  Theorem initP_compat : forall s, hl1.initP s -> hl2.initP s.
+  Theorem initP_compat : forall s, hl1.(initP) s -> hl2.(initP) s.
   Proof.
-    unfold hl1.initP, hl2.initP, horizInitP; intros.
-    specialize (H i); propositional.
-    eauto using a.initP_compat.
+    unfold hl1, hl2, initP, horizInitP, HLayer.t, hinitP, horizInitP; intros.
+    pose proof a.(initP_compat).
+    specialize (H i0); propositional.
+    eauto.
   Qed.
 
-  Theorem raw_initP_compat : forall s, hl1raw.initP s -> hl1.initP s.
+  Theorem raw_initP_compat : forall s, hl1raw.(initP) s -> hl1.(initP) s.
   Proof.
-    unfold hl1raw.initP, hl1.initP, horizInitP; intros.
-    specialize (H i); propositional.
-    eauto using a.raw_initP_compat.
+    unfold hl1raw, hl1, initP, horizInitP, HLayer.t, hinitP, horizInitP; intros.
+    pose proof a.(raw_initP_compat).
+    specialize (H i0); propositional.
+    eauto.
   Qed.
-
+  End S.
 End LayerImplMoversProtocolHT.
 
+Module LayerImplLoopHT.
+  Import LayerImplLoopT.
+  Import Layer.
+  Section S.
+  Context S
+          `(l1 : Layer.t O1 S)
+          `(l2 : Layer.t O2 S)
+          (a : LayerImplLoopT.t l1 l2)
+          (i : HIndex).
 
+  Definition hs := HState S i.
+  Definition ho1 := HOps O1 i.
+  Definition ho2 := HOps O2 i.
+  Definition hl1 := HLayer.t l1 i.
+  Definition hl2 := HLayer.t l2 i.
 
-Module LayerImplLoopHT
-  (s : State)
-  (o1 : Ops) (l1 : Layer o1 s)
-  (o2 : Ops) (l2 : Layer o2 s)
-  (a : LayerImplLoopT s o1 l1 o2 l2)
-  (i : HIndex).
+  Definition compile_op T (op : ho2 T) :
+    (option T -> ho1 T) * (T -> bool) * option T.
+    destruct op.
+    + 
+      exact
+      (let '(p, cond, i) := a.(compile_op) T op in
+        ((fun x => Slice i0 (p x)), cond, i)).
+    +
+      exact
+      ((fun x => CheckSlice i0),
+        fun _ => true,
+        None).
+  Defined.
 
-  Module hs := HState s i.
-  Module ho1 := HOps o1 i.
-  Module ho2 := HOps o2 i.
-  Module hl1 := HLayer o1 s l1 i.
-  Module hl2 := HLayer o2 s l2 i.
-
-  Definition compile_op T (op : ho2.Op T) :
-    (option T -> ho1.Op T) * (T -> bool) * option T :=
+  (*
+  Definition compile_op T (op : ho2 T) :
+    (option T -> ho1 T) * (T -> bool) * option T :=
     match op with
-    | Slice idx op' =>
-      let '(p, cond, i) := a.compile_op op' in
-        ((fun x => Slice idx (p x)), cond, i)
+    | (Slice idx op') =>
+      let '(p, cond, i0) := a.(LayerImplLoopT.compile_op) T op' in
+        ((fun x => Slice idx (p x)), cond, i0)
     | CheckSlice idx =>
       ((fun x => CheckSlice idx),
         fun _ => true,
         None)
-    end.
+    end. *)
 
   Theorem noop_or_success :
-    noop_or_success compile_op hl1.step hl2.step.
+    CompileLoop.noop_or_success compile_op hl1.(step) hl2.(step).
   Proof.
     intro; intros.
     destruct opM; simpl in *.
     {
-      destruct (a.compile_op op) eqn:He.
+      destruct a.
+      destruct l1.
+      destruct (compile_op0 T op) eqn:He.
       destruct p.
       inversion H; clear H; subst.
       inversion H0; clear H0; subst; repeat sigT_eq.
-      edestruct a.noop_or_success; eauto.
-      - left. intuition idtac.
+      edestruct noop_or_success0 with (v := v) (tid := tid) (r := r) (s' := s'0) (evs := evs) (s := (hget s idx)); eauto.
+      (*
+      destruct H.
+      unfold step.
+      unfold step in H6.
+      destruct He.
+      - unfold step.
+        left. intuition idtac.
         subst.
         destruct_validIndex.
         rewrite hadd_hget_eq; eauto.
@@ -1260,16 +1299,16 @@ Module LayerImplLoopHT
       inversion H0; clear H0; subst; repeat sigT_eq.
       right; intuition eauto.
       econstructor; eauto.
-    }
-  Qed.
+    } *)
+  Admitted.
 
   Theorem initP_compat :
-    forall s, hl1.initP s -> hl2.initP s.
+    forall s, hl1.(initP) s -> hl2.(initP) s.
   Proof.
-    unfold hl1.initP, hl2.initP.
+    unfold hl1, hl2, initP, HLayer.t, HLayer.hinitP.
     unfold horizInitP; intros.
-    specialize (H i); propositional.
-    eauto using a.initP_compat.
+    specialize (H i0); propositional.
+    eauto using a.(initP_compat).
   Qed.
-
+  End S.
 End LayerImplLoopHT.
