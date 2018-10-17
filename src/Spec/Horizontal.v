@@ -244,7 +244,6 @@ Section HorizontalComposition.
 
 End HorizontalComposition.
 
-Arguments horizState ind sliceState.
 Arguments horizStep ind {sliceOpT sliceState} sliceStep.
 Arguments Slice {ind sliceOpT} i {T}.
 Arguments CheckSlice {ind sliceOpT} i.
@@ -379,7 +378,6 @@ Section HorizontalCompositionAbs.
 
 End HorizontalCompositionAbs.
 
-Print horizAbsR.
 Arguments horizAbsR ind {sliceState1 sliceState2} absR.
 
 Section HorizontalCompositionMovers.
@@ -821,8 +819,6 @@ Module HProtocol.
   End S.
 End HProtocol.
 
-Check HProtocol.t.
-
 Module HLayerImpl.
   Import Layer.
   Section S.
@@ -979,8 +975,6 @@ Module LayerImplMoversHT.
     eapply horiz_ysa_movers.
     eapply a.(ysa_movers).
   Qed.
-
-  Check compile_correct.
 
   Theorem compile_correct :
     Compile.compile_correct compile_op hl1.(Layer.step) hl2.(Layer.step).
