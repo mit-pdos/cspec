@@ -1242,8 +1242,8 @@ Module LayerImplLoopHT.
   Definition compile_op T (op : ho2 T) :
     (option T -> ho1 T) * (T -> bool) * option T :=
     match op with
-    | @Slice _ _ idx T' op' =>
-      let '(p, cond, i0) := LayerImplLoopT.compile_op a T' op' in
+    | Slice idx op' =>
+      let '(p, cond, i0) := a.(LayerImplLoopT.compile_op) _ op' in
       (fun x => Slice idx (p x), cond, i0)
     | CheckSlice idx =>
       ((fun _ => CheckSlice idx),
