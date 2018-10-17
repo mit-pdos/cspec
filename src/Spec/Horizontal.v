@@ -1123,12 +1123,11 @@ Module LayerImplMoversProtocolHT.
   Proof.
     destruct op; simpl.
     - pose proof (a.(op_follows_protocol) tid (hget s i0) T op).
-      generalize dependent (layerImplMoversT.(LayerImplMoversT.compile_op) op); intros.
-      (* clear dependent op. *)
+      generalize dependent (a.(LayerImplMoversT.compile_op) op); intros.
+      clear dependent op.
       remember (hget s i0).
-      generalize dependent s0.
+      generalize dependent s.
       generalize dependent i0.
-(*
       induction H; intros; subst; simpl.
       + constructor. eauto.
       + constructor. eauto.
@@ -1147,8 +1146,8 @@ Module LayerImplMoversProtocolHT.
       + constructor.
       + constructor; intros.
         assert (forall tid', tid <> tid' ->
-                        follows_protocol_proc hl1raw.step hp.step_allow
-                                              tid' s0 (SliceProc i p)).
+                        follows_protocol_proc hl1raw.(step) hp.(Protocol.step_allow)
+                                              tid' s0 (SliceProc i0 p0)).
         eauto.
         rename H into Hspawn.
         unfold spawn_follows_protocol; intros.
@@ -1156,13 +1155,12 @@ Module LayerImplMoversProtocolHT.
         specialize (H0 tid' ltac:(auto)).
         specialize (Hspawn tid' ltac:(auto)).
 
-        assert (exec_ops (restricted_step l1raw.step p.step_allow)
-                         (hget s0 i) (hget s' i)).
+        assert (exec_ops (restricted_step l1raw.(step) p.(Protocol.step_allow))
+                         (hget s0 i0) (hget s' i0)).
         eapply exec_ops_high; eauto.
         eauto.
     - constructor; constructor.
-  Qed. *)
-  Admitted.
+  Qed.
 
   Theorem allowed_stable :
     forall `(op : ho1 T) `(op' : ho1 T') tid tid' s s' r evs,
@@ -1259,20 +1257,12 @@ Module LayerImplLoopHT.
     intro; intros.
     destruct opM; simpl in *.
     {
-      destruct a.
-      destruct l1.
-      destruct (compile_op0 T op) eqn:He.
+      destruct (a.(LayerImplLoopT.compile_op) T op) eqn:He.
       destruct p.
       inversion H; clear H; subst.
       inversion H0; clear H0; subst; repeat sigT_eq.
-      edestruct noop_or_success0 with (v := v) (tid := tid) (r := r) (s' := s'0) (evs := evs) (s := (hget s idx)); eauto.
-      (*
-      destruct H.
-      unfold step.
-      unfold step in H6.
-      destruct He.
-      - unfold step.
-        left. intuition idtac.
+      edestruct a.(noop_or_success); [ now eauto | now eauto | .. ].
+      - left. intuition idtac.
         subst.
         destruct_validIndex.
         rewrite hadd_hget_eq; eauto.
@@ -1284,8 +1274,8 @@ Module LayerImplLoopHT.
       inversion H0; clear H0; subst; repeat sigT_eq.
       right; intuition eauto.
       econstructor; eauto.
-    } *)
-  Admitted.
+    }
+  Qed.
 
   Theorem initP_compat :
     forall s, hl1.(initP) s -> hl2.(initP) s.
