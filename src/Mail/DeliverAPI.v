@@ -2,7 +2,7 @@ Require Import CSPEC.
 Require Import MailServerAPI.
 Require Import MailboxTmpAbsAPI.
 
-Module DeliverOp <: Ops.
+Module DeliverOp.
 
   Definition extopT := MailServerAPI.MailServerOp.extopT.
 
@@ -23,11 +23,9 @@ Module DeliverOp <: Ops.
   Definition Op := xOp.
 
 End DeliverOp.
-Module DeliverHOp := HOps DeliverOp UserIdx.
+Definition DeliverHOp := HOps DeliverOp.Op UserIdx.idx.
 
-
-Module DeliverAPI <: Layer DeliverOp MailboxTmpAbsState.
-
+Module DeliverAPI.
   Import DeliverOp.
   Import MailboxTmpAbsState.
 
@@ -129,11 +127,14 @@ Module DeliverAPI <: Layer DeliverOp MailboxTmpAbsState.
 
   Definition initP := initP.
 
+  Definition l : Layer.t DeliverOp.Op MailboxTmpAbsState.State :=
+    {| Layer.step := step;
+       Layer.initP := initP; |}.
+                        
 End DeliverAPI.
-Module DeliverHAPI := HLayer DeliverOp MailboxTmpAbsState DeliverAPI UserIdx.
+Definition DeliverHAPI := HLayer.t DeliverAPI.l UserIdx.idx.
 
-
-Module DeliverProtocol <: Protocol DeliverOp MailboxTmpAbsState.
+Module DeliverProtocol.
 
   Import DeliverOp.
   Import MailboxTmpAbsState.
@@ -161,17 +162,22 @@ Module DeliverProtocol <: Protocol DeliverOp MailboxTmpAbsState.
   .
 
   Definition step_allow := xstep_allow.
+  Definition p : Protocol.t DeliverOp.Op MailboxTmpAbsState.State :=
+    {| Protocol.step_allow := step_allow; |}.
 
 End DeliverProtocol.
-Module DeliverHProtocol := HProtocol DeliverOp MailboxTmpAbsState DeliverProtocol UserIdx.
+Definition DeliverHProtocol := HProtocol.t UserIdx.idx DeliverProtocol.p.
 
-
-Module DeliverRestrictedAPI <: Layer DeliverOp MailboxTmpAbsState.
+Module DeliverRestrictedAPI.
 
   Definition step :=
     restricted_step DeliverAPI.step DeliverProtocol.step_allow.
 
   Definition initP := DeliverAPI.initP.
+  
+  Definition l : Layer.t DeliverOp.Op MailboxTmpAbsState.State :=
+    {| Layer.step := step;
+       Layer.initP := initP; |}.
 
 End DeliverRestrictedAPI.
-Module DeliverRestrictedHAPI := HLayer DeliverOp MailboxTmpAbsState DeliverRestrictedAPI UserIdx.
+Definition DeliverRestrictedHAPI := HLayer.t DeliverRestrictedAPI.l UserIdx.idx.

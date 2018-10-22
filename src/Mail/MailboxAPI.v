@@ -2,7 +2,7 @@ Require Import CSPEC.
 Require Import MailServerAPI.
 Require Import MailServerLockAbsAPI.
 
-Module MailboxOp <: Ops.
+Module MailboxOp.
 
   Definition extopT := MailServerAPI.MailServerOp.extopT.
 
@@ -19,10 +19,10 @@ Module MailboxOp <: Ops.
   Definition Op := xOp.
 
 End MailboxOp.
-Module MailboxHOp := HOps MailboxOp UserIdx.
+Definition MailboxHOp := HOps MailboxOp.Op UserIdx.idx.
 
 
-Module MailboxAPI <: Layer MailboxOp MailServerLockAbsState.
+Module MailboxAPI.
 
   Import MailboxOp.
   Import MailServerLockAbsState.
@@ -96,11 +96,15 @@ Module MailboxAPI <: Layer MailboxOp MailServerLockAbsState.
 
   Definition initP := initP.
 
+  Definition l : Layer.t MailboxOp.Op MailServerLockAbsState.State :=
+    {| Layer.step := step;
+       Layer.initP := initP; |}.
+                    
 End MailboxAPI.
-Module MailboxHAPI := HLayer MailboxOp MailServerLockAbsState MailboxAPI UserIdx.
+Definition MailboxHAPI := HLayer.t MailboxAPI.l UserIdx.idx.
 
 
-Module MailboxProtocol <: Protocol MailboxOp MailServerLockAbsState.
+Module MailboxProtocol.
 
   Import MailboxOp.
   Import MailServerLockAbsState.
@@ -127,16 +131,23 @@ Module MailboxProtocol <: Protocol MailboxOp MailServerLockAbsState.
 
   Definition step_allow := xstep_allow.
 
+  Definition p : Protocol.t MailboxOp.Op MailServerLockAbsState.State :=
+    {| Protocol.step_allow := step_allow; |}.
+
 End MailboxProtocol.
-Module MailboxHProtocol := HProtocol MailboxOp MailServerLockAbsState MailboxProtocol UserIdx.
 
+Definition MailboxHProtocol := HProtocol.t UserIdx.idx MailboxProtocol.p.
 
-Module MailboxRestrictedAPI <: Layer MailboxOp MailServerLockAbsState.
+Module MailboxRestrictedAPI.
 
   Definition step :=
     restricted_step MailboxAPI.step MailboxProtocol.step_allow.
 
   Definition initP := MailboxAPI.initP.
 
+  Definition l : Layer.t MailboxOp.Op MailServerLockAbsState.State :=
+    {| Layer.step := step;
+       Layer.initP := initP; |}.
+
 End MailboxRestrictedAPI.
-Module MailboxRestrictedHAPI := HLayer MailboxOp MailServerLockAbsState MailboxRestrictedAPI UserIdx.
+Definition MailboxRestrictedHAPI := HLayer.t MailboxRestrictedAPI.l UserIdx.idx.

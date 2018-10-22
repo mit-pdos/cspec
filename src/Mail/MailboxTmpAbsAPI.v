@@ -2,7 +2,7 @@ Require Import CSPEC.
 Require Import MailboxAPI.
 Require Import MailServerAPI.
 
-Module MailboxTmpAbsState <: State.
+Module MailboxTmpAbsState.
 
   Record state_rec := mk_state {
     tmpdir : MailServerState.dir_contents;
@@ -16,10 +16,9 @@ Module MailboxTmpAbsState <: State.
                               maildir s = FMap.empty.
 
 End MailboxTmpAbsState.
-Module MailboxTmpAbsHState := HState MailboxTmpAbsState UserIdx.
+Definition MailboxTmpAbsHState := HState MailboxTmpAbsState.State UserIdx.idx.
 
-
-Module MailboxTmpAbsAPI <: Layer MailboxOp MailboxTmpAbsState.
+Module MailboxTmpAbsAPI.
 
   Import MailboxOp.
   Import MailboxTmpAbsState.
@@ -91,5 +90,9 @@ Module MailboxTmpAbsAPI <: Layer MailboxOp MailboxTmpAbsState.
 
   Definition initP := initP.
 
+  Definition l : Layer.t MailboxOp.Op MailboxTmpAbsState.State :=
+    {| Layer.step := step;
+       Layer.initP := initP; |}.
+
 End MailboxTmpAbsAPI.
-Module MailboxTmpAbsHAPI := HLayer MailboxOp MailboxTmpAbsState MailboxTmpAbsAPI UserIdx.
+Definition MailboxTmpAbsHAPI := HLayer.t MailboxTmpAbsAPI.l UserIdx.idx.

@@ -5,12 +5,7 @@ Require Import MailboxAPI.
 Require Import MailboxTmpAbsAPI.
 
 
-Module AtomicDeliver' <:
-  LayerImplMoversProtocolT
-    MailboxTmpAbsState
-    DeliverOp DeliverAPI DeliverRestrictedAPI
-    MailboxOp MailboxTmpAbsAPI
-    DeliverProtocol.
+Module AtomicDeliver'.
 
   (* START CODE *)
 
@@ -265,6 +260,11 @@ Module AtomicDeliver' <:
                                      DeliverRestrictedAPI.initP s :=
     ltac:(auto).
 
+  Definition t : LayerImplMoversProtocolT.t
+                   DeliverAPI.l DeliverRestrictedAPI.l MailboxTmpAbsAPI.l
+                   DeliverProtocol.p. (* TODO: refine this? *)
+                                                      
+    
 End AtomicDeliver'.
 
 

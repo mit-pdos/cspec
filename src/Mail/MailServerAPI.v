@@ -17,17 +17,18 @@ Instance string_Ordering : Ordering string.
 Admitted.
 
 
-Module UserIdx <: HIndex.
-  Definition indexT := string.
-  Parameter validUsers : list indexT.
-  Definition indexValid (s:string) := In s validUsers.
-  Definition indexCmp := string_Ordering.
+Module UserIdx.
+  Parameter validUsers : list string.
+  Definition idx : HIndex :=
+    {| indexT := string;
+       indexValid (s: string) := In s validUsers;
+       indexCmp := string_Ordering; |}.
 End UserIdx.
 
-Axiom nouser_valid : UserIdx.indexValid nouser_string.
+Axiom nouser_valid : UserIdx.idx.(indexValid) nouser_string.
 Definition nouser := exist _ nouser_string nouser_valid.
 
-Module MailServerOp <: Ops.
+Module MailServerOp.
 
   Inductive pop3req :=
   | POP3Stat
@@ -65,10 +66,9 @@ Module MailServerOp <: Ops.
   Definition Op := xOp.
 
 End MailServerOp.
-Module MailServerHOp := HOps MailServerOp UserIdx.
+Definition MailServerHOp := HOps MailServerOp.Op UserIdx.idx.
 
-
-Module MailServerState <: State.
+Module MailServerState.
 
   Definition dir_contents := FMap.t (nat*nat) string.
 
@@ -76,13 +76,13 @@ Module MailServerState <: State.
   Definition initP (s : State) := True.
 
 End MailServerState.
-Module MailServerHState := HState MailServerState UserIdx.
+Definition MailServerHState := HState MailServerState.State UserIdx.idx.
 
 
 (* TCB: this is the top-level specification for the mail server. It specifies
 what each operation does, and the proof covers any sequence of these
 operations. *)
-Module MailServerAPI <: Layer MailServerOp MailServerState.
+Module MailServerAPI.
 
   Import MailServerOp.
   Import MailServerState.
@@ -127,5 +127,9 @@ Module MailServerAPI <: Layer MailServerOp MailServerState.
 
   Definition initP := initP.
 
+  Definition l : Layer.t MailServerOp.Op MailServerState.State :=
+    {| Layer.step := step;
+       Layer.initP := initP; |}.
+
 End MailServerAPI.
-Module MailServerHAPI := HLayer MailServerOp MailServerState MailServerAPI UserIdx.
+Definition MailServerHAPI := HLayer.t MailServerAPI.l UserIdx.idx.

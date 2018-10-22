@@ -1,7 +1,7 @@
 Require Import CSPEC.
 Require Import MailServerAPI.
 
-Module MailServerLockAbsState <: State.
+Module MailServerLockAbsState.
 
   Definition dir_contents := FMap.t (nat*nat) string.
   
@@ -14,9 +14,9 @@ Module MailServerLockAbsState <: State.
   Definition initP (s : State) := locked s = None.
 
 End MailServerLockAbsState.
-Module MailServerLockAbsHState := HState MailServerLockAbsState UserIdx.
+Definition MailServerLockAbsHState := HState MailServerLockAbsState.State UserIdx.idx.
 
-Module MailServerLockAbsAPI <: Layer MailServerOp MailServerLockAbsState.
+Module MailServerLockAbsAPI. 
 
   Import MailServerOp.
   Import MailServerLockAbsState.
@@ -61,5 +61,10 @@ Module MailServerLockAbsAPI <: Layer MailServerOp MailServerLockAbsState.
 
   Definition initP := initP.
 
+  Definition l : Layer.t MailServerOp.Op MailServerLockAbsState.State :=
+    {| Layer.step := step;
+       Layer.initP := initP; |}.
+
 End MailServerLockAbsAPI.
-Module MailServerLockAbsHAPI := HLayer MailServerOp MailServerLockAbsState MailServerLockAbsAPI UserIdx.
+
+Definition MailServerLockAbsHAPI := HLayer.t MailServerLockAbsAPI.l UserIdx.idx.

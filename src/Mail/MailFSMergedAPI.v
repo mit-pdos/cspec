@@ -2,7 +2,6 @@ Require Import CSPEC.
 Require Import MailServerAPI.
 Require Import MailFSPathAPI.
 
-
 Module MailFSMergedOp <: Ops.
 
   Definition extopT := MailServerAPI.MailServerOp.extopT.
