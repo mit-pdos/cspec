@@ -298,7 +298,6 @@ End CounterImpl.
 Module CounterAtomicOp <: Ops.
 
   Inductive xOp : Type -> Type :=
-  | RunServer : xOp unit
   | DoInc : xOp nat
   | DoDec : xOp nat
 
@@ -310,17 +309,142 @@ Module CounterAtomicOp <: Ops.
 End CounterAtomicOp.
 
 
-(**
- * CounterAtomicOp seems impossible to prove with CSPEC movers.
- * Imagine [DoInc] as roughly [CallInc; GetRes].  The commit point
- * (non-mover) is the [CallInc], since that determines order among
- * many client threads that are calling [DoInc].  That requires
- * [GetRes] to be a left-mover.  But it cannot move left past the
- * execution of the server (on another tid) that handles the Inc
- * RPC call..
- *
- * Intuitively, it would be nice to incorporate the sequential
- * execution of the server's handler of [Inc] into the atomic
- * sequential execution of [DoInc] in the client thread.  But
- * CSPEC's definition of atomicity requires running on one tid.
- *)
+Module CounterAtomicAPI <: Layer CounterAtomicOp VariableState.
+
+  Import CounterAtomicOp.
+  Import VariableState.
+
+  Inductive xstep : forall T, Op T -> nat -> State -> T -> State -> list event -> Prop :=
+  | StepInc : forall tid v,
+    xstep DoInc tid
+      (mk_state v None)
+      v
+      (mk_state (v+1) None)
+      nil
+
+  | StepDec : forall tid v,
+    xstep DoDec tid
+      (mk_state v None)
+      v
+      (mk_state (v-1) None)
+      nil
+
+  | StepExt : forall s tid `(extop : extopT T) r,
+    xstep (Ext extop) tid
+      s
+      r
+      s
+      (Event (extop, r) :: nil)
+  .
+
+  Definition step := xstep.
+  Definition initP (s : State) := True.
+
+End CounterAtomicAPI.
+
+
+Module CounterAtomicLayer <:
+  LayerImpl
+    CounterOp       VariableState CounterAPI
+    CounterAtomicOp VariableState CounterAtomicAPI.
+
+  (**
+   * CounterAtomicLayer seems impossible to prove with CSPEC movers.
+   * Imagine [DoInc] as roughly [CallInc; GetRes].  The commit point
+   * (non-mover) is the [CallInc], since that determines order among
+   * many client threads that are calling [DoInc].  That requires
+   * [GetRes] to be a left-mover.  But it cannot move left past the
+   * execution of the server (on another tid) that handles the Inc
+   * RPC call..
+   *)
+
+  Definition server_core :=
+    Until (fun _ => false) (fun _ => Call CounterOp.RunServer) None.
+
+  Definition inc_core :=
+    _ <- Call (CounterOp.CallInc);
+    Call (CounterOp.GetRes).
+
+  Definition dec_core :=
+    _ <- Call (CounterOp.CallDec);
+    Call (CounterOp.GetRes).
+
+  Definition compile_op T (op : CounterAtomicOp.Op T) : proc _ T :=
+    match op with
+    | CounterAtomicOp.DoInc => inc_core
+    | CounterAtomicOp.DoDec => dec_core
+    | CounterAtomicOp.Ext extop => Call (CounterOp.Ext extop)
+    end.
+
+  (**
+   * The tentative plan here is to hide the server thread.  As long
+   * as the real server thread generates no events (empty trace), the
+   * abstract view (as CounterAtomicAPI) can't tell what's going on
+   * in the server.
+   *
+   * Mechnically, [compile_ts] just overwrites anything the
+   * caller may have had for [tid = server_tid], and this might be
+   * OK because it is possible for that thread to never run.
+   *)
+
+  Definition compile_ts (ts : threads_state CounterAtomicOp.Op) :=
+    let ts' := Compile.compile_ts compile_op ts in
+    thread_upd ts' VariableState.server_tid (Proc server_core).
+
+  Theorem compile_op_no_atomics :
+    forall `(op : _ T),
+      no_atomics (compile_op op).
+  Proof.
+    destruct op; compute; eauto.
+  Qed.
+
+  Theorem compile_ts_no_atomics :
+    forall ts,
+      no_atomics_ts ts ->
+      no_atomics_ts (compile_ts ts).
+  Proof.
+    intros.
+    eapply no_atomics_thread_upd_Proc.
+    - eapply Compile.compile_ts_no_atomics; eauto.
+      intros; eapply compile_op_no_atomics.
+    - compute; eauto.
+  Qed.
+
+  (**
+   * Boilerplate.
+   *)
+
+  Definition absR (s0 s1 : VariableState.State) := s0 = s1.
+
+  Theorem absInitP :
+    forall s1,
+      CounterAPI.initP s1 ->
+      exists s2, absR s1 s2 /\
+            CounterAtomicAPI.initP s2.
+  Proof.
+    unfold absR; eauto.
+  Qed.
+
+  (**
+   * As a proof technique, our existing [Atomic] might not be sufficient
+   * because we want atomicity with respect to everything _except_ for
+   * the server thread.  And it's OK to ignore the server thread because
+   * the higher level (CounterAtomicAPI) can't tell -- the server thread
+   * is not exposed because it gets overwritten by [compile_ts].
+   *
+   * This means we need some more fine-grained notion of atomization to
+   * push through a proof similar to [Compile.v] but in the presence of
+   * the hidden [server_tid] thread.
+   *)
+
+  Theorem compile_traces_match :
+    forall ts2,
+      no_atomics_ts ts2 ->
+      traces_match_abs absR
+        CounterAPI.initP CounterAtomicAPI.initP
+        CounterAPI.step CounterAtomicAPI.step (compile_ts ts2) ts2.
+  Proof.
+    
+  Admitted.
+
+End CounterAtomicLayer.
