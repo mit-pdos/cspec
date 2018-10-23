@@ -78,10 +78,10 @@ Module AtomicDeliver'.
 
   Lemma createwritetmp_right_mover : forall data,
     right_mover
-      DeliverRestrictedAPI.step
+      DeliverRestrictedAPI.l.(Layer.step)
       (DeliverOp.CreateWriteTmp data).
   Proof.
-    unfold right_mover; intros.
+    unfold right_mover; unfold Layer.step; unfold DeliverRestrictedAPI.l; intros.
     repeat step_inv; eauto 10.
     - eexists; split; eauto 10.
       rewrite FMap.add_add_ne by congruence.
@@ -262,8 +262,7 @@ Module AtomicDeliver'.
 
   Definition t : LayerImplMoversProtocolT.t
                    DeliverAPI.l DeliverRestrictedAPI.l MailboxTmpAbsAPI.l
-                   DeliverProtocol.p. (* TODO: refine this? *)
-                                                      
+                   DeliverProtocol.p :=
     
 End AtomicDeliver'.
 
