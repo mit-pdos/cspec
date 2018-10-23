@@ -122,10 +122,10 @@ Module AtomicDeliver'.
 
   Lemma unlinktmp_always_enabled :
     always_enabled
-      DeliverRestrictedAPI.step
+      DeliverRestrictedAPI.l.(Layer.step)
       (DeliverOp.UnlinkTmp).
   Proof.
-    unfold always_enabled, enabled_in; intros.
+    unfold always_enabled, enabled_in; unfold Layer.step; unfold DeliverRestrictedAPI.l; intros.
     destruct s; eauto.
   Qed.
 
@@ -133,11 +133,12 @@ Module AtomicDeliver'.
 
   Lemma unlinktmp_left_mover :
     left_mover
-      DeliverRestrictedAPI.step
+      DeliverRestrictedAPI.l.(Layer.step)
       (DeliverOp.UnlinkTmp).
   Proof.
     split; eauto.
-    intros; repeat step_inv; eauto; repeat deex.
+    unfold Layer.step; unfold DeliverRestrictedAPI.l; intros.
+    repeat step_inv; eauto; repeat deex.
     + eexists; split; eauto.
       rewrite <- FMap.add_remove_ne by congruence.
       eauto 10.
@@ -160,17 +161,18 @@ Module AtomicDeliver'.
   Hint Resolve unlinktmp_left_mover.
 
   Theorem ysa_movers : forall `(op : _ T),
-    ysa_movers DeliverRestrictedAPI.step (compile_op op).
+    ysa_movers DeliverRestrictedAPI.l.(Layer.step) (compile_op op).
   Proof.
+    unfold Layer.step; unfold DeliverRestrictedAPI.l.
     destruct op; simpl; eauto 20.
     econstructor; eauto.
     destruct r; eauto.
   Qed.
 
   Theorem compile_correct :
-    compile_correct compile_op DeliverRestrictedAPI.step MailboxTmpAbsAPI.step.
+    compile_correct compile_op DeliverRestrictedAPI.l.(Layer.step) MailboxTmpAbsAPI.l.(Layer.step).
   Proof.
-    unfold compile_correct; intros.
+    unfold compile_correct; unfold Layer.step; unfold MailboxTmpAbsAPI.l; unfold DeliverRestrictedAPI.l; intros.
     destruct op.
 
     + atomic_exec_inv.
@@ -197,7 +199,7 @@ Module AtomicDeliver'.
 
   Lemma deliver_follows_protocol : forall tid s data,
     follows_protocol_proc
-      DeliverAPI.step
+      DeliverAPI.l.(Layer.step)
       DeliverProtocol.step_allow
       tid s (deliver_core data).
   Proof.
@@ -226,7 +228,7 @@ Module AtomicDeliver'.
   Theorem op_follows_protocol :
     forall tid s `(op : _ T),
       follows_protocol_proc
-        DeliverAPI.step
+        DeliverAPI.l.(Layer.step)
         DeliverProtocol.step_allow
         tid s (compile_op op).
   Proof.
@@ -246,8 +248,8 @@ Module AtomicDeliver'.
 
   Theorem raw_step_ok :
     forall `(op : _ T) tid s r s' evs,
-      restricted_step DeliverAPI.step DeliverProtocol.step_allow op tid s r s' evs ->
-      DeliverRestrictedAPI.step op tid s r s' evs.
+      restricted_step DeliverAPI.l.(Layer.step) DeliverProtocol.step_allow op tid s r s' evs ->
+      DeliverRestrictedAPI.l.(Layer.step) op tid s r s' evs.
   Proof.
     eauto.
   Qed.
@@ -260,9 +262,16 @@ Module AtomicDeliver'.
                                      DeliverRestrictedAPI.initP s :=
     ltac:(auto).
 
+  Definition movers_impl : LayerImplMoversT.t DeliverRestrictedAPI.l MailboxTmpAbsAPI.l :=
+    {| LayerImplMoversT.compile_op := compile_op;
+       LayerImplMoversT.compile_op_no_atomics := compile_op_no_atomics;
+       LayerImplMoversT.ysa_movers := ysa_movers;
+       LayerImplMoversT.compile_correct := compile_correct;
+       LayerImplMoversT.initP_compat := initP_compat; |}.
+  
   Definition t : LayerImplMoversProtocolT.t
                    DeliverAPI.l DeliverRestrictedAPI.l MailboxTmpAbsAPI.l
-                   DeliverProtocol.p :=
+                   DeliverProtocol.p.
     
 End AtomicDeliver'.
 
