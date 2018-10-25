@@ -106,7 +106,7 @@ Module VariableAPI <: Layer VariableOp VariableState.
   .
 
   Definition step := xstep.
-  Definition initP (s : State) := True.
+  Definition initP (s : State) := rpc s = None.
 
 End VariableAPI.
 
@@ -177,7 +177,7 @@ Module CounterAPI <: Layer CounterOp VariableState.
   .
 
   Definition step := xstep.
-  Definition initP (s : State) := True.
+  Definition initP (s : State) := rpc s = None.
 
 End CounterAPI.
 
@@ -338,7 +338,7 @@ Module CounterAtomicAPI <: Layer CounterAtomicOp VariableState.
   .
 
   Definition step := xstep.
-  Definition initP (s : State) := True.
+  Definition initP (s : State) := rpc s = None.
 
 End CounterAtomicAPI.
 
@@ -358,8 +358,9 @@ Module CounterAtomicLayer <:
    * RPC call..
    *)
 
+  Definition forever (_ : unit) := false.
   Definition server_core :=
-    Until (fun _ => false) (fun _ => Call CounterOp.RunServer) None.
+    Until forever (fun _ => Call CounterOp.RunServer) None.
 
   Definition inc_core :=
     _ <- Call (CounterOp.CallInc);
@@ -437,14 +438,52 @@ Module CounterAtomicLayer <:
    * the hidden [server_tid] thread.
    *)
 
+  Ltac step_inv :=
+    match goal with
+    | H : CounterAPI.step _ _ _ _ _ _ |- _ =>
+      inversion H; clear H; subst; repeat sigT_eq
+    end.
+
+  Theorem compile_traces_match_helper :
+    forall s tr tsc,
+      exec CounterAPI.step s tsc tr ->
+      forall ts,
+        no_atomics_ts ts ->
+        (
+          VariableState.rpc s = None /\
+          tsc = Compile.compile_ts compile_op ts
+            [[ VariableState.server_tid := Proc (until1 forever (fun _ => Call CounterOp.RunServer) None) ]]
+        ) ->
+        exec CounterAtomicAPI.step s ts tr.
+  Proof.
+    induction 1; intros; eauto; intuition idtac; subst.
+    - (* Case 1: clean state *)
+      destruct (tid == VariableState.server_tid); subst.
+      + (* Server TID: should be impossible *)
+        autorewrite with t in *.
+        maybe_proc_inv; subst; repeat sigT_eq.
+        repeat exec_tid_inv.
+        step_inv; simpl in *; congruence.
+      + (* Client TID *)
+        autorewrite with t in *.
+        unfold Compile.compile_ts in H.
+        rewrite thread_map_get_match in H.
+        destruct (ts0 tid) eqn:Heq.
+  Admitted.
+
   Theorem compile_traces_match :
-    forall ts2,
-      no_atomics_ts ts2 ->
+    forall ts,
+      no_atomics_ts ts ->
       traces_match_abs absR
         CounterAPI.initP CounterAtomicAPI.initP
-        CounterAPI.step CounterAtomicAPI.step (compile_ts ts2) ts2.
+        CounterAPI.step CounterAtomicAPI.step (compile_ts ts) ts.
   Proof.
-    
-  Admitted.
+    unfold traces_match_abs.
+    unfold CounterAPI.initP, CounterAtomicAPI.initP; intros.
+    eexists; split; [ reflexivity | ].
+    split; eauto.
+
+    eapply compile_traces_match_helper; eauto.
+  Qed.
 
 End CounterAtomicLayer.
