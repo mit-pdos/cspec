@@ -1005,6 +1005,14 @@ Module LayerImplMoversHT.
     specialize (H i0); propositional.
     eauto.
   Qed.
+
+  Definition t : LayerImplMoversT.t hl1 hl2.
+    refine {| LayerImplMoversT.compile_op := compile_op;
+              LayerImplMoversT.compile_op_no_atomics := compile_op_no_atomics;
+              LayerImplMoversT.ysa_movers := ysa_movers;
+              LayerImplMoversT.compile_correct := compile_correct;
+              LayerImplMoversT.initP_compat := initP_compat; |}.
+  Defined.  
   End S.
 End LayerImplMoversHT.
 
@@ -1031,7 +1039,6 @@ Module LayerImplMoversProtocolHT.
   Definition hl1 := HLayer.t l1 i.
   Definition hl2 := HLayer.t l2 i.
   Definition hp := HProtocol.t i p.
-  Definition layerImplMoversT := a.(movers_impl).
 
   Definition compile_op T (op : ho2 T) : proc ho1 T :=
     match op with
@@ -1112,7 +1119,7 @@ Module LayerImplMoversProtocolHT.
       reflexivity.
   Qed.
 
-  Theorem op_follows_protocol : forall tid s `(op : ho2 T),
+  Theorem op_follows_protocol : forall tid s T (op : ho2 T),
     follows_protocol_proc hl1raw.(step) hp.(Protocol.step_allow) tid s (compile_op op).
   Proof.
     destruct op; simpl.
@@ -1214,6 +1221,23 @@ Module LayerImplMoversProtocolHT.
     specialize (H i0); propositional.
     eauto.
   Qed.
+  
+  Definition movers_impl : LayerImplMoversT.t hl1 hl2.
+    refine {| LayerImplMoversT.compile_op := compile_op;
+              LayerImplMoversT.compile_op_no_atomics := compile_op_no_atomics;
+              LayerImplMoversT.ysa_movers := ysa_movers;
+              LayerImplMoversT.compile_correct := compile_correct;
+              LayerImplMoversT.initP_compat := initP_compat; |}.
+    Defined.
+    
+  Definition t : LayerImplMoversProtocolT.t hl1raw hl1 hl2 hp.
+    refine {| LayerImplMoversProtocolT.movers_impl := movers_impl;
+              LayerImplMoversProtocolT.allowed_stable := @allowed_stable;
+              LayerImplMoversProtocolT.raw_step_ok := @raw_step_ok;
+              LayerImplMoversProtocolT.op_follows_protocol := @op_follows_protocol;
+              LayerImplMoversProtocolT.raw_initP_compat := @raw_initP_compat; |}.
+    Defined.
+
   End S.
 End LayerImplMoversProtocolHT.
 
@@ -1279,5 +1303,12 @@ Module LayerImplLoopHT.
     specialize (H i0); propositional.
     eauto using a.(initP_compat).
   Qed.
+
+  Definition t : LayerImplLoopT.t hl1 hl2.
+    refine {| LayerImplLoopT.compile_op := compile_op;
+              LayerImplLoopT.noop_or_success := noop_or_success;
+              LayerImplLoopT.initP_compat := initP_compat; |}.
+    Defined.
+  
   End S.
 End LayerImplLoopHT.

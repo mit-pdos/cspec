@@ -81,7 +81,7 @@ Module AtomicDeliver'.
       DeliverRestrictedAPI.l.(Layer.step)
       (DeliverOp.CreateWriteTmp data).
   Proof.
-    unfold right_mover; unfold Layer.step; unfold DeliverRestrictedAPI.l; intros.
+    unfold right_mover; unfold DeliverRestrictedAPI.l; unfold Layer.step; intros.
     repeat step_inv; eauto 10.
     - eexists; split; eauto 10.
       rewrite FMap.add_add_ne by congruence.
@@ -200,7 +200,7 @@ Module AtomicDeliver'.
   Lemma deliver_follows_protocol : forall tid s data,
     follows_protocol_proc
       DeliverAPI.l.(Layer.step)
-      DeliverProtocol.step_allow
+      DeliverProtocol.p.(Protocol.step_allow)
       tid s (deliver_core data).
   Proof.
     destruct s; simpl.
@@ -226,72 +226,70 @@ Module AtomicDeliver'.
   Hint Resolve deliver_follows_protocol.
 
   Theorem op_follows_protocol :
-    forall tid s `(op : _ T),
+    forall tid S T (op : _ T),
       follows_protocol_proc
         DeliverAPI.l.(Layer.step)
-        DeliverProtocol.step_allow
-        tid s (compile_op op).
+        DeliverProtocol.p.(Protocol.step_allow)
+        tid S (compile_op op).
   Proof.
     destruct op; simpl; eauto.
   Qed.
 
   Theorem allowed_stable :
-    forall `(op : DeliverOp.Op T) `(op' : DeliverOp.Op T') tid tid' s s' r evs,
+    forall `(op : DeliverOp.Op T) `(op' : DeliverOp.Op T') tid tid' S S' r evs,
       tid <> tid' ->
-      DeliverProtocol.step_allow op tid s ->
-      DeliverRestrictedAPI.step op' tid' s r s' evs ->
-      DeliverProtocol.step_allow op tid s'.
+      DeliverProtocol.p.(Protocol.step_allow) T op tid S ->
+      DeliverRestrictedAPI.l.(Layer.step) op' tid' S r S' evs ->
+      DeliverProtocol.p.(Protocol.step_allow) T op tid S'.
   Proof.
-    intros.
+    unfold Layer.step; unfold Protocol.step_allow; unfold DeliverProtocol.p.
+    unfold DeliverRestrictedAPI.l; intros.
     destruct op; destruct op'; repeat step_inv; subst; eauto.
   Qed.
 
   Theorem raw_step_ok :
     forall `(op : _ T) tid s r s' evs,
-      restricted_step DeliverAPI.l.(Layer.step) DeliverProtocol.step_allow op tid s r s' evs ->
+      restricted_step DeliverAPI.l.(Layer.step) DeliverProtocol.p.(Protocol.step_allow) op tid s r s' evs ->
       DeliverRestrictedAPI.l.(Layer.step) op tid s r s' evs.
   Proof.
     eauto.
   Qed.
 
-  Definition initP_compat : forall s, DeliverRestrictedAPI.initP s ->
-                                 MailboxTmpAbsAPI.initP s :=
+  Definition initP_compat : forall s, DeliverRestrictedAPI.l.(Layer.initP) s ->
+                                 MailboxTmpAbsAPI.l.(Layer.initP) s :=
     ltac:(auto).
 
-  Definition raw_initP_compat : forall s, DeliverAPI.initP s ->
-                                     DeliverRestrictedAPI.initP s :=
+  Definition raw_initP_compat : forall s, DeliverAPI.l.(Layer.initP) s ->
+                                     DeliverRestrictedAPI.l.(Layer.initP) s :=
     ltac:(auto).
 
-  Definition movers_impl : LayerImplMoversT.t DeliverRestrictedAPI.l MailboxTmpAbsAPI.l :=
-    {| LayerImplMoversT.compile_op := compile_op;
-       LayerImplMoversT.compile_op_no_atomics := compile_op_no_atomics;
-       LayerImplMoversT.ysa_movers := ysa_movers;
-       LayerImplMoversT.compile_correct := compile_correct;
-       LayerImplMoversT.initP_compat := initP_compat; |}.
+  Definition movers_impl : LayerImplMoversT.t DeliverRestrictedAPI.l MailboxTmpAbsAPI.l.
+    refine {| LayerImplMoversT.compile_op := compile_op;
+       LayerImplMoversT.compile_op_no_atomics := @compile_op_no_atomics;
+       LayerImplMoversT.ysa_movers := @ysa_movers;
+       LayerImplMoversT.compile_correct := @compile_correct;
+       LayerImplMoversT.initP_compat := @initP_compat; |}.
+    Defined.
   
   Definition t : LayerImplMoversProtocolT.t
                    DeliverAPI.l DeliverRestrictedAPI.l MailboxTmpAbsAPI.l
                    DeliverProtocol.p.
+    refine {| LayerImplMoversProtocolT.movers_impl := @movers_impl;
+              LayerImplMoversProtocolT.raw_step_ok := @raw_step_ok;
+              LayerImplMoversProtocolT.allowed_stable := @allowed_stable;
+              LayerImplMoversProtocolT.raw_initP_compat := @raw_initP_compat;
+              LayerImplMoversProtocolT.op_follows_protocol := @op_follows_protocol;|}.
+    Defined.
     
 End AtomicDeliver'.
 
+Definition AtomicDeliver :=
+  LayerImplMoversProtocol.t AtomicDeliver'.t.
 
-Module AtomicDeliver :=
-  LayerImplMoversProtocol
-    MailboxTmpAbsState
-    DeliverOp DeliverAPI DeliverRestrictedAPI
-    MailboxOp MailboxTmpAbsAPI
-    DeliverProtocol
-    AtomicDeliver'.
-
-Module AtomicDeliverH' :=
-  LayerImplMoversProtocolHT
-    MailboxTmpAbsState
-    DeliverOp DeliverAPI DeliverRestrictedAPI
-    MailboxOp MailboxTmpAbsAPI
-    DeliverProtocol
-    AtomicDeliver'
-    UserIdx.
+Definition AtomicDeliverH' :=
+  LayerImplMoversProtocolHT.t
+    AtomicDeliver'.t
+    UserIdx.idx.
 
 Module AtomicDeliverH :=
   LayerImplMoversProtocol

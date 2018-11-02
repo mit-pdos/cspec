@@ -162,6 +162,7 @@ Module DeliverProtocol.
   .
 
   Definition step_allow := xstep_allow.
+
   Definition p : Protocol.t DeliverOp.Op MailboxTmpAbsState.State :=
     {| Protocol.step_allow := step_allow; |}.
 
@@ -171,9 +172,9 @@ Definition DeliverHProtocol := HProtocol.t UserIdx.idx DeliverProtocol.p.
 Module DeliverRestrictedAPI.
 
   Definition step :=
-    restricted_step DeliverAPI.step DeliverProtocol.step_allow.
+    restricted_step DeliverAPI.l.(Layer.step) DeliverProtocol.p.(Protocol.step_allow).
 
-  Definition initP := DeliverAPI.initP.
+  Definition initP := DeliverAPI.l.(Layer.initP).
   
   Definition l : Layer.t DeliverOp.Op MailboxTmpAbsState.State :=
     {| Layer.step := step;

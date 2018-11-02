@@ -3,15 +3,15 @@ Require Import String.
 Require Import MailServerAPI.
 
 
-Module MailServerComposedOp <: Ops.
+Module MailServerComposedOp.
 
   Import MailServerOp.
-  Definition user := validIndexT UserIdx.indexValid.
+  Definition user := validIndexT UserIdx.idx.
 
   Inductive xOp : Type -> Type :=
   | Deliver : forall (u : user) (m : string), xOp bool
   | Pickup : forall (u : user), xOp (list ((nat*nat) * string))
-  | CheckUser : forall (u : string), xOp (CheckResult UserIdx.indexValid)
+  | CheckUser : forall (u : string), xOp (CheckResult UserIdx.idx)
   | Delete : forall (u : user) (id : nat*nat), xOp unit
   | Ext : forall `(op : extopT T), xOp T
   .
@@ -21,10 +21,12 @@ Module MailServerComposedOp <: Ops.
 End MailServerComposedOp.
 
 
-Module MailServerComposedState := MailServerHState.
+Module MailServerComposedState.
+  Definition State := MailServerHState.
+End MailServerComposedState.
 
 
-Module MailServerComposedAPI <: Layer MailServerComposedOp MailServerComposedState.
+Module MailServerComposedAPI.
 
   Import MailServerComposedOp.
   Import MailServerComposedState.
