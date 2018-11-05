@@ -59,7 +59,7 @@ Module MailServerComposedAPI.
       (hadd u (FMap.remove id (hget s u)) s)
       nil
 
-  | StepCheckUser : forall s tid u r,
+  | StepCheckUser : forall s tid (u: UserIdx.idx) r,
     sameSlice r u ->
     xstep (CheckUser u) tid
       s
