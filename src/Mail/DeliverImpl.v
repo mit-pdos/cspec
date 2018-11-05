@@ -4,6 +4,8 @@ Require Import DeliverAPI.
 Require Import MailboxAPI.
 Require Import MailboxTmpAbsAPI.
 
+Set Printing Projections.
+Import Protocol Layer.
 
 Module AtomicDeliver'.
 
@@ -44,6 +46,9 @@ Module AtomicDeliver'.
   Qed.
 
   Ltac step_inv :=
+    (* TODO: add other things to unfold here (or just unfold all the
+    layer/protocol .l's and .p's) *)
+    cbn [Layer.step DeliverAPI.l] in *;
     match goal with
     | H : MailboxAPI.step _ _ _ _ _ _ |- _ =>
       inversion H; clear H; subst; repeat sigT_eq
@@ -81,7 +86,7 @@ Module AtomicDeliver'.
       DeliverRestrictedAPI.l.(Layer.step)
       (DeliverOp.CreateWriteTmp data).
   Proof.
-    unfold right_mover; unfold DeliverRestrictedAPI.l; unfold Layer.step; intros.
+    unfold right_mover; intros.
     repeat step_inv; eauto 10.
     - eexists; split; eauto 10.
       rewrite FMap.add_add_ne by congruence.
