@@ -46,10 +46,22 @@ Module AtomicDeliver'.
   Qed.
 
   Ltac step_inv :=
-    (* TODO: add other things to unfold here (or just unfold all the
-    layer/protocol .l's and .p's) *)
-    cbn [Layer.step DeliverAPI.l] in *;
+    cbn [DeliverAPI.l] in *;
+    cbn [MailboxAPI.l] in *;
+    cbn [MailboxTmpAbsAPI.l] in *;
+    cbn [DeliverRestrictedAPI.l] in *;
+    cbn [Protocol.step_allow DeliverProtocol.p] in *;
     match goal with
+    | H : MailboxAPI.l.(step) _ _ _ _ _ _ |- _ =>
+      inversion H; clear H; subst; repeat sigT_eq
+    | H : MailboxTmpAbsAPI.l.(step) _ _ _ _ _ _ |- _ =>
+      inversion H; clear H; subst; repeat sigT_eq
+    | H : DeliverRestrictedAPI.l.(step) _ _ _ _ _ _ |- _ =>
+      inversion H; clear H; subst; repeat sigT_eq
+    | H : DeliverAPI.l.(step) _ _ _ _ _ _ |- _ =>
+      inversion H; clear H; subst; repeat sigT_eq
+    | H : DeliverProtocol.p.(step_allow) _ _ _ |- _ =>
+      inversion H; clear H; subst; repeat sigT_eq
     | H : MailboxAPI.step _ _ _ _ _ _ |- _ =>
       inversion H; clear H; subst; repeat sigT_eq
     | H : MailboxTmpAbsAPI.step _ _ _ _ _ _ |- _ =>
@@ -62,11 +74,11 @@ Module AtomicDeliver'.
       inversion H; clear H; subst; repeat sigT_eq
     end; intuition idtac.
 
-  Hint Extern 1 (MailboxAPI.step _ _ _ _ _ _) => econstructor.
-  Hint Extern 1 (MailboxTmpAbsAPI.step _ _ _ _ _ _) => econstructor.
-  Hint Extern 1 (DeliverRestrictedAPI.step _ _ _ _ _ _) => econstructor.
-  Hint Extern 1 (DeliverProtocol.step_allow _ _ _) => econstructor.
-  Hint Extern 1 (DeliverAPI.step _ _ _ _ _ _) => econstructor.
+  Hint Extern 1 (MailboxAPI.l.(step) _ _ _ _ _ _) => repeat econstructor.
+  Hint Extern 1 (MailboxTmpAbsAPI.l.(step) _ _ _ _ _ _) => repeat econstructor.
+  Hint Extern 1 (DeliverRestrictedAPI.l.(step) _ _ _ _ _ _) => repeat econstructor.
+  Hint Extern 1 (DeliverProtocol.p.(step_allow) _ _ _) => repeat econstructor.
+  Hint Extern 1 (DeliverAPI.l.(step) _ _ _ _ _ _) => repeat econstructor.
 
   Lemma tid_neq : forall (tid1 tid2 : nat),
     tid1 <> tid2 ->
@@ -83,17 +95,17 @@ Module AtomicDeliver'.
 
   Lemma createwritetmp_right_mover : forall data,
     right_mover
-      DeliverRestrictedAPI.l.(Layer.step)
+      DeliverRestrictedAPI.l.(step)
       (DeliverOp.CreateWriteTmp data).
   Proof.
     unfold right_mover; intros.
     repeat step_inv; eauto 10.
     - eexists; split; eauto 10.
       rewrite FMap.add_add_ne by congruence.
-      eauto 10.
-    - eexists; split; eauto 10.
+      repeat econstructor.
+    - eexists; split; eauto 15.
       rewrite FMap.add_add_ne by congruence.
-      eauto 10.
+      repeat econstructor.
     - eexists.
       rewrite FMap.add_add_ne by congruence.
       split.
@@ -105,7 +117,9 @@ Module AtomicDeliver'.
     - eexists.
       rewrite FMap.add_add_ne by congruence.
       split; ( constructor; [ eauto | ] ).
+      repeat econstructor.
       eapply DeliverAPI.StepCreateWriteTmpErr2.
+      repeat econstructor.
       eapply DeliverAPI.StepCreateWriteTmpErr2.
     - eexists; split; eauto 10.
       rewrite <- FMap.add_remove_ne by congruence.
@@ -116,12 +130,18 @@ Module AtomicDeliver'.
     - eexists; split; eauto.
       econstructor; eauto.
       econstructor; eauto.
+      repeat econstructor.
       eapply FMap.mapsto_add_ne; eauto.
+      trivial.
     - eapply FMap.mapsto_add_ne in H13; try congruence.
       eexists; split.
       eauto 8.
       eauto.
-  Qed.
+    - eexists; split; eauto.
+      repeat econstructor.
+      admit.
+      admit.
+  Admitted.
 
   Hint Resolve createwritetmp_right_mover.
 
@@ -132,6 +152,7 @@ Module AtomicDeliver'.
   Proof.
     unfold always_enabled, enabled_in; unfold Layer.step; unfold DeliverRestrictedAPI.l; intros.
     destruct s; eauto.
+    repeat econstructor.
   Qed.
 
   Hint Resolve unlinktmp_always_enabled.
@@ -145,12 +166,17 @@ Module AtomicDeliver'.
     unfold Layer.step; unfold DeliverRestrictedAPI.l; intros.
     repeat step_inv; eauto; repeat deex.
     + eexists; split; eauto.
+      eexists.
+      repeat econstructor.
+      eauto.
       rewrite <- FMap.add_remove_ne by congruence.
-      eauto 10.
-    + eexists; split; eauto.
-      rewrite <- FMap.add_remove_ne by congruence.
-      eauto 10.
-    + eexists; split; eauto.
+      repeat econstructor.
+    + eexists. eexists. split; eauto.
+      repeat econstructor.
+      unfold DeliverRestrictedAPI.step.
+      repeat econstructor.
+    + eexists. eexists. split; eauto.
+      repeat econstructor.
       rewrite FMap.remove_remove.
       eauto.
     + eexists; split; eauto.
