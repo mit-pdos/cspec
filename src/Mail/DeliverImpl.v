@@ -46,11 +46,11 @@ Module AtomicDeliver'.
   Qed.
 
   Ltac step_inv :=
-    cbn [DeliverAPI.l] in *;
-    cbn [MailboxAPI.l] in *;
-    cbn [MailboxTmpAbsAPI.l] in *;
-    cbn [DeliverRestrictedAPI.l] in *;
-    cbn [Protocol.step_allow DeliverProtocol.p] in *;
+    cbn [DeliverAPI.l
+           MailboxAPI.l
+           MailboxTmpAbsAPI.l
+           DeliverRestrictedAPI.l
+           Protocol.step_allow DeliverProtocol.p] in *;
     match goal with
     | H : MailboxAPI.l.(step) _ _ _ _ _ _ |- _ =>
       inversion H; clear H; subst; repeat sigT_eq
@@ -92,6 +92,7 @@ Module AtomicDeliver'.
   Hint Resolve FMap.in_add_ne.
   Hint Resolve FMap.in_remove.
   Hint Resolve FMap.in_remove_ne.
+  Hint Resolve FMap.is_permutation_in FMap.is_permutation_in'.
 
   Lemma createwritetmp_right_mover : forall data,
     right_mover
@@ -137,11 +138,7 @@ Module AtomicDeliver'.
       eexists; split.
       eauto 8.
       eauto.
-    - eexists; split; eauto.
-      repeat econstructor.
-      admit.
-      admit.
-  Admitted.
+  Qed.
 
   Hint Resolve createwritetmp_right_mover.
 
