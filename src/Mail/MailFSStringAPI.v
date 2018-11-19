@@ -143,9 +143,9 @@ Module MailFSStringAPI.
 
   Definition initP := initP.
 
-  Definition t : Layer.t MailFSStringOp.Op MailFSStringAbsState.State.
+  Definition l : Layer.t MailFSStringOp.Op MailFSStringAbsState.State.
     refine {| Layer.step := step;
               Layer.initP := initP; |}.
   Defined.
 End MailFSStringAPI.
-Definition MailFSStringHAPI := HLayer.t MailFSStringAPI.t UserIdx.idx.
+Definition MailFSStringHAPI := HLayer.t MailFSStringAPI.l UserIdx.idx.

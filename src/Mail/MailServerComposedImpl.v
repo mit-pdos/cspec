@@ -38,7 +38,6 @@ Module MailServerComposedImpl'.
 
   Hint Constructors MailServerComposedAPI.xstep.
 
-  Print MailServerHAPI.
   Theorem compile_correct :
     compile_correct compile_op MailServerHAPI.(Layer.step) MailServerComposedAPI.l.(Layer.step).
   Proof.

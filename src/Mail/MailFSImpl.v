@@ -5,11 +5,8 @@ Require Import DeliverListTidAPI.
 Require Import MailFSAPI.
 
 
-Module MailFSImpl' <:
-  LayerImplMoversT
-    MailboxTmpAbsState
-    MailFSOp  MailFSAPI
-    DeliverListTidOp DeliverListTidAPI.
+Module MailFSImpl'.
+  Import Layer.
 
   (* START CODE *)
 
@@ -48,6 +45,9 @@ Module MailFSImpl' <:
   Qed.
 
   Ltac step_inv :=
+    unfold MailFSAPI.l in *;
+    unfold DeliverListTidAPI.l in *;
+    unfold step in *;
     match goal with
     | H : MailFSAPI.step _ _ _ _ _ _ |- _ =>
       inversion H; clear H; subst; repeat sigT_eq
@@ -62,7 +62,7 @@ Module MailFSImpl' <:
 
   Lemma gettid_right_mover :
     right_mover
-      MailFSAPI.step
+      MailFSAPI.l.(step)
       (MailFSOp.GetTID).
   Proof.
     unfold right_mover; intros.
@@ -74,7 +74,7 @@ Module MailFSImpl' <:
   Hint Resolve gettid_right_mover.
 
   Theorem ysa_movers_listtid_core:
-    ysa_movers MailFSAPI.step listtid_core.
+    ysa_movers MailFSAPI.l.(step) listtid_core.
   Proof.
     econstructor; eauto 20.
   Qed.
@@ -82,13 +82,13 @@ Module MailFSImpl' <:
   Hint Resolve ysa_movers_listtid_core.
 
   Theorem ysa_movers : forall `(op : _ T),
-    ysa_movers MailFSAPI.step (compile_op op).
+    ysa_movers MailFSAPI.l.(step) (compile_op op).
   Proof.
     destruct op; simpl; eauto 20.
   Qed.
 
   Theorem compile_correct :
-    compile_correct compile_op MailFSAPI.step DeliverListTidAPI.step.
+    compile_correct compile_op MailFSAPI.l.(step) DeliverListTidAPI.l.(step).
   Proof.
     unfold compile_correct; intros.
     destruct op.
@@ -107,30 +107,21 @@ Module MailFSImpl' <:
     destruct (v1 == v1); congruence.
   Qed.
 
-  Definition initP_compat : forall s, MailFSAPI.initP s ->
-                                 DeliverListTidAPI.initP s :=
+  Definition initP_compat : forall s, MailFSAPI.l.(initP) s ->
+                                 DeliverListTidAPI.l.(initP) s :=
     ltac:(auto).
 
+  Definition l : LayerImplMoversT.t MailFSAPI.l DeliverListTidAPI.l.
+    exact {| LayerImplMoversT.compile_op := compile_op;
+              LayerImplMoversT.compile_op_no_atomics := @compile_op_no_atomics;
+              LayerImplMoversT.ysa_movers := @ysa_movers;
+              LayerImplMoversT.compile_correct := compile_correct;
+              LayerImplMoversT.initP_compat := initP_compat; |}.
+  Defined.
 End MailFSImpl'.
 
-Module MailFSImpl :=
-  LayerImplMovers
-    MailboxTmpAbsState
-    MailFSOp MailFSAPI
-    DeliverListTidOp DeliverListTidAPI
-    MailFSImpl'.
+Definition MailFSImpl := LayerImplMovers.t MailFSImpl'.l.
 
-Module MailFSImplH' :=
-  LayerImplMoversHT
-    MailboxTmpAbsState
-    MailFSOp MailFSAPI
-    DeliverListTidOp DeliverListTidAPI
-    MailFSImpl'
-    UserIdx.
+Definition MailFSImplH' := LayerImplMoversHT.t MailFSImpl'.l UserIdx.idx.
 
-Module MailFSImplH :=
-  LayerImplMovers
-    MailboxTmpAbsHState
-    MailFSHOp MailFSHAPI
-    DeliverListTidHOp DeliverListTidHAPI
-    MailFSImplH'.
+Definition MailFSImplH := LayerImplMovers.t MailFSImplH'.

@@ -5,10 +5,9 @@ Require Import MailFSStringAPI.
 Require Import MailFSPathAbsAPI.
 
 
-Module MailFSPathAbsImpl' <:
-  HLayerImplAbsT MailFSStringOp
-    MailFSPathAbsState MailFSPathAbsAPI
-    MailFSStringAbsState MailFSStringAPI.
+Module MailFSPathAbsImpl'.
+  Import Layer.
+  Import Protocol.
 
   Definition absR (s1 : MailFSPathAbsState.State) (s2 : MailFSStringAbsState.State) :=
     MailFSPathAbsState.locked s1 = MailFSStringAbsState.locked s2 /\
@@ -258,7 +257,7 @@ Module MailFSPathAbsImpl' <:
   Hint Resolve absR_change_lock.
 
   Theorem absR_ok :
-    op_abs absR MailFSPathAbsAPI.step MailFSStringAPI.step.
+    op_abs absR MailFSPathAbsAPI.l.(step) MailFSStringAPI.l.(step).
   Proof.
     unfold op_abs; intros.
     destruct s2; simpl in *; subst.
@@ -280,6 +279,9 @@ Module MailFSPathAbsImpl' <:
     apply FMap.empty_mapsto in H; propositional.
   Qed.
 
+  Definition l : HLayerImplAbsT MailFSStringOp
+    MailFSPathAbsState MailFSPathAbsAPI
+    MailFSStringAbsState MailFSStringAPI.
 End MailFSPathAbsImpl'.
 
 Module MailFSPathAbsImpl :=

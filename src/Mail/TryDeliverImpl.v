@@ -6,11 +6,8 @@ Require Import MailFSAPI.
 Require Import MailboxTmpAbsAPI.
 
 
-Module TryDeliverImpl' <:
-  LayerImplMoversT
-    MailboxTmpAbsState
-    MailFSOp     MailFSAPI
-    TryDeliverOp TryDeliverAPI.
+Module TryDeliverImpl'.
+  Import Layer.
 
   (* START CODE *)
 
@@ -42,6 +39,9 @@ Module TryDeliverImpl' <:
   Qed.
 
   Ltac step_inv :=
+    unfold MailFSAPI.l in *;
+    unfold TryDeliverAPI.l in *;
+    unfold step in *;
     match goal with
     | H : TryDeliverAPI.step _ _ _ _ _ _ |- _ =>
       inversion H; clear H; subst; repeat sigT_eq
@@ -54,7 +54,7 @@ Module TryDeliverImpl' <:
 
   Lemma random_right_mover :
     right_mover
-      MailFSAPI.step
+      MailFSAPI.l.(step)
       (MailFSOp.Random).
   Proof.
     unfold right_mover; intros.
@@ -66,7 +66,7 @@ Module TryDeliverImpl' <:
   Hint Resolve random_right_mover.
 
   Theorem ysa_movers_linkmail_core :
-    ysa_movers MailFSAPI.step linkmail_core.
+    ysa_movers MailFSAPI.l.(step) linkmail_core.
   Proof.
     econstructor; eauto 20.
   Qed.
@@ -74,13 +74,13 @@ Module TryDeliverImpl' <:
   Hint Resolve ysa_movers_linkmail_core.
 
   Theorem ysa_movers : forall `(op : _ T),
-    ysa_movers MailFSAPI.step (compile_op op).
+    ysa_movers MailFSAPI.l.(step) (compile_op op).
   Proof.
     destruct op; simpl; eauto 20.
   Qed.
 
   Theorem compile_correct :
-    compile_correct compile_op MailFSAPI.step TryDeliverAPI.step.
+    compile_correct compile_op MailFSAPI.l.(step) TryDeliverAPI.l.(step).
   Proof.
     unfold compile_correct; intros.
     destruct op.
@@ -88,31 +88,23 @@ Module TryDeliverImpl' <:
     all: repeat atomic_exec_inv; repeat step_inv; eauto.
   Qed.
 
-  Definition initP_compat : forall s, MailFSAPI.initP s ->
-                                 TryDeliverAPI.initP s :=
+  Definition initP_compat : forall s, MailFSAPI.l.(initP) s ->
+                                 TryDeliverAPI.l.(initP) s :=
     ltac:(auto).
 
+  Print LayerImplMoversT.t.
+  Definition l : LayerImplMoversT.t MailFSAPI.l TryDeliverAPI.l.
+    exact {| LayerImplMoversT.compile_op := compile_op;
+             LayerImplMoversT.compile_op_no_atomics := @compile_op_no_atomics;
+             LayerImplMoversT.ysa_movers := @ysa_movers;
+             LayerImplMoversT.compile_correct := compile_correct;
+             LayerImplMoversT.initP_compat := initP_compat; |}.
+  Defined.
+                                                         
 End TryDeliverImpl'.
 
+Definition TryDeliverImpl := LayerImplMovers.t TryDeliverImpl'.l.
 
-Module TryDeliverImpl :=
-  LayerImplMovers
-    MailboxTmpAbsState
-    MailFSOp     MailFSAPI
-    TryDeliverOp TryDeliverAPI
-    TryDeliverImpl'.
+Definition TryDeliverImplH' := LayerImplMoversHT.t TryDeliverImpl'.l UserIdx.idx.
 
-Module TryDeliverImplH' :=
-  LayerImplMoversHT
-    MailboxTmpAbsState
-    MailFSOp     MailFSAPI
-    TryDeliverOp TryDeliverAPI
-    TryDeliverImpl'
-    UserIdx.
-
-Module TryDeliverImplH :=
-  LayerImplMovers
-    MailboxTmpAbsHState
-    MailFSHOp     MailFSHAPI
-    TryDeliverHOp TryDeliverHAPI
-    TryDeliverImplH'.
+Definition TryDeliverImplH := LayerImplMovers.t TryDeliverImplH'.

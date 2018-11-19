@@ -6,10 +6,8 @@ Require Import MailServerAPI.
 Require Import MailboxTmpAbsAPI.
 
 
-Module MailFSStringAbsImpl' <:
-  HLayerImplAbsT MailFSOp
-    MailFSStringAbsState MailFSStringAbsAPI
-    MailboxTmpAbsState MailFSAPI.
+Module MailFSStringAbsImpl'.
+  Import Layer.
 
   Definition dirR (d1 : MailFSStringAbsState.dir_contents)
                   (d2 : MailServerState.dir_contents) : Prop :=
@@ -129,7 +127,7 @@ Module MailFSStringAbsImpl' <:
   Hint Resolve dirR_is_permutation_key.
 
   Theorem absR_ok :
-    op_abs absR MailFSStringAbsAPI.step MailFSAPI.step.
+    op_abs absR MailFSStringAbsAPI.l.(step) MailFSAPI.l.(step).
   Proof.
     unfold op_abs, absR; intros.
     destruct s1; simpl in *; subst.
@@ -149,24 +147,16 @@ Module MailFSStringAbsImpl' <:
     exists_econstructor; (intuition eauto); propositional.
   Qed.
 
+  Definition l : HLayerImpl.t MailFSStringAbsAPI.l MailFSAPI.l.
+    exact {| HLayerImpl.absR := absR;
+              HLayerImpl.absR_ok := absR_ok;
+              HLayerImpl.initP_map := initP_map; |}.
+  Defined.
+  
 End MailFSStringAbsImpl'.
 
-Module MailFSStringAbsImpl :=
-  HLayerImplAbs MailFSOp
-    MailFSStringAbsState MailFSStringAbsAPI
-    MailboxTmpAbsState MailFSAPI
-    MailFSStringAbsImpl'.
+Definition MailFSStringAbsImpl := HLayerImplAbs.t MailFSStringAbsImpl'.l.
 
-Module MailFSStringAbsImplH' :=
-  LayerImplAbsHT
-    MailFSOp
-    MailFSStringAbsState MailFSStringAbsAPI
-    MailboxTmpAbsState MailFSAPI
-    MailFSStringAbsImpl'
-    UserIdx.
+Definition MailFSStringAbsImplH' := LayerImplAbsHT.t MailFSStringAbsImpl'.l UserIdx.idx.
 
-Module MailFSStringAbsImplH :=
-  LayerImplAbs MailFSHOp
-    MailFSStringAbsHState MailFSStringAbsHAPI
-    MailboxTmpAbsHState MailFSHAPI
-    MailFSStringAbsImplH'.
+Definition MailFSStringAbsImplH := LayerImplAbs.t MailFSStringAbsImplH'.
