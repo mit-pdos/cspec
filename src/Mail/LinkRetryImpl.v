@@ -6,11 +6,8 @@ Require Import DeliverAPI.
 Require Import TryDeliverAPI.
 
 
-Module LinkRetryImpl' <:
-  LayerImplLoopT
-    MailboxTmpAbsState
-    TryDeliverOp TryDeliverAPI
-    DeliverOp DeliverAPI.
+Module LinkRetryImpl'.
+  Import Layer.
 
   (* START CODE *)
 
@@ -33,6 +30,11 @@ Module LinkRetryImpl' <:
   (* END CODE *)
 
   Ltac step_inv :=
+    unfold DeliverAPI.l in *;
+    unfold TryDeliverAPI.l in *;
+    unfold DeliverAPI.step in *;
+    unfold TryDeliverAPI.step in *;
+    unfold step in *;
     match goal with
     | H : TryDeliverAPI.xstep _ _ _ _ _ _ |- _ =>
       inversion H; clear H; subst; repeat sigT_eq
@@ -50,37 +52,26 @@ Module LinkRetryImpl' <:
   Hint Constructors DeliverAPI.xstep.
 
   Theorem noop_or_success :
-    noop_or_success compile_op TryDeliverAPI.step DeliverAPI.step.
+    noop_or_success compile_op TryDeliverAPI.l.(step) DeliverAPI.l.(step).
   Proof.
     unfold noop_or_success.
-    unfold TryDeliverAPI.step, DeliverAPI.step.
     destruct opM; simpl; intros; pair_inv; step_inv; eauto.
   Qed.
 
-  Definition initP_compat : forall s, TryDeliverAPI.initP s ->
-                                 DeliverAPI.initP s :=
+  Definition initP_compat : forall s, TryDeliverAPI.l.(initP) s ->
+                                 DeliverAPI.l.(initP) s :=
     ltac:(auto).
+ 
+  Definition l : LayerImplLoopT.t TryDeliverAPI.l DeliverAPI.l.
+    exact {| LayerImplLoopT.compile_op := compile_op;
+             LayerImplLoopT.noop_or_success := noop_or_success;
+             LayerImplLoopT.initP_compat := initP_compat; |}.
+  Defined.
 
 End LinkRetryImpl'.
 
-Module LinkRetryImpl :=
-  LayerImplLoop
-    MailboxTmpAbsState
-    TryDeliverOp TryDeliverAPI
-    DeliverOp DeliverAPI
-    LinkRetryImpl'.
+Definition LinkRetryImpl := LayerImplLoop.t LinkRetryImpl'.l.
 
-Module LinkRetryImplH' :=
-  LayerImplLoopHT
-    MailboxTmpAbsState
-    TryDeliverOp TryDeliverAPI
-    DeliverOp DeliverAPI
-    LinkRetryImpl'
-    UserIdx.
+Definition LinkRetryImplH' := LayerImplLoopHT.t LinkRetryImpl'.l UserIdx.idx.
 
-Module LinkRetryImplH :=
-  LayerImplLoop
-    MailboxTmpAbsHState
-    TryDeliverHOp TryDeliverHAPI
-    DeliverHOp DeliverHAPI
-    LinkRetryImplH'.
+Definition LinkRetryImplH := LayerImplLoop.t LinkRetryImplH'.

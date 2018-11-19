@@ -5,11 +5,8 @@ Require Import MailFSPathAbsAPI.
 Require Import MailFSPathAPI.
 
 
-Module MailFSPathImpl' <:
-  LayerImplMoversT
-    MailFSPathAbsState 
-    MailFSPathOp MailFSPathAPI
-    MailFSStringOp MailFSPathAbsAPI.
+Module MailFSPathImpl'.
+  Import Layer.
 
   (* START CODE *)
 
@@ -38,6 +35,9 @@ Module MailFSPathImpl' <:
   Qed.
 
   Ltac step_inv :=
+    unfold MailFSPathAbsAPI.l in *;
+    unfold MailFSPathAPI.l in *;
+    unfold step in *;
     match goal with
     | H : MailFSPathAbsAPI.step _ _ _ _ _ _ |- _ =>
       inversion H; clear H; subst; repeat sigT_eq
@@ -49,7 +49,7 @@ Module MailFSPathImpl' <:
   Hint Extern 1 (MailFSPathAPI.step _ _ _ _ _ _) => econstructor.
 
   Theorem compile_correct :
-    compile_correct compile_op MailFSPathAPI.step MailFSPathAbsAPI.step.
+    compile_correct compile_op MailFSPathAPI.l.(step) MailFSPathAbsAPI.l.(step).
   Proof.
     unfold compile_correct; intros.
     destruct op.
@@ -58,37 +58,27 @@ Module MailFSPathImpl' <:
   Qed.
 
   Theorem ysa_movers : forall `(op : _ T),
-    ysa_movers MailFSPathAPI.step (compile_op op).
+    ysa_movers MailFSPathAPI.l.(step) (compile_op op).
   Proof.
     destruct op; simpl; eauto 20.
   Qed.
 
-  Definition initP_compat : forall s, MailFSPathAPI.initP s ->
-                                 MailFSPathAbsAPI.initP s :=
+  Definition initP_compat : forall s, MailFSPathAPI.l.(initP) s ->
+                                 MailFSPathAbsAPI.l.(initP) s :=
     ltac:(auto).
 
+  Definition l: LayerImplMoversT.t MailFSPathAPI.l MailFSPathAbsAPI.l.
+    exact {| LayerImplMoversT.compile_op := compile_op;
+             LayerImplMoversT.compile_op_no_atomics := @compile_op_no_atomics;
+             LayerImplMoversT.compile_correct := compile_correct;
+             LayerImplMoversT.ysa_movers := @ysa_movers;
+             LayerImplMoversT.initP_compat := initP_compat; |}.
+  Defined.
 
 End MailFSPathImpl'.
 
+Definition MailFSPathImpl := LayerImplMovers.t MailFSPathImpl'.l.
 
-Module MailFSPathImpl :=
-  LayerImplMovers
-    MailFSPathAbsState 
-    MailFSPathOp MailFSPathAPI
-    MailFSStringOp MailFSPathAbsAPI
-    MailFSPathImpl'.
+Definition MailFSPathImplH' := LayerImplMoversHT.t MailFSPathImpl'.l UserIdx.idx.
 
-Module MailFSPathImplH' :=
-  LayerImplMoversHT
-    MailFSPathAbsState 
-    MailFSPathOp MailFSPathAPI
-    MailFSStringOp MailFSPathAbsAPI
-    MailFSPathImpl'
-    UserIdx.
-
-Module MailFSPathImplH :=
-  LayerImplMovers
-    MailFSPathAbsHState 
-    MailFSPathHOp MailFSPathHAPI
-    MailFSStringHOp MailFSPathAbsHAPI
-    MailFSPathImplH'.
+Definition MailFSPathImplH := LayerImplMovers.t MailFSPathImplH'.

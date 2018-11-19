@@ -5,11 +5,8 @@ Require Import MailFSStringAPI.
 Require Import MailFSStringAbsAPI.
 
 
-Module MailFSStringImpl' <:
-  LayerImplMoversT
-    MailFSStringAbsState
-    MailFSStringOp MailFSStringAPI
-    MailFSOp MailFSStringAbsAPI.
+Module MailFSStringImpl'.
+  Import Layer.
 
   (* START CODE *)
 
@@ -59,6 +56,9 @@ Module MailFSStringImpl' <:
 
   
   Ltac step_inv :=
+    unfold MailFSStringAPI.l in *;
+    unfold MailFSStringAbsAPI.l in *;
+    unfold step in *;
     match goal with
     | H : MailFSStringAbsAPI.step _ _ _ _ _ _ |- _ =>
       inversion H; clear H; subst; repeat sigT_eq
@@ -71,7 +71,7 @@ Module MailFSStringImpl' <:
 
   Lemma gettid_right_mover :
     right_mover
-      MailFSStringAPI.step
+      MailFSStringAPI.l.(step)
       (MailFSStringOp.GetTID).
   Proof.
     unfold right_mover; intros.
@@ -83,7 +83,7 @@ Module MailFSStringImpl' <:
   Hint Resolve gettid_right_mover.
 
   Theorem ysa_movers_linkmail_core: forall n,
-    ysa_movers MailFSStringAPI.step (linkmail_core n).
+    ysa_movers MailFSStringAPI.l.(step) (linkmail_core n).
   Proof.
     econstructor; eauto 20.
   Qed.
@@ -91,7 +91,7 @@ Module MailFSStringImpl' <:
   Hint Resolve ysa_movers_linkmail_core.
 
   Theorem ysa_movers_list_core:
-    ysa_movers MailFSStringAPI.step list_core.
+    ysa_movers MailFSStringAPI.l.(step) list_core.
   Proof.
     unfold list_core, ysa_movers.
     eauto 20.
@@ -100,7 +100,7 @@ Module MailFSStringImpl' <:
   Hint Resolve ysa_movers_list_core.
 
   Theorem ysa_movers_createwritetmp_core: forall s,
-    ysa_movers MailFSStringAPI.step (createwritetmp_core s).
+    ysa_movers MailFSStringAPI.l.(step) (createwritetmp_core s).
   Proof.
     econstructor; eauto 20.
   Qed.
@@ -108,7 +108,7 @@ Module MailFSStringImpl' <:
   Hint Resolve ysa_movers_createwritetmp_core.
 
   Theorem ysa_movers_unlinktmp_core:
-    ysa_movers MailFSStringAPI.step unlinktmp_core.
+    ysa_movers MailFSStringAPI.l.(step) unlinktmp_core.
   Proof.
     econstructor; eauto 20.
   Qed.
@@ -116,13 +116,13 @@ Module MailFSStringImpl' <:
   Hint Resolve ysa_movers_unlinktmp_core.
 
   Theorem ysa_movers : forall `(op : _ T),
-    ysa_movers MailFSStringAPI.step (compile_op op).
+    ysa_movers MailFSStringAPI.l.(step) (compile_op op).
   Proof.
     destruct op; simpl; eauto 20.
   Qed.
 
   Theorem compile_correct :
-    compile_correct compile_op MailFSStringAPI.step MailFSStringAbsAPI.step.
+    compile_correct compile_op MailFSStringAPI.l.(step) MailFSStringAbsAPI.l.(step).
   Proof.
     unfold compile_correct; intros.
     destruct op.
@@ -139,30 +139,22 @@ Module MailFSStringImpl' <:
     eauto.
   Qed.
 
-  Definition initP_compat : forall s, MailFSStringAPI.initP s ->
-                                 MailFSStringAbsAPI.initP s :=
+  Definition initP_compat : forall s, MailFSStringAPI.l.(initP) s ->
+                                 MailFSStringAbsAPI.l.(initP) s :=
     ltac:(auto).
 
+  Definition l : LayerImplMoversT.t MailFSStringAPI.l MailFSStringAbsAPI.l.
+    exact {| LayerImplMoversT.compile_op := compile_op;
+             LayerImplMoversT.compile_op_no_atomics := @compile_op_no_atomics;
+             LayerImplMoversT.ysa_movers := @ysa_movers;
+             LayerImplMoversT.compile_correct := compile_correct;
+             LayerImplMoversT.initP_compat := initP_compat; |}.
+  Defined.
+  
 End MailFSStringImpl'.
 
-Module MailFSStringImpl :=
-  LayerImplMovers
-    MailFSStringAbsState
-    MailFSStringOp MailFSStringAPI
-    MailFSOp MailFSStringAbsAPI
-    MailFSStringImpl'.
+Definition MailFSStringImpl := LayerImplMovers.t MailFSStringImpl'.l.
 
-Module MailFSStringImplH' :=
-  LayerImplMoversHT
-    MailFSStringAbsState
-    MailFSStringOp MailFSStringAPI
-    MailFSOp MailFSStringAbsAPI
-    MailFSStringImpl'
-    UserIdx.
+Definition MailFSStringImplH' := LayerImplMoversHT.t MailFSStringImpl'.l UserIdx.idx.
 
-Module MailFSStringImplH :=
-  LayerImplMovers
-    MailFSStringAbsHState
-    MailFSStringHOp MailFSStringHAPI
-    MailFSHOp MailFSStringAbsHAPI
-    MailFSStringImplH'.
+Definition MailFSStringImplH := LayerImplMovers.t MailFSStringImplH'.
