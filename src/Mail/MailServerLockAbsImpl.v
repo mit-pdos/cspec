@@ -21,37 +21,22 @@ Module MailServerLockAbsImpl'.
     all: eauto.
   Qed.
 
-(*
   Definition initP_map (s1: MailServerLockAbsState.State) :
-    {s2: MailServerState.State | initP s1 -> absR s1 s2 /\ MailServerState.initP s2}.
+    {s2: MailServerState.State | MailServerLockAbsState.initP s1 -> absR s1 s2 /\ MailServerState.initP s2}.
     exists (maildir s1).
     unfold initP, absR, MailServerState.initP; eauto.
   Defined.
-*)
 
-Print HLayerImplAbsT.t.
-Definition l : HLayerImplAbsT.t MailServerLockAbsAPI.l MailServerAPI.l.
-
-
+  Definition l : HLayerImpl.t MailServerLockAbsAPI.l MailServerAPI.l.
+    refine {| HLayerImpl.absR := absR;
+              HLayerImpl.absR_ok := absR_ok;
+              HLayerImpl.initP_map := initP_map; |}.
+  Defined.
 
 End MailServerLockAbsImpl'.
 
-Module MailServerLockAbsImpl :=
-  HLayerImplAbs MailServerOp
-    MailServerLockAbsState MailServerLockAbsAPI
-    MailServerState MailServerAPI
-    MailServerLockAbsImpl'.
+Definition MailServerLockAbsImpl := HLayerImplAbs.t MailServerLockAbsImpl'.l.
 
-Module MailServerLockAbsImplH' :=
-  LayerImplAbsHT
-    MailServerOp
-    MailServerLockAbsState MailServerLockAbsAPI
-    MailServerState MailServerAPI
-    MailServerLockAbsImpl'
-    UserIdx.
+Definition MailServerLockAbsImplH' := LayerImplAbsHT.t MailServerLockAbsImpl'.l UserIdx.idx.
 
-Module MailServerLockAbsImplH :=
-  LayerImplAbs MailServerHOp
-    MailServerLockAbsHState MailServerLockAbsHAPI
-    MailServerHState        MailServerHAPI
-    MailServerLockAbsImplH'.
+Definition MailServerLockAbsImplH := LayerImplAbs.t MailServerLockAbsImplH'.

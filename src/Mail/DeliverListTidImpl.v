@@ -5,12 +5,9 @@ Require Import DeliverAPI.
 Require Import DeliverListTidAPI.
 
 
-Module DeliverListTidImpl' <:
-  LayerImplMoversProtocolT
-    MailboxTmpAbsState
-    DeliverListTidOp DeliverListTidAPI DeliverListTidRestrictedAPI
-    DeliverOp        DeliverAPI
-    DeliverListTidProtocol.
+Module DeliverListTidImpl'.
+  Import Layer.
+  Import Protocol.
 
   (* START CODE *)
 
@@ -85,6 +82,13 @@ Module DeliverListTidImpl' <:
   Qed.
 
   Ltac step_inv :=
+    unfold DeliverAPI.l in *;
+    unfold DeliverRestrictedAPI.l in *;
+    unfold DeliverListTidAPI.l in *;
+    unfold DeliverListTidRestrictedAPI.l in *;
+    unfold DeliverListTidProtocol.p in *;
+    unfold step_allow in *;
+    unfold step in *;
     match goal with
     | H : DeliverAPI.step _ _ _ _ _ _ |- _ =>
       inversion H; clear H; subst; repeat sigT_eq
@@ -103,7 +107,7 @@ Module DeliverListTidImpl' <:
 
   Lemma listtid_right_mover :
     right_mover
-      DeliverListTidRestrictedAPI.step
+      DeliverListTidRestrictedAPI.l.(step)
       (DeliverListTidOp.ListTid).
   Proof.
     unfold right_mover; intros.
@@ -130,14 +134,14 @@ Module DeliverListTidImpl' <:
   Hint Resolve listtid_right_mover.
 
   Theorem ysa_movers : forall `(op : _ T),
-    ysa_movers DeliverListTidRestrictedAPI.step (compile_op op).
+    ysa_movers DeliverListTidRestrictedAPI.l.(step) (compile_op op).
   Proof.
     destruct op; simpl; eauto 20.
     unfold linkmail_core; eauto.
   Qed.
 
   Theorem compile_correct :
-    compile_correct compile_op DeliverListTidRestrictedAPI.step DeliverAPI.step.
+    compile_correct compile_op DeliverListTidRestrictedAPI.l.(step) DeliverAPI.l.(step).
   Proof.
     unfold compile_correct; intros.
     destruct op.
@@ -148,16 +152,17 @@ Module DeliverListTidImpl' <:
 
   Lemma linkmail_follows_protocol : forall tid s,
     follows_protocol_proc
-      DeliverListTidAPI.step
-      DeliverListTidProtocol.step_allow
+      DeliverListTidAPI.l.(step)
+      DeliverListTidProtocol.p.(step_allow)
       tid s (linkmail_core).
   Proof.
     intros.
     constructor; intros.
+    unfold step, DeliverListTidAPI.l, step_allow, DeliverListTidProtocol.p.
       constructor; intros. eauto.
 
     constructor; intros.
-      constructor; intros.
+      constructor; intros; eauto.
 
     {
       eapply exec_any_op in H; repeat deex.
@@ -176,19 +181,19 @@ Module DeliverListTidImpl' <:
   Theorem op_follows_protocol :
     forall tid s `(op : _ T),
       follows_protocol_proc
-        DeliverListTidAPI.step
-        DeliverListTidProtocol.step_allow
+        DeliverListTidAPI.l.(step)
+        DeliverListTidProtocol.p.(step_allow)
         tid s (compile_op op).
   Proof.
     destruct op; simpl; eauto.
   Qed.
 
   Theorem allowed_stable :
-    forall `(op : DeliverListTidOp.Op T) `(op' : DeliverListTidOp.Op T') tid tid' s s' r evs,
+    forall T (op : DeliverListTidOp.Op T) T' (op' : DeliverListTidOp.Op T') tid tid' s s' r evs,
       tid <> tid' ->
-      DeliverListTidProtocol.step_allow op tid s ->
-      DeliverListTidRestrictedAPI.step op' tid' s r s' evs ->
-      DeliverListTidProtocol.step_allow op tid s'.
+      DeliverListTidProtocol.p.(step_allow) T op tid s ->
+      DeliverListTidRestrictedAPI.l.(step) op' tid' s r s' evs ->
+      DeliverListTidProtocol.p.(step_allow) T op tid s'.
   Proof.
     intros.
     destruct op; destruct op'; repeat step_inv; subst; eauto.
@@ -203,44 +208,44 @@ Module DeliverListTidImpl' <:
 
   Theorem raw_step_ok :
     forall `(op : _ T) tid s r s' evs,
-      restricted_step DeliverListTidAPI.step DeliverListTidProtocol.step_allow op tid s r s' evs ->
-      DeliverListTidRestrictedAPI.step op tid s r s' evs.
+      restricted_step DeliverListTidAPI.l.(step) DeliverListTidProtocol.p.(step_allow) op tid s r s' evs ->
+      DeliverListTidRestrictedAPI.l.(step) op tid s r s' evs.
   Proof.
     eauto.
   Qed.
 
-  Definition initP_compat : forall s, DeliverListTidRestrictedAPI.initP s ->
-                                 DeliverAPI.initP s :=
+  Definition initP_compat : forall s, DeliverListTidRestrictedAPI.l.(initP) s ->
+                                 DeliverAPI.l.(initP) s :=
     ltac:(auto).
 
-  Definition raw_initP_compat : forall s, DeliverListTidRestrictedAPI.initP s ->
-                                     DeliverListTidAPI.initP s :=
+  Definition raw_initP_compat : forall s, DeliverListTidRestrictedAPI.l.(initP) s ->
+                                     DeliverListTidAPI.l.(initP) s :=
     ltac:(auto).
 
+
+  Definition movers_impl : LayerImplMoversT.t DeliverListTidRestrictedAPI.l DeliverAPI.l.
+    refine {| LayerImplMoversT.compile_op := compile_op;
+              LayerImplMoversT.compile_op_no_atomics := @compile_op_no_atomics;
+              LayerImplMoversT.ysa_movers := @ysa_movers;
+              LayerImplMoversT.compile_correct := @compile_correct;
+              LayerImplMoversT.initP_compat := @initP_compat; |}.
+  Defined.
+  
+  Print LayerImplMoversProtocolT.t.
+  Definition l : LayerImplMoversProtocolT.t
+                 DeliverListTidAPI.l DeliverListTidRestrictedAPI.l DeliverAPI.l
+                 DeliverListTidProtocol.p.
+    refine {| LayerImplMoversProtocolT.movers_impl := movers_impl;
+              LayerImplMoversProtocolT.op_follows_protocol := op_follows_protocol;
+              LayerImplMoversProtocolT.allowed_stable := allowed_stable;
+              LayerImplMoversProtocolT.raw_step_ok := @raw_step_ok;
+              LayerImplMoversProtocolT.raw_initP_compat := raw_initP_compat; |}.
+  Defined.
+              
 End DeliverListTidImpl'.
 
+Definition DeliverListTidImpl := LayerImplMoversProtocol.t DeliverListTidImpl'.l.
 
-Module DeliverListTidImpl :=
-  LayerImplMoversProtocol
-    MailboxTmpAbsState
-    DeliverListTidOp DeliverListTidAPI DeliverListTidRestrictedAPI
-    DeliverOp        DeliverAPI
-    DeliverListTidProtocol
-    DeliverListTidImpl'.
+Definition DeliverListTidImplH' := LayerImplMoversProtocolHT.t DeliverListTidImpl'.l UserIdx.idx.
 
-Module DeliverListTidImplH' :=
-  LayerImplMoversProtocolHT
-    MailboxTmpAbsState
-    DeliverListTidOp DeliverListTidAPI DeliverListTidRestrictedAPI
-    DeliverOp        DeliverAPI
-    DeliverListTidProtocol
-    DeliverListTidImpl'
-    UserIdx.
-
-Module DeliverListTidImplH :=
-  LayerImplMoversProtocol
-    MailboxTmpAbsHState
-    DeliverListTidHOp DeliverListTidHAPI DeliverListTidRestrictedHAPI
-    DeliverHOp        DeliverHAPI
-    DeliverListTidHProtocol
-    DeliverListTidImplH'.
+Definition DeliverListTidImplH := LayerImplMoversProtocol.t DeliverListTidImplH'.

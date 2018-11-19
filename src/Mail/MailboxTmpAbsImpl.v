@@ -44,27 +44,19 @@ Module MailboxTmpAbs'.
     exists_econstructor; intuition eauto.
   Defined.
 
-  Definition l :
-  HLayerImplAbsT.t MailboxTmpAbsAPI.l MailboxAPI.l.
+  (* Sydney: I'm fairly sure this should be an HLayerImpl.t and not an
+  HLayerImplAbsT.t? *)
+  Print HLayerImpl.t.
+  Definition l : HLayerImpl.t MailboxTmpAbsAPI.l MailboxAPI.l.
+    exact {| HLayerImpl.absR := absR;
+             HLayerImpl.absR_ok := absR_ok;
+             HLayerImpl.initP_map := initP_map; |}.
+  Defined.
 
 End MailboxTmpAbs'.
 
-Module MailboxTmpAbsImpl :=
-  HLayerImplAbs MailboxOp
-   MailboxTmpAbsState MailboxTmpAbsAPI
-   MailServerLockAbsState MailboxAPI
-   MailboxTmpAbs'.
+Definition MailboxTmpAbsImpl := HLayerImplAbs.t MailboxTmpAbs'.l.
 
-Module MailboxTmpAbsH' :=
-  LayerImplAbsHT
-    MailboxOp
-    MailboxTmpAbsState MailboxTmpAbsAPI
-    MailServerLockAbsState MailboxAPI
-    MailboxTmpAbs'
-    UserIdx.
+Definition MailboxTmpAbsH' := LayerImplAbsHT.t MailboxTmpAbs'.l UserIdx.idx.
 
-Module MailboxTmpAbsImplH :=
-  LayerImplAbs MailboxHOp
-    MailboxTmpAbsHState     MailboxTmpAbsHAPI
-    MailServerLockAbsHState MailboxHAPI
-    MailboxTmpAbsH'.
+Definition MailboxTmpAbsImplH := LayerImplAbs.t MailboxTmpAbsH'.
