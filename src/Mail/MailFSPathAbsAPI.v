@@ -2,7 +2,7 @@ Require Import CSPEC.
 Require Import MailServerAPI.
 Require Import MailFSStringAPI.
 
-Module MailFSPathAbsState <: State.
+Module MailFSPathAbsState.
 
   Definition fs_contents := FMap.t (string * string) string.
 
@@ -16,10 +16,10 @@ Module MailFSPathAbsState <: State.
                               fs s = FMap.empty.
 
 End MailFSPathAbsState.
-Module MailFSPathAbsHState := HState MailFSPathAbsState UserIdx.
+Definition MailFSPathAbsHState := HState MailFSPathAbsState.State UserIdx.idx.
 
 
-Module MailFSPathAbsAPI <: Layer MailFSStringOp MailFSPathAbsState.
+Module MailFSPathAbsAPI.
 
   Import MailFSStringOp.
   Import MailFSPathAbsState.
@@ -198,5 +198,10 @@ Module MailFSPathAbsAPI <: Layer MailFSStringOp MailFSPathAbsState.
 
   Definition initP := initP.
 
+  Definition l : Layer.t MailFSStringOp.Op MailFSPathAbsState.State.
+    refine {| Layer.step := step;
+              Layer.initP := initP; |}.
+  Defined.
+                            
 End MailFSPathAbsAPI.
-Module MailFSPathAbsHAPI := HLayer MailFSStringOp MailFSPathAbsState MailFSPathAbsAPI UserIdx.
+Definition MailFSPathAbsHAPI := HLayer.t MailFSPathAbsAPI.l UserIdx.idx.

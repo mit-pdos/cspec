@@ -305,14 +305,7 @@ Definition AtomicDeliver :=
   LayerImplMoversProtocol.t AtomicDeliver'.t.
 
 Definition AtomicDeliverH' :=
-  LayerImplMoversProtocolHT.t
-    AtomicDeliver'.t
-    UserIdx.idx.
+  LayerImplMoversProtocolHT.t AtomicDeliver'.t UserIdx.idx.
 
-Module AtomicDeliverH :=
-  LayerImplMoversProtocol
-    MailboxTmpAbsHState
-    DeliverHOp DeliverHAPI DeliverRestrictedHAPI
-    MailboxHOp MailboxTmpAbsHAPI
-    DeliverHProtocol
-    AtomicDeliverH'.
+Definition AtomicDeliverH :=
+  LayerImplMoversProtocol.t AtomicDeliverH'.

@@ -2,7 +2,7 @@ Require Import CSPEC.
 Require Import MailServerAPI.
 Require Import MailFSPathAPI.
 
-Module MailFSMergedOp <: Ops.
+Module MailFSMergedOp.
 
   Definition extopT := MailServerAPI.MailServerOp.extopT.
 
@@ -19,7 +19,7 @@ Module MailFSMergedOp <: Ops.
 
   | Lock : forall (u : string), xOp unit
   | Unlock : forall (u : string), xOp unit
-  | Exists : forall (u : string), xOp (CheckResult UserIdx.indexValid)
+  | Exists : forall (u : string), xOp (CheckResult UserIdx.idx)
 
   | Ext : forall `(op : extopT T), xOp T
   .
@@ -29,7 +29,7 @@ Module MailFSMergedOp <: Ops.
 End MailFSMergedOp.
 
 
-Module MailFSMergedState <: State.
+Module MailFSMergedState.
 
   Definition fs_contents := FMap.t (string * string * string) string.
   Definition locked_map := FMap.t string bool.
@@ -40,9 +40,11 @@ Module MailFSMergedState <: State.
   }.
 
   Definition State := state_rec.
+
+  Print UserIdx.idx.
   Definition initP (s : State) :=
     (forall u,
-      UserIdx.indexValid u ->
+      UserIdx.idx.(indexValid) u ->
       FMap.MapsTo u false (locked s)) /\
     fs s = FMap.empty.
 
@@ -56,7 +58,7 @@ Definition drop_dirname (fs : MailFSMergedState.fs_contents) :=
   FMap.map_keys (fun '(dn, fn) => fn) fs.
 
 
-Module MailFSMergedAPI <: Layer MailFSMergedOp MailFSMergedState.
+Module MailFSMergedAPI.
 
   Import MailFSMergedOp.
   Import MailFSMergedState.
@@ -163,14 +165,14 @@ Module MailFSMergedAPI <: Layer MailFSMergedOp MailFSMergedState.
       (mk_state fs (FMap.add u false locked))
       nil
 
-  | StepExistsOK : forall fs tid u P locked,
+  | StepExistsOK : forall fs tid (u: UserIdx.idx) P locked,
     FMap.In u locked ->
     xstep (Exists u) tid
       (mk_state fs locked)
       (Present (exist _ u P))
       (mk_state fs locked)
       nil
-  | StepExistsErr : forall fs tid u locked,
+  | StepExistsErr : forall fs tid (u: UserIdx.idx) locked,
     ~ FMap.In u locked ->
     xstep (Exists u) tid
       (mk_state fs locked)
@@ -190,17 +192,20 @@ Module MailFSMergedAPI <: Layer MailFSMergedOp MailFSMergedState.
 
   Definition initP := initP.
 
+  Definition l : Layer.t MailFSMergedOp.Op MailFSMergedState.State.
+    refine {| Layer.step := step;
+              Layer.initP := initP; |}.
+  Defined.
 End MailFSMergedAPI.
 
 
-Module MailFSMergedAbsAPI <: Layer MailFSPathHOp MailFSMergedState.
+Module MailFSMergedAbsAPI.
 
   Import MailFSPathOp.
-  Import MailFSPathHOp.
   Import MailFSMergedState.
 
   Inductive xstep : forall T, Op T -> nat -> State -> T -> State -> list event -> Prop :=
-  | StepCreateWriteOK : forall fs tid dir fn data lock u P,
+  | StepCreateWriteOK : forall fs tid dir fn data lock (u: UserIdx.idx) P,
     xstep (Slice (exist _ u P) (CreateWrite (dir, fn) data)) tid
       (mk_state fs lock)
       true

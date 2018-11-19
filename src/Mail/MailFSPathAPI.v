@@ -2,7 +2,7 @@ Require Import CSPEC.
 Require Import MailServerAPI.
 Require Import MailFSPathAbsAPI.
 
-Module MailFSPathOp <: Ops.
+Module MailFSPathOp.
 
   Definition extopT := MailServerAPI.MailServerOp.extopT.
 
@@ -26,10 +26,10 @@ Module MailFSPathOp <: Ops.
   Definition Op := xOp.
 
 End MailFSPathOp.
-Module MailFSPathHOp := HOps MailFSPathOp UserIdx.
+Definition MailFSPathHOp := HOps MailFSPathOp.Op UserIdx.idx.
 
 
-Module MailFSPathAPI <: Layer MailFSPathOp MailFSPathAbsState.
+Module MailFSPathAPI.
 
   Import MailFSPathOp.
   Import MailFSPathAbsState.
@@ -136,5 +136,9 @@ Module MailFSPathAPI <: Layer MailFSPathOp MailFSPathAbsState.
 
   Definition initP := initP.
 
+  Definition l : Layer.t MailFSPathOp.Op MailFSPathAbsState.State.
+    refine {| Layer.step := step;
+              Layer.initP := initP; |}.
+  Defined.
 End MailFSPathAPI.
-Module MailFSPathHAPI := HLayer MailFSPathOp MailFSPathAbsState MailFSPathAPI UserIdx.
+Definition MailFSPathHAPI := HLayer.t MailFSPathAPI.l UserIdx.idx.

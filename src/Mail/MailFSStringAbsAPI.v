@@ -3,7 +3,6 @@ Require Import MailServerAPI.
 Require Import MailboxTmpAbsAPI.
 Require Import MailFSAPI.
 
-
 Parameter encode_tid_fn : nat -> nat -> string.
 Parameter decode_tid_fn : string -> (nat * nat).
 Axiom encode_decode_tid_fn : forall tid fn,
@@ -32,7 +31,7 @@ Qed.
 Hint Resolve encode_tid_fn_injective.
 
 
-Module MailFSStringAbsState <: State.
+Module MailFSStringAbsState.
 
   Definition dir_contents := FMap.t string string.
 
@@ -48,10 +47,10 @@ Module MailFSStringAbsState <: State.
                               maildir s = FMap.empty.
 
 End MailFSStringAbsState.
-Module MailFSStringAbsHState := HState MailFSStringAbsState UserIdx.
+Definition MailFSStringAbsHState := HState MailFSStringAbsState.State UserIdx.idx.
 
 
-Module MailFSStringAbsAPI <: Layer MailFSOp MailFSStringAbsState.
+Module MailFSStringAbsAPI.
 
   Import MailFSOp.
   Import MailFSStringAbsState.
@@ -164,5 +163,9 @@ Module MailFSStringAbsAPI <: Layer MailFSOp MailFSStringAbsState.
 
   Definition initP := initP.
 
+  Definition l : Layer.t MailFSOp.Op MailFSStringAbsState.State.
+    refine {| Layer.step := step;
+              Layer.initP := initP; |}.
+  Defined.
 End MailFSStringAbsAPI.
-Module MailFSStringAbsHAPI := HLayer MailFSOp MailFSStringAbsState MailFSStringAbsAPI UserIdx.
+Definition MailFSStringAbsHAPI := HLayer.t MailFSStringAbsAPI.l UserIdx.idx.

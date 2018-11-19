@@ -21,19 +21,18 @@ Module MailServerLockAbsImpl'.
     all: eauto.
   Qed.
 
-  Set Printing All.
-  Print MailServerLockAbsState.
-
+(*
   Definition initP_map (s1: MailServerLockAbsState.State) :
     {s2: MailServerState.State | initP s1 -> absR s1 s2 /\ MailServerState.initP s2}.
     exists (maildir s1).
     unfold initP, absR, MailServerState.initP; eauto.
   Defined.
+*)
 
-Definitnion t : 
-  HLayerImplAbsT MailServerOp
-    MailServerLockAbsState MailServerLockAbsAPI
-    MailServerState MailServerAPI.
+Print HLayerImplAbsT.t.
+Definition l : HLayerImplAbsT.t MailServerLockAbsAPI.l MailServerAPI.l.
+
+
 
 End MailServerLockAbsImpl'.
 

@@ -3,7 +3,7 @@ Require Import MailServerAPI.
 Require Import MailboxTmpAbsAPI.
 Require Import DeliverAPI.
 
-Module MailFSOp <: Ops.
+Module MailFSOp.
 
   Definition extopT := MailServerAPI.MailServerOp.extopT.
 
@@ -27,10 +27,9 @@ Module MailFSOp <: Ops.
   Definition Op := xOp.
 
 End MailFSOp.
-Module MailFSHOp := HOps MailFSOp UserIdx.
+Definition MailFSHOp := HOps MailFSOp.Op UserIdx.idx.
 
-
-Module MailFSAPI <: Layer MailFSOp MailboxTmpAbsState.
+Module MailFSAPI.
 
   Import MailFSOp.
   Import MailboxTmpAbsState.
@@ -144,5 +143,10 @@ Module MailFSAPI <: Layer MailFSOp MailboxTmpAbsState.
 
   Definition initP := initP.
 
+  Definition l : Layer.t MailFSOp.Op MailboxTmpAbsState.State.
+    refine {| Layer.step := step;
+              Layer.initP := initP; |}.
+  Defined.
+
 End MailFSAPI.
-Module MailFSHAPI := HLayer MailFSOp MailboxTmpAbsState MailFSAPI UserIdx.
+Definition MailFSHAPI := HLayer.t MailFSAPI.l UserIdx.idx.

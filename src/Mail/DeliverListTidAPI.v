@@ -3,7 +3,7 @@ Require Import MailServerAPI.
 Require Import MailboxTmpAbsAPI.
 Require Import DeliverAPI.
 
-Module DeliverListTidOp <: Ops.
+Module DeliverListTidOp.
 
   Definition extopT := MailServerAPI.MailServerOp.extopT.
   
@@ -25,10 +25,10 @@ Module DeliverListTidOp <: Ops.
   Definition Op := xOp.
 
 End DeliverListTidOp.
-Module DeliverListTidHOp := HOps DeliverListTidOp UserIdx.
+Definition DeliverListTidHOp := HOps DeliverListTidOp.Op UserIdx.idx.
 
 
-Module DeliverListTidAPI <: Layer DeliverListTidOp MailboxTmpAbsState.
+Module DeliverListTidAPI.
 
   Import DeliverListTidOp.
   Import MailboxTmpAbsState.
@@ -136,11 +136,15 @@ Module DeliverListTidAPI <: Layer DeliverListTidOp MailboxTmpAbsState.
 
   Definition initP := initP.
 
+  Definition l : Layer.t DeliverListTidOp.Op MailboxTmpAbsState.State.
+    refine {| Layer.step := step;
+              Layer.initP := initP; |}.
+  Defined.
 End DeliverListTidAPI.
-Module DeliverListTidHAPI := HLayer DeliverListTidOp MailboxTmpAbsState DeliverListTidAPI UserIdx.
+Definition DeliverListTidHAPI := HLayer.t DeliverListTidAPI.l UserIdx.idx.
 
 
-Module DeliverListTidProtocol <: Protocol DeliverListTidOp MailboxTmpAbsState.
+Module DeliverListTidProtocol.
 
   Import DeliverListTidOp.
   Import MailboxTmpAbsState.
@@ -173,15 +177,23 @@ Module DeliverListTidProtocol <: Protocol DeliverListTidOp MailboxTmpAbsState.
 
   Definition initP := MailboxTmpAbsState.initP.
 
+  Print Protocol.t.
+  Definition p : Protocol.t DeliverListTidOp.Op MailboxTmpAbsState.State.
+    refine {| Protocol.step_allow := step_allow; |}.
+  Defined.
 End DeliverListTidProtocol.
-Module DeliverListTidHProtocol := HProtocol DeliverListTidOp MailboxTmpAbsState DeliverListTidProtocol UserIdx.
+Definition DeliverListTidHProtocol := HProtocol.t UserIdx.idx DeliverListTidProtocol.p.
 
 
-Module DeliverListTidRestrictedAPI <: Layer DeliverListTidOp MailboxTmpAbsState.
+Module DeliverListTidRestrictedAPI.
 
   Definition step := restricted_step DeliverListTidAPI.step DeliverListTidProtocol.step_allow.
 
   Definition initP := MailboxTmpAbsState.initP.
 
+  Definition l : Layer.t DeliverListTidOp.Op MailboxTmpAbsState.State.
+    refine {| Layer.step := step;
+              Layer.initP := initP; |}.
+  Defined.
 End DeliverListTidRestrictedAPI.
-Module DeliverListTidRestrictedHAPI := HLayer DeliverListTidOp MailboxTmpAbsState DeliverListTidRestrictedAPI UserIdx.
+Definition DeliverListTidRestrictedHAPI := HLayer.t DeliverListTidRestrictedAPI.l UserIdx.idx.

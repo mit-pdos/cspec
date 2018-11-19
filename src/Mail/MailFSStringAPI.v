@@ -3,7 +3,7 @@ Require Import MailServerAPI.
 Require Import MailFSStringAbsAPI.
 Require Import MailFSAPI.
 
-Module MailFSStringOp <: Ops.
+Module MailFSStringOp.
 
   Definition extopT := MailServerAPI.MailServerOp.extopT.
 
@@ -27,10 +27,10 @@ Module MailFSStringOp <: Ops.
   Definition Op := xOp.
 
 End MailFSStringOp.
-Module MailFSStringHOp := HOps MailFSStringOp UserIdx.
+Definition MailFSStringHOp := HOps MailFSStringOp.Op UserIdx.idx.
 
 
-Module MailFSStringAPI <: Layer MailFSStringOp MailFSStringAbsState.
+Module MailFSStringAPI.
 
   Import MailFSStringOp.
   Import MailFSStringAbsState.
@@ -143,5 +143,9 @@ Module MailFSStringAPI <: Layer MailFSStringOp MailFSStringAbsState.
 
   Definition initP := initP.
 
+  Definition t : Layer.t MailFSStringOp.Op MailFSStringAbsState.State.
+    refine {| Layer.step := step;
+              Layer.initP := initP; |}.
+  Defined.
 End MailFSStringAPI.
-Module MailFSStringHAPI := HLayer MailFSStringOp MailFSStringAbsState MailFSStringAPI UserIdx.
+Definition MailFSStringHAPI := HLayer.t MailFSStringAPI.t UserIdx.idx.

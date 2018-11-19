@@ -3,7 +3,7 @@ Require Import MailServerAPI.
 Require Import MailFSStringAbsAPI.
 Require Import MailboxTmpAbsAPI.
 
-Module TryDeliverOp <: Ops.
+Module TryDeliverOp. 
 
   Definition extopT := MailServerAPI.MailServerOp.extopT.
 
@@ -24,10 +24,10 @@ Module TryDeliverOp <: Ops.
   Definition Op := xOp.
 
 End TryDeliverOp.
-Module TryDeliverHOp := HOps TryDeliverOp UserIdx.
+Definition TryDeliverHOp := HOps TryDeliverOp.Op UserIdx.idx.
 
 
-Module TryDeliverAPI <: Layer TryDeliverOp MailboxTmpAbsState.
+Module TryDeliverAPI.
 
   Import TryDeliverOp.
   Import MailboxTmpAbsState.
@@ -127,5 +127,9 @@ Module TryDeliverAPI <: Layer TryDeliverOp MailboxTmpAbsState.
 
   Definition initP := initP.
 
+  Definition l : Layer.t TryDeliverOp.Op MailboxTmpAbsState.State.
+    refine {| Layer.step := step;
+              Layer.initP := initP; |}.
+  Defined.
 End TryDeliverAPI.
-Module TryDeliverHAPI := HLayer TryDeliverOp MailboxTmpAbsState TryDeliverAPI UserIdx.
+Definition TryDeliverHAPI := HLayer.t TryDeliverAPI.l UserIdx.idx.
