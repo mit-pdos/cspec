@@ -9,6 +9,7 @@ Parameter tmp_string : string.
 Parameter mail_string : string.
 Parameter nouser_string : string.
 Parameter bench_msg : string.
+Parameter empty_string : string.
 Parameter tmp_mail_ne : tmp_string <> mail_string.
 Parameter abstract_string_length : string -> nat.
 Definition string_length s := abstract_string_length s.

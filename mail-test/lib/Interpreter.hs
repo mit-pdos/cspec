@@ -11,7 +11,7 @@ import GHC.Base
 import System.Posix.ByteString.FilePath (RawFilePath)
 import System.Posix.Files.ByteString (createLink, removeLink, fileExist)
 import "unix" System.Posix.IO.ByteString (openFd, closeFd,
-                                          defaultFileFlags, OpenMode(..))
+                                          defaultFileFlags, OpenFileFlags(..), OpenMode(..))
 import "unix-bytestring" System.Posix.IO.ByteString (fdRead, fdWrite)
 import System.Posix.Directory.ByteString (openDirStream, readDirStream, closeDirStream)
 import System.IO.Error
@@ -110,6 +110,11 @@ withFd p m fm = bracket open close
   where open = openFd p m fm defaultFileFlags
         close = closeFd
 
+withFdFlags :: RawFilePath -> OpenMode -> Maybe FileMode -> OpenFileFlags -> (Fd -> IO a) -> IO a
+withFdFlags p m fm fdFlags = bracket open close
+  where open = openFd p m fm fdFlags
+        close = closeFd
+
 readFileBytes :: RawFilePath -> IO BS.ByteString
 readFileBytes p = withFd p ReadOnly Nothing $
   \fd -> let bytes = 4096
@@ -119,6 +124,10 @@ readFileBytes p = withFd p ReadOnly Nothing $
                 then BS.append s <$> go
                 else return s in
           go
+
+createFile :: RawFilePath -> IO ()
+createFile p = withFdFlags p WriteOnly (Just 0o666) (defaultFileFlags { trunc = True }) $
+  \fd -> return ()
 
 writeFileBytes :: RawFilePath -> BS.ByteString -> IO ()
 writeFileBytes p contents = withFd p WriteOnly (Just 0o666) $
@@ -233,17 +242,30 @@ run_proc _ (Call (MailFSMergedOp__Ext (MailServerOp__POP3RespondDelete conn))) =
   pop3RespondDelete conn
   return $ unsafeCoerce ()
 
-run_proc _ (Call (MailFSMergedOp__CreateWrite ((u, dir), fn) contents)) = {-# SCC "CreateWrite" #-} do
-  debugmsgs ["CreateWrite ", u, "/", dir, "/", fn, ", ", showBS contents]
+run_proc _ (Call (MailFSMergedOp__Create ((u, dir), fn))) = {-# SCC "Create" #-} do
+  debugmsgs ["Create ", u, "/", dir, "/", fn]
+  catch (do
+           createFile (filePath u dir fn)
+           return $ unsafeCoerce True)
+        (\e -> case e of
+               _ | isFullError e -> do
+                 debugmsg "Out of space on create"
+                 return $ unsafeCoerce False
+               _ -> do
+                 debugmsg "Unknown exception on create"
+                 return $ unsafeCoerce False)
+
+run_proc _ (Call (MailFSMergedOp__Write ((u, dir), fn) contents)) = {-# SCC "Write" #-} do
+  debugmsgs ["Write ", u, "/", dir, "/", fn, ", ", showBS contents]
   catch (do
            writeFileBytes (filePath u dir fn) contents
            return $ unsafeCoerce True)
         (\e -> case e of
                _ | isFullError e -> do
-                 debugmsg "Out of space on createwrite"
+                 debugmsg "Out of space on write"
                  return $ unsafeCoerce False
                _ -> do
-                 debugmsg "Unknown exception on createwrite"
+                 debugmsg "Unknown exception on write"
                  return $ unsafeCoerce False)
 
 run_proc _ (Call (MailFSMergedOp__Link ((srcu, srcdir), srcfn) ((dstu, dstdir), dstfn))) = {-# SCC "Link" #-} do

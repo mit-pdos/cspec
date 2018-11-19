@@ -56,20 +56,34 @@ Module MailFSStringAbsAPI.
   Import MailFSStringAbsState.
 
   Inductive xstep : forall T, Op T -> nat -> State -> T -> State -> list event -> Prop :=
-  | StepCreateWriteTmpOK : forall tmp mbox tid data lock,
-    xstep (CreateWriteTmp data) tid
+  | StepCreateTmpOK : forall tmp mbox tid lock,
+    xstep (CreateTmp) tid
       (mk_state tmp mbox lock)
       true
-      (mk_state (FMap.add (encode_tid_fn tid 0) data tmp) mbox lock)
+      (mk_state (FMap.add (encode_tid_fn tid 0) empty_string tmp) mbox lock)
       nil
-  | StepCreateWriteTmpErr1 : forall tmp mbox tid data lock,
-    xstep (CreateWriteTmp data) tid
+  | StepCreateTmpErr : forall tmp mbox tid lock,
+    xstep (CreateTmp) tid
       (mk_state tmp mbox lock)
       false
       (mk_state tmp mbox lock)
       nil
-  | StepCreateWriteTmpErr2 : forall tmp mbox tid data data' lock,
-    xstep (CreateWriteTmp data) tid
+  | StepWriteTmpOK : forall tmp mbox tid data lock,
+    FMap.MapsTo (encode_tid_fn tid 0) empty_string tmp ->
+    xstep (WriteTmp data) tid
+      (mk_state tmp mbox lock)
+      true
+      (mk_state (FMap.add (encode_tid_fn tid 0) data tmp) mbox lock)
+      nil
+  | StepWriteTmpErr1 : forall tmp mbox tid data lock,
+    xstep (WriteTmp data) tid
+      (mk_state tmp mbox lock)
+      false
+      (mk_state tmp mbox lock)
+      nil
+  | StepWriteTmpErr2 : forall tmp mbox tid data data' lock,
+    FMap.MapsTo (encode_tid_fn tid 0) empty_string tmp ->
+    xstep (WriteTmp data) tid
       (mk_state tmp mbox lock)
       false
       (mk_state (FMap.add (encode_tid_fn tid 0) data' tmp) mbox lock)

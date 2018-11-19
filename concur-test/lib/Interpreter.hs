@@ -12,13 +12,13 @@ import ConcurProc
 import LockedCounter
 
 data State =
-  S !(MVar ()) !(IORef Integer)
+  S !(IORef Integer) !(IORef Integer)
 
 mkState :: IO State
 mkState = do
-  lck <- newMVar ()
-  val <- newIORef 0
-  return $ S lck val
+  val0 <- newIORef 0
+  val1 <- newIORef 0
+  return $ S val0 val1
 
 verbose :: Bool
 verbose = True
@@ -31,7 +31,7 @@ debugmsg s =
   else
     return ()
 
-run_proc :: State -> Coq_proc (TASOp__Coq_xOp a) GHC.Base.Any -> IO a
+run_proc :: State -> Coq_proc (TSOOp__Coq_xOp a) GHC.Base.Any -> IO a
 run_proc s (Ret v) = do
   -- debugmsg $ "Ret"
   return $ unsafeCoerce v
@@ -50,27 +50,29 @@ run_proc s (Until c p v0) = do
     return v
   else
     run_proc s (Until c p (unsafeCoerce v))
-run_proc (S lck val) (Call TASOp__Read) = do
-  v <- readIORef val
-  -- debugmsg $ "ReadTAS " ++ (show v)
+run_proc (S val0 val1) (Call (TSOOp__Read TSOOp__Coq_addr0)) = do
+  v <- readIORef val0
   return $ unsafeCoerce v
-run_proc (S lck val) (Call (TASOp__Write v)) = do
-  debugmsg $ "WriteTAS " ++ (show v)
-  writeIORef val v
+run_proc (S val0 val1) (Call (TSOOp__Read TSOOp__Coq_addr1)) = do
+  v <- readIORef val1
+  return $ unsafeCoerce v
+run_proc (S val0 val1) (Call (TSOOp__Write TSOOp__Coq_addr0 v)) = do
+  debugmsg $ "Write0 " ++ (show v)
+  writeIORef val0 v
   return $ unsafeCoerce ()
-run_proc (S lck val) (Call TASOp__TestAndSet) = do
-  ok <- tryTakeMVar lck
-  -- debugmsg $ "TestAndSet " ++ (show ok)
-  if isJust ok then
-    return $ unsafeCoerce False
-  else do
-    yield
-    return $ unsafeCoerce True
-run_proc (S lck val) (Call TASOp__Clear) = do
-  -- debugmsg $ "Clear"
-  tryPutMVar lck ()
+run_proc (S val0 val1) (Call (TSOOp__Write TSOOp__Coq_addr1 v)) = do
+  debugmsg $ "Write1 " ++ (show v)
+  writeIORef val1 v
   return $ unsafeCoerce ()
-run_proc _ (Call TASOp__Flush) = do
+run_proc (S val0 val1) (Call (TSOOp__TestAndSet TSOOp__Coq_addr0 v)) = do
+  prev <- atomicModifyIORef val0 (\cur -> (v, cur))
+  if v == prev then yield else return ()
+  return $ unsafeCoerce prev
+run_proc (S val0 val1) (Call (TSOOp__TestAndSet TSOOp__Coq_addr1 v)) = do
+  prev <- atomicModifyIORef val1 (\cur -> (v, cur))
+  if v == prev then yield else return ()
+  return $ unsafeCoerce prev
+run_proc _ (Call TSOOp__Fence) = do
   -- we don't actually have weak memory (in fact Haskell does not define a
   -- memory model for IORefs), but if we had intrinsics we would call MFENCE
   return $ unsafeCoerce ()

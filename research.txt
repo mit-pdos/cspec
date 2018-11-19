@@ -1,9 +1,5 @@
 Possible projects
 
-- Support spawn
-  need to reproof all core lemmas
-  modify mail server to spwan pop and smtp threads
-
 - Code gen
   generate Go code for unfolded mailserver program
   compare to our hand-written Go implementation (gomail)
@@ -25,6 +21,7 @@ Possible projects
   Model open() isn't atomic
   Slide fd layer under current bottom layer
   Proof atomicity of pathname lookups in context of mail server
+  readdir
   
   Maybe a good base for scalable commutativity
     proof implementation scales

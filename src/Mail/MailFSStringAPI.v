@@ -8,7 +8,8 @@ Module MailFSStringOp.
   Definition extopT := MailServerAPI.MailServerOp.extopT.
 
   Inductive xOp : Type -> Type :=
-  | CreateWriteTmp : forall (tmpfn : string) (data : string), xOp bool
+  | CreateTmp : forall (tmpfn : string), xOp bool
+  | WriteTmp : forall (tmpfn : string) (data : string), xOp bool
   | LinkMail : forall (tmpfn : string) (mboxfn : string), xOp bool
   | UnlinkTmp : forall (tmpfn : string), xOp unit
 
@@ -36,20 +37,34 @@ Module MailFSStringAPI.
   Import MailFSStringAbsState.
 
   Inductive xstep : forall T, Op T -> nat -> State -> T -> State -> list event -> Prop :=
-  | StepCreateWriteTmpOK : forall tmp mbox tid tmpfn data lock,
-    xstep (CreateWriteTmp tmpfn data) tid
+  | StepCreateTmpOK : forall tmp mbox tid tmpfn lock,
+    xstep (CreateTmp tmpfn) tid
       (mk_state tmp mbox lock)
       true
-      (mk_state (FMap.add tmpfn data tmp) mbox lock)
+      (mk_state (FMap.add tmpfn empty_string tmp) mbox lock)
       nil
-  | StepCreateWriteTmpErr1 : forall tmp mbox tid tmpfn data lock,
-    xstep (CreateWriteTmp tmpfn data) tid
+  | StepCreateTmpErr : forall tmp mbox tid tmpfn lock,
+    xstep (CreateTmp tmpfn) tid
       (mk_state tmp mbox lock)
       false
       (mk_state tmp mbox lock)
       nil
-  | StepCreateWriteTmpErr2 : forall tmp mbox tid tmpfn data data' lock,
-    xstep (CreateWriteTmp tmpfn data) tid
+  | StepWriteTmpOK : forall tmp mbox tid tmpfn data lock,
+    FMap.MapsTo tmpfn empty_string tmp ->
+    xstep (WriteTmp tmpfn data) tid
+      (mk_state tmp mbox lock)
+      true
+      (mk_state (FMap.add tmpfn data tmp) mbox lock)
+      nil
+  | StepWriteTmpErr1 : forall tmp mbox tid tmpfn data lock,
+    xstep (WriteTmp tmpfn data) tid
+      (mk_state tmp mbox lock)
+      false
+      (mk_state tmp mbox lock)
+      nil
+  | StepWriteTmpErr2 : forall tmp mbox tid tmpfn data data' lock,
+    FMap.MapsTo tmpfn empty_string tmp ->
+    xstep (WriteTmp tmpfn data) tid
       (mk_state tmp mbox lock)
       false
       (mk_state (FMap.add tmpfn data' tmp) mbox lock)

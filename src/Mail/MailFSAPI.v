@@ -8,7 +8,8 @@ Module MailFSOp.
   Definition extopT := MailServerAPI.MailServerOp.extopT.
 
   Inductive xOp : Type -> Type :=
-  | CreateWriteTmp : forall (data : string), xOp bool
+  | CreateTmp : xOp bool
+  | WriteTmp : forall (data : string), xOp bool
   | LinkMail : forall (mboxfn : nat), xOp bool
   | UnlinkTmp : xOp unit
 
@@ -35,20 +36,34 @@ Module MailFSAPI.
   Import MailboxTmpAbsState.
 
   Inductive xstep : forall T, Op T -> nat -> State -> T -> State -> list event -> Prop :=
-  | StepCreateWriteTmpOk : forall tmp mbox tid data lock,
-    xstep (CreateWriteTmp data) tid
+  | StepCreateTmpOk : forall tmp mbox tid lock,
+    xstep (CreateTmp) tid
       (mk_state tmp mbox lock)
       true
-      (mk_state (FMap.add (tid, 0) data tmp) mbox lock)
+      (mk_state (FMap.add (tid, 0) empty_string tmp) mbox lock)
       nil
-  | StepCreateWriteTmpErr1 : forall tmp mbox tid data lock,
-    xstep (CreateWriteTmp data) tid
+  | StepCreateTmpErr : forall tmp mbox tid lock,
+    xstep (CreateTmp) tid
       (mk_state tmp mbox lock)
       false
       (mk_state tmp mbox lock)
       nil
-  | StepCreateWriteTmpErr2 : forall tmp mbox tid data data' lock,
-    xstep (CreateWriteTmp data) tid
+  | StepWriteTmpOk : forall tmp mbox tid data lock,
+    FMap.MapsTo (tid, 0) empty_string tmp ->
+    xstep (WriteTmp data) tid
+      (mk_state tmp mbox lock)
+      true
+      (mk_state (FMap.add (tid, 0) data tmp) mbox lock)
+      nil
+  | StepWriteTmpErr1 : forall tmp mbox tid data lock,
+    xstep (WriteTmp data) tid
+      (mk_state tmp mbox lock)
+      false
+      (mk_state tmp mbox lock)
+      nil
+  | StepWriteTmpErr2 : forall tmp mbox tid data data' lock,
+    FMap.MapsTo (tid, 0) empty_string tmp ->
+    xstep (WriteTmp data) tid
       (mk_state tmp mbox lock)
       false
       (mk_state (FMap.add (tid, 0) data' tmp) mbox lock)
