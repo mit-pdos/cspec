@@ -18,9 +18,9 @@ Module MailFSMergedOp.
   | List : forall (dir : string * string), xOp (list string)
   | Read : forall (fn : string * string * string), xOp (option string)
 
-  | Lock : forall (u : string), xOp unit
-  | Unlock : forall (u : string), xOp unit
-  | Exists : forall (u : string), xOp (CheckResult UserIdx.idx)
+  | Lock : forall (u : UserIdx.idx), xOp unit
+  | Unlock : forall (u : UserIdx.idx), xOp unit
+  | Exists : forall (u : UserIdx.idx), xOp (CheckResult UserIdx.idx)
 
   | Ext : forall `(op : extopT T), xOp T
   .
@@ -42,7 +42,6 @@ Module MailFSMergedState.
 
   Definition State := state_rec.
 
-  Print UserIdx.idx.
   Definition initP (s : State) :=
     (forall u,
       UserIdx.idx.(indexValid) u ->
@@ -226,7 +225,7 @@ Module MailFSMergedAbsAPI.
       true
       (mk_state (FMap.add (u, dir, fn) empty_string fs) lock)
       nil
-  | StepCreateErr : forall fs tid dir fn lock (uu: UserIdx.idx) P,
+  | StepCreateErr : forall fs tid dir fn lock (u: UserIdx.idx) P,
     xstep (Slice (exist _ u P) (Create (dir, fn))) tid
       (mk_state fs lock)
       false

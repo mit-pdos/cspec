@@ -293,26 +293,16 @@ Module MailFSPathAbsImpl'.
     apply FMap.empty_mapsto in H; propositional.
   Qed.
 
-  Definition l : HLayerImplAbsT MailFSStringOp
-    MailFSPathAbsState MailFSPathAbsAPI
-    MailFSStringAbsState MailFSStringAPI.
+  Definition l : HLayerImpl.t MailFSPathAbsAPI.l MailFSStringAPI.l.
+    exact {| HLayerImpl.absR := absR;
+             HLayerImpl.absR_ok := absR_ok;
+             HLayerImpl.initP_map := initP_map; |}.
+  Defined.
+    
 End MailFSPathAbsImpl'.
 
-Module MailFSPathAbsImpl :=
- HLayerImplAbs MailFSStringOp
-    MailFSPathAbsState MailFSPathAbsAPI
-    MailFSStringAbsState MailFSStringAPI
-    MailFSPathAbsImpl'.
+Definition MailFSPathAbsImpl := HLayerImplAbsT.t MailFSPathAbsImpl'.l.
 
-Module MailFSPathAbsImplH' :=
- LayerImplAbsHT MailFSStringOp
-    MailFSPathAbsState MailFSPathAbsAPI
-    MailFSStringAbsState MailFSStringAPI
-    MailFSPathAbsImpl'
-    UserIdx.
+Definition MailFSPathAbsImplH' := LayerImplAbsHT.t MailFSPathAbsImpl'.l UserIdx.idx.
 
-Module MailFSPathAbsImplH :=
- LayerImplAbs MailFSStringHOp
-    MailFSPathAbsHState MailFSPathAbsHAPI
-    MailFSStringAbsHState MailFSStringHAPI
-    MailFSPathAbsImplH'.
+Definition MailFSPathAbsImplH := LayerImplAbs.t MailFSPathAbsImplH'.
