@@ -216,6 +216,7 @@ End MailFSMergedAPI.
 Module MailFSMergedAbsAPI.
 
   Import MailFSPathOp.
+  Import MailFSPathHOp.
   Import MailFSMergedState.
 
   Inductive xstep : forall T, Op T -> nat -> State -> T -> State -> list event -> Prop :=
@@ -272,7 +273,7 @@ Module MailFSMergedAbsAPI.
       (mk_state fs lock)
       nil
 
-  | StepList : forall fs tid r dirname lock u P,
+  | StepList : forall fs tid r dirname lock (u: UserIdx.idx) P,
     FMap.is_permutation_key r (drop_dirname (filter_dir (u, dirname) fs)) ->
     xstep (Slice (exist _ u P) (List dirname)) tid
       (mk_state fs lock)

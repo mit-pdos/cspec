@@ -27,7 +27,10 @@ Module MailFSPathOp.
   Definition Op := xOp.
 
 End MailFSPathOp.
-Definition MailFSPathHOp := HOps MailFSPathOp.Op UserIdx.idx.
+
+Module MailFSPathHOp.
+  Definition Op := HOps MailFSPathOp.Op UserIdx.idx.
+End MailFSPathHOp.
 
 
 Module MailFSPathAPI.
