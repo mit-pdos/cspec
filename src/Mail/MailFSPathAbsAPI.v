@@ -16,8 +16,10 @@ Module MailFSPathAbsState.
                               fs s = FMap.empty.
 
 End MailFSPathAbsState.
-Definition MailFSPathAbsHState := HState MailFSPathAbsState.State UserIdx.idx.
 
+Module MailFSPathAbsHState.
+  Definition State := HState MailFSPathAbsState.State UserIdx.idx.
+End MailFSPathAbsHState.
 
 Module MailFSPathAbsAPI.
 

@@ -4,15 +4,11 @@ Require Import MailFSMergedAPI.
 Require Import MailFSPathAPI.
 Require Import MailFSPathAbsAPI.
 
-
-Module MailFSMergedAbsImpl' <:
-  HLayerImplAbsT MailFSPathHOp
-    MailFSMergedState   MailFSMergedAbsAPI
-    MailFSPathAbsHState MailFSPathHAPI.
+Module MailFSMergedAbsImpl'.
 
   Definition absR (s1 : MailFSMergedState.State) (s2 : MailFSPathAbsHState.State) :=
     forall u,
-      UserIdx.indexValid u ->
+      UserIdx.idx.(indexValid) u ->
       ( forall s2',
         FMap.MapsTo u s2' (HSMap s2) ->
           FMap.MapsTo u (MailFSPathAbsState.locked s2') (MailFSMergedState.locked s1) /\
@@ -38,7 +34,7 @@ Module MailFSMergedAbsImpl' <:
     forall u0 u1 T (s : T) indexValid S v P,
       u0 <> u1 ->
       FMap.MapsTo u0 s (HSMap (hadd (exist _ u1 P) v S)) ->
-      FMap.MapsTo u0 s (HSMap (indexValid:=indexValid) S).
+      FMap.MapsTo u0 s (HSMap (indexValid := indexValid) S).
   Proof.
     destruct S.
     unfold hadd.

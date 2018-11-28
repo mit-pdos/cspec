@@ -357,4 +357,9 @@ Module MailFSMergedAbsAPI.
 
   Definition initP := initP.
 
+  Definition l: Layer.t MailFSPathHOp.Op MailFSMergedState.State.
+    exact {| Layer.step := step;
+             Layer.initP := initP; |}.
+  Defined.
+
 End MailFSMergedAbsAPI.
