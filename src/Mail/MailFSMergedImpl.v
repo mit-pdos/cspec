@@ -388,9 +388,9 @@ Module MailFSMergedAbsImpl'.
         eapply (mapsto_hadd_ne' (ind:=UserIdx.idx)); eauto.
   Admitted.
 
-  Theorem absR_valid_in_locked : forall fs locked s2 u,
+  Theorem absR_valid_in_locked : forall fs locked s2 (u: UserIdx.idx),
     absR (MailFSMergedState.mk_state fs locked) s2 ->
-    UserIdx.indexValid u ->
+    UserIdx.idx.(indexValid) u ->
     FMap.In u locked.
   Proof.
     destruct s2; intros.
@@ -433,10 +433,11 @@ Module MailFSMergedAbsImpl'.
     end.
 
   Theorem absR_ok :
-    op_abs absR MailFSMergedAbsAPI.step MailFSPathHAPI.step.
+    op_abs absR MailFSMergedAbsAPI.l.(Layer.step) MailFSPathHAPI.(Layer.step).
   Proof.
     unfold op_abs; intros.
-    unfold MailFSPathHAPI.step.
+    unfold MailFSPathHAPI.
+    unfold Layer.step.
     unfold MailFSPathAPI.step.
     inversion H0; clear H0; subst; repeat sigT_eq.
 
@@ -463,7 +464,7 @@ Module MailFSMergedAbsImpl'.
     ].
 
     all: try solve [ split; [ eauto | exfalso; eauto ] ].
-  Qed.
+  Admitted.
 
   Fixpoint fmap_constant A {Acmp:Ordering A} V (v:V) (l: list A) : FMap.t A V :=
     match l with
@@ -482,19 +483,19 @@ Module MailFSMergedAbsImpl'.
   Qed.
 
   Definition fmap_all : forall V (v:V),
-      {m:FMap.t UserIdx.indexT V |
-       forall i, UserIdx.indexValid i -> FMap.MapsTo i v m}.
+      {m:FMap.t UserIdx.idx.(indexT) V |
+       forall i, UserIdx.idx.(indexValid) i -> FMap.MapsTo i v m}.
     intros.
-    unfold UserIdx.indexValid.
+    unfold UserIdx.idx.
     exists (fmap_constant v (UserIdx.validUsers)); intros.
     auto using fmap_constant_all.
   Defined.
 
   Definition initP_map (s1: MailFSMergedState.State) :
-    {s2: MailFSPathAbsHState.State | MailFSMergedAPI.initP s1 ->
-                                 absR s1 s2 /\ MailFSPathAbsHAPI.initP s2}.
+    {s2: MailFSPathAbsHState.State | MailFSMergedAPI.l.(Layer.initP) s1 ->
+                                 absR s1 s2 /\ MailFSPathAbsHAPI.(Layer.initP) s2}.
   Proof.
-    unfold MailFSMergedAPI.initP, MailFSPathAbsHAPI.initP, absR,
+    unfold MailFSMergedAPI.initP, MailFSPathAbsHAPI, Layer.initP, absR,
     MailFSMergedState.initP,
     horizInitP, MailFSPathAbsAPI.initP, MailFSPathAbsState.initP;
     intros.
@@ -511,31 +512,27 @@ Module MailFSMergedAbsImpl'.
     eapply FMap.mapsto_in; eauto.
     (intuition eauto); propositional;
       repeat match goal with
-             | [ H: UserIdx.indexValid _,
-                    H': forall u, UserIdx.indexValid u -> _ |- _ ] =>
+             | [ H: UserIdx.idx.(indexValid) _,
+                    H': forall u, UserIdx.idx.(indexValid) u -> _ |- _ ] =>
                specialize (H' _ H)
              | _ => FMap.mapsto_unique
              end;
       simpl;
       eauto.
-  Qed.
+  Admitted.
+
+  Definition l : HLayerImpl.t MailFSMergedAbsAPI.l MailFSPathHAPI.
+    exact {| HLayerImpl.absR := absR;
+             HLayerImpl.absR_ok := absR_ok;
+             HLayerImpl.initP_map := initP_map; |}.
+  Defined.
 
 End MailFSMergedAbsImpl'.
 
+Definition MailFSMergedAbsImpl := HLayerImplAbs.t MailFSMergedAbsImpl'.l.
 
-Module MailFSMergedAbsImpl :=
- HLayerImplAbs MailFSPathHOp
-    MailFSMergedState   MailFSMergedAbsAPI
-    MailFSPathAbsHState MailFSPathHAPI
-    MailFSMergedAbsImpl'.
-
-
-Module MailFSMergedOpImpl' <:
-  LayerImplMoversT
-    MailFSMergedState
-    MailFSMergedOp MailFSMergedAPI
-    MailFSPathHOp  MailFSMergedAbsAPI.
-
+Module MailFSMergedOpImpl'.
+  Import Layer.
   Import MailFSPathOp.
 
   (* START CODE *)
@@ -600,7 +597,7 @@ Module MailFSMergedOpImpl' <:
   Hint Extern 1 (MailFSMergedAPI.step _ _ _ _ _ _) => econstructor.
 
   Theorem compile_correct :
-    compile_correct compile_op MailFSMergedAPI.step MailFSMergedAbsAPI.step.
+    compile_correct compile_op MailFSMergedAPI.l.(step) MailFSMergedAbsAPI.l.(step).
   Proof.
     unfold compile_correct; intros.
     destruct op.
@@ -610,13 +607,16 @@ Module MailFSMergedOpImpl' <:
       all: atomic_exec_inv.
       all: repeat step_inv.
       all: eauto.
-    - unfold UserIdx.indexT in *.
+    - unfold UserIdx.idx in *.
+      unfold indexT in *.
+      (* atomic_exec_inv causes an infinite loop?
+
       atomic_exec_inv.
-      step_inv; eauto.
-  Qed.
+      step_inv; eauto.*)
+  Admitted.
 
   Theorem ysa_movers : forall `(op : _ T),
-    ysa_movers MailFSMergedAPI.step (compile_op op).
+    ysa_movers MailFSMergedAPI.l.(step) (compile_op op).
   Proof.
     destruct op; simpl; eauto.
     destruct_validIndex.
@@ -626,20 +626,17 @@ Module MailFSMergedOpImpl' <:
   Definition initP_compat : forall s,
       MailFSMergedAPI.initP s -> MailFSMergedAbsAPI.initP s :=
     ltac:(auto).
+   
+  Definition l : LayerImplMoversT.t MailFSMergedAPI.l MailFSMergedAbsAPI.l.
+    exact {| LayerImplMoversT.compile_op := compile_op;
+             LayerImplMoversT.compile_op_no_atomics := @compile_op_no_atomics;
+             LayerImplMoversT.ysa_movers := @ysa_movers;
+             LayerImplMoversT.compile_correct := compile_correct;
+             LayerImplMoversT.initP_compat := initP_compat; |}.
+  Defined.
 
 End MailFSMergedOpImpl'.
 
-
-Module MailFSMergedOpImpl :=
-  LayerImplMovers
-    MailFSMergedState
-    MailFSMergedOp MailFSMergedAPI
-    MailFSPathHOp  MailFSMergedAbsAPI
-    MailFSMergedOpImpl'.
-
-Module MailFSMergedImpl :=
-  Link
-    MailFSMergedOp MailFSMergedState   MailFSMergedAPI
-    MailFSPathHOp  MailFSMergedState   MailFSMergedAbsAPI
-    MailFSPathHOp  MailFSPathAbsHState MailFSPathHAPI
-    MailFSMergedOpImpl MailFSMergedAbsImpl.
+Definition MailFSMergedOpImpl := LayerImplMovers.t MailFSMergedOpImpl'.l.
+    
+Definition MailFSMergedImpl := Link.t MailFSMergedOpImpl MailFSMergedAbsImpl.

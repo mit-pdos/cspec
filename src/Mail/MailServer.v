@@ -75,7 +75,7 @@ Definition do_smtp_req : proc _ unit :=
     end
   end.
 
-Definition handle_pop3_one conn (u : validIndexT UserIdx.indexValid) (msgs : list ((nat*nat) * string)) :=
+Definition handle_pop3_one conn (u : validIndexT UserIdx.idx) (msgs : list ((nat*nat) * string)) :=
   req <- Call (Ext (POP3GetRequest conn));
   match req with
   | POP3Stat =>
@@ -131,7 +131,7 @@ Definition mail_server nsmtp npop3 : threads_state _ :=
     (Bind (SpawnN nsmtp smtp_server_thread)
            (fun _ => SpawnN npop3 pop3_server_thread)).
 
-Definition pop3_one (u : validIndexT UserIdx.indexValid) (msgs : list ((nat*nat) * string)) :=
+Definition pop3_one (u : validIndexT UserIdx.idx) (msgs : list ((nat*nat) * string)) :=
   Until
     (fun l => match l with | nil => true | _ => false end)
     (fun l => match l with
@@ -210,102 +210,41 @@ Definition mail_perf nprocs niter nsmtpiter npop3iter : threads_state _ :=
   threads_from_proc
     (SpawnN nprocs (do_bench_loop bench_msg nsmtpiter npop3iter niter)).
 
-Module c1 :=
-  Link
-    MailboxHOp    MailServerLockAbsHState MailboxHAPI
-    MailServerHOp MailServerLockAbsHState MailServerLockAbsHAPI
-    MailServerHOp MailServerHState        MailServerHAPI
-    AtomicReaderH MailServerLockAbsImplH.
-Module c2 :=
-  Link
-    MailboxHOp    MailboxTmpAbsHState     MailboxTmpAbsHAPI
-    MailboxHOp    MailServerLockAbsHState MailboxHAPI
-    MailServerHOp MailServerHState        MailServerHAPI
-    MailboxTmpAbsImplH c1.
-Module c3 :=
-  Link
-    DeliverHOp    MailboxTmpAbsHState     DeliverHAPI
-    MailboxHOp    MailboxTmpAbsHState     MailboxTmpAbsHAPI
-    MailServerHOp MailServerHState        MailServerHAPI
-    AtomicDeliverH c2.
+Local Infix "<==>" := (Link.t) (at level 30, right associativity).
 
-Module c4 :=
-  Link
-    DeliverListTidHOp MailboxTmpAbsHState DeliverListTidHAPI
-    DeliverHOp        MailboxTmpAbsHState DeliverHAPI
-    MailServerHOp     MailServerHState    MailServerHAPI
-    DeliverListTidImplH c3.
-Module c5 :=
-  Link
-    MailFSHOp         MailboxTmpAbsHState MailFSHAPI
-    DeliverListTidHOp MailboxTmpAbsHState DeliverListTidHAPI
-    MailServerHOp     MailServerHState    MailServerHAPI
-    MailFSImplH c4.
+Module c.
+  Definition t0 :=
+      AtomicDeliverH
+      <==> MailboxTmpAbsImplH
+      <==> AtomicReaderH
+      <==> MailServerLockAbsImplH.
+  
+  Definition t1 :=
+    MailFSImplH
+      <==> DeliverListTidImplH
+      <==> t0.
 
-Module c4' :=
-  Link
-    TryDeliverHOp MailboxTmpAbsHState TryDeliverHAPI
-    DeliverHOp    MailboxTmpAbsHState DeliverHAPI
-    MailServerHOp MailServerHState    MailServerHAPI
-    LinkRetryImplH c3.
-Module c5' :=
-  Link
-    MailFSHOp     MailboxTmpAbsHState MailFSHAPI
-    TryDeliverHOp MailboxTmpAbsHState TryDeliverHAPI
-    MailServerHOp MailServerHState    MailServerHAPI
-    TryDeliverImplH c4'.
+  Definition t2 :=
+      MailFSMergedImpl
+      <==> MailFSPathImplH
+      <==> MailFSPathAbsImplH
+      <==> MailFSStringImplH
+      <==> MailFSStringAbsImplH
+      <==> TryDeliverImplH
+      <==> LinkRetryImplH
+      <==> t0.
 
-Module c6 :=
-  Link
-    MailFSHOp     MailFSStringAbsHState MailFSStringAbsHAPI
-    MailFSHOp     MailboxTmpAbsHState   MailFSHAPI
-    MailServerHOp MailServerHState      MailServerHAPI
-    MailFSStringAbsImplH
-    (* c5 *)
-    c5'.
+  Definition t3 := t2 <==> MailServerComposedImpl.
 
-Module c7 :=
-  Link
-    MailFSStringHOp MailFSStringAbsHState MailFSStringHAPI
-    MailFSHOp       MailFSStringAbsHState MailFSStringAbsHAPI
-    MailServerHOp   MailServerHState      MailServerHAPI
-    MailFSStringImplH c6.
-Module c8 :=
-  Link
-    MailFSStringHOp MailFSPathAbsHState   MailFSPathAbsHAPI
-    MailFSStringHOp MailFSStringAbsHState MailFSStringHAPI
-    MailServerHOp   MailServerHState      MailServerHAPI
-    MailFSPathAbsImplH c7.
-Module c9 :=
-  Link
-    MailFSPathHOp   MailFSPathAbsHState MailFSPathHAPI
-    MailFSStringHOp MailFSPathAbsHState MailFSPathAbsHAPI
-    MailServerHOp   MailServerHState    MailServerHAPI
-    MailFSPathImplH c8.
-
-
-Module c10 :=
-  Link
-    MailFSMergedOp MailFSMergedState   MailFSMergedAPI
-    MailFSPathHOp  MailFSPathAbsHState MailFSPathHAPI
-    MailServerHOp  MailServerHState    MailServerHAPI
-    MailFSMergedImpl c9.
-
-Module c0 :=
-  Link
-    MailFSMergedOp       MailFSMergedState       MailFSMergedAPI
-    MailServerHOp        MailServerHState        MailServerHAPI
-    MailServerComposedOp MailServerComposedState MailServerComposedAPI
-    c10 MailServerComposedImpl.
+End c.
 
 Definition ms_bottom nprocs niter nsmtpiter npop3iter :=
-  thread_to_list (c0.compile_ts (mail_perf nprocs niter nsmtpiter npop3iter)).
+  @thread_to_list (c.t2.(LayerImpl.compile_ts) (mail_perf nprocs niter nsmtpiter npop3iter)).
 
 Definition ms_bottom_server nsmtp npop3 :=
   thread_to_list (c0.compile_ts (mail_server nsmtp npop3)).
 
 Print Assumptions c0.compile_traces_match.
-
 
 (**
  * Generating optimized code.
@@ -441,7 +380,7 @@ Ltac step :=
 
 Definition ms_bottom_server_opt' a b :
     {ts : threads_state _ | exec_equiv_ts MailFSMergedAPI.step ts
-                            (c0.compile_ts (mail_server a b))}.
+                            (c.t2.(LayerImpl.compile_ts) (mail_server a b))}.
 
   eexists.
 
