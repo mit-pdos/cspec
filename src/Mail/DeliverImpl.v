@@ -159,11 +159,11 @@ Module AtomicDeliver'.
       (DeliverOp.UnlinkTmp).
   Proof.
     split; eauto.
-    unfold Layer.step; unfold DeliverRestrictedAPI.l; intros.
-    repeat step_inv; eauto; repeat deex.
+    unfold Layer.step; unfold DeliverRestrictedAPI.l.
+    intros; repeat step_inv; eauto; repeat deex.
         + eexists; split; eauto.
       rewrite <- FMap.add_remove_ne by congruence.
-      debug eauto.
+      eauto 10.
     + eexists; split; eauto.
       rewrite <- FMap.add_remove_ne by congruence.
       eauto 10.
@@ -171,10 +171,15 @@ Module AtomicDeliver'.
       rewrite FMap.remove_remove.
       eauto.
     + eexists; split; eauto.
-      admit.
+      econstructor; eauto.
+      unfold Protocol.step_allow.
+      econstructor; eauto.
+      unfold Layer.step.
+      econstructor; eauto.
+      eapply FMap.mapsto_remove_ne; eauto.
     + eexists; split; eauto.
     + eexists; split; eauto.
-  Admitted.
+  Qed.
 
   Hint Resolve unlinktmp_left_mover.
 

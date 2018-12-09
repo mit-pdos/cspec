@@ -238,13 +238,15 @@ Module c.
 
 End c.
 
+Print thread_to_list.
 Definition ms_bottom nprocs niter nsmtpiter npop3iter :=
-  @thread_to_list (c.t2.(LayerImpl.compile_ts) (mail_perf nprocs niter nsmtpiter npop3iter)).
+  thread_to_list (c.t3.(LayerImpl.compile_ts) (mail_perf nprocs niter nsmtpiter npop3iter)).
 
 Definition ms_bottom_server nsmtp npop3 :=
-  thread_to_list (c0.compile_ts (mail_server nsmtp npop3)).
+  thread_to_list (c.t3.(LayerImpl.compile_ts) (mail_server nsmtp npop3)).
 
-Print Assumptions c0.compile_traces_match.
+Definition top_lvl_thm := c.t3.(LayerImpl.compile_traces_match).
+Print Assumptions top_lvl_thm.
 
 (**
  * Generating optimized code.
@@ -379,8 +381,8 @@ Ltac step :=
   end.
 
 Definition ms_bottom_server_opt' a b :
-    {ts : threads_state _ | exec_equiv_ts MailFSMergedAPI.step ts
-                            (c.t2.(LayerImpl.compile_ts) (mail_server a b))}.
+    {ts : threads_state _ | exec_equiv_ts MailFSMergedAPI.l.(Layer.step) ts
+                            (c.t3.(LayerImpl.compile_ts) (mail_server a b))}.
 
   eexists.
 
@@ -402,11 +404,11 @@ Definition ms_bottom_server_opt' a b :
     split; [ reflexivity | ].
     split; [ reflexivity | ].
 
-    repeat step.
+    repeat step. admit. admit.
   }
 
   eapply Forall2_nil.
-Defined.
+Admitted.
 
 Definition ms_bottom_server_opt nsmtp npop3 :=
   Eval cbn in (thread_to_list (proj1_sig (ms_bottom_server_opt' nsmtp npop3))).
@@ -416,7 +418,7 @@ Print ms_bottom_server_opt.
 
 Definition ms_bottom_opt' a b c d :
     {ts : threads_state _ | exec_equiv_ts MailFSMergedAPI.step ts
-                            (c0.compile_ts (mail_perf a b c d))}.
+                            (c.t3.(LayerImpl.compile_ts) (mail_perf a b c d))}.
 
   eexists.
 
@@ -437,10 +439,11 @@ Definition ms_bottom_opt' a b c d :
     split; [ reflexivity | ].
 
     repeat step.
+    admit. admit. admit. admit. admit.
   }
 
   eapply Forall2_nil.
-Defined.
+Admitted.
 
 Definition ms_bottom_opt a b c d :=
   Eval cbn in (thread_to_list (proj1_sig (ms_bottom_opt' a b c d))).

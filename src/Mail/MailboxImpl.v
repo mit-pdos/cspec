@@ -88,14 +88,14 @@ Module AtomicReader'.
   Hint Constructors MailboxAPI.xstep.
   Hint Constructors MailboxProtocol.xstep_allow.
 
-  Hint Resolve FMap.mapsto_in.
-  Hint Resolve FMap.mapsto_add_ne'.
-  Hint Resolve FMap.mapsto_add_ne.
-  Hint Resolve FMap.add_incr.
-  Hint Resolve FMap.add_mapsto.
-  Hint Resolve FMap.in_add_ne.
-  Hint Resolve FMap.remove_not_in.
-  Hint Resolve FMap.mapsto_remove_ne.
+  Hint Resolve @FMap.mapsto_in.
+  Hint Resolve @FMap.mapsto_add_ne'.
+  Hint Resolve @FMap.mapsto_add_ne.
+  Hint Resolve @FMap.add_incr.
+  Hint Resolve @FMap.add_mapsto.
+  Hint Resolve @FMap.in_add_ne.
+  Hint Resolve @FMap.remove_not_in.
+  Hint Resolve @FMap.mapsto_remove_ne.
 
   Lemma read_left_mover : forall fn,
     left_mover_pred
@@ -109,12 +109,10 @@ Module AtomicReader'.
       destruct rM; try congruence.
       + repeat step_inv; eauto 10; simpl in *; try congruence.
         destruct (fn == fn0); subst; eauto 10.
-      + repeat step_inv; eauto 10; simpl in *; try congruence.
+      + repeat step_inv; simpl in *; debug eauto 8; try congruence.
         destruct (fn0 == fn); subst; eauto 10.
-        admit.
-        admit.
-        admit.
-        admit.
+        (* How do you tell Coq to use a particular argument in a hint?*)
+        admit. admit. admit. admit.
     - intros; repeat step_inv; eauto 10; repeat deex; simpl in *; try congruence.
       + destruct (fn0 == fn); subst; try congruence.
         eauto 10.
@@ -389,25 +387,25 @@ Module AtomicReader'.
       tid s (delete_core fn).
   Proof.
     intros.
-    repeat constructor; intros; eauto.
-    eapply exec_any_op in H; repeat deex.
-      eapply lock_monotonic in H; try reflexivity.
-      unfold restricted_step in *; intuition idtac.
-      repeat step_inv.
-      simpl in *; subst.
-      admit.
+    constructor; intros.
+      constructor; intros. econstructor; eauto.
 
     eapply exec_any_op in H; repeat deex.
       unfold restricted_step in *; intuition idtac.
       repeat step_inv.
 
-    repeat constructor; intros.
+      constructor; intros.
+      constructor; intros. eauto.
 
     eapply exec_any_op in H0; repeat deex.
       eapply lock_monotonic in H0; try reflexivity.
       unfold restricted_step in *; intuition idtac.
       repeat step_inv.
-  Admitted.
+
+      constructor; intros.
+      constructor; intros. eauto.
+      constructor; intros.
+  Qed.
 
   Lemma pickup_follows_protocol : forall tid s,
     follows_protocol_proc
@@ -417,8 +415,7 @@ Module AtomicReader'.
   Proof.
     intros.
     constructor; intros.
-      constructor; intros. eauto.
-      admit.
+      constructor; intros. econstructor.
 
     eapply exec_any_op in H; repeat deex.
       unfold restricted_step in *; intuition idtac.
@@ -450,7 +447,7 @@ Module AtomicReader'.
         eapply lock_monotonic in H; try reflexivity.
         unfold restricted_step in *; intuition idtac.
         repeat step_inv; simpl in *; subst; eauto.
-  Admitted.
+  Qed.
 
   Hint Resolve delete_follows_protocol.
   Hint Resolve pickup_follows_protocol.

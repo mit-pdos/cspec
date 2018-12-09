@@ -102,8 +102,8 @@ Module MailFSMergedAbsImpl'.
     destruct (u == u0); subst.
     - specialize (H u0 H0); clear H0; intuition idtac.
       + eapply (mapsto_hadd_eq (ind:=UserIdx.idx)) in H1; subst; simpl in *.
-        eapply H0; eauto.
-        admit.
+        eapply H0.
+        eapply (hget_mapsto' (ind:=UserIdx.idx)).
       + eapply (mapsto_hadd_eq (ind:=UserIdx.idx)) in H1; subst; simpl in *.
         destruct ((dir0, fn0) == (dir, fn)).
         * inversion e; clear e; subst.
@@ -112,8 +112,7 @@ Module MailFSMergedAbsImpl'.
         * eapply FMap.mapsto_add_ne in H3; eauto.
           eapply FMap.mapsto_add_ne'; try congruence.
           eapply H0; eauto.
-          eauto.
-          admit.
+          eapply (hget_mapsto' (ind:=UserIdx.idx)).
       + edestruct H; eauto; intuition idtac.
         eexists; split.
         eapply (mapsto_hadd_eq' (ind:=UserIdx.idx)).
@@ -123,10 +122,9 @@ Module MailFSMergedAbsImpl'.
       + destruct ((dir0, fn0) == (dir, fn)).
         * inversion e; clear e; subst.
           eapply FMap.mapsto_add in H1; subst.
-          eexists; split; eauto.
+          eexists; split.
+          eapply (mapsto_hadd_eq' (ind:=UserIdx.idx)).
           simpl; eauto.
-          admit.
-          admit.
         * eapply FMap.mapsto_add_ne in H1; try congruence.
           edestruct H2; eauto; intuition idtac.
           eexists; split.
@@ -150,7 +148,7 @@ Module MailFSMergedAbsImpl'.
         eapply H2 in H1; deex.
         eexists; intuition eauto.
         eapply (mapsto_hadd_ne' (ind:=UserIdx.idx)); eauto.
-  Admitted.
+  Qed.
 
   Theorem absR_fs_remove :
     forall fs lock s2 (u: UserIdx.idx) dir fn P,
@@ -166,14 +164,13 @@ Module MailFSMergedAbsImpl'.
     destruct (u == u0); subst.
     - specialize (H u0 H0); clear H0; simpl in *; intuition idtac.
       + eapply (mapsto_hadd_eq (ind:=UserIdx.idx)) in H1; subst; simpl in *.
-        eapply H0; eauto.
-        admit.
+        eapply H0.
+        eapply (hget_mapsto' (ind:=UserIdx.idx)).
       + eapply (mapsto_hadd_eq (ind:=UserIdx.idx)) in H1; subst; simpl in *.
         eapply FMap.mapsto_remove in H3; intuition.
         eapply FMap.mapsto_remove_ne; try congruence.
         eapply H0; eauto.
-        eauto.
-        admit.
+        eapply (hget_mapsto' (ind:=UserIdx.idx)).
       + edestruct H; eauto; intuition idtac.
         eexists; split.
         eapply (mapsto_hadd_eq' (ind:=UserIdx.idx)).
@@ -207,7 +204,7 @@ Module MailFSMergedAbsImpl'.
         eapply H2 in H4; deex.
         eexists; intuition eauto.
         eapply (mapsto_hadd_ne' (ind:=UserIdx.idx)); eauto.
-  Admitted.
+  Qed.
 
   Theorem absR_MapsTo :
     forall fs lock s2 (u: UserIdx.idx) dir fn data P,
@@ -321,10 +318,10 @@ Module MailFSMergedAbsImpl'.
       eapply Hx; clear Hx.
 
       eapply FMap.filter_complete.
-      eapply FMap.mapsto_in; eauto.
+      eapply FMap.mapsto_in; apply H0.
       destruct ((u, dir) == (u, dir)); eauto.
-      admit.
-  Admitted.
+      eapply (hget_mapsto' (ind:=UserIdx.idx)).
+  Qed.
 
   Theorem absR_locked :
     forall fs locked s2 u v P,
@@ -358,12 +355,11 @@ Module MailFSMergedAbsImpl'.
         eauto.
       + eapply (mapsto_hadd_eq (ind:=UserIdx.idx)) in H1; subst; simpl in *.
         eapply H0; eauto.
-        eauto.
-        admit.
+        eapply (hget_mapsto' (ind:=UserIdx.idx)).
       + eapply FMap.mapsto_add in H1; subst.
-        eexists; split; eauto.
-        admit.
-        admit.
+        eexists; split.
+        eapply (mapsto_hadd_eq' (ind:=UserIdx.idx)).
+        eauto.
       + edestruct H2; eauto; intuition idtac.
         eexists; split.
         eapply (mapsto_hadd_eq' (ind:=UserIdx.idx)).
@@ -386,7 +382,7 @@ Module MailFSMergedAbsImpl'.
       + eapply H2 in H1; deex.
         eexists; intuition eauto.
         eapply (mapsto_hadd_ne' (ind:=UserIdx.idx)); eauto.
-  Admitted.
+  Qed.
 
   Theorem absR_valid_in_locked : forall fs locked s2 (u: UserIdx.idx),
     absR (MailFSMergedState.mk_state fs locked) s2 ->
@@ -586,6 +582,9 @@ Module MailFSMergedOpImpl'.
   Qed.
 
   Ltac step_inv :=
+    unfold Layer.step in *;
+    unfold MailFSMergedAbsAPI.l in *;
+    unfold MailFSMergedAPI.l in *;
     match goal with
     | H : MailFSMergedAbsAPI.step _ _ _ _ _ _ |- _ =>
       inversion H; clear H; subst; repeat sigT_eq
@@ -607,13 +606,9 @@ Module MailFSMergedOpImpl'.
       all: atomic_exec_inv.
       all: repeat step_inv.
       all: eauto.
-    - unfold UserIdx.idx in *.
-      unfold indexT in *.
-      (* atomic_exec_inv causes an infinite loop?
-
-      atomic_exec_inv.
-      step_inv; eauto.*)
-  Admitted.
+    - atomic_exec_inv.
+      step_inv; eauto.
+  Qed.
 
   Theorem ysa_movers : forall `(op : _ T),
     ysa_movers MailFSMergedAPI.l.(step) (compile_op op).
