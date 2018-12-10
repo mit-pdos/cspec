@@ -14,8 +14,8 @@ Parameter tmp_mail_ne : tmp_string <> mail_string.
 Parameter abstract_string_length : string -> nat.
 Definition string_length s := abstract_string_length s.
 
-Instance string_Ordering : Ordering string.
-Admitted.
+Axiom string_Ordering : Ordering string.
+Existing Instance string_Ordering.
 
 
 Module UserIdx.
