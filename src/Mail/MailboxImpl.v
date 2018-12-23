@@ -70,6 +70,7 @@ Module AtomicReader'.
     unfold MailboxProtocol.p in *;
     unfold step in *;
     unfold step_allow in *;
+    unfold restricted_step in *;
     match goal with
     | H : MailboxAPI.step _ _ _ _ _ _ |- _ =>
       inversion H; clear H; subst; repeat sigT_eq
@@ -109,16 +110,18 @@ Module AtomicReader'.
       destruct rM; try congruence.
       + repeat step_inv; eauto 10; simpl in *; try congruence.
         destruct (fn == fn0); subst; eauto 10.
-      + repeat step_inv; simpl in *; debug eauto 8; try congruence.
+      + repeat step_inv; simpl in *; eauto 8; try congruence.
+        all: unfold MailboxRestrictedAPI.step.
+        all: unfold restricted_step.
+        all: unfold MailboxAPI.step.
+        all: repeat step_inv; simpl in *; eauto 8; try congruence.
         destruct (fn0 == fn); subst; eauto 10.
-        (* How do you tell Coq to use a particular argument in a hint?*)
-        admit. admit. admit. admit.
     - intros; repeat step_inv; eauto 10; repeat deex; simpl in *; try congruence.
       + destruct (fn0 == fn); subst; try congruence.
         eauto 10.
       + destruct (fn0 == fn); subst; try congruence.
         eauto 15.
-  Admitted.
+  Qed.
 
   Lemma unlock_left_mover :
     left_mover
