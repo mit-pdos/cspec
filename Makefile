@@ -9,7 +9,7 @@ CODE += $(wildcard src/Examples/*.v)
 
 # TODO: fix implicit core warnings
 COQRFLAGS := -R build POCS
-COQWFLAGs := -w -implicit-core-hint-db
+COQWFLAGS := -w -implicit-core-hint-db
 
 BINS	:= concur-test mail-test
 
