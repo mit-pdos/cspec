@@ -186,8 +186,9 @@ numbers of steps *)
   Qed.
 
   Global Instance trace_incl_ts_N_reflexive :
-    Reflexive (@trace_incl_ts_N n) := RelInstance.
+    Reflexive (@trace_incl_ts_N n).
   Proof.
+    RelInstance_t.
     unfold trace_incl_ts_N; intros.
     eapply exec_till_to_exec; eauto.
   Qed.
@@ -198,15 +199,16 @@ numbers of steps *)
     Reflexive (@trace_incl_N n T) := RelInstance.
 
   Global Instance trace_incl_rx_preorder :
-    PreOrder (@trace_incl_rx T) := RelInstance.
+    PreOrder (@trace_incl_rx T).
   Proof.
+    RelInstance_t.
+    - repeat (hnf; intros).
+      eapply trace_incl_N_bind_a; typeclasses eauto with core.
     - repeat (hnf; intros).
       eapply H in H4; intros; try apply le_n; eauto.
       apply exec_to_counter in H4; propositional.
       eapply H0 in H4; try apply le_n; eauto.
       reflexivity.
-    - repeat (hnf; intros).
-      eapply trace_incl_N_bind_a; typeclasses eauto with core.
   Qed.
 
   Local Theorem trace_incl_rx_to_exec :

@@ -20,7 +20,7 @@ Section Map.
   Variable Op : Type -> Type.
   Notation V := (maybe_proc Op).
 
-  Local Record threads_state :=
+  Record threads_state :=
     { thread_get :> A -> V;
       thread_max : nat;
       mapping_finite : forall a, thread_max < a -> thread_get a = NoProc;
