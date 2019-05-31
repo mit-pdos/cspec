@@ -8,7 +8,8 @@ CODE += $(wildcard src/Mail/*.v)
 CODE += $(wildcard src/Examples/*.v)
 
 # TODO: fix implicit core warnings
-COQRFLAGS := -R build POCS -w -implicit-core-hint-db
+COQRFLAGS := -R build POCS
+COQWFLAGs := -w -implicit-core-hint-db
 
 BINS	:= concur-test mail-test
 
@@ -28,7 +29,7 @@ build/%.v.d: build/%.v $(patsubst src/%.v,build/%.v,$(CODE))
 -include $(patsubst src/%.v,build/%.v.d,$(CODE))
 
 build/%.vo: build/%.v
-	coqc -q $(COQRFLAGS) $<
+	coqc -q $(COQRFLAGS) $(COQWFLAGS) $<
 .PRECIOUS: build/%.vo
 
 .PHONY: coq
@@ -42,7 +43,7 @@ docs: coq
 .PHONY: %/extract
 %/extract: %/Extract.v %/fiximports.py
 	@mkdir -p $@
-	coqtop $(COQRFLAGS) -batch -noglob -load-vernac-source $<
+	coqtop $(COQRFLAGS) $(COQWFLAGS) -batch -noglob -load-vernac-source $<
 	./scripts/add-preprocess.sh $@/*.hs
 
 concur-test/extract: build/Examples/LockedCounter.vo
