@@ -348,7 +348,7 @@ func process_pop(c net.Conn, tid int) {
 			}
 			file, ok := mbox.file(words)
 			if !ok {
-				tw.PrintfLine("-ERR file %v")
+				tw.PrintfLine("-ERR file %v", file)
 				break
 			}
 			mbox.dele(file)
