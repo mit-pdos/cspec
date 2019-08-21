@@ -42,11 +42,16 @@ before_script:
     "
 script:
 - echo -e "${ANSI_YELLOW}Building ${TRAVIS_REPO_SLUG}...${ANSI_RESET}" && echo -en 'travis_fold:start:build\\r'
-- docker exec COQ /bin/bash --login -c "make -j${NJOBS} -k coq"
-  # disabled due to permissions issues
-  # - make bin/mclnt bin/gomail
+- |
+  docker exec COQ /bin/bash --login -c "
+    export PS4='+ \e[33;1m(\$0 @ line \$LINENO) \$\e[0m '
+    set -ex
+    make -j${NJOBS} -k coq mail-test/extract
+    chmod -R a+rw .
+    "
+- make bin/mclnt bin/gomail
 - cd mail-test
-- stack --allow-different-user build --copy-bins ../bin
+- stack --allow-different-user build
 - echo -en 'travis_fold:end:build\\r'
 
 after_script:
