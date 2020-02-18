@@ -14,6 +14,7 @@ env:
   matrix:
   - COQ_IMAGE="coqorg/coq:dev"
   - COQ_IMAGE="coqorg/coq:latest"
+  - COQ_IMAGE="coqorg/coq:8.10"
 
 before_install:
   # Download and unpack the stack executable
