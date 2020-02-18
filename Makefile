@@ -43,7 +43,7 @@ docs: coq
 .PHONY: %/extract
 %/extract: %/Extract.v %/fiximports.py
 	@mkdir -p $@
-	coqtop $(COQRFLAGS) $(COQWFLAGS) -batch -noglob -load-vernac-source $<
+	coqtop $(COQRFLAGS) $(COQWFLAGS) -batch -load-vernac-source $<
 	./scripts/add-preprocess.sh $@/*.hs
 
 concur-test/extract: build/Examples/LockedCounter.vo
