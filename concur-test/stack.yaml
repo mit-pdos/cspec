@@ -1,6 +1,6 @@
 # For advanced use and comprehensive documentation of the format, please see:
 # http://docs.haskellstack.org/en/stable/yaml_configuration/
 
-# latest release as of 2019-05-31
+# latest release for GHC 8.6.5 as of 2020-02-17
 # uses GHC 8.6.5
-resolver: lts-13.23
+resolver: lts-14.27
